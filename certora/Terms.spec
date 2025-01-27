@@ -7,10 +7,12 @@ methods {
     function balanceOf(address, address) external returns uint256 envfree;
     function id(Terms.Term) external returns bytes32 envfree;
 
+    function _.price() external => NONDET;
     function _.transfer(address, uint256) external => DISPATCHER(true);
     function _.transferFrom(address, address, uint256) external => DISPATCHER(true);
     function _.balanceOf(address) external => DISPATCHER(true);
 }
+
 
 /// HOOKS ///
 
@@ -38,7 +40,7 @@ hook Sstore debtOf[KEY address owner][KEY bytes32 id] uint256 newDebt (uint256 o
 
 invariant sanitySumBond(bytes32 id)
     sumBondOf[id] >= 0;
-    
+
 invariant sanitySumDebt(bytes32 id)
     sumDebtOf[id] >= 0;
 

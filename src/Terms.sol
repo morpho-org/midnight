@@ -33,15 +33,18 @@ contract Terms is ITerms {
         _checkOffers(buyOffer, buySig, sellOffer, sellSig);
 
         // Commented because it makes invariants "not vacuous".
-        // uint256 amount = Math.min(buyOffer.assets - consumed[keccak256(abi.encode(buyOffer))], sellOffer.assets - consumed[keccak256(abi.encode(sellOffer))]);
-        uint256 amount = Math.min(buyOffer.assets, sellOffer.assets);
+        uint256 amount = Math.min(
+            buyOffer.assets - consumed[keccak256(abi.encode(buyOffer))],
+            sellOffer.assets - consumed[keccak256(abi.encode(sellOffer))]
+        );
+        //uint256 amount = Math.min(buyOffer.assets, sellOffer.assets);
         require(amount > 0, "No assets to match");
         address buyer = buyOffer.offering;
         address seller = sellOffer.offering;
 
         // Commented because it makes invariants "not vacuous".
-        // consumed[keccak256(abi.encode(buyOffer))] += amount;
-        // consumed[keccak256(abi.encode(sellOffer))] += amount;
+        consumed[keccak256(abi.encode(buyOffer))] += amount;
+        consumed[keccak256(abi.encode(sellOffer))] += amount;
 
         Term memory term = Term(sellOffer.loanToken, sellOffer.collaterals, sellOffer.maturity);
         bytes32 id = _id(term);
