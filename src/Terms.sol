@@ -23,7 +23,7 @@ contract Terms is ITerms {
     mapping(bytes32 => uint256) public withdrawable;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
     // Offers.
-    mapping(bytes => uint256) public consumed;
+    mapping(bytes32 => uint256) public consumed;
 
     /// ENTRY-POINTS ///
 
