@@ -9,11 +9,11 @@ import "./interfaces/ITerms.sol";
 contract Terms is ITerms {
     /// CONSTANTS ///
 
-    bytes32 constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
-    bytes32 constant OFFER_TYPEHASH = keccak256(
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
+    bytes32 public constant OFFER_TYPEHASH = keccak256(
         "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price)"
     );
-    uint256 constant WAD = 1 ether;
+    uint256 public constant WAD = 1 ether;
 
     /// STORAGE ///
 
@@ -23,26 +23,24 @@ contract Terms is ITerms {
     mapping(bytes32 => uint256) public withdrawable;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
     // Offers.
-    mapping(bytes32 => uint256) public consumed;
+    mapping(bytes => uint256) public consumed;
 
     /// ENTRY-POINTS ///
 
+    /// @dev This function is used for both primary and secondary markets.
     function MATCH(Offer memory buyOffer, Signature memory buySig, Offer memory sellOffer, Signature memory sellSig)
         public
     {
         _checkOffers(buyOffer, buySig, sellOffer, sellSig);
 
-        // Commented because it makes invariants "not vacuous".
         uint256 amount = Math.min(
             buyOffer.assets - consumed[keccak256(abi.encode(buyOffer))],
             sellOffer.assets - consumed[keccak256(abi.encode(sellOffer))]
         );
-        //uint256 amount = Math.min(buyOffer.assets, sellOffer.assets);
         require(amount > 0, "No assets to match");
         address buyer = buyOffer.offering;
         address seller = sellOffer.offering;
 
-        // Commented because it makes invariants "not vacuous".
         consumed[keccak256(abi.encode(buyOffer))] += amount;
         consumed[keccak256(abi.encode(sellOffer))] += amount;
 
@@ -105,17 +103,18 @@ contract Terms is ITerms {
         return keccak256(abi.encode(term));
     }
 
-    function _checkOffers(Offer memory buyOffer, Signature memory, Offer memory sellOffer, Signature memory)
-        internal
-        view
-    {
+    function _checkOffers(
+        Offer memory buyOffer,
+        Signature memory buySig,
+        Offer memory sellOffer,
+        Signature memory sellSig
+    ) internal view {
         // Check consistency.
 
         require(buyOffer.buy && !sellOffer.buy, "Inconsistent lend flags");
         require(buyOffer.maturity > block.timestamp, "Buy offer has expired");
-        // Commented because it makes verification fail.
-        // _checkSignature(buyOffer, buySig);
-        // _checkSignature(sellOffer, sellSig);
+        _checkSignature(buyOffer, buySig);
+        _checkSignature(sellOffer, sellSig);
 
         // Check compatibility.
 
