@@ -1,5 +1,5 @@
 [profile.default]
 via_ir = true
 libs = ["lib"]
-
+optimizer_runs = 1000000
 [dependencies]
