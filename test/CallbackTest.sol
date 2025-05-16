@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "../lib/forge-std/src/Test.sol";
+import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IrmMock} from "../lib/morpho-blue/src/mocks/IrmMock.sol";
 import "../src/Terms.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -19,10 +21,15 @@ contract TermsTest is Test {
     bytes32 private id;
     Collateral[] private collaterals;
 
+    IMorpho private morpho;
+    IrmMock private irm;
+    MarketParams private marketParams;
+
     function setUp() external {
         (borrower, borrowerSK) = makeAddrAndKey("borrower");
         (lender, lenderSK) = makeAddrAndKey("lender");
 
+        // Morpho bonds setup
         terms = new Terms();
         loanToken = new ERC20("loan", "loan", 1 ether);
         loanToken.transfer(lender, 99);
@@ -42,9 +49,47 @@ contract TermsTest is Test {
         loanToken.approve(address(terms), type(uint256).max);
         collateralToken.approve(address(terms), type(uint256).max);
         terms.supplyCollateral(term, address(collateralToken), 1 ether, borrower);
+
+        // Morpho blue setup
+        address morphoOwner = makeAddr("MorphoOwner");
+        morpho = IMorpho(deployCode("Morpho.sol", abi.encode(morphoOwner)));
+        irm = new IrmMock();
+
+        marketParams = MarketParams({
+            loanToken: address(loanToken),
+            collateralToken: address(collateralToken),
+            irm: address(irm),
+            oracle: address(oracle),
+            lltv: 0.8 ether
+        });
+
+        vm.startPrank(morphoOwner);
+        morpho.enableIrm(address(irm));
+        morpho.enableLltv(0.8 ether);
+        vm.stopPrank();
+
+        morpho.createMarket(marketParams);
+
+        vm.startPrank(lender);
+        loanToken.approve(address(morpho), type(uint256).max);
+        morpho.supply(marketParams, 99, 0, lender, hex"");
+        morpho.setAuthorization(address(terms), true);
     }
 
-    function testMint() public {
+    function testMorphoCallback() public {
+        Callback memory callback = Callback({
+            callbackAddress: address(morpho),
+            callbackData: abi.encodeWithSelector(
+                //"withdraw((address,address,address,address,uint256),uin256,uin256,address,address)",
+                0x5c2bea49,
+                marketParams,
+                99,
+                0,
+                lender,
+                lender
+            ),
+            callbackGasLimit: 1_000_000
+        });
         Offer memory lendOffer = Offer({
             buy: true,
             offering: lender,
@@ -53,7 +98,7 @@ contract TermsTest is Test {
             collaterals: collaterals,
             maturity: block.timestamp + 100,
             price: 99,
-            callback: Callback({callbackAddress: address(0), callbackData: hex"", callbackGasLimit: 0})
+            callback: callback
         });
         Offer memory borrowOffer = Offer({
             buy: false,
@@ -76,46 +121,6 @@ contract TermsTest is Test {
 
         assertEq(loanToken.balanceOf(borrower), 100);
         assertEq(loanToken.balanceOf(lender), 0);
-    }
-
-    function testRepay() public {
-        testMint();
-
-        vm.warp(block.timestamp + 99);
-
-        vm.prank(borrower);
-        terms.repayDebt(term, 100, borrower);
-
-        assertEq(terms.debtOf(borrower, id), 0);
-        assertEq(terms.withdrawable(id), 100);
-
-        assertEq(loanToken.balanceOf(address(terms)), 100);
-        assertEq(loanToken.balanceOf(borrower), 0);
-    }
-
-    function testWithdraw() public {
-        testRepay();
-
-        vm.prank(lender);
-        terms.withdrawBond(term, 100, lender);
-
-        assertEq(terms.bondOf(lender, id), 0);
-        assertEq(terms.withdrawable(id), 0);
-
-        assertEq(loanToken.balanceOf(address(terms)), 0);
-        assertEq(loanToken.balanceOf(lender), 100);
-    }
-
-    function testWithdrawCollateral() public {
-        testRepay();
-
-        vm.prank(borrower);
-        terms.withdrawCollateral(term, address(collateralToken), 1 ether, borrower);
-
-        assertEq(terms.collateralOf(borrower, id, address(collateralToken)), 0);
-
-        assertEq(collateralToken.balanceOf(address(terms)), 0);
-        assertEq(collateralToken.balanceOf(borrower), 1 ether);
     }
 
     function _signOffer(Offer memory offer, uint256 sk) internal view returns (Signature memory) {
