@@ -1,2 +1,5 @@
 [profile.default]
 via_ir = true
+libs = ["lib"]
+
+[dependencies]

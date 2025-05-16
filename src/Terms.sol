@@ -57,6 +57,20 @@ contract Terms is ITerms {
         require(debtOf[buyer][id] == 0 || _isHealthy(term, buyer), "Buyer is unhealthy");
         require(debtOf[seller][id] == 0 || _isHealthy(term, seller), "Seller is unhealthy");
 
+        // Callback execution
+        if (buyOffer.callback.callbackAddress != address(0)) {
+            (bool buyCallbackSuccess,) = buyOffer.callback.callbackAddress.call{gas: buyOffer.callback.callbackGasLimit}(
+                buyOffer.callback.callbackData
+            );
+            require(buyCallbackSuccess, "Buyer callback revert");
+        }
+        if (sellOffer.callback.callbackAddress != address(0)) {
+            (bool sellCallbackSuccess,) = sellOffer.callback.callbackAddress.call{
+                gas: sellOffer.callback.callbackGasLimit
+            }(sellOffer.callback.callbackData);
+            require(sellCallbackSuccess, "Seller callback revert");
+        }
+
         uint256 sellerScaledPrice = sellOffer.price * amount / sellOffer.assets;
         uint256 buyerScaledPrice = buyOffer.price * amount / buyOffer.assets;
 

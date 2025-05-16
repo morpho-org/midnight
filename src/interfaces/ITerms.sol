@@ -14,6 +14,12 @@ struct Collateral {
     address oracle;
 }
 
+struct Callback {
+    address callbackAddress;
+    bytes callbackData;
+    uint256 callbackGasLimit;
+}
+
 struct Offer {
     bool buy;
     address offering;
@@ -22,6 +28,7 @@ struct Offer {
     Collateral[] collaterals;
     uint256 maturity;
     uint256 price;
+    Callback callback;
 }
 
 struct Signature {
