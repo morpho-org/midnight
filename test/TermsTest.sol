@@ -137,4 +137,15 @@ contract TermsTest is BaseTest {
         assertEq(terms.bondOf(lender, id), 87);
         assertEq(terms.totalAssets(id), 87);
     }
+
+    function testFuzzMintAtPar(uint256 amount) public {
+        uint256 MAX_AMOUNT = 1 ether - 100;
+        amount = bound(amount, 1, MAX_AMOUNT);
+        loanToken.transfer(liquidator, MAX_AMOUNT);
+        assertEq(terms.bondOf(liquidator, id), 0);
+        vm.prank(liquidator);
+        terms.mintAtPar(term, amount, liquidator);
+        assertEq(loanToken.balanceOf(liquidator), MAX_AMOUNT - amount);
+        assertEq(terms.bondOf(liquidator, id), amount);
+    }
 }

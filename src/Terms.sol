@@ -203,6 +203,21 @@ contract Terms is ITerms {
         return seizures;
     }
 
+    function mintAtPar(Term memory term, uint256 debt, address onBehalf) public {
+        // This is always possible because a user can match with
+        // himself using two different addresses and flashloaning
+        // collateral: following these steps: flashloan, borrow/mint
+        // at par X bonds, repay, withdraw collateral, lender address
+        // has now X bonds and there's X withdrawable assets.
+        bytes32 id = _id(term);
+
+        require(debtOf[msg.sender][id] == 0 || _isHealthy(term, onBehalf), "Buyer is unhealthy");
+        uint256 boughtShares = debt.toSharesDown(totalAssets[id], totalShares[id]);
+        bondSharesOf[onBehalf][id] += boughtShares;
+        withdrawable[id] += debt;
+        IERC20(term.loanToken).transferFrom(msg.sender, address(this), debt);
+    }
+
     function bondOf(address owner, bytes32 id) public view returns (uint256) {
         return bondSharesOf[owner][id].toAssetsDown(totalAssets[id], totalShares[id]);
     }
