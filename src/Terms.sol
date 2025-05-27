@@ -218,8 +218,13 @@ contract Terms is ITerms {
         // current debt and merge the function with repay.
         require(debtOf[onBehalf][id] == 0 || _isHealthy(term, onBehalf), "Buyer is unhealthy");
 
-        bondSharesOf[onBehalf][id] += debt.toSharesDown(totalAssets[id], totalShares[id]);
+        uint256 sharesToMint = debt.toSharesDown(totalAssets[id], totalShares[id]);
+
         withdrawable[id] += debt;
+        bondSharesOf[onBehalf][id] += sharesToMint;
+
+        totalShares[id] += sharesToMint;
+        totalAssets[id] += debt;
 
         IERC20(term.loanToken).transferFrom(msg.sender, address(this), debt);
     }
