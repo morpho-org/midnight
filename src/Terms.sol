@@ -203,18 +203,24 @@ contract Terms is ITerms {
         return seizures;
     }
 
+    //@dev It is always possible to mint at par because a user can
+    //match with himself - using two different addresses - and
+    //flash-loan collateral by following these steps: flashloan;
+    //borrow/lend at par to mint X bonds; repay as borrower; withdraw
+    //collateral to repay flashloan; lender address has now X bonds
+    //and there's X withdrawable lent assets; note however that the
+    //value (not the amount) of bond could be lesser than of the loan
+    //asset, in case of accounted bad debt.
     function mintAtPar(Term memory term, uint256 debt, address onBehalf) public {
-        // This is always possible because a user can match with
-        // himself using two different addresses and flashloaning
-        // collateral: following these steps: flashloan, borrow/mint
-        // at par X bonds, repay, withdraw collateral, lender address
-        // has now X bonds and there's X withdrawable assets.
         bytes32 id = _id(term);
 
-        require(debtOf[msg.sender][id] == 0 || _isHealthy(term, onBehalf), "Buyer is unhealthy");
-        uint256 boughtShares = debt.toSharesDown(totalAssets[id], totalShares[id]);
-        bondSharesOf[onBehalf][id] += boughtShares;
+        // Maybe we could relax this restriction and just offset the
+        // current debt and merge the function with repay.
+        require(debtOf[onBehalf][id] == 0 || _isHealthy(term, onBehalf), "Buyer is unhealthy");
+
+        bondSharesOf[onBehalf][id] += debt.toSharesDown(totalAssets[id], totalShares[id]);
         withdrawable[id] += debt;
+
         IERC20(term.loanToken).transferFrom(msg.sender, address(this), debt);
     }
 
