@@ -127,6 +127,8 @@ contract TermsTest is BaseTest {
         testMint();
 
         loanToken.transfer(liquidator, 1000);
+        vm.prank(liquidator);
+        terms.mintAtPar(term, 87, liquidator);
         Oracle(collaterals[0].oracle).setPrice(0.75e36);
 
         vm.prank(liquidator);
@@ -135,6 +137,8 @@ contract TermsTest is BaseTest {
         assertEq(ret[0].repaidAmount, 87);
         assertEq(terms.withdrawable(id), 87);
         assertEq(terms.bondOf(lender, id), 87);
+        assertEq(terms.bondOf(liquidator, id), 0);
+
         assertEq(terms.totalAssets(id), 87);
     }
 

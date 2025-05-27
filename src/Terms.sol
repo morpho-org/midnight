@@ -186,6 +186,12 @@ contract Terms is ITerms {
         uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
 
+        uint256 sharesToBurn = totalRepaid.toSharesUp(totalAssets[id], totalShares[id]);
+        bondSharesOf[msg.sender][id] -= sharesToBurn;
+
+        totalShares[id] -= sharesToBurn;
+        totalAssets[id] -= totalRepaid;
+
         // Realize bad debt
         if (repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original debt minus the theoretical repayable debt.
@@ -194,11 +200,7 @@ contract Terms is ITerms {
             totalAssets[id] -= badDebt;
         }
 
-        withdrawable[id] += totalRepaid;
-
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
-
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), totalRepaid);
 
         return seizures;
     }
