@@ -132,7 +132,8 @@ contract LiquidationTest is BaseTest {
         loanToken.transfer(liquidator, 1000);
         Term memory t = liquidationTerms[n - 1];
         Oracle(t.collaterals[0].oracle).setPrice(0.25e36);
-
+        vm.prank(liquidator);
+        terms.mintAtPar(t, 1000, liquidator);
         vm.prank(liquidator);
         uint256 gasBefore;
         uint256 gasUsed;
