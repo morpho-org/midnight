@@ -54,9 +54,6 @@ contract Terms is ITerms {
         bondOf[seller][id] -= withdrawn;
         debtOf[seller][id] += amount - withdrawn;
 
-        require(debtOf[buyer][id] == 0 || _isHealthy(term, buyer), "Buyer is unhealthy");
-        require(debtOf[seller][id] == 0 || _isHealthy(term, seller), "Seller is unhealthy");
-
         // Callback execution
         if (buyOffer.callback.callbackAddress != address(0)) {
             (bool buyCallbackSuccess,) = buyOffer.callback.callbackAddress.call{gas: buyOffer.callback.callbackGasLimit}(
@@ -64,6 +61,13 @@ contract Terms is ITerms {
             );
             require(buyCallbackSuccess, "Buyer callback revert");
         }
+
+        uint256 sellerScaledPrice = sellOffer.price * amount / sellOffer.assets;
+        uint256 buyerScaledPrice = buyOffer.price * amount / buyOffer.assets;
+
+        IERC20(buyOffer.loanToken).transferFrom(buyer, seller, sellerScaledPrice);
+        IERC20(buyOffer.loanToken).transferFrom(buyer, msg.sender, buyerScaledPrice - sellerScaledPrice);
+
         if (sellOffer.callback.callbackAddress != address(0)) {
             (bool sellCallbackSuccess,) = sellOffer.callback.callbackAddress.call{
                 gas: sellOffer.callback.callbackGasLimit
@@ -71,11 +75,8 @@ contract Terms is ITerms {
             require(sellCallbackSuccess, "Seller callback revert");
         }
 
-        uint256 sellerScaledPrice = sellOffer.price * amount / sellOffer.assets;
-        uint256 buyerScaledPrice = buyOffer.price * amount / buyOffer.assets;
-
-        IERC20(buyOffer.loanToken).transferFrom(buyer, seller, sellerScaledPrice);
-        IERC20(buyOffer.loanToken).transferFrom(buyer, msg.sender, buyerScaledPrice - sellerScaledPrice);
+        require(debtOf[buyer][id] == 0 || _isHealthy(term, buyer), "Buyer is unhealthy");
+        require(debtOf[seller][id] == 0 || _isHealthy(term, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
