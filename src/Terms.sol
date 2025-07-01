@@ -35,24 +35,28 @@ contract Terms is ITerms {
 
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to make to offers without taking a position, they can batch take them and not have a position at the end.
-    function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
-        public
-    {
+    function buy(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig) public {
+        require(!offer.buy);
         _checkOffer(term, offer);
         _checkSignature(offer, sig);
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        (address buyer, address seller) = (onBehalf, offer.offering);
 
         consumed[abi.encode(offer)] += amount;
 
         bytes32 id = _id(term);
 
+        uint256 withdrawnEstimate =
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), amount);
+        uint256 withdrawnShares = withdrawnEstimate.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
+        uint256 withdrawnForSeller = withdrawnShares.mulDivUp(totalAssets[id] + 1, totalShares[id] + 1);
+        uint256 withdrawn = withdrawnShares.mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+
+        debtOf[buyer][id] += withdrawnForSeller - withdrawn;
+
         uint256 repaid = UtilsLib.min(debtOf[buyer][id], amount);
         uint256 bought = amount - repaid;
         uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalAssets[id] + 1);
-        uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), amount);
-        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
