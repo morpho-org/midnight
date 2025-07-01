@@ -38,10 +38,13 @@ contract Terms is ITerms {
     function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
         public
     {
-        _checkOffer(term, offer);
         _checkSignature(offer, sig);
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        Term memory offerTerm = Term(offer.loanToken, offer.collaterals, offer.maturity);
+        (address buyer, Term memory buyTerm, address seller, Term memory sellTerm) =
+            offer.buy ? (offer.offering, offerTerm, onBehalf, term) : (onBehalf, term, offer.offering, offerTerm);
+
+        _checkTerms(sellTerm, buyTerm);
 
         consumed[abi.encode(offer)] += amount;
 
@@ -194,21 +197,21 @@ contract Terms is ITerms {
         return keccak256(abi.encode(term));
     }
 
-    function _checkOffer(Term memory term, Offer memory offer) internal pure {
-        require(offer.loanToken == term.loanToken, "Loan tokens do not match");
-        require(offer.maturity == term.maturity, "Maturities do not match");
+    function _checkTerms(Term memory sellTerm, Term memory buyTerm) internal pure {
+        require(sellTerm.loanToken == buyTerm.loanToken, "Loan tokens do not match");
+        require(sellTerm.maturity == buyTerm.maturity, "Maturities do not match");
 
         uint256 j = 0;
-        for (uint256 i = 0; i < term.collaterals.length; i++) {
+        for (uint256 i = 0; i < buyTerm.collaterals.length; i++) {
             // Relies on the fact that the collaterals are sorted.
             // Note that we actually never check that.
             // If they are not, the match could fail.
-            for (; j < offer.collaterals.length; j++) {
-                if (offer.collaterals[j].token == term.collaterals[i].token || j == offer.collaterals.length) break;
+            for (; j < buyTerm.collaterals.length; j++) {
+                if (buyTerm.collaterals[j].token == sellTerm.collaterals[i].token) break;
             }
-            require(offer.collaterals[i].token == offer.collaterals[j].token, "Collaterals tokens do not match");
-            require(offer.collaterals[i].lltv <= offer.collaterals[j].lltv, "LLTVs do not match");
-            require(offer.collaterals[i].oracle == offer.collaterals[j].oracle, "Oracles do not match");
+            require(sellTerm.collaterals[i].token == buyTerm.collaterals[j].token, "Collaterals tokens do not match");
+            require(sellTerm.collaterals[i].lltv <= buyTerm.collaterals[j].lltv, "LLTVs do not match");
+            require(sellTerm.collaterals[i].oracle == buyTerm.collaterals[j].oracle, "Oracles do not match");
             j++;
         }
     }
