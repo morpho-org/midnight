@@ -60,6 +60,8 @@ contract TermsTest is BaseTest {
         maturity = bound(maturity, 0, block.timestamp - 1);
         Term memory _term = Term(address(loanToken), collaterals, maturity);
         Offer memory offer;
+        offer.loanToken = address(loanToken);
+        offer.maturity = maturity;
         Signature memory sig;
         vm.expectRevert("maturity");
         terms.take(_term, 100, lender, offer, sig);

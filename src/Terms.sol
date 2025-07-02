@@ -38,14 +38,22 @@ contract Terms is ITerms {
     function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
         public
     {
+        require(term.loanToken == offer.loanToken, "Loan tokens do not match");
+        require(term.maturity == offer.maturity, "Maturities do not match");
         require(term.maturity >= block.timestamp, "maturity");
         _checkSignature(offer, sig);
 
-        Term memory offerTerm = Term(offer.loanToken, offer.collaterals, offer.maturity);
-        (address buyer, Term memory buyTerm, address seller, Term memory sellTerm) =
-            offer.buy ? (offer.offering, offerTerm, onBehalf, term) : (onBehalf, term, offer.offering, offerTerm);
-
-        _checkTerms(sellTerm, buyTerm);
+        address buyer;
+        address seller;
+        if (offer.buy) {
+            buyer = offer.offering;
+            seller = onBehalf;
+            _checkCollateralInclusion(term.collaterals, offer.collaterals);
+        } else {
+            buyer = onBehalf;
+            seller = offer.offering;
+            _checkCollateralInclusion(offer.collaterals, term.collaterals);
+        }
 
         consumed[abi.encode(offer)] += amount;
         require(consumed[abi.encode(offer)] <= offer.assets, "consumed");
@@ -199,18 +207,18 @@ contract Terms is ITerms {
         return keccak256(abi.encode(term));
     }
 
-    function _checkTerms(Term memory sellTerm, Term memory buyTerm) internal pure {
-        require(sellTerm.loanToken == buyTerm.loanToken, "Loan tokens do not match");
-        require(sellTerm.maturity == buyTerm.maturity, "Maturities do not match");
-
+    function _checkCollateralInclusion(Collateral[] memory sellCollaterals, Collateral[] memory buyCollaterals)
+        internal
+        pure
+    {
         uint256 j = 0;
-        for (uint256 i = 0; i < sellTerm.collaterals.length; i++) {
+        for (uint256 i = 0; i < sellCollaterals.length; i++) {
             // Relies on the fact that the collaterals are sorted.
             // Note that we actually never check that.
             // If they are not, the matching could fail.
-            while (buyTerm.collaterals[j].token != sellTerm.collaterals[i].token) j++;
-            require(buyTerm.collaterals[j].lltv >= sellTerm.collaterals[i].lltv, "LLTVs do not match");
-            require(buyTerm.collaterals[j].oracle == sellTerm.collaterals[i].oracle, "Oracles do not match");
+            while (buyCollaterals[j].token != sellCollaterals[i].token) j++;
+            require(buyCollaterals[j].lltv >= sellCollaterals[i].lltv, "LLTVs do not match");
+            require(buyCollaterals[j].oracle == sellCollaterals[i].oracle, "Oracles do not match");
             j++;
         }
     }
