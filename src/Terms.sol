@@ -38,6 +38,7 @@ contract Terms is ITerms {
     function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
         public
     {
+        require(term.maturity >= block.timestamp, "maturity");
         _checkSignature(offer, sig);
 
         Term memory offerTerm = Term(offer.loanToken, offer.collaterals, offer.maturity);
@@ -47,6 +48,7 @@ contract Terms is ITerms {
         _checkTerms(sellTerm, buyTerm);
 
         consumed[abi.encode(offer)] += amount;
+        require(consumed[abi.encode(offer)] <= offer.assets, "consumed");
 
         bytes32 id = _id(term);
 
@@ -202,16 +204,13 @@ contract Terms is ITerms {
         require(sellTerm.maturity == buyTerm.maturity, "Maturities do not match");
 
         uint256 j = 0;
-        for (uint256 i = 0; i < buyTerm.collaterals.length; i++) {
+        for (uint256 i = 0; i < sellTerm.collaterals.length; i++) {
             // Relies on the fact that the collaterals are sorted.
             // Note that we actually never check that.
-            // If they are not, the match could fail.
-            for (; j < buyTerm.collaterals.length; j++) {
-                if (buyTerm.collaterals[j].token == sellTerm.collaterals[i].token) break;
-            }
-            require(sellTerm.collaterals[i].token == buyTerm.collaterals[j].token, "Collaterals tokens do not match");
-            require(sellTerm.collaterals[i].lltv <= buyTerm.collaterals[j].lltv, "LLTVs do not match");
-            require(sellTerm.collaterals[i].oracle == buyTerm.collaterals[j].oracle, "Oracles do not match");
+            // If they are not, the matching could fail.
+            while (buyTerm.collaterals[j].token != sellTerm.collaterals[i].token) j++;
+            require(buyTerm.collaterals[j].lltv >= sellTerm.collaterals[i].lltv, "LLTVs do not match");
+            require(buyTerm.collaterals[j].oracle == sellTerm.collaterals[i].oracle, "Oracles do not match");
             j++;
         }
     }
