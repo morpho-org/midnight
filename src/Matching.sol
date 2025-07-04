@@ -11,7 +11,9 @@ struct Offer {
     address loanToken;
     Collateral[] collaterals;
     uint256 maturity;
-    uint256 price;
+    // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
+    // 1% APR.
+    uint256 rate;
     uint256 nonce;
 }
 
@@ -26,7 +28,7 @@ contract Matching is IMatching {
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
     bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price)"
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce)"
     );
 
     /// STORAGE ///
@@ -38,12 +40,12 @@ contract Matching is IMatching {
 
     /// FUNCTIONS ///
 
-    function take(Term memory term, uint256 assets, bytes calldata data) external returns (address) {
+    function take(Term memory term, uint256 assets, bytes calldata data) external returns (address, uint256) {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
-        return offer.offering;
+        return (offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
     }
 
     /// INTERNAL ///

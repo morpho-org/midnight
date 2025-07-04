@@ -22,7 +22,7 @@ contract Terms is ITerms {
     mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
     mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
     mapping(bytes32 termId => uint256) public withdrawable;
-    mapping(bytes32 termId => uint256) public totalAssets;
+    mapping(bytes32 termId => uint256) public totalBonds;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
     mapping(address user => mapping(address matching => bool)) public isMatching;
@@ -37,28 +37,28 @@ contract Terms is ITerms {
     {
         require(term.maturity >= block.timestamp, "maturity");
 
-        address counterparty = IMatching(matching).take(term, assets, data);
-        require(isMatching[counterparty][matching], "not matching");
+        (address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
+        require(isMatching[counterparty][matching], "not a matching contract");
 
         (address buyer, address seller) = buy ? (onBehalf, counterparty) : (counterparty, onBehalf);
         bytes32 id = _id(term);
 
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], assets);
-        uint256 bought = assets - repaid;
-        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalAssets[id] + 1);
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+        uint256 bought = bonds - repaid;
+        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), assets);
-        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
         bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += assets - withdrawn;
+        debtOf[seller][id] += bonds - withdrawn;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;
-        totalAssets[id] += bought;
-        totalAssets[id] -= withdrawn;
+        totalBonds[id] += bought;
+        totalBonds[id] -= withdrawn;
 
         require(_isHealthy(term, buyer), "Buyer is unhealthy");
         require(_isHealthy(term, seller), "Seller is unhealthy");
@@ -67,42 +67,42 @@ contract Terms is ITerms {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 amount, uint256 shares, address onBehalf) external {
-        require(UtilsLib.exactlyOneZero(amount, shares), "INCONSISTENT_INPUT");
+    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
+        require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (amount > 0) shares = amount.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
-        else amount = shares.mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
         bondSharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= amount;
+        withdrawable[id] -= bonds;
 
         totalShares[id] -= shares;
-        totalAssets[id] -= amount;
+        totalBonds[id] -= bonds;
 
-        IERC20(term.loanToken).transfer(msg.sender, amount);
+        IERC20(term.loanToken).transfer(msg.sender, bonds);
     }
 
-    function repayDebt(Term memory term, uint256 amount, address onBehalf) external {
+    function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
         bytes32 id = _id(term);
 
-        debtOf[onBehalf][id] -= amount;
-        withdrawable[id] += amount;
+        debtOf[onBehalf][id] -= bonds;
+        withdrawable[id] += bonds;
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), amount);
+        IERC20(term.loanToken).transferFrom(msg.sender, address(this), bonds);
     }
 
-    function supplyCollateral(Term memory term, address collateral, uint256 amount, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] += amount;
-        IERC20(collateral).transferFrom(msg.sender, address(this), amount);
+    function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        collateralOf[onBehalf][_id(term)][collateral] += assets;
+        IERC20(collateral).transferFrom(msg.sender, address(this), assets);
     }
 
-    function withdrawCollateral(Term memory term, address collateral, uint256 amount, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= amount;
+    function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        collateralOf[onBehalf][_id(term)][collateral] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        IERC20(collateral).transfer(msg.sender, amount);
+        IERC20(collateral).transfer(msg.sender, assets);
     }
 
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
@@ -137,23 +137,23 @@ contract Terms is ITerms {
         uint256 totalRepaid;
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            if (seizures[i].repaidAmount + seizures[i].seizedAssets > 0) {
+            if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
-                    UtilsLib.exactlyOneZero(seizures[i].repaidAmount, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
+                    UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
                 );
 
                 uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
 
                 if (seizures[i].seizedAssets > 0) {
-                    seizures[i].repaidAmount = seizures[i].seizedAssets.mulDivDown(collateralPrice, ORACLE_PRICE_SCALE)
+                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivDown(collateralPrice, ORACLE_PRICE_SCALE)
                         .wDivUp(liquidationIncentiveFactor);
                 } else {
-                    seizures[i].seizedAssets = seizures[i].repaidAmount.wMulDown(liquidationIncentiveFactor).mulDivDown(
+                    seizures[i].seizedAssets = seizures[i].repaidBonds.wMulDown(liquidationIncentiveFactor).mulDivDown(
                         ORACLE_PRICE_SCALE, collateralPrice
                     );
                 }
 
-                totalRepaid += seizures[i].repaidAmount;
+                totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
                 IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
@@ -169,7 +169,7 @@ contract Terms is ITerms {
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - repayableDebt);
             debtOf[borrower][id] -= badDebt;
-            totalAssets[id] -= badDebt;
+            totalBonds[id] -= badDebt;
         }
 
         withdrawable[id] += totalRepaid;
@@ -182,7 +182,7 @@ contract Terms is ITerms {
     }
 
     function bondOf(address owner, bytes32 id) public view returns (uint256) {
-        return bondSharesOf[owner][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+        return bondSharesOf[owner][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
     }
 
     function setMatching(address matching, bool _isMatching) external {

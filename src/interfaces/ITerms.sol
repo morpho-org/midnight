@@ -16,9 +16,9 @@ struct Collateral {
 }
 
 struct Seizure {
-    // Amount of loan asset to repay.
-    uint256 repaidAmount;
-    // Amount of collater asset to seize.
+    // Amount of bonds to repay.
+    uint256 repaidBonds;
+    // Amount of collateral asset to seize.
     uint256 seizedAssets;
 }
 
