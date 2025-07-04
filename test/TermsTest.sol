@@ -57,7 +57,8 @@ contract TermsTest is BaseTest {
             collaterals: collaterals,
             maturity: block.timestamp + 100,
             price: 99,
-            nonce: 0
+            nonce: 0,
+            index: 1
         });
 
         borrowOffer = Offer({
@@ -68,7 +69,8 @@ contract TermsTest is BaseTest {
             collaterals: collaterals,
             maturity: block.timestamp + 100,
             price: 99,
-            nonce: 0
+            nonce: 0,
+            index: 1
         });
 
         vm.prank(lender);
@@ -100,7 +102,7 @@ contract TermsTest is BaseTest {
         assertEq(terms.debtOf(borrower, id), 100, "borrower debt");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
-        assertEq(terms.consumed(borrower, 0), 100, "borrower nonce");
+        assertEq(terms.group(borrower, 0).consumed, 100, "borrower nonce");
     }
 
     function testBorrow() public {
@@ -110,7 +112,7 @@ contract TermsTest is BaseTest {
         assertEq(terms.debtOf(borrower, id), 100, "lender debt");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
-        assertEq(terms.consumed(lender, 0), 100, "lender nonce");
+        assertEq(terms.group(lender, 0).consumed, 100, "lender nonce");
     }
 
     function testMatch() public {
@@ -120,8 +122,8 @@ contract TermsTest is BaseTest {
         assertEq(terms.bondSharesOf(address(this), id), 0, "bond shares");
         assertEq(terms.debtOf(address(this), id), 0, "debt");
         assertEq(loanToken.balanceOf(address(this)), 100, "balance");
-        assertEq(terms.consumed(lender, 0), 100, "lender nonce");
-        assertEq(terms.consumed(borrower, 0), 100, "borrower nonce");
+        assertEq(terms.group(lender, 0).consumed, 100, "lender nonce");
+        assertEq(terms.group(borrower, 0).consumed, 100, "borrower nonce");
     }
 
     function testRepay() public {
@@ -186,14 +188,14 @@ contract TermsTest is BaseTest {
     function testPartialFill() public {
         terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK));
 
-        assertEq(terms.consumed(lender, 0), 50);
+        assertEq(terms.group(lender, 0).consumed, 50);
 
         vm.expectRevert("consumed");
         terms.take(term, 51, borrower, lendOffer, sig(lendOffer, lenderSK));
 
         terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK));
 
-        assertEq(terms.consumed(lender, 0), 100);
+        assertEq(terms.group(lender, 0).consumed, 100);
     }
 
     function testOCO() public {
@@ -210,7 +212,7 @@ contract TermsTest is BaseTest {
         terms.supplyCollateral(term2, address(collateralToken), 134, borrower);
 
         terms.take(term2, 30, borrower, lendOffer2, sig(lendOffer2, lenderSK));
-        assertEq(terms.consumed(lender, 0), 100);
+        assertEq(terms.group(lender, 0).consumed, 100);
     }
 
     function testTakeLendOfferCollateralMissing() public {

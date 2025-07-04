@@ -23,6 +23,7 @@ struct Offer {
     uint256 maturity;
     uint256 price;
     uint256 nonce;
+    uint8 index;
 }
 
 struct Signature {
@@ -39,3 +40,8 @@ struct Seizure {
 }
 
 interface ITerms {}
+
+struct Group {
+    uint8 selected;
+    uint248 consumed;
+}

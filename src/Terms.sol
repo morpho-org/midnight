@@ -15,7 +15,7 @@ contract Terms is ITerms {
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
     bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price)"
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price,uint256 nonce, uint256 index)"
     );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
 
@@ -29,10 +29,10 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
 
-    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
-    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
-    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling,
+    /// mass-cancelling, OCO (One-Cancels-the-Other) and OPCO (Once-Partially-Cancels-the-Other) orders.
+    mapping(address user => uint256) nonce;
+    mapping(address user => mapping(uint256 nonce => Group)) public _group;
 
     /// ENTRY-POINTS ///
 
@@ -46,7 +46,12 @@ contract Terms is ITerms {
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
 
-        require((consumed[offer.offering][offer.nonce] += amount) <= offer.assets, "consumed");
+        Group storage offerGroup = _group[offer.offering][offer.nonce];
+        require(offer.nonce >= nonce[offer.offering], "min nonce");
+        require(offer.index > 0, "index");
+        require(offerGroup.selected == 0 || offerGroup.selected == offer.index, "taken");
+        require((offerGroup.consumed += amount.toUint248()) <= offer.assets, "consumed");
+        offerGroup.selected = offer.index;
 
         (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
         bytes32 id = _id(term);
@@ -192,6 +197,17 @@ contract Terms is ITerms {
 
     function bondOf(address owner, bytes32 id) public view returns (uint256) {
         return bondSharesOf[owner][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+    }
+
+    /// @dev Invalidate all offers with a nonce < newNonce.
+    function setNonce(uint256 newNonce) external {
+        require(newNonce <= type(uint248).max, "max");
+        require(nonce[msg.sender] <= newNonce, "no increase");
+        nonce[msg.sender] = newNonce;
+    }
+
+    function group(address user, uint256 _nonce) external view returns (Group memory) {
+        return _group[user][_nonce];
     }
 
     /// INTERNAL ///

@@ -67,7 +67,8 @@ contract LiquidationTest is BaseTest {
             collaterals: cs,
             maturity: block.timestamp + 100,
             price: 990,
-            nonce: gasleft()
+            nonce: gasleft(),
+            index: 1
         });
 
         terms.take(term, 1000, lender, borrowOffer, sig(borrowOffer, borrowerSK));
