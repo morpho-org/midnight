@@ -74,7 +74,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory borrowSig = _signOffer(borrowOffer, borrowerSK);
         terms.take(term, 100, lender, borrowOffer, borrowSig);
@@ -94,7 +95,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
         terms.take(term, 100, borrower, lendOffer, lendSig);
@@ -114,7 +116,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
         Offer memory borrowOffer = Offer({
@@ -124,7 +127,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory borrowSig = _signOffer(borrowOffer, borrowerSK);
 
@@ -199,7 +203,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
 
@@ -219,7 +224,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
 
@@ -237,7 +243,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
 
@@ -255,7 +262,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory lendSig = _signOffer(lendOffer, lenderSK);
 
@@ -273,7 +281,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory borrowSig = _signOffer(borrowOffer, borrowerSK);
 
@@ -291,7 +300,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory borrowSig = _signOffer(borrowOffer, borrowerSK);
 
@@ -309,7 +319,8 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99
+            price: 99,
+            nonce: 0
         });
         Signature memory borrowSig = _signOffer(borrowOffer, borrowerSK);
 
