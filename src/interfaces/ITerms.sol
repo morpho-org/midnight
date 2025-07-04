@@ -15,23 +15,6 @@ struct Collateral {
     address oracle;
 }
 
-struct Offer {
-    bool buy;
-    address offering;
-    uint256 assets;
-    address loanToken;
-    Collateral[] collaterals;
-    uint256 maturity;
-    uint256 price;
-    uint256 nonce;
-}
-
-struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
 struct Seizure {
     // Amount of loan asset to repay.
     uint256 repaidAmount;

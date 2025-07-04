@@ -71,7 +71,7 @@ contract LiquidationTest is BaseTest {
             nonce: gasleft()
         });
 
-        terms.take(term, 1000, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 1000, lender, false, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 
     function setUp() public override {

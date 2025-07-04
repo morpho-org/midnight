@@ -8,61 +8,52 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
+import "./interfaces/IMatching.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
 
     /// CONSTANTS ///
 
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
-    bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price)"
-    );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
 
     /// STORAGE ///
 
-    // Terms.
     mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
     mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
     mapping(bytes32 termId => uint256) public withdrawable;
     mapping(bytes32 termId => uint256) public totalAssets;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-
-    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
-    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
-    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    mapping(address user => mapping(address matching => bool)) public isMatching;
 
     /// ENTRY-POINTS ///
 
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
+    function take(Term memory term, uint256 assets, address onBehalf, bool buy, address matching, bytes calldata data)
         external
     {
         require(term.maturity >= block.timestamp, "maturity");
-        _checkSignature(offer, sig);
-        _checkOffer(term, offer);
 
-        require((consumed[offer.offering][offer.nonce] += amount) <= offer.assets, "consumed");
+        address counterparty = IMatching(matching).take(term, assets, data);
+        require(isMatching[counterparty][matching], "not matching");
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        (address buyer, address seller) = buy ? (onBehalf, counterparty) : (counterparty, onBehalf);
         bytes32 id = _id(term);
 
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], amount);
-        uint256 bought = amount - repaid;
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], assets);
+        uint256 bought = assets - repaid;
         uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalAssets[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), amount);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), assets);
         uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
         bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += amount - withdrawn;
+        debtOf[seller][id] += assets - withdrawn;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;
@@ -72,8 +63,7 @@ contract Terms is ITerms {
         require(_isHealthy(term, buyer), "Buyer is unhealthy");
         require(_isHealthy(term, seller), "Seller is unhealthy");
 
-        uint256 scaledPrice = offer.price * amount / offer.assets;
-        IERC20(offer.loanToken).transferFrom(buyer, seller, scaledPrice);
+        IERC20(term.loanToken).transferFrom(buyer, seller, assets);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -195,38 +185,14 @@ contract Terms is ITerms {
         return bondSharesOf[owner][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
     }
 
+    function setMatching(address matching, bool _isMatching) external {
+        isMatching[msg.sender][matching] = _isMatching;
+    }
+
     /// INTERNAL ///
 
     function _id(Term memory term) public pure returns (bytes32) {
         return keccak256(abi.encode(term));
-    }
-
-    function _checkOffer(Term memory term, Offer memory offer) internal pure {
-        require(offer.loanToken == term.loanToken, "Loan tokens do not match");
-        require(offer.maturity == term.maturity, "Maturities do not match");
-
-        Collateral[] memory subset = offer.buy ? term.collaterals : offer.collaterals;
-        Collateral[] memory superset = offer.buy ? offer.collaterals : term.collaterals;
-
-        uint256 j = 0;
-        for (uint256 i = 0; i < subset.length; i++) {
-            // Relies on the fact that the collaterals are sorted.
-            // Note that we actually never check that.
-            // If they are not, the matching could fail.
-            while (superset[j].token != subset[i].token) j++;
-            require(superset[j].lltv >= subset[i].lltv, "LLTVs do not match");
-            require(subset[i].oracle == superset[j].oracle, "Oracles do not match");
-            j++;
-        }
-    }
-
-    function _checkSignature(Offer memory offer, Signature memory signature) internal view {
-        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
-
-        require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
     }
 
     function _isHealthy(Term memory term, address borrower) internal view returns (bool) {

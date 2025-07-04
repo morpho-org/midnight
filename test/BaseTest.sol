@@ -5,22 +5,25 @@ pragma solidity ^0.8.0;
 import "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import "../src/Terms.sol";
+import "../src/Matching.sol";
 
 abstract contract BaseTest is Test {
     Terms internal terms;
+    Matching internal matching;
     bytes32 internal offerTypehash; // to avoid calls.
     bytes32 internal domainTypehash; // to avoid calls.
 
     function setUp() public virtual {
         terms = new Terms();
+        matching = new Matching();
 
-        offerTypehash = terms.OFFER_TYPEHASH();
-        domainTypehash = terms.DOMAIN_TYPEHASH();
+        offerTypehash = matching.OFFER_TYPEHASH();
+        domainTypehash = matching.DOMAIN_TYPEHASH();
     }
 
     function sig(Offer memory offer, uint256 sk) internal view returns (Signature memory) {
         bytes32 hashStruct = keccak256(abi.encode(offerTypehash, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(domainTypehash, block.chainid, address(terms)));
+        bytes32 domainSeparator = keccak256(abi.encode(domainTypehash, block.chainid, address(matching)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
 
         Signature memory signature;
