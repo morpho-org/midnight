@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
+// Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
 import "./libraries/UtilsLib.sol";
@@ -15,19 +16,18 @@ contract Terms is ITerms {
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
     bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 price,uint256 nonce, uint256 index)"
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce, uint256 index)"
     );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
 
     /// STORAGE ///
 
-    // Terms.
-    mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
-    mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
-    mapping(bytes32 termId => uint256) public withdrawable;
-    mapping(bytes32 termId => uint256) public totalAssets;
-    mapping(bytes32 termId => uint256) public totalShares;
-    mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
+    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
+    mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(bytes32 => uint256) public withdrawable;
+    mapping(bytes32 => uint256) public totalBonds;
+    mapping(bytes32 => uint256) public totalShares;
+    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling,
     /// mass-cancelling, OCO (One-Cancels-the-Other) and OPCO (Once-Partially-Cancels-the-Other) orders.
@@ -39,84 +39,86 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 amount, address onBehalf, Offer memory offer, Signature memory sig)
-        external
+    function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory sig)
+        public
     {
         require(term.maturity >= block.timestamp, "maturity");
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
 
+        uint256 timeToMaturity = term.maturity - block.timestamp;
+        uint256 bonds = assets * (1e18 + timeToMaturity * offer.rate) / 1e18;
+
         Group storage offerGroup = _group[offer.offering][offer.nonce];
         require(offer.nonce >= nonce[offer.offering], "min nonce");
         require(offer.index > 0, "index");
         require(offerGroup.selected == 0 || offerGroup.selected == offer.index, "taken");
-        require((offerGroup.consumed += amount.toUint248()) <= offer.assets, "consumed");
+        require((offerGroup.consumed += assets.toUint248()) <= offer.assets, "consumed");
         offerGroup.selected = offer.index;
 
         (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
         bytes32 id = _id(term);
 
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], amount);
-        uint256 bought = amount - repaid;
-        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalAssets[id] + 1);
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+        uint256 bought = bonds - repaid;
+        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1), amount);
-        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
         bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += amount - withdrawn;
+        debtOf[seller][id] += bonds - withdrawn;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;
-        totalAssets[id] += bought;
-        totalAssets[id] -= withdrawn;
+        totalBonds[id] += bought;
+        totalBonds[id] -= withdrawn;
 
         require(_isHealthy(term, buyer), "Buyer is unhealthy");
         require(_isHealthy(term, seller), "Seller is unhealthy");
 
-        uint256 scaledPrice = offer.price * amount / offer.assets;
-        IERC20(offer.loanToken).transferFrom(buyer, seller, scaledPrice);
+        IERC20(offer.loanToken).transferFrom(buyer, seller, assets);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 amount, uint256 shares, address onBehalf) external {
-        require(UtilsLib.exactlyOneZero(amount, shares), "INCONSISTENT_INPUT");
+    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
+        require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (amount > 0) shares = amount.mulDivUp(totalShares[id] + 1, totalAssets[id] + 1);
-        else amount = shares.mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
         bondSharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= amount;
+        withdrawable[id] -= bonds;
 
         totalShares[id] -= shares;
-        totalAssets[id] -= amount;
+        totalBonds[id] -= bonds;
 
-        IERC20(term.loanToken).transfer(msg.sender, amount);
+        IERC20(term.loanToken).transfer(msg.sender, bonds);
     }
 
-    function repayDebt(Term memory term, uint256 amount, address onBehalf) external {
+    function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
         bytes32 id = _id(term);
 
-        debtOf[onBehalf][id] -= amount;
-        withdrawable[id] += amount;
+        debtOf[onBehalf][id] -= bonds;
+        withdrawable[id] += bonds;
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), amount);
+        IERC20(term.loanToken).transferFrom(msg.sender, address(this), bonds);
     }
 
-    function supplyCollateral(Term memory term, address collateral, uint256 amount, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] += amount;
-        IERC20(collateral).transferFrom(msg.sender, address(this), amount);
+    function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        collateralOf[onBehalf][_id(term)][collateral] += assets;
+        IERC20(collateral).transferFrom(msg.sender, address(this), assets);
     }
 
-    function withdrawCollateral(Term memory term, address collateral, uint256 amount, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= amount;
+    function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        collateralOf[onBehalf][_id(term)][collateral] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        IERC20(collateral).transfer(msg.sender, amount);
+        IERC20(collateral).transfer(msg.sender, assets);
     }
 
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
@@ -151,23 +153,23 @@ contract Terms is ITerms {
         uint256 totalRepaid;
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            if (seizures[i].repaidAmount + seizures[i].seizedAssets > 0) {
+            if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
-                    UtilsLib.exactlyOneZero(seizures[i].repaidAmount, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
+                    UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
                 );
 
                 uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
 
                 if (seizures[i].seizedAssets > 0) {
-                    seizures[i].repaidAmount = seizures[i].seizedAssets.mulDivDown(collateralPrice, ORACLE_PRICE_SCALE)
+                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivDown(collateralPrice, ORACLE_PRICE_SCALE)
                         .wDivUp(liquidationIncentiveFactor);
                 } else {
-                    seizures[i].seizedAssets = seizures[i].repaidAmount.wMulDown(liquidationIncentiveFactor).mulDivDown(
+                    seizures[i].seizedAssets = seizures[i].repaidBonds.wMulDown(liquidationIncentiveFactor).mulDivDown(
                         ORACLE_PRICE_SCALE, collateralPrice
                     );
                 }
 
-                totalRepaid += seizures[i].repaidAmount;
+                totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
                 IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
@@ -183,7 +185,7 @@ contract Terms is ITerms {
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - repayableDebt);
             debtOf[borrower][id] -= badDebt;
-            totalAssets[id] -= badDebt;
+            totalBonds[id] -= badDebt;
         }
 
         withdrawable[id] += totalRepaid;
@@ -196,7 +198,7 @@ contract Terms is ITerms {
     }
 
     function bondOf(address owner, bytes32 id) public view returns (uint256) {
-        return bondSharesOf[owner][id].mulDivDown(totalAssets[id] + 1, totalShares[id] + 1);
+        return bondSharesOf[owner][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
     }
 
     /// @dev Invalidate all offers with a nonce < newNonce.

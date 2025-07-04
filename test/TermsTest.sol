@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
 import "./BaseTest.sol";
@@ -33,8 +34,8 @@ contract TermsTest is BaseTest {
         secondCollateralToken = new ERC20("collat2", "collat2");
 
         deal(address(loanToken), address(this), 100);
-        deal(address(loanToken), address(lender), 99);
-        deal(address(loanToken), address(borrower), 1);
+        deal(address(loanToken), address(lender), 100);
+        deal(address(collateralToken), address(this), 135);
         deal(address(collateralToken), address(this), type(uint256).max);
         oracle = new Oracle();
 
@@ -43,8 +44,8 @@ contract TermsTest is BaseTest {
         collaterals[1] = Collateral({token: address(secondCollateralToken), lltv: 0.75e18, oracle: address(oracle)});
 
         seizures = new Seizure[](2);
-        seizures[0] = Seizure({repaidAmount: 0, seizedAssets: 134});
-        seizures[1] = Seizure({repaidAmount: 0, seizedAssets: 0});
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 135});
+        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
 
         term = Term(address(loanToken), collaterals, block.timestamp + 100);
         id = keccak256(abi.encode(term));
@@ -56,7 +57,7 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99,
+            rate: 0.01e18 / 100,
             nonce: 0,
             index: 1
         });
@@ -68,7 +69,7 @@ contract TermsTest is BaseTest {
             loanToken: address(loanToken),
             collaterals: collaterals,
             maturity: block.timestamp + 100,
-            price: 99,
+            rate: 0.01e18 / 100,
             nonce: 0,
             index: 1
         });
@@ -83,7 +84,7 @@ contract TermsTest is BaseTest {
         loanToken.approve(address(terms), type(uint256).max);
 
         collateralToken.approve(address(terms), type(uint256).max);
-        terms.supplyCollateral(term, address(collateralToken), 134, borrower);
+        terms.supplyCollateral(term, address(collateralToken), 135, borrower);
     }
 
     function testTakePostMaturity(uint256 maturity) public {
@@ -98,8 +99,8 @@ contract TermsTest is BaseTest {
     function testLend() public {
         terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 100, "lender bond shares");
-        assertEq(terms.debtOf(borrower, id), 100, "borrower debt");
+        assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
+        assertEq(terms.debtOf(borrower, id), 101, "borrower debt");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(terms.group(borrower, 0).consumed, 100, "borrower nonce");
@@ -108,8 +109,8 @@ contract TermsTest is BaseTest {
     function testBorrow() public {
         terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 100, "bond shares");
-        assertEq(terms.debtOf(borrower, id), 100, "lender debt");
+        assertEq(terms.bondSharesOf(lender, id), 101, "bond shares");
+        assertEq(terms.debtOf(borrower, id), 101, "lender debt");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(terms.group(lender, 0).consumed, 100, "lender nonce");
@@ -131,12 +132,14 @@ contract TermsTest is BaseTest {
 
         vm.warp(block.timestamp + 99);
 
+        deal(address(loanToken), address(borrower), 101);
+
         vm.prank(borrower);
-        terms.repayDebt(term, 100, borrower);
+        terms.repayDebt(term, 101, borrower);
 
         assertEq(terms.debtOf(borrower, id), 0);
-        assertEq(terms.withdrawable(id), 100);
-        assertEq(loanToken.balanceOf(address(terms)), 100);
+        assertEq(terms.withdrawable(id), 101);
+        assertEq(loanToken.balanceOf(address(terms)), 101);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
@@ -144,23 +147,23 @@ contract TermsTest is BaseTest {
         testRepay();
 
         vm.prank(lender);
-        terms.withdrawBond(term, 100, 0, lender);
+        terms.withdrawBond(term, 101, 0, lender);
 
         assertEq(terms.bondSharesOf(lender, id), 0);
         assertEq(terms.withdrawable(id), 0);
         assertEq(loanToken.balanceOf(address(terms)), 0);
-        assertEq(loanToken.balanceOf(lender), 100);
+        assertEq(loanToken.balanceOf(lender), 101);
     }
 
     function testWithdrawCollateral() public {
         testRepay();
 
         vm.prank(borrower);
-        terms.withdrawCollateral(term, address(collateralToken), 134, borrower);
+        terms.withdrawCollateral(term, address(collateralToken), 135, borrower);
 
         assertEq(terms.collateralOf(borrower, id, address(collateralToken)), 0);
         assertEq(collateralToken.balanceOf(address(terms)), 0);
-        assertEq(collateralToken.balanceOf(borrower), 134);
+        assertEq(collateralToken.balanceOf(borrower), 135);
     }
 
     function testBadDebt() public {
@@ -172,10 +175,10 @@ contract TermsTest is BaseTest {
         vm.prank(liquidator);
         Seizure[] memory ret = terms.liquidate(term, seizures, borrower, hex"");
         assertEq(terms.debtOf(borrower, id), 0);
-        assertEq(ret[0].repaidAmount, 87);
-        assertEq(terms.withdrawable(id), 87);
-        assertEq(terms.bondOf(lender, id), 87);
-        assertEq(terms.totalAssets(id), 87);
+        assertEq(ret[0].repaidBonds, 88);
+        assertEq(terms.withdrawable(id), 88);
+        assertEq(terms.bondOf(lender, id), 88);
+        assertEq(terms.totalBonds(id), 88);
     }
 
     function testConsumed() public {

@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
 import "./BaseTest.sol";
@@ -13,72 +14,15 @@ contract LiquidationTest is BaseTest {
     address private borrower;
     uint256 private lenderSK;
     address private lender;
-    address private liquidator;
+    address private liquidator = makeAddr("liquidator");
     Term[] private liquidationTerms;
     Seizure[][] private sN;
     Seizure[][] private sK;
-
-    function genTerm(uint256 n) internal returns (Term memory) {
-        Collateral[] memory cs = new Collateral[](n);
-        ERC20[] memory tokens = new ERC20[](n);
-
-        for (uint256 i = 0; i < n; i++) {
-            tokens[i] = new ERC20("collat", "c");
-            deal(address(tokens[i]), address(this), 1 ether);
-        }
-
-        tokens = sortTokens(tokens);
-
-        for (uint256 i = 0; i < n; i++) {
-            ERC20 c = tokens[i];
-            Oracle o = new Oracle();
-            c.transfer(borrower, 1 ether);
-            cs[i] = Collateral({token: address(tokens[i]), lltv: 0.75e18, oracle: address(o)});
-            vm.startPrank(borrower);
-            c.approve(address(terms), type(uint256).max);
-            vm.stopPrank();
-        }
-
-        Term memory t = Term(address(loanToken), cs, block.timestamp + 100);
-
-        loanToken.transfer(lender, 1000);
-
-        vm.startPrank(borrower);
-        uint256 remaining = 840;
-        uint256 dealt;
-        for (uint256 i = 1; i < n; i++) {
-            dealt += remaining / (n - 1);
-            terms.supplyCollateral(t, cs[i].token, remaining / (n - 1), borrower);
-        }
-        // The collateral in position 0 is used to make the position liquidatable.
-        terms.supplyCollateral(t, cs[0].token, remaining + 500, borrower);
-        vm.stopPrank();
-
-        return t;
-    }
-
-    function mintBond(Collateral[] memory cs) internal {
-        Term memory term = Term(address(loanToken), cs, block.timestamp + 100);
-        Offer memory borrowOffer = Offer({
-            buy: false,
-            offering: borrower,
-            assets: 1000,
-            loanToken: address(loanToken),
-            collaterals: cs,
-            maturity: block.timestamp + 100,
-            price: 990,
-            nonce: gasleft(),
-            index: 1
-        });
-
-        terms.take(term, 1000, lender, borrowOffer, sig(borrowOffer, borrowerSK));
-    }
 
     function setUp() public override {
         super.setUp();
         (borrower, borrowerSK) = makeAddrAndKey("borrower");
         (lender, lenderSK) = makeAddrAndKey("lender");
-        liquidator = makeAddr("liquidator");
 
         loanToken = new ERC20("loan", "loan");
         deal(address(loanToken), address(this), type(uint256).max);
@@ -101,9 +45,9 @@ contract LiquidationTest is BaseTest {
             liquidationTerms[i] = genTerm(i + 1);
             mintBond(liquidationTerms[i].collaterals);
             sK[i] = new Seizure[](10);
-            sK[i][0] = Seizure({repaidAmount: 100, seizedAssets: 0});
+            sK[i][0] = Seizure({repaidBonds: 100, seizedAssets: 0});
             for (uint256 k = 1; k < i + 1; k++) {
-                sK[i][k] = Seizure({repaidAmount: 0, seizedAssets: 93});
+                sK[i][k] = Seizure({repaidBonds: 0, seizedAssets: 93});
             }
         }
 
@@ -111,13 +55,63 @@ contract LiquidationTest is BaseTest {
             liquidationTerms[i] = genTerm(i + 1);
             mintBond(liquidationTerms[i].collaterals);
             sN[i] = new Seizure[](i + 1);
-            sN[i][0] = Seizure({repaidAmount: 100, seizedAssets: 0});
+            sN[i][0] = Seizure({repaidBonds: 100, seizedAssets: 0});
             for (uint256 k = 1; k < i + 1; k++) {
-                sN[i][k] = Seizure({repaidAmount: 0, seizedAssets: 0});
+                sN[i][k] = Seizure({repaidBonds: 0, seizedAssets: 0});
             }
         }
 
         vm.warp(block.timestamp + 50);
+    }
+
+    function genTerm(uint256 n) internal returns (Term memory) {
+        Collateral[] memory cs = new Collateral[](n);
+        ERC20[] memory tokens = new ERC20[](n);
+
+        for (uint256 i = 0; i < n; i++) {
+            tokens[i] = new ERC20("collat", "c");
+        }
+
+        tokens = sortTokens(tokens);
+
+        for (uint256 i = 0; i < n; i++) {
+            ERC20 collateral = tokens[i];
+            deal(address(collateral), borrower, 1 ether);
+            vm.prank(borrower);
+            collateral.approve(address(terms), type(uint256).max);
+            cs[i] = Collateral({token: address(collateral), lltv: 0.75e18, oracle: address(new Oracle())});
+        }
+
+        Term memory term = Term(address(loanToken), cs, block.timestamp + 100);
+
+        deal(address(loanToken), lender, 1000);
+
+        vm.startPrank(borrower);
+        for (uint256 i = 1; i < n; i++) {
+            terms.supplyCollateral(term, cs[i].token, 100, borrower);
+        }
+        // The collateral in position 0 is used to make the position liquidatable.
+        terms.supplyCollateral(term, cs[0].token, 1400 - (n - 1) * 100, borrower);
+        vm.stopPrank();
+
+        return term;
+    }
+
+    function mintBond(Collateral[] memory cs) internal {
+        Term memory term = Term(address(loanToken), cs, block.timestamp + 100);
+        Offer memory borrowOffer = Offer({
+            buy: false,
+            offering: borrower,
+            assets: 1000,
+            loanToken: address(loanToken),
+            collaterals: cs,
+            maturity: block.timestamp + 100,
+            rate: 0.01e18 / 100,
+            nonce: gasleft(),
+            index: 1
+        });
+
+        terms.take(term, 1000, lender, borrowOffer, sig(borrowOffer, borrowerSK));
     }
 
     function execLiquidation(uint256 k, uint256 n) public {
