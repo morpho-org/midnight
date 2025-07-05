@@ -31,7 +31,7 @@ contract Terms is ITerms {
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling,
     /// mass-cancelling, OCO (One-Cancels-the-Other) and OPCO (Once-Partially-Cancels-the-Other) orders.
-    mapping(address user => uint256) nonce;
+    mapping(address user => uint256) public nonce;
     mapping(address user => mapping(uint256 nonce => Group)) internal _group;
 
     /// ENTRY-POINTS ///
