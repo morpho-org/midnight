@@ -203,7 +203,6 @@ contract Terms is ITerms {
 
     /// @dev Invalidate all offers with a nonce < newNonce.
     function setNonce(uint256 newNonce) external {
-        require(newNonce <= type(uint248).max, "max");
         require(nonce[msg.sender] <= newNonce, "no increase");
         nonce[msg.sender] = newNonce;
     }
