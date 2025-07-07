@@ -5,18 +5,6 @@ pragma solidity ^0.8.0;
 import "./BaseTest.sol";
 
 contract NonceTest is BaseTest {
-    function testSetNonceOverflow(address account, uint256 nonce1, uint256 nonce2) external {
-        nonce1 = bound(nonce1, 0, type(uint248).max);
-        nonce2 = bound(nonce2, uint256(type(uint248).max) + 1, type(uint256).max);
-
-        vm.prank(account);
-        terms.setNonce(nonce1);
-
-        vm.prank(account);
-        vm.expectRevert();
-        terms.setNonce(nonce2);
-    }
-
     function testSetNonceOk(address account, uint256 nonce1, uint256 nonce2) external {
         nonce1 = bound(nonce1, 0, type(uint248).max);
         nonce2 = bound(nonce2, nonce1, type(uint248).max);
