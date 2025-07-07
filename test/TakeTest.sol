@@ -160,11 +160,11 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithLender() public {
-        terms.take(term, 100, borrower, true, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         borrowOffer.offering = lender;
         borrowOffer.nonce = 1;
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(borrowOffer, sig(borrowOffer, lenderSK)));
+        terms.take(term, 100, borrower, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, lenderSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
