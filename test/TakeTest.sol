@@ -68,11 +68,11 @@ contract TakeTest is BaseTest {
         Offer memory offer;
         Signature memory sig;
         vm.expectRevert("maturity");
-        terms.take(term, 100, lender, true, address(matching), abi.encode(offer, sig));
+        terms.take(term, 100, lender, address(matching), abi.encode(offer, sig));
     }
 
     function testLend() public {
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
         assertEq(terms.debtOf(borrower, id), 101, "borrower debt");
@@ -84,7 +84,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBorrow() public {
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 101, "bond shares");
         assertEq(terms.debtOf(borrower, id), 101, "lender debt");
@@ -96,7 +96,7 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithLender() public {
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
 
         (address otherLender, uint256 otherLenderSK) = makeAddrAndKey("otherLender");
         vm.startPrank(otherLender);
@@ -105,7 +105,7 @@ contract TakeTest is BaseTest {
         vm.stopPrank();
         deal(address(loanToken), otherLender, 100);
         lendOffer.offering = otherLender;
-        terms.take(term, 100, lender, false, address(matching), abi.encode(lendOffer, sig(lendOffer, otherLenderSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(lendOffer, sig(lendOffer, otherLenderSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(otherLender, id), 101, "other lender bond shares");
@@ -117,10 +117,10 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithBorrower() public {
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
         lendOffer.offering = borrower;
         lendOffer.nonce = 1;
-        terms.take(term, 100, lender, false, address(matching), abi.encode(lendOffer, sig(lendOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(lendOffer, sig(lendOffer, borrowerSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -132,7 +132,7 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithBorrower() public {
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         (address otherBorrower, uint256 otherBorrowerSK) = makeAddrAndKey("otherBorrower");
         vm.startPrank(otherBorrower);
@@ -143,9 +143,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), otherBorrower, 135);
         terms.supplyCollateral(term, address(collateralToken1), 135, otherBorrower);
         borrowOffer.offering = otherBorrower;
-        terms.take(
-            term, 100, borrower, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, otherBorrowerSK))
-        );
+        terms.take(term, 100, borrower, address(matching), abi.encode(borrowOffer, sig(borrowOffer, otherBorrowerSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -160,11 +158,11 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithLender() public {
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         borrowOffer.offering = lender;
         borrowOffer.nonce = 1;
-        terms.take(term, 100, borrower, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(borrowOffer, sig(borrowOffer, lenderSK)));
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -178,10 +176,8 @@ contract TakeTest is BaseTest {
     }
 
     function testMatch() public {
-        terms.take(
-            term, 100, address(this), true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
-        );
-        terms.take(term, 100, address(this), false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, address(this), address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, address(this), address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         assertEq(terms.bondSharesOf(address(this), id), 0, "bond shares");
         assertEq(terms.debtOf(address(this), id), 0, "debt");
@@ -191,21 +187,21 @@ contract TakeTest is BaseTest {
     }
 
     function testConsumed() public {
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         vm.expectRevert("consumed");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakePartialFill() public {
-        terms.take(term, 50, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 50, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         assertEq(matching.consumed(lender, 0), 50);
 
         vm.expectRevert("consumed");
-        terms.take(term, 51, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 51, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
-        terms.take(term, 50, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 50, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         assertEq(matching.consumed(lender, 0), 100);
     }
@@ -216,99 +212,99 @@ contract TakeTest is BaseTest {
         Term memory term2 = term;
         term2.maturity = block.timestamp + 200;
 
-        terms.take(term, 70, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 70, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         vm.expectRevert("consumed");
-        terms.take(term2, 31, borrower, false, address(matching), abi.encode(lendOffer2, sig(lendOffer2, lenderSK)));
+        terms.take(term2, 31, borrower, address(matching), abi.encode(lendOffer2, sig(lendOffer2, lenderSK)));
 
         terms.supplyCollateral(term2, address(collateralToken1), 134, borrower);
 
-        terms.take(term2, 30, borrower, false, address(matching), abi.encode(lendOffer2, sig(lendOffer2, lenderSK)));
+        terms.take(term2, 30, borrower, address(matching), abi.encode(lendOffer2, sig(lendOffer2, lenderSK)));
         assertEq(matching.consumed(lender, 0), 100);
     }
 
     function testTakeMaturityPassed() public {
         vm.warp(block.timestamp + 101);
         vm.expectRevert("maturity");
-        terms.take(term, 100, lender, true, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeLendOfferCollateralMissing() public {
         lendOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeLendOfferLLTVMismatch() public {
         lendOffer.collaterals[0].lltv = 0.5e18;
 
         vm.expectRevert("LLTVs do not match");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeLendOfferOraclesMismatch() public {
         lendOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeBorrowOfferTooMuchCollaterals() public {
         borrowOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 
     function testTakeBorrowOfferLLTVMismatch() public {
         borrowOffer.collaterals[0].lltv = 0.99e18;
 
         vm.expectRevert("LLTVs do not match");
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 
     function testTakeBorrowOfferOraclesMismatch() public {
         borrowOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 
     function testTakeSellerMakerNotHealthyMaker() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        terms.take(term, 100, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 
     function testTakeSellerTakerNotHealthy() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeOfferWrongLoanToken(address _loanToken) public {
         vm.assume(_loanToken != address(loanToken));
         lendOffer.loanToken = _loanToken;
         vm.expectRevert("Loan tokens do not match");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeOfferWrongMaturity(uint256 _maturity) public {
         vm.assume(_maturity != term.maturity);
         lendOffer.maturity = _maturity;
         vm.expectRevert("Maturities do not match");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
     }
 
     function testTakeWrongSignature(Offer memory _offer) public {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
         vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(_offer, sig(_offer, lenderSK)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(_offer, sig(_offer, lenderSK)));
     }
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, false, address(matching), abi.encode(lendOffer, Signature(0, 0, 0)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(0, 0, 0)));
     }
 }

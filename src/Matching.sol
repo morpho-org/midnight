@@ -4,25 +4,6 @@ pragma solidity 0.8.28;
 
 import "./interfaces/IMatching.sol";
 
-struct Offer {
-    bool buy;
-    address offering;
-    uint256 assets;
-    address loanToken;
-    Collateral[] collaterals;
-    uint256 maturity;
-    // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
-    // 1% APR.
-    uint256 rate;
-    uint256 nonce;
-}
-
-struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
 contract Matching is IMatching {
     /// CONSTANTS ///
 
@@ -40,12 +21,15 @@ contract Matching is IMatching {
 
     /// FUNCTIONS ///
 
-    function take(Term memory term, uint256 assets, bytes calldata data) external returns (address, uint256) {
+    function take(Term memory term, uint256 assets, bytes calldata data)
+        external
+        returns (bool buy, address counterparty, uint256 bonds)
+    {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
-        return (offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
+        return (offer.buy, offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
     }
 
     /// INTERNAL ///

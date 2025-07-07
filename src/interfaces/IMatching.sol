@@ -4,8 +4,27 @@ pragma solidity ^0.8.0;
 
 import "./ITerms.sol";
 
+struct Offer {
+    bool buy;
+    address offering;
+    uint256 assets;
+    address loanToken;
+    Collateral[] collaterals;
+    uint256 maturity;
+    // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
+    // 1% APR.
+    uint256 rate;
+    uint256 nonce;
+}
+
+struct Signature {
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
+
 interface IMatching {
     function take(Term memory term, uint256 assets, bytes calldata data)
         external
-        returns (address counterparty, uint256 bonds);
+        returns (bool buy, address counterparty, uint256 bonds);
 }

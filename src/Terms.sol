@@ -33,15 +33,13 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 assets, address onBehalf, bool buy, address matching, bytes calldata data)
-        external
-    {
+    function take(Term memory term, uint256 assets, address onBehalf, address matching, bytes calldata data) external {
         require(term.maturity >= block.timestamp, "maturity");
 
-        (address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
+        (bool buy, address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
         require(isMatching[counterparty][matching], "not a matching contract");
 
-        (address buyer, address seller) = buy ? (onBehalf, counterparty) : (counterparty, onBehalf);
+        (address buyer, address seller) = buy ? (counterparty, onBehalf) : (onBehalf, counterparty);
         bytes32 id = _id(term);
 
         {

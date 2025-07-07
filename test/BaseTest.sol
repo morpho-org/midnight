@@ -105,6 +105,6 @@ abstract contract BaseTest is Test {
         });
 
         // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, true, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(term, bonds, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
     }
 }
