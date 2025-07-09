@@ -305,7 +305,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(0, 0, 0)));
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(1, 0, 0)));
     }
 
     function testContractSignature() public {
