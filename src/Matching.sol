@@ -20,7 +20,7 @@ contract Matching is IMatching {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    mapping (address => mapping(bytes32 => bool)) signed;
+    mapping(address => mapping(bytes32 => bool)) signed;
 
     /// FUNCTIONS ///
 
@@ -59,7 +59,7 @@ contract Matching is IMatching {
     function _checkSignature(Offer memory offer, Signature memory signature) internal view {
         // Interpret v == 0 as a contract signature.
         if (signature.v == 0) {
-            require(signed[offer.offering][keccak256(abi.encode(offer))],"Invalid contract signature");
+            require(signed[offer.offering][keccak256(abi.encode(offer))], "Invalid contract signature");
         } else {
             bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
             bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
@@ -71,11 +71,11 @@ contract Matching is IMatching {
 
     function signOffer(Offer memory offer) external {
         signed[msg.sender][keccak256(abi.encode(offer))] = true;
-        emit EventsLib.SignOffer(msg.sender,offer);
+        emit EventsLib.SignOffer(msg.sender, offer);
     }
 
     function revokeOffer(Offer memory offer) external {
         signed[msg.sender][keccak256(abi.encode(offer))] = false;
-        emit EventsLib.RevokeOffer(msg.sender,offer);
+        emit EventsLib.RevokeOffer(msg.sender, offer);
     }
 }
