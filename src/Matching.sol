@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import "./interfaces/IMatching.sol";
+import "./libraries/EventsLib.sol";
 
 contract Matching is IMatching {
     /// CONSTANTS ///
@@ -18,6 +19,8 @@ contract Matching is IMatching {
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+
+    mapping (address => mapping(bytes32 => bool)) signed;
 
     /// FUNCTIONS ///
 
@@ -54,11 +57,25 @@ contract Matching is IMatching {
     }
 
     function _checkSignature(Offer memory offer, Signature memory signature) internal view {
-        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+        // Interpret v == 0 as a contract signature.
+        if (signature.v == 0) {
+            require(signed[offer.offering][keccak256(abi.encode(offer))],"Invalid contract signature");
+        } else {
+            bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
+            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+            address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+            require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
+        }
+    }
 
-        require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
+    function signOffer(Offer memory offer) external {
+        signed[msg.sender][keccak256(abi.encode(offer))] = true;
+        emit EventsLib.SignOffer(msg.sender,offer);
+    }
+
+    function revokeOffer(Offer memory offer) external {
+        signed[msg.sender][keccak256(abi.encode(offer))] = false;
+        emit EventsLib.RevokeOffer(msg.sender,offer);
     }
 }

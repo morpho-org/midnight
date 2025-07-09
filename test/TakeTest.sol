@@ -307,4 +307,21 @@ contract TakeTest is BaseTest {
         vm.expectRevert("Invalid signature");
         terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(0, 0, 0)));
     }
+
+    function testContractSignature() public {
+        Signature memory zeroSig;
+
+        vm.expectRevert("Invalid contract signature");
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, zeroSig));
+
+        vm.prank(borrower);
+        matching.signOffer(borrowOffer);
+
+        terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
+
+        vm.prank(borrower);
+        matching.revokeOffer(borrowOffer);
+        vm.expectRevert("Invalid contract signature");
+        terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
+    }
 }
