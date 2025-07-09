@@ -27,20 +27,20 @@ contract Matching is IMatching {
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         _checkSignature(offer, sig);
-        _checkOffer(term, offer);
+        require(offer.loanToken == term.loanToken, "Loan tokens do not match");
+        require(offer.maturity == term.maturity, "Maturities do not match");
+        if (offer.buy) {
+            _checkCollateralsInclusion(term.collaterals, offer.collaterals);
+        } else {
+            _checkCollateralsInclusion(offer.collaterals, term.collaterals);
+        }
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
         return (offer.buy, offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
     }
 
     /// INTERNAL ///
 
-    function _checkOffer(Term memory term, Offer memory offer) internal pure {
-        require(offer.loanToken == term.loanToken, "Loan tokens do not match");
-        require(offer.maturity == term.maturity, "Maturities do not match");
-
-        Collateral[] memory subset = offer.buy ? term.collaterals : offer.collaterals;
-        Collateral[] memory superset = offer.buy ? offer.collaterals : term.collaterals;
-
+    function _checkCollateralsInclusion(Collateral[] memory subset, Collateral[] memory superset) internal pure {
         uint256 j = 0;
         for (uint256 i = 0; i < subset.length; i++) {
             // Relies on the fact that the collaterals are sorted.
