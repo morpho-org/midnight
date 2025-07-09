@@ -26,7 +26,7 @@ struct Offer {
     // 1% APR.
     uint256 rate;
     uint256 nonce;
-    uint8 index;
+    uint16 index;
 }
 
 struct Signature {
@@ -45,6 +45,6 @@ struct Seizure {
 interface ITerms {}
 
 struct Group {
-    uint8 selected;
-    uint248 consumed;
+    uint16 selected;
+    uint240 consumed;
 }

@@ -53,7 +53,7 @@ contract Terms is ITerms {
         require(offer.nonce >= nonce[offer.offering], "min nonce");
         require(offer.index > 0, "index");
         require(offerGroup.selected == 0 || offerGroup.selected == offer.index, "taken");
-        require((offerGroup.consumed += assets.toUint248()) <= offer.assets, "consumed");
+        require((offerGroup.consumed += assets.toUint240()) <= offer.assets, "consumed");
         offerGroup.selected = offer.index;
 
         (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);

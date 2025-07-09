@@ -6,8 +6,8 @@ import "./BaseTest.sol";
 
 contract NonceTest is BaseTest {
     function testSetNonceOk(address account, uint256 nonce1, uint256 nonce2) external {
-        nonce1 = bound(nonce1, 0, type(uint248).max);
-        nonce2 = bound(nonce2, nonce1, type(uint248).max);
+        nonce1 = bound(nonce1, 0, type(uint240).max);
+        nonce2 = bound(nonce2, nonce1, type(uint240).max);
 
         vm.prank(account);
         terms.setNonce(nonce1);
@@ -20,7 +20,7 @@ contract NonceTest is BaseTest {
     }
 
     function testSetNonceNoIncrease(address account, uint256 nonce1, uint256 nonce2) external {
-        nonce1 = bound(nonce1, 1, type(uint248).max);
+        nonce1 = bound(nonce1, 1, type(uint240).max);
         nonce2 = bound(nonce2, 0, nonce1 - 1);
 
         vm.prank(account);

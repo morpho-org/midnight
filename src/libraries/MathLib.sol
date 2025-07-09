@@ -36,9 +36,9 @@ library MathLib {
         return (x * y + (d - 1)) / d;
     }
 
-    /// @dev Casts to uint248, reverting if input number is too large.
-    function toUint248(uint256 x) internal pure returns (uint248) {
-        require(x <= type(uint248).max, ErrorsLib.CastOverflow());
-        return uint248(x);
+    /// @dev Casts to uint240, reverting if input number is too large.
+    function toUint240(uint256 x) internal pure returns (uint240) {
+        require(x <= type(uint240).max, ErrorsLib.CastOverflow());
+        return uint240(x);
     }
 }
