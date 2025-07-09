@@ -8,7 +8,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
-import "./interfaces/IMatching.sol";
+import "./interfaces/IHook.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -26,44 +26,52 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalBonds;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address user => mapping(address matching => bool)) public isMatching;
+    mapping(address user => mapping(address hook => bool)) public isHook;
 
     /// ENTRY-POINTS ///
 
-    /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 assets, address onBehalf, address matching, bytes calldata data) external {
+    /// @dev The hook of the maker is validated.
+    function take(
+        Term memory term,
+        uint256 assets,
+        uint256 bonds,
+        address buyer,
+        address buyerHook,
+        bytes calldata buyerData,
+        address seller,
+        address sellerHook,
+        bytes calldata sellerData
+    ) external {
         require(term.maturity >= block.timestamp, "maturity");
+        // TODO: implement isAuthorized
+        // require(buyer == msg.sender || isAuthorized[buyer][msg.sender] || isHook[buyer][buyerHook], "not a hook");
+        // require(seller == msg.sender || isAuthorized[seller][msg.sender] || isHook[buyer][buyerHook], "not a hook");
 
-        (bool buy, address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
-        require(isMatching[counterparty][matching], "not a matching contract");
-
-        (address buyer, address seller) = buy ? (counterparty, onBehalf) : (onBehalf, counterparty);
         bytes32 id = _id(term);
 
-        {
-            uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
-            uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
-            uint256 withdrawn =
-                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+        uint256 bought = bonds - repaid;
+        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
+        uint256 withdrawn =
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
-            debtOf[buyer][id] -= repaid;
-            bondSharesOf[buyer][id] += boughtShares;
-            bondSharesOf[seller][id] -= withdrawnShares;
-            debtOf[seller][id] += bonds - withdrawn;
+        debtOf[buyer][id] -= repaid;
+        bondSharesOf[buyer][id] += boughtShares;
+        bondSharesOf[seller][id] -= withdrawnShares;
+        debtOf[seller][id] += bonds - withdrawn;
 
-            totalShares[id] += boughtShares;
-            totalShares[id] -= withdrawnShares;
-            totalBonds[id] += bought;
-            totalBonds[id] -= withdrawn;
+        totalShares[id] += boughtShares;
+        totalShares[id] -= withdrawnShares;
+        totalBonds[id] += bought;
+        totalBonds[id] -= withdrawn;
 
-            require(_isHealthy(term, seller), "Seller is unhealthy");
-        }
-
+        if (buyerHook != address(0)) IHook(buyerHook).hook(term, assets, bonds, buyer, buyerData);
         IERC20(term.loanToken).transferFrom(buyer, seller, assets);
+        if (sellerHook != address(0)) IHook(sellerHook).hook(term, assets, bonds, seller, sellerData);
+        require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -182,8 +190,8 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function setMatching(address matching, bool _isMatching) external {
-        isMatching[msg.sender][matching] = _isMatching;
+    function setHook(address hook, bool _isHook) external {
+        isHook[msg.sender][hook] = _isHook;
     }
 
     /// INTERNAL ///

@@ -43,10 +43,10 @@ abstract contract BaseTest is Test {
 
         vm.startPrank(lender);
         loanToken.approve(address(terms), type(uint256).max);
-        terms.setMatching(address(matching), true);
+        terms.setHook(address(matching), true);
         vm.startPrank(borrower);
         loanToken.approve(address(terms), type(uint256).max);
-        terms.setMatching(address(matching), true);
+        terms.setHook(address(matching), true);
         vm.startPrank(liquidator);
         loanToken.approve(address(terms), type(uint256).max);
         vm.stopPrank();
@@ -105,6 +105,16 @@ abstract contract BaseTest is Test {
         });
 
         // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(
+            term,
+            bonds,
+            bonds,
+            lender,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
+            borrower,
+            address(0),
+            hex""
+        );
     }
 }
