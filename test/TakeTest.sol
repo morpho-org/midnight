@@ -36,6 +36,7 @@ contract TakeTest is BaseTest {
         id = keccak256(abi.encode(term));
 
         lendOffer.buy = true;
+        borrowOffer.asBorrower = false;
         lendOffer.offering = lender;
         lendOffer.assets = 100;
         lendOffer.loanToken = address(loanToken);
@@ -48,6 +49,7 @@ contract TakeTest is BaseTest {
         }
 
         borrowOffer.buy = false;
+        borrowOffer.asBorrower = true;
         borrowOffer.offering = borrower;
         borrowOffer.assets = 100;
         borrowOffer.loanToken = address(loanToken);
@@ -119,6 +121,7 @@ contract TakeTest is BaseTest {
     function testWithdrawSecondaryWithBorrower() public {
         terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
         lendOffer.offering = borrower;
+        lendOffer.asBorrower = true;
         lendOffer.nonce = 1;
         terms.take(term, 100, lender, address(matching), abi.encode(lendOffer, sig(lendOffer, borrowerSK)));
 
@@ -161,6 +164,7 @@ contract TakeTest is BaseTest {
         terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, sig(lendOffer, lenderSK)));
 
         borrowOffer.offering = lender;
+        borrowOffer.asBorrower = false;
         borrowOffer.nonce = 1;
         terms.take(term, 100, borrower, address(matching), abi.encode(borrowOffer, sig(borrowOffer, lenderSK)));
 

@@ -38,21 +38,21 @@ contract LiquidationTest is BaseTest {
     }
 
     function testLiquidateHealthy() public {
-        setupBond(term, 100);
+        setupBond(term, 100, true);
 
         vm.expectRevert("position is healthy");
         terms.liquidate(term, new Seizure[](2), borrower, "");
     }
 
     function testLiquidateNoOp() public {
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(0);
 
         terms.liquidate(term, new Seizure[](2), borrower, "");
     }
 
     function testLiquidateInconsistentInput() public {
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(0);
 
         Seizure[] memory seizures = new Seizure[](2);
@@ -65,7 +65,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateBondsInput() public {
         // Setup
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(1e36 - 1);
         deal(address(loanToken), address(this), 1);
 
@@ -81,7 +81,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateCollateralInput() public {
         // Setup
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(1e36 - 1);
         deal(address(loanToken), address(this), 1);
 
@@ -97,7 +97,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateBadDebt() public {
         // Setup
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(0.5e36);
         deal(address(loanToken), address(this), 1);
 
@@ -114,7 +114,7 @@ contract LiquidationTest is BaseTest {
         vm.assume(data.length > 0);
 
         // Setup
-        setupBond(term, 100);
+        setupBond(term, 100, true);
         oracle.setPrice(1e36 - 1);
         deal(address(loanToken), address(this), 1);
 

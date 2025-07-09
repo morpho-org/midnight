@@ -63,7 +63,7 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, 0, (supply - minCollateral) / 2);
         deal(address(collateralToken1), address(this), supply);
-        setupBond(term, bonds, supply);
+        setupBond(term, bonds, supply, true);
 
         // Test
         terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
@@ -82,7 +82,7 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, supply - minCollateral + 1, supply);
         deal(address(collateralToken1), address(this), supply);
-        setupBond(term, bonds, supply);
+        setupBond(term, bonds, supply, true);
 
         // Test
         vm.expectRevert("Unhealthy borrower");
@@ -93,7 +93,7 @@ contract OtherFunctionsTest is BaseTest {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
         bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
         repaid = bound(repaid, 0, bonds);
-        setupBond(term, bonds);
+        setupBond(term, bonds, true);
 
         vm.warp(block.timestamp + 99);
 

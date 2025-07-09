@@ -23,13 +23,18 @@ contract Matching is IMatching {
 
     function take(Term memory term, uint256 assets, bytes calldata data)
         external
-        returns (bool buy, address counterparty, uint256 bonds)
+        returns (bool buy, bool asBorrower, address counterparty, uint256 bonds)
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
-        return (offer.buy, offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
+        return (
+            offer.buy,
+            offer.asBorrower,
+            offer.offering,
+            assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18
+        );
     }
 
     /// INTERNAL ///

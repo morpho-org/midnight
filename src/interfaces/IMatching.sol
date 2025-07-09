@@ -6,6 +6,11 @@ import "./ITerms.sol";
 
 struct Offer {
     bool buy;
+    // Buying as a borrower is repaying.
+    // Buying as a lender is lending.
+    // Selling as a borrower is borrowing.
+    // Selling as a lender is withdrawing.
+    bool asBorrower;
     address offering;
     uint256 assets;
     address loanToken;
@@ -26,5 +31,5 @@ struct Signature {
 interface IMatching {
     function take(Term memory term, uint256 assets, bytes calldata data)
         external
-        returns (bool buy, address counterparty, uint256 bonds);
+        returns (bool buy, bool asBorrower, address counterparty, uint256 bonds);
 }

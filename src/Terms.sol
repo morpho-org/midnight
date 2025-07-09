@@ -36,7 +36,7 @@ contract Terms is ITerms {
     function take(Term memory term, uint256 assets, address onBehalf, address matching, bytes calldata data) external {
         require(term.maturity >= block.timestamp, "maturity");
 
-        (bool buy, address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
+        (bool buy, bool asBorrower, address counterparty, uint256 bonds) = IMatching(matching).take(term, assets, data);
         require(isMatching[counterparty][matching], "not a matching contract");
 
         (address buyer, address seller) = buy ? (counterparty, onBehalf) : (onBehalf, counterparty);
@@ -49,11 +49,15 @@ contract Terms is ITerms {
             uint256 withdrawn =
                 UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+            uint256 borrowed = bonds - withdrawn;
+
+            if (buyer == counterparty) require((asBorrower ? bought : repaid) == 0, "buyer role");
+            else require((asBorrower ? withdrawn : borrowed) == 0, "seller role");
 
             debtOf[buyer][id] -= repaid;
             bondSharesOf[buyer][id] += boughtShares;
             bondSharesOf[seller][id] -= withdrawnShares;
-            debtOf[seller][id] += bonds - withdrawn;
+            debtOf[seller][id] += borrowed;
 
             totalShares[id] += boughtShares;
             totalShares[id] -= withdrawnShares;
