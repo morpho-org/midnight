@@ -77,11 +77,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
@@ -121,11 +121,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
 
         (address otherLender, uint256 otherLenderSK) = makeAddrAndKey("otherLender");
@@ -175,11 +175,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             borrower,
-            address(0),
-            hex"",
-            lender,
             address(matching),
-            abi.encode(lendOffer, sig(lendOffer, borrowerSK))
+            abi.encode(lendOffer, sig(lendOffer, borrowerSK)),
+            lender,
+            address(0),
+            hex""
         );
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
@@ -281,11 +281,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             address(this),
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
         terms.take(
             term,
@@ -335,7 +335,7 @@ contract TakeTest is BaseTest {
 
     function testTakePartialFill() public {
         lendOffer.rate = 0; // to simplify inputs
-        
+
         terms.take(
             term,
             50,
@@ -384,6 +384,7 @@ contract TakeTest is BaseTest {
         lendOffer2.maturity = block.timestamp + 200;
         Term memory term2 = term;
         term2.maturity = block.timestamp + 200;
+        terms.supplyCollateral(term2, address(collateralToken1), 135, borrower);
 
         terms.take(
             term,
@@ -400,8 +401,8 @@ contract TakeTest is BaseTest {
         vm.expectRevert("consumed");
         terms.take(
             term2,
-            30,
-            30,
+            31,
+            31,
             lender,
             address(matching),
             abi.encode(lendOffer2, sig(lendOffer2, lenderSK)),
@@ -409,8 +410,6 @@ contract TakeTest is BaseTest {
             address(0),
             hex""
         );
-
-        terms.supplyCollateral(term2, address(collateralToken1), 134, borrower);
 
         terms.take(
             term2,
@@ -502,11 +501,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
     }
 
@@ -519,11 +518,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
     }
 
@@ -536,11 +535,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
     }
 
@@ -552,11 +551,11 @@ contract TakeTest is BaseTest {
             100,
             101,
             lender,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
-            borrower,
             address(0),
-            hex""
+            hex"",
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
     }
 
@@ -619,7 +618,7 @@ contract TakeTest is BaseTest {
             101,
             lender,
             address(matching),
-            abi.encode(_offer, sig(_offer, lenderSK)),
+            abi.encode(lendOffer, sig(_offer, lenderSK)),
             borrower,
             address(0),
             hex""

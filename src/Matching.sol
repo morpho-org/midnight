@@ -42,12 +42,13 @@ contract Matching is IHook {
 
     function hook(Term memory term, uint256 assets, uint256 bonds, address user, bytes calldata data) external {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
+        // TODO validate buy
+        require(offer.offering == user, "not offering");
+        consumed[user][offer.nonce] += assets;
+        require(consumed[user][offer.nonce] <= offer.assets, "consumed");
+        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18, "bonds");
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
-        // validate buy
-        require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
-        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18, "bonds");
-        // require(offer.offering == user, "not offering");
     }
 
     /// INTERNAL ///
