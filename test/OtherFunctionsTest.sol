@@ -28,6 +28,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testSupplyCollateral(address user, uint256 amount) public {
         // Setup
+        vm.assume(user != borrower);
         ERC20 collateralToken = new ERC20("collat", "c");
         deal(address(collateralToken), address(this), amount);
         collateralToken.approve(address(terms), amount);
