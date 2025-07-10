@@ -68,9 +68,9 @@ contract Terms is ITerms {
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        if (buyerHook != address(0)) IHook(buyerHook).hook(term, assets, bonds, buyer, buyerData);
+        if (buyerHook != address(0)) IHook(buyerHook).hook(term, assets, bonds, true, buyer, buyerData);
         IERC20(term.loanToken).transferFrom(buyer, seller, assets);
-        if (sellerHook != address(0)) IHook(sellerHook).hook(term, assets, bonds, seller, sellerData);
+        if (sellerHook != address(0)) IHook(sellerHook).hook(term, assets, bonds, false, seller, sellerData);
         require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 
