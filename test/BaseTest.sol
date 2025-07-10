@@ -101,7 +101,8 @@ abstract contract BaseTest is Test {
             collaterals: term.collaterals,
             maturity: term.maturity,
             rate: 0,
-            nonce: 0
+            nonce: 0,
+            hook: address(matching)
         });
 
         // take `bonds` because the rate is 0.

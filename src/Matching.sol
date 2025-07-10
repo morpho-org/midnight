@@ -15,6 +15,7 @@ struct Offer {
     // 1% APR.
     uint256 rate;
     uint256 nonce;
+    address hook;
 }
 
 struct Signature {
@@ -28,7 +29,7 @@ contract Matching is IHook {
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
     bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce)"
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce, address hook)"
     );
 
     /// STORAGE ///
@@ -47,6 +48,7 @@ contract Matching is IHook {
         // validate buy
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18, "bonds");
+        require(offer.hook == address(this), "hook");
         // require(offer.offering == user, "not offering");
     }
 

@@ -42,6 +42,7 @@ contract TakeTest is BaseTest {
         lendOffer.maturity = block.timestamp + 100;
         lendOffer.rate = 0.01e18 / 100;
         lendOffer.nonce = 0;
+        lendOffer.hook = address(matching);
 
         for (uint256 i = 0; i < collaterals.length; i++) {
             lendOffer.collaterals.push(collaterals[i]);
@@ -54,6 +55,7 @@ contract TakeTest is BaseTest {
         borrowOffer.maturity = block.timestamp + 100;
         borrowOffer.rate = 0.01e18 / 100;
         borrowOffer.nonce = 0;
+        borrowOffer.hook = address(matching);
 
         for (uint256 i = 0; i < collaterals.length; i++) {
             borrowOffer.collaterals.push(collaterals[i]);
@@ -335,7 +337,7 @@ contract TakeTest is BaseTest {
 
     function testTakePartialFill() public {
         lendOffer.rate = 0; // to simplify inputs
-        
+
         terms.take(
             term,
             50,
@@ -382,6 +384,7 @@ contract TakeTest is BaseTest {
         lendOffer.rate = 0; // to simplify inputs
         Offer memory lendOffer2 = lendOffer;
         lendOffer2.maturity = block.timestamp + 200;
+        lendOffer2.hook = address(matching);
         Term memory term2 = term;
         term2.maturity = block.timestamp + 200;
 
