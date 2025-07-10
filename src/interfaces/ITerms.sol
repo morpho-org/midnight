@@ -2,6 +2,17 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+struct Trade {
+    Offer offer;
+    bytes check;
+}
+
+struct Offer {
+    address owner;
+    address hook;
+    bytes details;
+}
+
 struct Term {
     address loanToken;
     // Must be sorted by address.

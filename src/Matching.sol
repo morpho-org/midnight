@@ -3,10 +3,10 @@
 pragma solidity 0.8.28;
 
 import "./interfaces/IHook.sol";
+import "./libraries/ConstantsLib.sol";
 
-struct Offer {
-    bool buy;
-    address offering;
+struct MatchingDetails {
+    bool buying;
     uint256 assets;
     address loanToken;
     Collateral[] collaterals;
@@ -15,7 +15,6 @@ struct Offer {
     // 1% APR.
     uint256 rate;
     uint256 nonce;
-    address hook;
 }
 
 struct Signature {
@@ -28,9 +27,6 @@ contract Matching is IHook {
     /// CONSTANTS ///
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
-    bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce, address hook)"
-    );
 
     /// STORAGE ///
 
@@ -41,28 +37,25 @@ contract Matching is IHook {
 
     /// FUNCTIONS ///
 
-    function hook(Term memory term, uint256 assets, uint256 bonds, bool buy, address user, bytes calldata data)
-        external
-    {
-        (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
-        require(offer.buy == buy, "not a buy");
-        require(offer.offering == user, "not offering");
-        consumed[user][offer.nonce] += assets;
-        require(consumed[user][offer.nonce] <= offer.assets, "consumed");
-        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18, "bonds");
-        require(offer.hook == address(this), "hook");
-        _checkSignature(offer, sig);
-        _checkOffer(term, offer);
+    function hook(Term memory term, uint256 assets, uint256 bonds, bool buying, Trade calldata trade) external {
+        MatchingDetails memory details = abi.decode(trade.offer.details, (MatchingDetails));
+        require(buying == details.buying, "buy sell mismatch");
+        consumed[trade.offer.owner][details.nonce] += assets;
+        require(consumed[trade.offer.owner][details.nonce] <= details.assets, "consumed");
+        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * details.rate) / 1e18, "bonds");
+        require(trade.offer.hook == address(this), "hook");
+        _checkSignature(trade.offer, abi.decode(trade.check, (Signature)));
+        _checkMatching(term, details);
     }
 
     /// INTERNAL ///
 
-    function _checkOffer(Term memory term, Offer memory offer) internal pure {
-        require(offer.loanToken == term.loanToken, "Loan tokens do not match");
-        require(offer.maturity == term.maturity, "Maturities do not match");
+    function _checkMatching(Term memory term, MatchingDetails memory details) internal pure {
+        require(details.loanToken == term.loanToken, "Loan tokens do not match");
+        require(details.maturity == term.maturity, "Maturities do not match");
 
-        Collateral[] memory subset = offer.buy ? term.collaterals : offer.collaterals;
-        Collateral[] memory superset = offer.buy ? offer.collaterals : term.collaterals;
+        Collateral[] memory subset = details.buying ? term.collaterals : details.collaterals;
+        Collateral[] memory superset = details.buying ? details.collaterals : term.collaterals;
 
         uint256 j = 0;
         for (uint256 i = 0; i < subset.length; i++) {
@@ -82,6 +75,6 @@ contract Matching is IHook {
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
 
-        require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
+        require(signatory != address(0) && offer.owner == signatory, "Invalid signature");
     }
 }
