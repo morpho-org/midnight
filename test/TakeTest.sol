@@ -311,17 +311,17 @@ contract TakeTest is BaseTest {
     function testContractSignature() public {
         Signature memory zeroSig;
 
-        vm.expectRevert("Invalid contract signature");
+        vm.expectRevert("offer not enabled");
         terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, zeroSig));
 
         vm.prank(borrower);
-        matching.signOffer(borrowOffer);
+        matching.enableOffer(borrowOffer);
 
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
 
         vm.prank(borrower);
-        matching.revokeOffer(borrowOffer);
-        vm.expectRevert("Invalid contract signature");
+        matching.disableOffer(borrowOffer);
+        vm.expectRevert("offer not enabled");
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
     }
 }
