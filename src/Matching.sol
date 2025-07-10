@@ -20,7 +20,7 @@ contract Matching is IMatching {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    mapping(address => mapping(bytes32 => bool)) signed;
+    mapping(address => mapping(bytes => bool)) enabled;
 
     /// FUNCTIONS ///
 
@@ -29,7 +29,8 @@ contract Matching is IMatching {
         returns (bool buy, address counterparty, uint256 bonds)
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
-        _checkSignature(offer, sig);
+
+        _checkCanUseOffer(offer,sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
         return (offer.buy, offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
@@ -56,26 +57,25 @@ contract Matching is IMatching {
         }
     }
 
-    function _checkSignature(Offer memory offer, Signature memory signature) internal view {
-        // Interpret v == 0 as a contract signature.
-        if (signature.v == 0) {
-            require(signed[offer.offering][keccak256(abi.encode(offer))], "Invalid contract signature");
+    function _checkCanUseOffer(Offer memory offer, Signature memory sig) internal view {
+        if (sig.v == 0) {
+            require(enabled[offer.offering][abi.encode(offer)], "offer not enabled");
         } else {
             bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
             bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-            address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
-            require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
+            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
+            require(signatory != address(0) && offer.offering == signatory, "Invalid sig");
         }
     }
 
-    function signOffer(Offer memory offer) external {
-        signed[msg.sender][keccak256(abi.encode(offer))] = true;
-        emit EventsLib.SignOffer(msg.sender, offer);
+    function enableOffer(Offer memory offer) external {
+        enabled[msg.sender][abi.encode(offer)] = true;
+        emit EventsLib.EnableOffer(msg.sender, offer);
     }
 
-    function revokeOffer(Offer memory offer) external {
-        signed[msg.sender][keccak256(abi.encode(offer))] = false;
-        emit EventsLib.RevokeOffer(msg.sender, offer);
+    function disableOffer(Offer memory offer) external {
+        enabled[msg.sender][abi.encode(offer)] = false;
+        emit EventsLib.DisableOffer(msg.sender, offer);
     }
 }
