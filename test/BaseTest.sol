@@ -105,7 +105,8 @@ abstract contract BaseTest is Test {
             hook: address(matching)
         });
 
-        // take `bonds` because the rate is 0.
+        // assets = bonds because the rate is 0.
+        vm.prank(lender);
         terms.take(
             term,
             bonds,
