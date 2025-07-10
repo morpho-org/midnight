@@ -45,9 +45,8 @@ contract Terms is ITerms {
         bytes calldata sellerData
     ) external {
         require(term.maturity >= block.timestamp, "maturity");
-        // TODO: implement isAuthorized
-        // require(buyer == msg.sender || isAuthorized[buyer][msg.sender] || isHook[buyer][buyerHook], "not a hook");
-        // require(seller == msg.sender || isAuthorized[seller][msg.sender] || isHook[buyer][buyerHook], "not a hook");
+        require(buyer == msg.sender || isHook[buyer][buyerHook], "not a hook");
+        require(seller == msg.sender || isHook[seller][sellerHook], "not a hook");
 
         bytes32 id = _id(term);
 

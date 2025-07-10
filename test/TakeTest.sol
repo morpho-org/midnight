@@ -72,6 +72,7 @@ contract TakeTest is BaseTest {
     }
 
     function testLend() public {
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -94,6 +95,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBorrow() public {
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -116,6 +118,7 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithLender() public {
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -135,6 +138,7 @@ contract TakeTest is BaseTest {
         vm.stopPrank();
         deal(address(loanToken), otherLender, 100);
         lendOffer.offering = otherLender;
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -157,6 +161,7 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithBorrower() public {
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -170,6 +175,7 @@ contract TakeTest is BaseTest {
         );
         lendOffer.offering = borrower;
         lendOffer.nonce = 1;
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -192,6 +198,7 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithBorrower() public {
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -213,6 +220,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), otherBorrower, 135);
         terms.supplyCollateral(term, address(collateralToken1), 135, otherBorrower);
         borrowOffer.offering = otherBorrower;
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -238,6 +246,7 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithLender() public {
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -252,6 +261,7 @@ contract TakeTest is BaseTest {
 
         borrowOffer.offering = lender;
         borrowOffer.nonce = 1;
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -280,23 +290,12 @@ contract TakeTest is BaseTest {
             term,
             100,
             101,
-            address(this),
-            address(0),
-            hex"",
-            borrower,
-            address(matching),
-            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
-        );
-        terms.take(
-            term,
-            100,
-            101,
             lender,
             address(matching),
             abi.encode(lendOffer, sig(lendOffer, lenderSK)),
-            address(this),
-            address(0),
-            hex""
+            borrower,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK))
         );
 
         assertEq(terms.bondSharesOf(address(this), id), 0, "bond shares");
@@ -307,6 +306,7 @@ contract TakeTest is BaseTest {
     }
 
     function testConsumed() public {
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -320,10 +320,11 @@ contract TakeTest is BaseTest {
         );
 
         vm.expectRevert("consumed");
+        vm.prank(borrower);
         terms.take(
             term,
-            100,
-            101,
+            1,
+            2,
             lender,
             address(matching),
             abi.encode(lendOffer, sig(lendOffer, lenderSK)),
@@ -336,6 +337,7 @@ contract TakeTest is BaseTest {
     function testTakePartialFill() public {
         lendOffer.rate = 0; // to simplify inputs
 
+        vm.prank(borrower);
         terms.take(
             term,
             50,
@@ -351,6 +353,7 @@ contract TakeTest is BaseTest {
         assertEq(matching.consumed(lender, 0), 50);
 
         vm.expectRevert("consumed");
+        vm.prank(borrower);
         terms.take(
             term,
             51,
@@ -363,6 +366,7 @@ contract TakeTest is BaseTest {
             hex""
         );
 
+        vm.prank(borrower);
         terms.take(
             term,
             50,
@@ -386,6 +390,7 @@ contract TakeTest is BaseTest {
         term2.maturity = block.timestamp + 200;
         terms.supplyCollateral(term2, address(collateralToken1), 135, borrower);
 
+        vm.prank(borrower);
         terms.take(
             term,
             70,
@@ -399,6 +404,7 @@ contract TakeTest is BaseTest {
         );
 
         vm.expectRevert("consumed");
+        vm.prank(borrower);
         terms.take(
             term2,
             31,
@@ -411,6 +417,7 @@ contract TakeTest is BaseTest {
             hex""
         );
 
+        vm.prank(borrower);
         terms.take(
             term2,
             30,
@@ -428,6 +435,7 @@ contract TakeTest is BaseTest {
     function testTakeMaturityPassed() public {
         vm.warp(block.timestamp + 101);
         vm.expectRevert("maturity");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -445,6 +453,7 @@ contract TakeTest is BaseTest {
         lendOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -462,6 +471,7 @@ contract TakeTest is BaseTest {
         lendOffer.collaterals[0].lltv = 0.5e18;
 
         vm.expectRevert("LLTVs do not match");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -479,6 +489,7 @@ contract TakeTest is BaseTest {
         lendOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -496,6 +507,7 @@ contract TakeTest is BaseTest {
         borrowOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -513,6 +525,7 @@ contract TakeTest is BaseTest {
         borrowOffer.collaterals[0].lltv = 0.99e18;
 
         vm.expectRevert("LLTVs do not match");
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -530,6 +543,7 @@ contract TakeTest is BaseTest {
         borrowOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -546,6 +560,7 @@ contract TakeTest is BaseTest {
     function testTakeSellerMakerNotHealthyMaker() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
+        vm.prank(lender);
         terms.take(
             term,
             100,
@@ -562,6 +577,7 @@ contract TakeTest is BaseTest {
     function testTakeSellerTakerNotHealthy() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -579,6 +595,7 @@ contract TakeTest is BaseTest {
         vm.assume(_loanToken != address(loanToken));
         lendOffer.loanToken = _loanToken;
         vm.expectRevert("Loan tokens do not match");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -596,6 +613,7 @@ contract TakeTest is BaseTest {
         vm.assume(_maturity != term.maturity);
         lendOffer.maturity = _maturity;
         vm.expectRevert("Maturities do not match");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -612,6 +630,7 @@ contract TakeTest is BaseTest {
     function testTakeWrongSignature(Offer memory _offer) public {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
         vm.expectRevert("Invalid signature");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -627,6 +646,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("Invalid signature");
+        vm.prank(borrower);
         terms.take(
             term,
             100,
@@ -639,14 +659,4 @@ contract TakeTest is BaseTest {
             hex""
         );
     }
-
-    // Term memory term,
-    // uint256 assets,
-    // uint256 bonds,
-    // address buyer,
-    // address buyerHook,
-    // bytes calldata buyerData,
-    // address seller,
-    // address sellerHook,
-    // bytes calldata sellerData
 }
