@@ -27,6 +27,7 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
     mapping(address user => mapping(address hook => bool)) public isHook;
+    mapping(address owner => mapping(address spender => bool)) isAuthorized;
 
     /// ENTRY-POINTS ///
 
@@ -35,8 +36,16 @@ contract Terms is ITerms {
     /// @dev The hook of the maker is validated.
     function take(Term memory term, uint256 assets, uint256 bonds, Trade memory buy, Trade memory sell) external {
         require(term.maturity >= block.timestamp, "maturity");
-        require(buy.offer.owner == msg.sender || isHook[buy.offer.owner][buy.offer.hook], "not a hook");
-        require(sell.offer.owner == msg.sender || isHook[sell.offer.owner][sell.offer.hook], "not a hook");
+        require(
+            buy.offer.owner == msg.sender
+                || (isAuthorized[buy.offer.owner][msg.sender] && isHook[buy.offer.owner][buy.offer.hook]),
+            "not a hook"
+        );
+        require(
+            sell.offer.owner == msg.sender
+                || (isAuthorized[sell.offer.owner][msg.sender] && isHook[sell.offer.owner][sell.offer.hook]),
+            "not a hook"
+        );
 
         bytes32 id = _id(term);
 
@@ -181,6 +190,10 @@ contract Terms is ITerms {
 
     function setHook(address hook, bool _isHook) external {
         isHook[msg.sender][hook] = _isHook;
+    }
+
+    function setIsAuthorized(address spender, bool _isAuthorized) external {
+        isAuthorized[msg.sender][spender] = _isAuthorized;
     }
 
     /// INTERNAL ///
