@@ -33,48 +33,51 @@ contract Terms is ITerms {
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev The hook of the maker is validated.
-    function take(Term memory term, uint256 assets, uint256 bonds, Trade memory buy, Trade memory sell) external {
+    function take(Term memory term, uint256 assets, uint256 bonds, Trade calldata buy, Trade calldata sell) external {
+        address buyer = buy.offer.owner;
+        Hook[] calldata buyHooks = buy.offer.hooks;
+        address buyMatching;
+        if (buy.offer.hooks.length > 0) buyMatching = buyHooks[0].to;
+
+        address seller = sell.offer.owner;
+        Hook[] calldata sellHooks = sell.offer.hooks;
+        address sellMatching;
+        if (sell.offer.hooks.length > 0) sellMatching = sellHooks[0].to;
+
         require(term.maturity >= block.timestamp, "maturity");
-        require(
-            buy.offer.owner == msg.sender
-                || (buy.offer.hooks.length > 0 && isFirstHook[buy.offer.owner][buy.offer.hooks[0].to]),
-            "invalid buy"
-        );
-        require(
-            sell.offer.owner == msg.sender
-                || (sell.offer.hooks.length > 0 && isFirstHook[sell.offer.owner][sell.offer.hooks[0].to]),
-            "invalid sell"
-        );
+        require(buyer == msg.sender || isFirstHook[buyer][buyMatching], "invalid buy");
+        require(seller == msg.sender || isFirstHook[seller][sellMatching], "invalid sell");
 
         bytes32 id = _id(term);
 
-        uint256 repaid = UtilsLib.min(debtOf[buy.offer.owner][id], bonds);
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
         uint256 bought = bonds - repaid;
         uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[sell.offer.owner][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
         uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
-        debtOf[buy.offer.owner][id] -= repaid;
-        bondSharesOf[buy.offer.owner][id] += boughtShares;
-        bondSharesOf[sell.offer.owner][id] -= withdrawnShares;
-        debtOf[sell.offer.owner][id] += bonds - withdrawn;
+        debtOf[buyer][id] -= repaid;
+        bondSharesOf[buyer][id] += boughtShares;
+        bondSharesOf[seller][id] -= withdrawnShares;
+        debtOf[seller][id] += bonds - withdrawn;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        for (uint256 i = 0; i < buy.offer.hooks.length; i++) {
-            IHook(buy.offer.hooks[i].to).hook(term, assets, bonds, true, buy, i);
+        for (uint256 i = 0; i < buyHooks.length; i++) {
+            IHook(buyHooks[i].to).hook(term, assets, bonds, true, buy, i);
         }
 
-        IERC20(term.loanToken).transferFrom(buy.offer.owner, sell.offer.owner, assets);
+        IERC20(term.loanToken).transferFrom(buyer, seller, assets);
 
-        for (uint256 i = 0; i < sell.offer.hooks.length; i++) {
-            IHook(sell.offer.hooks[i].to).hook(term, assets, bonds, false, sell, i);
+        for (uint256 i = 0; i < sellHooks.length; i++) {
+            IHook(sellHooks[i].to).hook(term, assets, bonds, false, sell, i);
         }
-        require(_isHealthy(term, sell.offer.owner), "Seller is unhealthy");
+
+        require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
