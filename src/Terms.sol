@@ -27,6 +27,7 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
     mapping(address user => mapping(address hook => bool)) public isFirstHook;
+    mapping(address owner => mapping(address spender => bool)) isAuthorized;
 
     /// ENTRY-POINTS ///
 
@@ -45,8 +46,8 @@ contract Terms is ITerms {
         if (sell.offer.hooks.length > 0) sellMatching = sellHooks[0].to;
 
         require(term.maturity >= block.timestamp, "maturity");
-        require(buyer == msg.sender || isFirstHook[buyer][buyMatching], "invalid buy");
-        require(seller == msg.sender || isFirstHook[seller][sellMatching], "invalid sell");
+        require(buyer == msg.sender || (isAuthorized[buyer][msg.sender] && isFirstHook[buyer][buyMatching]), "invalid buy");
+        require(seller == msg.sender || (isAuthorized[seller][msg.sender] && isFirstHook[seller][sellMatching]), "invalid sell");
 
         bytes32 id = _id(term);
 
@@ -198,6 +199,10 @@ contract Terms is ITerms {
 
     function setFirstHook(address hook, bool _isFirstHook) external {
         isFirstHook[msg.sender][hook] = _isFirstHook;
+    }
+
+    function setIsAuthorized(address spender, bool _isAuthorized) external {
+        isAuthorized[msg.sender][spender] = _isAuthorized;
     }
 
     /// INTERNAL ///
