@@ -37,13 +37,14 @@ contract Matching is IHook {
 
     /// FUNCTIONS ///
 
-    function hook(Term memory term, uint256 assets, uint256 bonds, bool buying, Trade calldata trade) external {
-        MatchingDetails memory details = abi.decode(trade.offer.details, (MatchingDetails));
+    function hook(Term memory term, uint256 assets, uint256 bonds, bool buying, Trade calldata trade, uint256 index)
+        external
+    {
+        MatchingDetails memory details = abi.decode(trade.offer.hooks[index].data, (MatchingDetails));
         require(buying == details.buying, "buy sell mismatch");
         consumed[trade.offer.owner][details.nonce] += assets;
         require(consumed[trade.offer.owner][details.nonce] <= details.assets, "consumed");
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * details.rate) / 1e18, "bonds");
-        require(trade.offer.hook == address(this), "hook");
         _checkSignature(trade.offer, abi.decode(trade.check, (Signature)));
         _checkMatching(term, details);
     }

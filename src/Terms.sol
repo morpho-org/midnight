@@ -26,7 +26,7 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalBonds;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address user => mapping(address hook => bool)) public isHook;
+    mapping(address user => mapping(address hook => bool)) public isFirstHook;
 
     /// ENTRY-POINTS ///
 
@@ -35,8 +35,16 @@ contract Terms is ITerms {
     /// @dev The hook of the maker is validated.
     function take(Term memory term, uint256 assets, uint256 bonds, Trade memory buy, Trade memory sell) external {
         require(term.maturity >= block.timestamp, "maturity");
-        require(buy.offer.owner == msg.sender || isHook[buy.offer.owner][buy.offer.hook], "not a hook");
-        require(sell.offer.owner == msg.sender || isHook[sell.offer.owner][sell.offer.hook], "not a hook");
+        require(
+            buy.offer.owner == msg.sender
+                || (buy.offer.hooks.length > 0 && isFirstHook[buy.offer.owner][buy.offer.hooks[0].to]),
+            "invalid buy"
+        );
+        require(
+            sell.offer.owner == msg.sender
+                || (sell.offer.hooks.length > 0 && isFirstHook[sell.offer.owner][sell.offer.hooks[0].to]),
+            "invalid sell"
+        );
 
         bytes32 id = _id(term);
 
@@ -57,9 +65,15 @@ contract Terms is ITerms {
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        if (buy.offer.hook != address(0)) IHook(buy.offer.hook).hook(term, assets, bonds, true, buy);
+        for (uint256 i = 0; i < buy.offer.hooks.length; i++) {
+            IHook(buy.offer.hooks[i].to).hook(term, assets, bonds, true, buy, i);
+        }
+
         IERC20(term.loanToken).transferFrom(buy.offer.owner, sell.offer.owner, assets);
-        if (sell.offer.hook != address(0)) IHook(sell.offer.hook).hook(term, assets, bonds, false, sell);
+
+        for (uint256 i = 0; i < sell.offer.hooks.length; i++) {
+            IHook(sell.offer.hooks[i].to).hook(term, assets, bonds, false, sell, i);
+        }
         require(_isHealthy(term, sell.offer.owner), "Seller is unhealthy");
     }
 
@@ -179,8 +193,8 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function setHook(address hook, bool _isHook) external {
-        isHook[msg.sender][hook] = _isHook;
+    function setFirstHook(address hook, bool _isFirstHook) external {
+        isFirstHook[msg.sender][hook] = _isFirstHook;
     }
 
     /// INTERNAL ///

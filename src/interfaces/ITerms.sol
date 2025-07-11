@@ -9,8 +9,12 @@ struct Trade {
 
 struct Offer {
     address owner;
-    address hook;
-    bytes details;
+    Hook[] hooks;
+}
+
+struct Hook {
+    address to;
+    bytes data;
 }
 
 struct Term {
