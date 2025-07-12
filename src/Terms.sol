@@ -46,8 +46,8 @@ contract Terms is ITerms {
         if (sell.offer.hooks.length > 0) sellMatching = sellHooks[0].to;
 
         require(term.maturity >= block.timestamp, "maturity");
-        require(buyer == msg.sender || (isAuthorized[buyer][msg.sender] && isFirstHook[buyer][buyMatching]), "invalid buy");
-        require(seller == msg.sender || (isAuthorized[seller][msg.sender] && isFirstHook[seller][sellMatching]), "invalid sell");
+        require(buyer == msg.sender || isAuthorized[buyer][msg.sender] || isFirstHook[buyer][buyMatching], "invalid buy");
+        require(seller == msg.sender || isAuthorized[seller][msg.sender] || isFirstHook[seller][sellMatching], "invalid sell");
 
         bytes32 id = _id(term);
 
