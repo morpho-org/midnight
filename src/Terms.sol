@@ -117,11 +117,6 @@ contract Terms is ITerms {
         IERC20(collateral).transfer(msg.sender, assets);
     }
 
-    struct Vars {
-        uint256 maxDebt;
-        uint256 repayableDebt;
-    }
-
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
     /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
     /// @param term The term of the bond.
@@ -136,55 +131,49 @@ contract Terms is ITerms {
     {
         require(seizures.length == term.collaterals.length, "should have all collats");
 
-        Vars memory vars;
+        uint256 maxDebt;
+        uint256 repayableDebt;
+        uint256 totalRepaid;
         bytes32 id = _id(term);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            uint256 price = IOracle(term.collaterals[i].oracle).price();
+            require(seizures[i].repaidBonds * seizures[i].seizedAssets == 0, "INCONSISTENT_INPUT");
+
+            uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
             uint256 collateralQuoted =
-                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
-            vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
-            vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
-        }
-        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(collateralPrice, ORACLE_PRICE_SCALE);
+            maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+            repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
 
-        uint256 totalRepaid;
+            if (seizures[i].seizedAssets > 0) {
+                seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
+                    .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+            } else if (seizures[i].repaidBonds > 0) {
+                seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
+                    .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
+            }
 
-        for (uint256 i = 0; i < term.collaterals.length; i++) {
-            if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
-                require(
-                    UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
-                );
+            totalRepaid += seizures[i].repaidBonds;
+            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
-                uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
-
-                if (seizures[i].seizedAssets > 0) {
-                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
-                        .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
-                } else {
-                    seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
-                        .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
-                }
-
-                totalRepaid += seizures[i].repaidBonds;
-                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-
+            if (seizures[i].seizedAssets > 0) {
                 IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
             }
         }
 
         uint256 originalDebt = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
+        require(originalDebt > maxDebt, "position is healthy");
 
         // Realize bad debt
-        if (vars.repayableDebt < originalDebt) {
+        uint256 badDebt;
+        if (repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
-            debtOf[borrower][id] -= badDebt;
+            badDebt = UtilsLib.min(originalDebt - totalRepaid, originalDebt - repayableDebt);
             totalBonds[id] -= badDebt;
         }
 
+        debtOf[borrower][id] = originalDebt - totalRepaid - badDebt;
         withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
