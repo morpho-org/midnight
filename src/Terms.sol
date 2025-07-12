@@ -135,29 +135,34 @@ contract Terms is ITerms {
         uint256 repayableDebt;
         uint256 totalRepaid;
         bytes32 id = _id(term);
+        Seizure memory seizure;
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            require(seizures[i].repaidBonds * seizures[i].seizedAssets == 0, "INCONSISTENT_INPUT");
+            seizure = seizures[i];
+            require(seizure.repaidBonds * seizure.seizedAssets == 0, "INCONSISTENT_INPUT");
 
             uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
-            uint256 collateralQuoted =
-                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(collateralPrice, ORACLE_PRICE_SCALE);
-            maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
-            repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+            {
+                uint collateralAmount = collateralOf[borrower][id][term.collaterals[i].token];
+                uint256 collateralQuoted =
+                    collateralAmount.mulDivDown(collateralPrice, ORACLE_PRICE_SCALE);
+                maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+                repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+            }
 
-            if (seizures[i].seizedAssets > 0) {
-                seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
+            if (seizure.seizedAssets > 0) {
+                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
                     .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
-            } else if (seizures[i].repaidBonds > 0) {
-                seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
+            } else if (seizure.repaidBonds > 0) {
+                seizure.seizedAssets = seizure.repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
                     .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
             }
 
-            totalRepaid += seizures[i].repaidBonds;
-            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+            totalRepaid += seizure.repaidBonds;
+            collateralOf[borrower][id][term.collaterals[i].token] -= seizure.seizedAssets;
 
-            if (seizures[i].seizedAssets > 0) {
-                IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
+            if (seizure.seizedAssets > 0) {
+                IERC20(term.collaterals[i].token).transfer(msg.sender, seizure.seizedAssets);
             }
         }
 
