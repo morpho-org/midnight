@@ -28,6 +28,10 @@ contract Terms is ITerms {
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
     mapping(address user => mapping(address hook => bool)) public isHook;
 
+    /// @dev Cut on interest at each trade.
+    mapping(address loanToken => uint256) public tradingFeePct;
+    address public tradingFeeRecipient;
+
     /// ENTRY-POINTS ///
 
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
@@ -35,7 +39,8 @@ contract Terms is ITerms {
     /// @dev The hook of the maker is validated.
     function take(
         Term memory term,
-        uint256 assets,
+        uint256 buyerAssets,
+        uint256 sellerAssets,
         uint256 bonds,
         address buyer,
         address buyerHook,
@@ -44,9 +49,21 @@ contract Terms is ITerms {
         address sellerHook,
         bytes calldata sellerData
     ) external {
+        require(buyerAssets * sellerAssets == 0, "INCONSISTENT_INPUT");
         require(term.maturity >= block.timestamp, "maturity");
         require(buyer == msg.sender || isHook[buyer][buyerHook], "not a hook");
         require(seller == msg.sender || isHook[seller][sellerHook], "not a hook");
+
+        uint256 tradingFee;
+        if (sellerAssets > 0) {
+            buyerAssets = (sellerAssets + bonds.mulDivDown(tradingFeePct[term.loanToken], 1e18)).mulDivDown(
+                1e18, 1e18 - tradingFeePct[term.loanToken]
+            );
+            tradingFee = buyerAssets - sellerAssets;
+        } else {
+            tradingFee = (bonds - buyerAssets).mulDivUp(tradingFeePct[term.loanToken], 1e18);
+            sellerAssets = buyerAssets - tradingFee;
+        }
 
         bytes32 id = _id(term);
 
@@ -67,9 +84,10 @@ contract Terms is ITerms {
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        if (buyerHook != address(0)) IHook(buyerHook).hook(term, assets, bonds, true, buyer, buyerData);
-        IERC20(term.loanToken).transferFrom(buyer, seller, assets);
-        if (sellerHook != address(0)) IHook(sellerHook).hook(term, assets, bonds, false, seller, sellerData);
+        if (buyerHook != address(0)) IHook(buyerHook).hook(term, buyerAssets, bonds, true, buyer, buyerData);
+        IERC20(term.loanToken).transferFrom(buyer, tradingFeeRecipient, tradingFee);
+        IERC20(term.loanToken).transferFrom(buyer, seller, sellerAssets);
+        if (sellerHook != address(0)) IHook(sellerHook).hook(term, sellerAssets, bonds, false, seller, sellerData);
         require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 

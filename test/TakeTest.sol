@@ -68,7 +68,7 @@ contract TakeTest is BaseTest {
         Offer memory offer;
         Signature memory sig;
         vm.expectRevert("maturity");
-        terms.take(term, 100, 101, lender, address(matching), abi.encode(offer, sig), borrower, address(0), hex"");
+        terms.take(term, 100, 0, 101, lender, address(matching), abi.encode(offer, sig), borrower, address(0), hex"");
     }
 
     function testLend() public {
@@ -76,6 +76,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -99,6 +100,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -122,6 +124,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -142,6 +145,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             otherLender,
             address(matching),
@@ -165,6 +169,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -179,6 +184,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             borrower,
             address(matching),
@@ -202,6 +208,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -224,6 +231,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             borrower,
             address(0),
@@ -250,6 +258,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -265,6 +274,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             borrower,
             address(0),
@@ -289,6 +299,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -310,6 +321,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -324,6 +336,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             1,
+            0,
             2,
             lender,
             address(matching),
@@ -341,6 +354,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             50,
+            0,
             50,
             lender,
             address(matching),
@@ -357,6 +371,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             51,
+            0,
             51,
             lender,
             address(matching),
@@ -370,6 +385,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             50,
+            0,
             50,
             lender,
             address(matching),
@@ -394,6 +410,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             70,
+            0,
             70,
             lender,
             address(matching),
@@ -408,6 +425,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term2,
             31,
+            0,
             31,
             lender,
             address(matching),
@@ -421,6 +439,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term2,
             30,
+            0,
             30,
             lender,
             address(matching),
@@ -439,6 +458,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -457,6 +477,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -475,6 +496,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -493,6 +515,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -511,6 +534,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -529,6 +553,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -547,6 +572,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -564,6 +590,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(0),
@@ -581,6 +608,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -599,6 +627,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -617,6 +646,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -634,6 +664,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),
@@ -650,6 +681,7 @@ contract TakeTest is BaseTest {
         terms.take(
             term,
             100,
+            0,
             101,
             lender,
             address(matching),

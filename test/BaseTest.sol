@@ -109,6 +109,7 @@ abstract contract BaseTest is Test {
         terms.take(
             term,
             bonds,
+            0,
             bonds,
             lender,
             address(0),
