@@ -20,7 +20,7 @@ contract Terms is ITerms {
     );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
     uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
-
+    uint256 public constant FULL_LIQUIDATION_FACTOR = 1.03e18;
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
@@ -122,6 +122,7 @@ contract Terms is ITerms {
     struct Vars {
         uint256 maxDebt;
         uint256 repayableDebt;
+        uint256 minDebtForFullLiquidation;
     }
 
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
@@ -146,9 +147,12 @@ contract Terms is ITerms {
             uint256 collateralQuoted =
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+            vars.minDebtForFullLiquidation +=
+                collateralQuoted.mulDivDown(term.collaterals[i].lltv.mulDivDown(FULL_LIQUIDATION_FACTOR, 1e18), 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+        uint256 originalDebt = debtOf[borrower][id];
+        require(originalDebt > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
 
@@ -175,7 +179,6 @@ contract Terms is ITerms {
             }
         }
 
-        uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
@@ -192,6 +195,10 @@ contract Terms is ITerms {
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        require(
+            originalDebt >= vars.minDebtForFullLiquidation || !_isHealthy(term, borrower), "Recovery close factor error"
+        );
 
         return seizures;
     }
