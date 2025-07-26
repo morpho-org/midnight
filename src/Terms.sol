@@ -23,12 +23,20 @@ contract Terms is ITerms {
 
     /// STORAGE ///
 
-    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public withdrawable;
-    mapping(bytes32 => uint256) public totalBonds;
-    mapping(bytes32 => uint256) public totalShares;
-    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    struct User {
+        uint256 debt;
+        uint256 bondShares;
+        mapping (address collateralAddress => uint256) collateral;
+    }
+
+    struct Loan {
+        uint256 withdrawable;
+        uint256 totalBonds;
+        uint256 totalShares;
+        mapping(address userAddress => User) users;
+    }
+
+    mapping(bytes32 termId => Loan) public loans;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
@@ -53,70 +61,73 @@ contract Terms is ITerms {
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
-        bytes32 id = _id(term);
 
+        (address buyerAddress, address sellerAddress) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        Loan storage loan = loans[_id(term)];
+        User storage buyer = loan.users[buyerAddress];
+        User storage seller = loan.users[sellerAddress];
         {
-            uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+            uint256 repaid = UtilsLib.min(buyer.debt, bonds);
             uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
+            uint256 boughtShares = bought.mulDivDown(loan.totalShares + 1, loan.totalBonds + 1);
             uint256 withdrawn =
-                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+                UtilsLib.min(seller.bondShares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1), bonds);
+            uint256 withdrawnShares = withdrawn.mulDivUp(loan.totalShares + 1, loan.totalBonds + 1);
 
-            debtOf[buyer][id] -= repaid;
-            bondSharesOf[buyer][id] += boughtShares;
-            bondSharesOf[seller][id] -= withdrawnShares;
-            debtOf[seller][id] += bonds - withdrawn;
+            buyer.debt -= repaid;
+            buyer.bondShares += boughtShares;
+            seller.bondShares -= withdrawnShares;
+            seller.debt += bonds - withdrawn;
 
-            totalShares[id] += boughtShares;
-            totalShares[id] -= withdrawnShares;
-            totalBonds[id] += bought;
-            totalBonds[id] -= withdrawn;
+            loan.totalShares += boughtShares;
+            loan.totalShares -= withdrawnShares;
+            loan.totalBonds += bought;
+            loan.totalBonds -= withdrawn;
 
-            require(_isHealthy(term, seller), "Seller is unhealthy");
+            require(_isHealthy(term, sellerAddress), "Seller is unhealthy");
+
         }
 
-        SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
+        SafeTransferLib.safeTransferFrom(offer.loanToken, buyerAddress, sellerAddress, assets);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
     function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
         require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
-        bytes32 id = _id(term);
+        Loan storage loan = loans[_id(term)];
 
-        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) shares = bonds.mulDivUp(loan.totalShares + 1, loan.totalBonds + 1);
+        else bonds = shares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1);
 
-        bondSharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= bonds;
+        loan.users[onBehalf].bondShares -= shares;
+        loan.withdrawable -= bonds;
 
-        totalShares[id] -= shares;
-        totalBonds[id] -= bonds;
+        loan.totalShares -= shares;
+        loan.totalBonds -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
-        bytes32 id = _id(term);
+        Loan storage loan = loans[_id(term)];
 
-        debtOf[onBehalf][id] -= bonds;
-        withdrawable[id] += bonds;
+        loan.users[onBehalf].debt -= bonds;
+        loan.withdrawable += bonds;
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
     }
 
-    function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] += assets;
-        SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
+    function supplyCollateral(Term memory term, address collateralAddress, uint256 assets, address onBehalf) external {
+        loans[_id(term)].users[onBehalf].collateral[collateralAddress] += assets;
+        SafeTransferLib.safeTransferFrom(collateralAddress, msg.sender, address(this), assets);
     }
 
-    function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= assets;
+    function withdrawCollateral(Term memory term, address collateralAddress, uint256 assets, address onBehalf) external {
+        loans[_id(term)].users[onBehalf].collateral[collateralAddress] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
+        SafeTransferLib.safeTransfer(collateralAddress, msg.sender, assets);
     }
 
     struct Vars {
@@ -124,31 +135,32 @@ contract Terms is ITerms {
         uint256 repayableDebt;
     }
 
-    /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
+    /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrowerAddress`.
     /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
     /// @param term The term of the bond.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// term's collateral assets.
-    /// @param borrower The debtor of the loan.
+    /// @param borrowerAddress The debtor of the loan.
     /// @param data Arbitrary data to pass to the callback. Pass empty data if not needed.
     /// @return A collection of the actual amounts of debt repaid or asset seized with the collateral index.
-    function liquidate(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
+    function liquidate(Term memory term, Seizure[] memory seizures, address borrowerAddress, bytes calldata data)
         external
         returns (Seizure[] memory)
     {
         require(seizures.length == term.collaterals.length, "should have all collats");
 
         Vars memory vars;
-        bytes32 id = _id(term);
+        Loan storage loan = loans[_id(term)];
+        User storage borrower = loan.users[borrowerAddress];
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 collateralQuoted =
-                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                borrower.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+        require(borrower.debt > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
 
@@ -169,27 +181,27 @@ contract Terms is ITerms {
                 }
 
                 totalRepaid += seizures[i].repaidBonds;
-                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+                borrower.collateral[term.collaterals[i].token] -= seizures[i].seizedAssets;
 
                 SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
 
-        uint256 originalDebt = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
+        uint256 originalDebt = borrower.debt;
+        borrower.debt -= totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
-            debtOf[borrower][id] -= badDebt;
-            totalBonds[id] -= badDebt;
+            uint256 badDebt = UtilsLib.min(borrower.debt, originalDebt - vars.repayableDebt);
+            borrower.debt -= badDebt;
+            loan.totalBonds -= badDebt;
         }
 
-        withdrawable[id] += totalRepaid;
+        loan.withdrawable += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrowerAddress, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
@@ -230,9 +242,10 @@ contract Terms is ITerms {
         require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
     }
 
-    function _isHealthy(Term memory term, address borrower) internal view returns (bool) {
-        bytes32 id = _id(term);
-        uint256 debt = debtOf[borrower][id];
+    function _isHealthy(Term memory term, address borrowerAddress) internal view returns (bool) {
+        User storage borrower = loans[_id(term)].users[borrowerAddress];
+
+        uint256 debt = borrower.debt;
         if (debt == 0) {
             return true;
         } else {
@@ -240,11 +253,38 @@ contract Terms is ITerms {
             for (uint256 i = 0; i < term.collaterals.length; i++) {
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
-                    collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                    borrower.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             }
 
             return debt <= maxDebt;
         }
     }
+
+    // GETTER FUNCTIONS //
+
+    function debtOf(address borrowerAddress, bytes32 termId) external view returns (uint256) {
+        return loans[termId].users[borrowerAddress].debt;
+    }
+
+    function bondSharesOf(address borrowerAddress, bytes32 termId) external view returns (uint256) {
+        return loans[termId].users[borrowerAddress].bondShares;
+    }
+
+    function collateralOf(address borrowerAddress, bytes32 termId, address collateral) external view returns (uint256) {
+        return loans[termId].users[borrowerAddress].collateral[collateral];
+    }
+
+    function withdrawable(bytes32 termId) external view returns (uint256) {
+        return loans[termId].withdrawable;
+    }
+
+    function totalBonds(bytes32 termId) external view returns (uint256) {
+        return loans[termId].totalBonds;
+    }
+
+    function totalShares(bytes32 termId) external view returns (uint256) {
+        return loans[termId].totalShares;
+    }
+
 }
