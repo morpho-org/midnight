@@ -26,14 +26,14 @@ contract Terms is ITerms {
     struct User {
         uint256 debt;
         uint256 bondShares;
-        mapping (address collateralAddress => uint256) collateral;
+        mapping (address => uint256) collateral;
     }
 
     struct Loan {
         uint256 withdrawable;
         uint256 totalBonds;
         uint256 totalShares;
-        mapping(address userAddress => User) users;
+        mapping(address => User) users;
     }
 
     mapping(bytes32 termId => Loan) public loans;
@@ -62,33 +62,32 @@ contract Terms is ITerms {
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
 
-        (address buyerAddress, address sellerAddress) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
         Loan storage loan = loans[_id(term)];
-        User storage buyer = loan.users[buyerAddress];
-        User storage seller = loan.users[sellerAddress];
+        User storage buyUser = loan.users[buyer];
+        User storage sellUser = loan.users[seller];
         {
-            uint256 repaid = UtilsLib.min(buyer.debt, bonds);
+            uint256 repaid = UtilsLib.min(buyUser.debt, bonds);
             uint256 bought = bonds - repaid;
             uint256 boughtShares = bought.mulDivDown(loan.totalShares + 1, loan.totalBonds + 1);
             uint256 withdrawn =
-                UtilsLib.min(seller.bondShares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1), bonds);
+                UtilsLib.min(sellUser.bondShares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(loan.totalShares + 1, loan.totalBonds + 1);
 
-            buyer.debt -= repaid;
-            buyer.bondShares += boughtShares;
-            seller.bondShares -= withdrawnShares;
-            seller.debt += bonds - withdrawn;
+            buyUser.debt -= repaid;
+            buyUser.bondShares += boughtShares;
+            sellUser.bondShares -= withdrawnShares;
+            sellUser.debt += bonds - withdrawn;
 
             loan.totalShares += boughtShares;
             loan.totalShares -= withdrawnShares;
             loan.totalBonds += bought;
             loan.totalBonds -= withdrawn;
 
-            require(_isHealthy(term, sellerAddress), "Seller is unhealthy");
+            require(_isHealthy(term, seller), "Seller is unhealthy");
 
         }
-
-        SafeTransferLib.safeTransferFrom(offer.loanToken, buyerAddress, sellerAddress, assets);
+        SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -117,17 +116,17 @@ contract Terms is ITerms {
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
     }
 
-    function supplyCollateral(Term memory term, address collateralAddress, uint256 assets, address onBehalf) external {
-        loans[_id(term)].users[onBehalf].collateral[collateralAddress] += assets;
-        SafeTransferLib.safeTransferFrom(collateralAddress, msg.sender, address(this), assets);
+    function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        loans[_id(term)].users[onBehalf].collateral[collateral] += assets;
+        SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
-    function withdrawCollateral(Term memory term, address collateralAddress, uint256 assets, address onBehalf) external {
-        loans[_id(term)].users[onBehalf].collateral[collateralAddress] -= assets;
+    function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        loans[_id(term)].users[onBehalf].collateral[collateral] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        SafeTransferLib.safeTransfer(collateralAddress, msg.sender, assets);
+        SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
     struct Vars {
@@ -135,15 +134,15 @@ contract Terms is ITerms {
         uint256 repayableDebt;
     }
 
-    /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrowerAddress`.
+    /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
     /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
     /// @param term The term of the bond.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// term's collateral assets.
-    /// @param borrowerAddress The debtor of the loan.
+    /// @param borrower The debtor of the loan.
     /// @param data Arbitrary data to pass to the callback. Pass empty data if not needed.
     /// @return A collection of the actual amounts of debt repaid or asset seized with the collateral index.
-    function liquidate(Term memory term, Seizure[] memory seizures, address borrowerAddress, bytes calldata data)
+    function liquidate(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
         external
         returns (Seizure[] memory)
     {
@@ -151,16 +150,16 @@ contract Terms is ITerms {
 
         Vars memory vars;
         Loan storage loan = loans[_id(term)];
-        User storage borrower = loan.users[borrowerAddress];
+        User storage borrowUser = loan.users[borrower];
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 collateralQuoted =
-                borrower.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                borrowUser.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(borrower.debt > vars.maxDebt, "position is healthy");
+        require(borrowUser.debt > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
 
@@ -181,27 +180,27 @@ contract Terms is ITerms {
                 }
 
                 totalRepaid += seizures[i].repaidBonds;
-                borrower.collateral[term.collaterals[i].token] -= seizures[i].seizedAssets;
+                borrowUser.collateral[term.collaterals[i].token] -= seizures[i].seizedAssets;
 
                 SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
 
-        uint256 originalDebt = borrower.debt;
-        borrower.debt -= totalRepaid;
+        uint256 originalDebt = borrowUser.debt;
+        borrowUser.debt -= totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(borrower.debt, originalDebt - vars.repayableDebt);
-            borrower.debt -= badDebt;
+            uint256 badDebt = UtilsLib.min(borrowUser.debt, originalDebt - vars.repayableDebt);
+            borrowUser.debt -= badDebt;
             loan.totalBonds -= badDebt;
         }
 
         loan.withdrawable += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrowerAddress, msg.sender, data);
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
@@ -242,10 +241,10 @@ contract Terms is ITerms {
         require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
     }
 
-    function _isHealthy(Term memory term, address borrowerAddress) internal view returns (bool) {
-        User storage borrower = loans[_id(term)].users[borrowerAddress];
+    function _isHealthy(Term memory term, address borrower) internal view returns (bool) {
+        User storage borrowUser = loans[_id(term)].users[borrower];
 
-        uint256 debt = borrower.debt;
+        uint256 debt = borrowUser.debt;
         if (debt == 0) {
             return true;
         } else {
@@ -253,7 +252,7 @@ contract Terms is ITerms {
             for (uint256 i = 0; i < term.collaterals.length; i++) {
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
-                    borrower.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                    borrowUser.collateral[term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             }
 
@@ -263,16 +262,16 @@ contract Terms is ITerms {
 
     // GETTER FUNCTIONS //
 
-    function debtOf(address borrowerAddress, bytes32 termId) external view returns (uint256) {
-        return loans[termId].users[borrowerAddress].debt;
+    function debtOf(address borrower, bytes32 termId) external view returns (uint256) {
+        return loans[termId].users[borrower].debt;
     }
 
-    function bondSharesOf(address borrowerAddress, bytes32 termId) external view returns (uint256) {
-        return loans[termId].users[borrowerAddress].bondShares;
+    function bondSharesOf(address borrower, bytes32 termId) external view returns (uint256) {
+        return loans[termId].users[borrower].bondShares;
     }
 
-    function collateralOf(address borrowerAddress, bytes32 termId, address collateral) external view returns (uint256) {
-        return loans[termId].users[borrowerAddress].collateral[collateral];
+    function collateralOf(address borrower, bytes32 termId, address collateral) external view returns (uint256) {
+        return loans[termId].users[borrower].collateral[collateral];
     }
 
     function withdrawable(bytes32 termId) external view returns (uint256) {
