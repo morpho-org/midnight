@@ -126,7 +126,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(lender);
         terms.withdrawBond(term, withdraw, 0, lender);
 
-        assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
+        assertEq(terms.sharesOf(lender, id), bonds - withdraw, "sharesOf");
         assertEq(terms.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
@@ -143,7 +143,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(lender);
         terms.withdrawBond(term, 0, shares, lender);
 
-        assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
+        assertEq(terms.sharesOf(lender, id), bonds - shares, "sharesOf");
         assertEq(terms.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");

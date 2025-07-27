@@ -25,14 +25,14 @@ contract Terms is ITerms {
 
     struct User {
         uint256 debt;
-        uint256 bondShares;
+        uint256 shares;
         mapping (address => uint256) collateral;
     }
 
     struct Loan {
         uint256 withdrawable;
-        uint256 totalBonds;
-        uint256 totalShares;
+        uint256 bonds;
+        uint256 shares;
         mapping(address => User) users;
     }
 
@@ -69,20 +69,20 @@ contract Terms is ITerms {
         {
             uint256 repaid = UtilsLib.min(buyUser.debt, bonds);
             uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(loan.totalShares + 1, loan.totalBonds + 1);
+            uint256 boughtShares = bought.mulDivDown(loan.shares + 1, loan.bonds + 1);
             uint256 withdrawn =
-                UtilsLib.min(sellUser.bondShares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(loan.totalShares + 1, loan.totalBonds + 1);
+                UtilsLib.min(sellUser.shares.mulDivDown(loan.bonds + 1, loan.shares + 1), bonds);
+            uint256 withdrawnShares = withdrawn.mulDivUp(loan.shares + 1, loan.bonds + 1);
 
             buyUser.debt -= repaid;
-            buyUser.bondShares += boughtShares;
-            sellUser.bondShares -= withdrawnShares;
+            buyUser.shares += boughtShares;
+            sellUser.shares -= withdrawnShares;
             sellUser.debt += bonds - withdrawn;
 
-            loan.totalShares += boughtShares;
-            loan.totalShares -= withdrawnShares;
-            loan.totalBonds += bought;
-            loan.totalBonds -= withdrawn;
+            loan.shares += boughtShares;
+            loan.shares -= withdrawnShares;
+            loan.bonds += bought;
+            loan.bonds -= withdrawn;
 
             require(_isHealthy(term, seller), "Seller is unhealthy");
 
@@ -95,14 +95,14 @@ contract Terms is ITerms {
         require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         Loan storage loan = loans[_id(term)];
 
-        if (bonds > 0) shares = bonds.mulDivUp(loan.totalShares + 1, loan.totalBonds + 1);
-        else bonds = shares.mulDivDown(loan.totalBonds + 1, loan.totalShares + 1);
+        if (bonds > 0) shares = bonds.mulDivUp(loan.shares + 1, loan.bonds + 1);
+        else bonds = shares.mulDivDown(loan.bonds + 1, loan.shares + 1);
 
-        loan.users[onBehalf].bondShares -= shares;
+        loan.users[onBehalf].shares -= shares;
         loan.withdrawable -= bonds;
 
-        loan.totalShares -= shares;
-        loan.totalBonds -= bonds;
+        loan.shares -= shares;
+        loan.bonds -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
@@ -195,7 +195,7 @@ contract Terms is ITerms {
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(borrowUser.debt, originalDebt - vars.repayableDebt);
             borrowUser.debt -= badDebt;
-            loan.totalBonds -= badDebt;
+            loan.bonds -= badDebt;
         }
 
         loan.withdrawable += totalRepaid;
@@ -266,8 +266,8 @@ contract Terms is ITerms {
         return loans[termId].users[borrower].debt;
     }
 
-    function bondSharesOf(address borrower, bytes32 termId) external view returns (uint256) {
-        return loans[termId].users[borrower].bondShares;
+    function sharesOf(address borrower, bytes32 termId) external view returns (uint256) {
+        return loans[termId].users[borrower].shares;
     }
 
     function collateralOf(address borrower, bytes32 termId, address collateral) external view returns (uint256) {
@@ -278,12 +278,12 @@ contract Terms is ITerms {
         return loans[termId].withdrawable;
     }
 
-    function totalBonds(bytes32 termId) external view returns (uint256) {
-        return loans[termId].totalBonds;
+    function loanBonds(bytes32 termId) external view returns (uint256) {
+        return loans[termId].bonds;
     }
 
-    function totalShares(bytes32 termId) external view returns (uint256) {
-        return loans[termId].totalShares;
+    function loanShares(bytes32 termId) external view returns (uint256) {
+        return loans[termId].shares;
     }
 
 }

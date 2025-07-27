@@ -77,10 +77,10 @@ contract TakeTest is BaseTest {
     function testLend() public {
         terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
+        assertEq(terms.sharesOf(lender, id), 101, "lender shares");
         assertEq(terms.debtOf(borrower, id), 101, "borrower debt");
-        assertEq(terms.totalBonds(id), 101, "total bonds");
-        assertEq(terms.totalShares(id), 101, "total shares");
+        assertEq(terms.loanBonds(id), 101, "loan bonds");
+        assertEq(terms.loanShares(id), 101, "loan shares");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(terms.consumed(borrower, 0), 100, "borrower nonce");
@@ -89,10 +89,10 @@ contract TakeTest is BaseTest {
     function testBorrow() public {
         terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 101, "bond shares");
+        assertEq(terms.sharesOf(lender, id), 101, "lender shares");
         assertEq(terms.debtOf(borrower, id), 101, "lender debt");
-        assertEq(terms.totalBonds(id), 101, "total bonds");
-        assertEq(terms.totalShares(id), 101, "total shares");
+        assertEq(terms.loanBonds(id), 101, "loan bonds");
+        assertEq(terms.loanShares(id), 101, "loan shares");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(terms.consumed(lender, 0), 100, "lender nonce");
@@ -108,10 +108,10 @@ contract TakeTest is BaseTest {
         lendOffer.offering = otherLender;
         terms.take(term, 100, lender, lendOffer, sig(lendOffer, otherLenderSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondSharesOf(otherLender, id), 101, "other lender bond shares");
-        assertEq(terms.totalBonds(id), 101, "total bonds");
-        assertEq(terms.totalShares(id), 101, "total shares");
+        assertEq(terms.sharesOf(lender, id), 0, "lender shares");
+        assertEq(terms.sharesOf(otherLender, id), 101, "other lender shares");
+        assertEq(terms.loanBonds(id), 101, "loan bonds");
+        assertEq(terms.loanShares(id), 101, "loan shares");
         assertEq(terms.consumed(otherLender, 0), 100, "other lender nonce");
         assertEq(loanToken.balanceOf(lender), 100, "lender balance");
         assertEq(loanToken.balanceOf(otherLender), 0, "other lender balance");
@@ -123,10 +123,10 @@ contract TakeTest is BaseTest {
         lendOffer.nonce = 1;
         terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
-        assertEq(terms.totalBonds(id), 0, "total bonds");
-        assertEq(terms.totalShares(id), 0, "total shares");
+        assertEq(terms.sharesOf(lender, id), 0, "lender shares");
+        assertEq(terms.sharesOf(borrower, id), 0, "borrower shares");
+        assertEq(terms.loanBonds(id), 0, "loan bonds");
+        assertEq(terms.loanShares(id), 0, "loan shares");
         assertEq(terms.consumed(borrower, 1), 100, "borrower nonce");
         assertEq(loanToken.balanceOf(lender), 100, "lender balance");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
@@ -143,13 +143,13 @@ contract TakeTest is BaseTest {
         borrowOffer.offering = otherBorrower;
         terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, otherBorrowerSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
-        assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
-        assertEq(terms.bondSharesOf(otherBorrower, id), 0, "other borrower bond shares");
+        assertEq(terms.sharesOf(lender, id), 101, "lender shares");
+        assertEq(terms.sharesOf(borrower, id), 0, "borrower shares");
+        assertEq(terms.sharesOf(otherBorrower, id), 0, "other borrower shares");
         assertEq(terms.debtOf(borrower, id), 0, "borrower debt");
         assertEq(terms.debtOf(otherBorrower, id), 101, "other borrower debt");
-        assertEq(terms.totalBonds(id), 101, "total bonds");
-        assertEq(terms.totalShares(id), 101, "total shares");
+        assertEq(terms.loanBonds(id), 101, "loan bonds");
+        assertEq(terms.loanShares(id), 101, "loan shares");
         assertEq(terms.consumed(otherBorrower, 0), 100, "other borrower nonce");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
         assertEq(loanToken.balanceOf(otherBorrower), 100, "other borrower balance");
@@ -162,12 +162,12 @@ contract TakeTest is BaseTest {
         borrowOffer.nonce = 1;
         terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
+        assertEq(terms.sharesOf(lender, id), 0, "lender shares");
+        assertEq(terms.sharesOf(borrower, id), 0, "borrower shares");
         assertEq(terms.debtOf(borrower, id), 0, "borrower debt");
         assertEq(terms.debtOf(lender, id), 0, "lender debt");
-        assertEq(terms.totalBonds(id), 0, "total bonds");
-        assertEq(terms.totalShares(id), 0, "total shares");
+        assertEq(terms.loanBonds(id), 0, "loan bonds");
+        assertEq(terms.loanShares(id), 0, "loan shares");
         assertEq(terms.consumed(lender, 1), 100, "lender nonce");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 100, "lender balance");
@@ -177,7 +177,7 @@ contract TakeTest is BaseTest {
         terms.take(term, 100, address(this), borrowOffer, sig(borrowOffer, borrowerSK));
         terms.take(term, 100, address(this), lendOffer, sig(lendOffer, lenderSK));
 
-        assertEq(terms.bondSharesOf(address(this), id), 0, "bond shares");
+        assertEq(terms.sharesOf(address(this), id), 0, "shares");
         assertEq(terms.debtOf(address(this), id), 0, "debt");
         assertEq(loanToken.balanceOf(address(this)), 100, "balance");
         assertEq(terms.consumed(lender, 0), 100, "lender nonce");
