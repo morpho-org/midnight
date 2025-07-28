@@ -108,14 +108,6 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
-    function testWithdrawInconsistentInput() public {
-        vm.expectRevert("INCONSISTENT_INPUT");
-        terms.withdrawBond(term, 1, 1, lender);
-
-        vm.expectRevert("INCONSISTENT_INPUT");
-        terms.withdrawBond(term, 0, 0, lender);
-    }
-
     function testWithdrawWithBonds(uint256 bonds, uint256 withdraw) public {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
@@ -124,28 +116,11 @@ contract OtherFunctionsTest is BaseTest {
 
         // Test
         vm.prank(lender);
-        terms.withdrawBond(term, withdraw, 0, lender);
+        terms.withdrawBond(term, withdraw, lender);
 
-        assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
+        assertEq(terms.bondsOf(lender, id), bonds - withdraw, "bondsOf");
         assertEq(terms.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
-    }
-
-    function testWithdrawWithShares(uint256 bonds, uint256 shares) public {
-        // Setup
-        bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
-        shares = bound(shares, 1, bonds);
-        testRepay(bonds, shares);
-
-        // Test
-        // TODO: sharesPrice != 1
-        vm.prank(lender);
-        terms.withdrawBond(term, 0, shares, lender);
-
-        assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
-        assertEq(terms.withdrawable(id), 0, "withdrawable");
-        assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
-        assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
     }
 }

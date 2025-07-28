@@ -23,11 +23,11 @@ contract Terms is ITerms {
 
     /// STORAGE ///
 
-    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
+    mapping(address => mapping(bytes32 => uint256)) public bondsOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalBonds;
-    mapping(bytes32 => uint256) public totalShares;
+    mapping(bytes32 => uint256) public totalBadDebt;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
@@ -59,18 +59,13 @@ contract Terms is ITerms {
         {
             uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
-            uint256 withdrawn =
-                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+            uint256 withdrawn = UtilsLib.min(bondsOf[seller][id], bonds);
 
             debtOf[buyer][id] -= repaid;
-            bondSharesOf[buyer][id] += boughtShares;
-            bondSharesOf[seller][id] -= withdrawnShares;
+            bondsOf[buyer][id] += bought;
+            bondsOf[seller][id] -= withdrawn;
             debtOf[seller][id] += bonds - withdrawn;
 
-            totalShares[id] += boughtShares;
-            totalShares[id] -= withdrawnShares;
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
 
@@ -81,20 +76,16 @@ contract Terms is ITerms {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
-        require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
+    function withdrawBond(Term memory term, uint256 bonds, address onBehalf) external {
         bytes32 id = _id(term);
 
-        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        uint256 scaledBonds = bonds.mulDivDown(totalBonds[id] - totalBadDebt[id], totalBonds[id]);
 
-        bondSharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= bonds;
-
-        totalShares[id] -= shares;
+        bondsOf[onBehalf][id] -= bonds;
         totalBonds[id] -= bonds;
+        withdrawable[id] -= scaledBonds;
 
-        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
+        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, scaledBonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
@@ -184,7 +175,7 @@ contract Terms is ITerms {
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
             debtOf[borrower][id] -= badDebt;
-            totalBonds[id] -= badDebt;
+            totalBadDebt[id] += badDebt;
         }
 
         withdrawable[id] += totalRepaid;
