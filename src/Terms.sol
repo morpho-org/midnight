@@ -60,11 +60,14 @@ contract Terms is ITerms {
             uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
             uint256 withdrawn = UtilsLib.min(bondsOf[seller][id], bonds);
+            uint borrowed = bonds - withdrawn;
 
             debtOf[buyer][id] -= repaid;
             bondsOf[buyer][id] += bought;
             bondsOf[seller][id] -= withdrawn;
-            debtOf[seller][id] += bonds - withdrawn;
+            debtOf[seller][id] += borrowed;
+
+            require(repaid <= borrowed, "Cannot reduce total debt");
 
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;

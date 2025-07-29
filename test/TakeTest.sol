@@ -118,14 +118,9 @@ contract TakeTest is BaseTest {
         terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
         lendOffer.offering = borrower;
         lendOffer.nonce = 1;
-        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
 
-        assertEq(terms.bondsOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondsOf(borrower, id), 0, "borrower bond shares");
-        assertEq(terms.totalBonds(id), 0, "total bonds");
-        assertEq(terms.consumed(borrower, 1), 100, "borrower nonce");
-        assertEq(loanToken.balanceOf(lender), 100, "lender balance");
-        assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
+        vm.expectRevert("Cannot reduce total debt");
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
     }
 
     function testRepaySecondaryWithBorrower() public {
@@ -155,16 +150,9 @@ contract TakeTest is BaseTest {
 
         borrowOffer.offering = lender;
         borrowOffer.nonce = 1;
-        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK));
 
-        assertEq(terms.bondsOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondsOf(borrower, id), 0, "borrower bond shares");
-        assertEq(terms.debtOf(borrower, id), 0, "borrower debt");
-        assertEq(terms.debtOf(lender, id), 0, "lender debt");
-        assertEq(terms.totalBonds(id), 0, "total bonds");
-        assertEq(terms.consumed(lender, 1), 100, "lender nonce");
-        assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
-        assertEq(loanToken.balanceOf(lender), 100, "lender balance");
+        vm.expectRevert("Cannot reduce total debt");
+        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK));
     }
 
     function testMatch() public {
