@@ -50,7 +50,6 @@ contract Matching is IHook {
         consumed[user][offer.nonce] += assets;
         require(consumed[user][offer.nonce] <= offer.assets, "consumed");
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18, "bonds");
-        require(offer.hook == address(this), "hook");
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
     }
