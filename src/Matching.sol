@@ -43,7 +43,6 @@ contract Matching is IHook {
         consumed[trade.offer.owner][details.nonce] += assets;
         require(consumed[trade.offer.owner][details.nonce] <= details.assets, "consumed");
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * details.rate) / 1e18, "bonds");
-        require(trade.offer.hook == address(this), "hook");
         _checkSignature(trade.offer, abi.decode(trade.check, (Signature)));
         _checkMatching(term, details);
     }
