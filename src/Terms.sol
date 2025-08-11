@@ -12,6 +12,14 @@ import "./interfaces/IMorphoLiquidationCallback.sol";
 contract Terms is ITerms {
     using MathLib for uint256;
 
+    event Consumed(address indexed user, uint256 indexed nonce, uint256 amount);
+    event Take(bytes32 indexed id, address indexed onbehalf, bytes32 indexed offerHash, uint256 amount, uint256 bonds, Offer offer, Term term);
+    event WithdrawBond(bytes32 indexed id, address indexed onbehalf, uint256 shares, uint256 bonds);
+    event RepayDebt(bytes32 indexed id, address indexed onbehalf, uint256 bonds);
+    event SupplyCollateral(bytes32 indexed id, address indexed collateral, address indexed onbehalf, uint256 amount, Term term);
+    event WithdrawCollateral(bytes32 indexed id, address indexed collateral, address indexed onbehalf, uint256 amount);
+    event Liquidate(bytes32 indexed id, address indexed borrower, address indexed liquidator, uint256 amount, Seizure[] seizures, Term term);
+
     /// CONSTANTS ///
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
@@ -53,6 +61,8 @@ contract Terms is ITerms {
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
+        emit Consumed(offer.offering, offer.nonce, assets);
+
         (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
         bytes32 id = _id(term);
 
@@ -78,6 +88,7 @@ contract Terms is ITerms {
         }
 
         SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
+        emit Take(id, onBehalf, keccak256(abi.encode(offer)), assets, bonds,offer, term);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -95,6 +106,7 @@ contract Terms is ITerms {
         totalBonds[id] -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
+        emit WithdrawBond(id, onBehalf, shares,bonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
@@ -104,11 +116,13 @@ contract Terms is ITerms {
         withdrawable[id] += bonds;
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
+        emit RepayDebt(id, onBehalf, bonds);
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         collateralOf[onBehalf][_id(term)][collateral] += assets;
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
+        emit SupplyCollateral(_id(term), collateral, onBehalf, assets, term);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
@@ -117,6 +131,7 @@ contract Terms is ITerms {
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
+        emit WithdrawCollateral(_id(term), collateral, onBehalf, assets);
     }
 
     struct Vars {
@@ -192,6 +207,8 @@ contract Terms is ITerms {
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        emit Liquidate(id, borrower, msg.sender, totalRepaid, seizures, term);
 
         return seizures;
     }
