@@ -13,12 +13,29 @@ contract Terms is ITerms {
     using MathLib for uint256;
 
     event Consumed(address indexed user, uint256 indexed nonce, uint256 amount);
-    event Take(bytes32 indexed id, address indexed onbehalf, bytes32 indexed offerHash, uint256 amount, uint256 bonds, Offer offer, Term term);
+    event Take(
+        bytes32 indexed id,
+        address indexed onbehalf,
+        bytes32 indexed offerHash,
+        uint256 amount,
+        uint256 bonds,
+        Offer offer,
+        Term term
+    );
     event WithdrawBond(bytes32 indexed id, address indexed onbehalf, uint256 shares, uint256 bonds);
     event RepayDebt(bytes32 indexed id, address indexed onbehalf, uint256 bonds);
-    event SupplyCollateral(bytes32 indexed id, address indexed collateral, address indexed onbehalf, uint256 amount, Term term);
+    event SupplyCollateral(
+        bytes32 indexed id, address indexed collateral, address indexed onbehalf, uint256 amount, Term term
+    );
     event WithdrawCollateral(bytes32 indexed id, address indexed collateral, address indexed onbehalf, uint256 amount);
-    event Liquidate(bytes32 indexed id, address indexed borrower, address indexed liquidator, uint256 amount, Seizure[] seizures, Term term);
+    event Liquidate(
+        bytes32 indexed id,
+        address indexed borrower,
+        address indexed liquidator,
+        uint256 amount,
+        Seizure[] seizures,
+        Term term
+    );
 
     /// CONSTANTS ///
 
@@ -88,7 +105,7 @@ contract Terms is ITerms {
         }
 
         SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
-        emit Take(id, onBehalf, keccak256(abi.encode(offer)), assets, bonds,offer, term);
+        emit Take(id, onBehalf, keccak256(abi.encode(offer)), assets, bonds, offer, term);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -106,7 +123,7 @@ contract Terms is ITerms {
         totalBonds[id] -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
-        emit WithdrawBond(id, onBehalf, shares,bonds);
+        emit WithdrawBond(id, onBehalf, shares, bonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
