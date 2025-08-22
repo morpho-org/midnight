@@ -175,8 +175,19 @@ contract Terms is ITerms {
             }
         }
 
+        // Recovery close factor check
+        uint256 postLiquidationMaxDebt = 0;
+        for (uint256 i = 0; i < term.collaterals.length; i++) {
+            uint256 price = IOracle(term.collaterals[i].oracle).price();
+            uint256 collateralQuoted =
+                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+            postLiquidationMaxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+        }
+
         uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
+
+        require(debtOf[borrower][id] > postLiquidationMaxDebt, "liquidation above recovery close factor");
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
