@@ -142,4 +142,19 @@ contract LiquidationTest is BaseTest {
         recordedLiquidator = liquidator;
         recordedData = data;
     }
+
+    function testLiquidateAboveRecoveryCloseFactor(uint256 bonds) public {
+        vm.assume(bonds < 1e30);
+        vm.assume(bonds > 1e18);
+        // Setup
+        setupBond(term, bonds);
+        oracle.setPrice(1e36 - 1);
+
+        // Test
+        Seizure[] memory seizures = new Seizure[](2);
+        seizures[0] = Seizure({repaidBonds: bonds, seizedAssets: 0});
+        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        vm.expectRevert("liquidation above recovery close factor");
+        terms.liquidate(term, seizures, borrower, hex"");
+    }
 }
