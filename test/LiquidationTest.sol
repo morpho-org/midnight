@@ -66,7 +66,7 @@ contract LiquidationTest is BaseTest {
     function testLiquidateBondsInput() public {
         // Setup
         setupBond(term, 100);
-        oracle.setPrice(1e36 - 1);
+        oracle.setPrice(1e36 - 1e35);
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -82,7 +82,7 @@ contract LiquidationTest is BaseTest {
     function testLiquidateCollateralInput() public {
         // Setup
         setupBond(term, 100);
-        oracle.setPrice(1e36 - 1);
+        oracle.setPrice(1e36 - 1e35);
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -115,7 +115,7 @@ contract LiquidationTest is BaseTest {
 
         // Setup
         setupBond(term, 100);
-        oracle.setPrice(1e36 - 1);
+        oracle.setPrice(1e36 - 1e35);
         deal(address(loanToken), address(this), 1);
 
         // Test
