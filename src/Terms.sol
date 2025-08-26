@@ -140,9 +140,12 @@ contract Terms is ITerms {
 
         Vars memory vars;
         bytes32 id = _id(term);
+        uint256[] memory prices = new uint256[](term.collaterals.length);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
+            prices[i] = price;
+
             uint256 collateralQuoted =
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
@@ -178,9 +181,8 @@ contract Terms is ITerms {
         // Recovery close factor check
         uint256 postLiquidationMaxDebt = 0;
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 collateralQuoted =
-                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(prices[i], ORACLE_PRICE_SCALE);
             postLiquidationMaxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
         }
 
