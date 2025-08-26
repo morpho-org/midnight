@@ -93,6 +93,7 @@ contract LiquidationTest is BaseTest {
         assertEq(loanToken.balanceOf(address(this)), 0);
         assertEq(terms.debtOf(borrower, id), 99);
         assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
+        assert(!isHealthy(term, borrower));
     }
 
     function testLiquidateBadDebt() public {
@@ -156,5 +157,7 @@ contract LiquidationTest is BaseTest {
         seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
         vm.expectRevert("liquidation above recovery close factor");
         terms.liquidate(term, seizures, borrower, hex"");
+
+        assert(!isHealthy(term, borrower));
     }
 }

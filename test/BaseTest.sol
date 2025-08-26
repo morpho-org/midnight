@@ -103,4 +103,21 @@ abstract contract BaseTest is Test {
         // take `bonds` because the rate is 0.
         terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
     }
+
+    function isHealthy(Term memory term, address user) public view returns (bool) {
+        bytes32 id = toId(term);
+        uint256 debt = terms.debtOf(user, id);
+        if (debt == 0) {
+            return true;
+        } else {
+            uint256 maxDebt;
+            for (uint256 i = 0; i < term.collaterals.length; i++) {
+                uint256 price = IOracle(term.collaterals[i].oracle).price();
+                uint256 collateralQuoted = terms.collateralOf(user, id, term.collaterals[i].token) * price / 1e36;
+                maxDebt += collateralQuoted * term.collaterals[i].lltv / 1e18;
+            }
+
+            return debt <= maxDebt;
+        }
+    }
 }
