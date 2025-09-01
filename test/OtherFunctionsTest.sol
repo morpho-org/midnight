@@ -27,13 +27,14 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSupplyCollateral(address user, uint256 amount) public {
+        amount = bound(amount, 0, 1e48);
         // Setup
         ERC20 collateralToken = new ERC20("collat", "c");
         deal(address(collateralToken), address(this), amount);
         collateralToken.approve(address(terms), amount);
 
         // Test
-        terms.supplyCollateral(term, address(collateralToken), amount, user);
+        router.supplyCollateral(term, address(collateralToken), amount, user);
 
         assertEq(terms.collateralOf(user, toId(term), address(collateralToken)), amount, "collateral of");
         assertEq(collateralToken.balanceOf(address(terms)), amount, "balance of terms");
@@ -41,15 +42,17 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawCollateralNoBorrow(address user, uint256 supply, uint256 withdraw) public {
+        supply = bound(supply, 0, 1e48);
+
         // Setup
         withdraw = bound(withdraw, 0, supply);
         ERC20 collateralToken = new ERC20("collat", "c");
         deal(address(collateralToken), address(this), supply);
         collateralToken.approve(address(terms), supply);
-        terms.supplyCollateral(term, address(collateralToken), supply, user);
+        router.supplyCollateral(term, address(collateralToken), supply, user);
 
         // Test
-        terms.withdrawCollateral(term, address(collateralToken), withdraw, user);
+        router.withdrawCollateral(term, address(collateralToken), withdraw, user);
 
         assertEq(terms.collateralOf(user, toId(term), address(collateralToken)), supply - withdraw, "collateral of");
         assertEq(collateralToken.balanceOf(address(terms)), supply - withdraw, "balance of terms");
@@ -66,7 +69,7 @@ contract OtherFunctionsTest is BaseTest {
         setupBond(term, bonds, supply);
 
         // Test
-        terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
+        router.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
 
         assertEq(
             terms.collateralOf(borrower, toId(term), address(collateralToken1)), supply - withdraw, "collateral of"
@@ -86,7 +89,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // Test
         vm.expectRevert("Unhealthy borrower");
-        terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
+        router.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
     }
 
     function testRepay(uint256 bonds, uint256 repaid) public {
@@ -100,7 +103,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        terms.repayDebt(term, repaid, borrower);
+        router.repayDebt(term, repaid, borrower);
 
         assertEq(terms.debtOf(borrower, id), bonds - repaid);
         assertEq(terms.withdrawable(id), repaid);
@@ -110,10 +113,10 @@ contract OtherFunctionsTest is BaseTest {
 
     function testWithdrawInconsistentInput() public {
         vm.expectRevert("INCONSISTENT_INPUT");
-        terms.withdrawBond(term, 1, 1, lender);
+        router.withdrawBond(term, 1, 1, lender);
 
         vm.expectRevert("INCONSISTENT_INPUT");
-        terms.withdrawBond(term, 0, 0, lender);
+        router.withdrawBond(term, 0, 0, lender);
     }
 
     function testWithdrawWithBonds(uint256 bonds, uint256 withdraw) public {
@@ -124,7 +127,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // Test
         vm.prank(lender);
-        terms.withdrawBond(term, withdraw, 0, lender);
+        router.withdrawBond(term, withdraw, 0, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
         assertEq(terms.withdrawable(id), 0, "withdrawable");
@@ -141,7 +144,7 @@ contract OtherFunctionsTest is BaseTest {
         // Test
         // TODO: sharesPrice != 1
         vm.prank(lender);
-        terms.withdrawBond(term, 0, shares, lender);
+        router.withdrawBond(term, 0, shares, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
         assertEq(terms.withdrawable(id), 0, "withdrawable");

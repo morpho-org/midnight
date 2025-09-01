@@ -8,6 +8,7 @@ import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
+import {IMBALANCE_PREFIX, MAYBE_UNHEALTHY_PREFIX} from "./libraries/ConstantsLib.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -21,19 +22,36 @@ contract Terms is ITerms {
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
     uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
 
-    /// STORAGE ///
+    /// TRANSIENT ///
 
-    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public withdrawable;
-    mapping(bytes32 => uint256) public totalBonds;
-    mapping(bytes32 => uint256) public totalShares;
-    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    address public transient interactionInitiator;
+    uint256 public transient missingChecks;
+
+    /// STORAGE ///
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
+    mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
+    mapping(bytes32 termId => uint256) public withdrawable;
+    mapping(bytes32 termId => uint256) public totalBonds;
+    mapping(bytes32 termId => uint256) public totalShares;
+    mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
+    mapping(address user => mapping(address hook => bool)) public isFirstHook;
+    mapping(address owner => mapping(address spender => bool)) isAuthorized;
+
+    function interact(bytes calldata data) external {
+        address previousInteractionInitiator = interactionInitiator;
+        interactionInitiator = msg.sender;
+
+        (bool success, bytes memory returnData) = interactionInitiator.call(data);
+        if (!success) UtilsLib.lowLevelRevert(returnData);
+
+        if (previousInteractionInitiator == address(0)) require(missingChecks == 0, "missing checks");
+        interactionInitiator = previousInteractionInitiator;
+    }
 
     /// ENTRY-POINTS ///
 
@@ -43,6 +61,8 @@ contract Terms is ITerms {
     function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory sig)
         public
     {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
+
         require(block.timestamp >= offer.offerStart, "offer not started");
         require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(term.maturity >= block.timestamp, "bond maturity");
@@ -74,14 +94,48 @@ contract Terms is ITerms {
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
 
-            require(_isHealthy(term, seller), "Seller is unhealthy");
+            if (bonds - withdrawn > 0) setMaybeUnhealthy(id, seller, true);
         }
 
-        SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
+        setImbalance(term.loanToken, buyer, -assets.toInt256());
+        setImbalance(term.loanToken, seller, assets.toInt256());
     }
 
-    /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
+    function setImbalance(address token, address account, int256 amount) internal {
+        bytes32 slot = keccak256(abi.encodePacked(IMBALANCE_PREFIX, token, account));
+        int256 oldBalance;
+        int256 newBalance;
+        assembly {
+            oldBalance := tload(slot)
+            newBalance := add(oldBalance, amount)
+            tstore(slot, newBalance)
+        }
+        if (oldBalance != 0 && newBalance == 0) {
+            missingChecks--;
+        } else if (oldBalance == 0 && newBalance != 0) {
+            missingChecks++;
+        }
+    }
+
+    function setMaybeUnhealthy(bytes32 id, address borrower, bool newMaybeUnhealthy) internal {
+        bytes32 slot = keccak256(abi.encodePacked(MAYBE_UNHEALTHY_PREFIX, id, borrower));
+        bool oldMaybeUnhealthy;
+        assembly {
+            oldMaybeUnhealthy := tload(slot)
+            tstore(slot, newMaybeUnhealthy)
+        }
+        if (!oldMaybeUnhealthy && newMaybeUnhealthy) {
+            missingChecks++;
+        } else if (oldMaybeUnhealthy && !newMaybeUnhealthy) {
+            missingChecks--;
+        }
+    }
+
+    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf)
+        external
+        returns (uint256, uint256)
+    {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
         require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
@@ -94,29 +148,61 @@ contract Terms is ITerms {
         totalShares[id] -= shares;
         totalBonds[id] -= bonds;
 
-        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
+        setImbalance(term.loanToken, msg.sender, bonds.toInt256());
+        return (bonds, shares);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
         bytes32 id = _id(term);
 
         debtOf[onBehalf][id] -= bonds;
         withdrawable[id] += bonds;
 
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
+        setImbalance(term.loanToken, msg.sender, -bonds.toInt256());
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
         collateralOf[onBehalf][_id(term)][collateral] += assets;
-        SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
+
+        setImbalance(collateral, msg.sender, -assets.toInt256());
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= assets;
+        require(interactionInitiator != address(0), "interactionInitiator not set");
+        bytes32 id = _id(term);
+        collateralOf[onBehalf][id][collateral] -= assets;
 
-        require(_isHealthy(term, onBehalf), "Unhealthy borrower");
+        if (debtOf[onBehalf][id] > 0) setMaybeUnhealthy(id, onBehalf, true);
 
-        SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
+        setImbalance(collateral, msg.sender, assets.toInt256());
+    }
+
+    // TODO add authorization system
+    function transferImbalance(address token, address source, address dest, uint256 amount) external {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
+
+        setImbalance(token, source, -amount.toInt256());
+        setImbalance(token, dest, amount.toInt256());
+    }
+
+    function rebalance(address token, address source, address dest, uint256 amount) external {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
+        if (source != address(this)) {
+            setImbalance(token, source, amount.toInt256());
+            SafeTransferLib.safeTransferFrom(token, source, dest, amount);
+        } else {
+            SafeTransferLib.safeTransfer(token, dest, amount);
+        }
+
+        if (dest != address(this)) setImbalance(token, dest, -amount.toInt256());
+    }
+
+    function checkHealthy(Term memory term, address borrower) external {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
+        require(_isHealthy(term, borrower), "Unhealthy borrower");
+        setMaybeUnhealthy(_id(term), borrower, false);
     }
 
     struct Vars {
@@ -136,6 +222,7 @@ contract Terms is ITerms {
         external
         returns (Seizure[] memory)
     {
+        require(interactionInitiator != address(0), "interactionInitiator not set");
         require(seizures.length == term.collaterals.length, "should have all collats");
 
         Vars memory vars;
@@ -171,7 +258,7 @@ contract Terms is ITerms {
                 totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
-                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
+                setImbalance(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets.toInt256());
             }
         }
 
@@ -191,7 +278,7 @@ contract Terms is ITerms {
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+        setImbalance(term.loanToken, msg.sender, -totalRepaid.toInt256());
 
         return seizures;
     }

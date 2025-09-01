@@ -6,6 +6,7 @@ import "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import "../src/Terms.sol";
+import {AtomicRouter} from "./AtomicRouter.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
@@ -22,9 +23,11 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
     bytes32 internal offerTypehash; // to avoid calls.
     bytes32 internal domainTypehash; // to avoid calls.
+    AtomicRouter internal router;
 
     function setUp() public virtual {
         terms = new Terms();
+        router = new AtomicRouter(address(terms));
 
         offerTypehash = terms.OFFER_TYPEHASH();
         domainTypehash = terms.DOMAIN_TYPEHASH();
@@ -86,7 +89,7 @@ abstract contract BaseTest is Test {
         deal(address(loanToken), lender, bonds);
         deal(address(term.collaterals[0].token), address(this), collateral);
 
-        terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
+        router.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
         Offer memory borrowOffer = Offer({
             buy: false,
             offering: borrower,
@@ -100,7 +103,27 @@ abstract contract BaseTest is Test {
             nonce: 0
         });
 
-        // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        router.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+    }
+
+    /// Liquidation (not part of router) ///
+
+    function liquidate(Term memory term, Seizure[] memory seizures, address _borrower, bytes memory data) internal {
+        terms.interact(abi.encodeCall(this.interactionCallbackLiquidate, (term, seizures, _borrower, data)));
+    }
+
+    function interactionCallbackLiquidate(
+        Term memory term,
+        Seizure[] memory seizures,
+        address _borrower,
+        bytes calldata data
+    ) external {
+        seizures = terms.liquidate(term, seizures, _borrower, data);
+        uint256 totalRepaid = 0;
+        for (uint256 i = 0; i < seizures.length; i++) {
+            terms.rebalance(term.collaterals[i].token, address(terms), address(this), seizures[i].seizedAssets);
+            totalRepaid += seizures[i].repaidBonds;
+        }
+        terms.rebalance(term.loanToken, address(this), address(terms), totalRepaid);
     }
 }
