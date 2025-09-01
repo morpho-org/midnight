@@ -151,10 +151,12 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
+        uint256 thresholdProportion = 0.2e18;
+
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
-
+        uint256 newMaxDebt;
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -174,6 +176,10 @@ contract Terms is ITerms {
                 totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
+                uint256 collateralQuoted =
+                    collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(prices[i], ORACLE_PRICE_SCALE);
+                newMaxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+
                 SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
@@ -182,7 +188,7 @@ contract Terms is ITerms {
         debtOf[borrower][id] -= totalRepaid;
 
         // Recovery close factor check
-        require(!_isHealthy(term, borrower, prices), "liquidation above recovery close factor");
+        require(debtOf[borrower][id] > newMaxDebt, "liquidation above recovery close factor");
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
@@ -247,23 +253,6 @@ contract Terms is ITerms {
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
-                maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
-            }
-
-            return debt <= maxDebt;
-        }
-    }
-
-    function _isHealthy(Term memory term, address borrower, uint256[] memory prices) internal view returns (bool) {
-        bytes32 id = _id(term);
-        uint256 debt = debtOf[borrower][id];
-        if (debt == 0) {
-            return true;
-        } else {
-            uint256 maxDebt;
-            for (uint256 i = 0; i < term.collaterals.length; i++) {
-                uint256 collateralQuoted =
-                    collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(prices[i], ORACLE_PRICE_SCALE);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             }
 
