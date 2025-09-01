@@ -151,8 +151,6 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        uint256 thresholdProportion = 0.2e18;
-
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
