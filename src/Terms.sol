@@ -32,15 +32,15 @@ contract Terms is ITerms {
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
-    mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
-    mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
-    mapping(bytes32 termId => uint256) public withdrawable;
-    mapping(bytes32 termId => uint256) public totalBonds;
-    mapping(bytes32 termId => uint256) public totalShares;
-    mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address user => mapping(address hook => bool)) public isFirstHook;
-    mapping(address owner => mapping(address spender => bool)) isAuthorized;
+    mapping(address => mapping(uint256 => uint256)) public consumed;
+    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
+    mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(bytes32 => uint256) public withdrawable;
+    mapping(bytes32 => uint256) public totalBonds;
+    mapping(bytes32 => uint256) public totalShares;
+    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    mapping(address => mapping(address => bool)) public isFirstHook;
+    mapping(address => mapping(address => bool)) isAuthorized;
 
     function interact(bytes calldata data) external {
         address previousInteractionInitiator = interactionInitiator;
