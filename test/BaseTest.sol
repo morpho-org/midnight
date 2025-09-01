@@ -112,12 +112,23 @@ abstract contract BaseTest is Test {
         terms.interact(abi.encodeCall(this.interactionCallbackLiquidate, (term, seizures, _borrower, data)));
     }
 
+    function interactionCallback(bytes calldata data) external {
+        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        (bool success, bytes memory returnData) = address(this).call(data);
+        if (!success) {
+            assembly ("memory-safe") {
+                revert(add(32, returnData), mload(returnData))
+            }
+        }
+    }
+
     function interactionCallbackLiquidate(
         Term memory term,
         Seizure[] memory seizures,
         address _borrower,
         bytes calldata data
     ) external {
+        require(msg.sender == address(this), "unauthorized");
         seizures = terms.liquidate(term, seizures, _borrower, data);
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {

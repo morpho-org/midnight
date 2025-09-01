@@ -9,6 +9,7 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
 import {IMBALANCE_PREFIX, MAYBE_UNHEALTHY_PREFIX} from "./libraries/ConstantsLib.sol";
+import {IInteractionInitiator} from "./interfaces/IInteractionInitiator.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -46,8 +47,7 @@ contract Terms is ITerms {
         address previousInteractionInitiator = interactionInitiator;
         interactionInitiator = msg.sender;
 
-        (bool success, bytes memory returnData) = interactionInitiator.call(data);
-        if (!success) UtilsLib.lowLevelRevert(returnData);
+        IInteractionInitiator(interactionInitiator).interactionCallback(data);
 
         if (previousInteractionInitiator == address(0)) require(missingChecks == 0, "missing checks");
         interactionInitiator = previousInteractionInitiator;

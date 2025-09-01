@@ -21,12 +21,4 @@ library UtilsLib {
             z := xor(x, mul(xor(x, y), lt(y, x)))
         }
     }
-
-    /// @dev Bubbles up the revert reason / custom error encoded in `returnData`.
-    /// @dev Assumes `returnData` is the return data of any kind of failing CALL to a contract.
-    function lowLevelRevert(bytes memory returnData) internal pure {
-        assembly ("memory-safe") {
-            revert(add(32, returnData), mload(returnData))
-        }
-    }
 }

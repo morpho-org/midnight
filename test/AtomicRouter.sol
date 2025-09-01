@@ -12,6 +12,16 @@ contract AtomicRouter {
         terms = Terms(_terms);
     }
 
+    function interactionCallback(bytes calldata data) external {
+        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        (bool success, bytes memory returnData) = address(this).call(data);
+        if (!success) {
+            assembly ("memory-safe") {
+                revert(add(32, returnData), mload(returnData))
+            }
+        }
+    }
+
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         terms.interact(abi.encodeCall(this.supplyCollateralCallback, (term, collateral, assets, onBehalf, msg.sender)));
     }
@@ -23,7 +33,7 @@ contract AtomicRouter {
         address onBehalf,
         address msgSender
     ) external {
-        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        require(msg.sender == address(this), "unauthorized");
         terms.supplyCollateral(term, collateral, assets, onBehalf);
         terms.transferImbalance(collateral, msgSender, address(this), assets);
         terms.rebalance(collateral, msgSender, address(terms), assets);
@@ -42,7 +52,7 @@ contract AtomicRouter {
         address onBehalf,
         address msgSender
     ) external {
-        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        require(msg.sender == address(this), "unauthorized");
         terms.withdrawCollateral(term, collateral, assets, onBehalf);
         terms.transferImbalance(collateral, address(this), msgSender, assets);
         terms.rebalance(collateral, address(terms), msgSender, assets);
@@ -54,7 +64,7 @@ contract AtomicRouter {
     }
 
     function repayDebtCallback(Term memory term, uint256 bonds, address onBehalf, address msgSender) external {
-        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        require(msg.sender == address(this), "unauthorized");
         terms.repayDebt(term, bonds, onBehalf);
         terms.transferImbalance(term.loanToken, msgSender, address(this), bonds);
         terms.rebalance(term.loanToken, msgSender, address(terms), bonds);
@@ -69,7 +79,7 @@ contract AtomicRouter {
     function takeCallback(Term memory term, uint256 bonds, address onBehalf, Offer memory offer, Signature memory _sig)
         external
     {
-        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        require(msg.sender == address(this), "unauthorized");
         terms.take(term, bonds, onBehalf, offer, _sig);
 
         (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
@@ -84,7 +94,7 @@ contract AtomicRouter {
     function withdrawBondCallback(Term memory term, uint256 bonds, uint256 shares, address onBehalf, address msgSender)
         external
     {
-        require(terms.interactionInitiator() == address(this), "wrong initiator");
+        require(msg.sender == address(this), "unauthorized");
         (bonds, shares) = terms.withdrawBond(term, bonds, shares, onBehalf);
         terms.transferImbalance(term.loanToken, address(this), msgSender, bonds);
         terms.rebalance(term.loanToken, address(terms), msgSender, bonds);
