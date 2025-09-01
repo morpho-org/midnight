@@ -161,14 +161,13 @@ contract Terms is ITerms {
                     UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
                 );
 
-                uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
-
                 if (seizures[i].seizedAssets > 0) {
-                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
-                        .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(prices[i], ORACLE_PRICE_SCALE).mulDivUp(
+                        1e18, LIQUIDATION_INCENTIVE_FACTOR
+                    );
                 } else {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
-                        .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
+                        .mulDivDown(ORACLE_PRICE_SCALE, prices[i]);
                 }
 
                 totalRepaid += seizures[i].repaidBonds;
@@ -185,8 +184,23 @@ contract Terms is ITerms {
         uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
 
+        bool useRecoveryCF = true;
+        uint256 thresholdProportion = 0.2e18;
+        uint256 proportion = totalRepaid.mulDivDown(1e18, originalDebt);
+        if (proportion > thresholdProportion) {
+            uint256 theoreticalMaxDebt;
+            for (uint256 i = 0; i < term.collaterals.length; i++) {
+                uint256 theoreticalCollateralOf = (
+                    collateralOf[borrower][id][term.collaterals[i].token] + seizures[i].seizedAssets
+                ) - seizures[i].seizedAssets.mulDivDown(thresholdProportion, proportion);
+                uint256 collateralQuoted = theoreticalCollateralOf.mulDivDown(prices[i], ORACLE_PRICE_SCALE);
+                theoreticalMaxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
+            }
+            useRecoveryCF =
+                (originalDebt - totalRepaid.mulDivDown(thresholdProportion, proportion) <= theoreticalMaxDebt);
+        }
         // Recovery close factor check
-        require(debtOf[borrower][id] > newMaxDebt, "liquidation above recovery close factor");
+        require(!useRecoveryCF || debtOf[borrower][id] > newMaxDebt, "liquidation above recovery close factor");
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
