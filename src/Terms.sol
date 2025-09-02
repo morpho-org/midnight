@@ -75,6 +75,7 @@ contract Terms is ITerms {
             totalBonds[id] -= withdrawn;
 
             require(_isHealthy(term, seller), "Seller is unhealthy");
+            require(offer.rate == term.rate || bought == withdrawn, "primary trading with wrong rate");
         }
 
         SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);

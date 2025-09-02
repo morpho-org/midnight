@@ -28,6 +28,7 @@ contract TakeTest is BaseTest {
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
         term.loanToken = address(loanToken);
+        term.rate = 0.01e18 / 100;
         term.maturity = block.timestamp + 100;
         for (uint256 i = 0; i < collaterals.length; i++) {
             term.collaterals.push(collaterals[i]);
@@ -106,10 +107,11 @@ contract TakeTest is BaseTest {
         loanToken.approve(address(terms), 100);
         deal(address(loanToken), otherLender, 100);
         lendOffer.offering = otherLender;
+        lendOffer.rate = 0;
         terms.take(term, 100, lender, lendOffer, sig(lendOffer, otherLenderSK));
 
-        assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
-        assertEq(terms.bondSharesOf(otherLender, id), 101, "other lender bond shares");
+        assertEq(terms.bondSharesOf(lender, id), 1, "lender bond shares");
+        assertEq(terms.bondSharesOf(otherLender, id), 100, "other lender bond shares");
         assertEq(terms.totalBonds(id), 101, "total bonds");
         assertEq(terms.totalShares(id), 101, "total shares");
         assertEq(terms.consumed(otherLender, 0), 100, "other lender nonce");
@@ -117,7 +119,7 @@ contract TakeTest is BaseTest {
         assertEq(loanToken.balanceOf(otherLender), 0, "other lender balance");
     }
 
-    function testWithdrawSecondaryWithBorrower() public {
+    function testWithdrawSecondaryWithBorrowerSameRate() public {
         terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
         lendOffer.offering = borrower;
         lendOffer.nonce = 1;
@@ -132,6 +134,15 @@ contract TakeTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
     }
 
+    function testWithdrawSecondaryWithBorrowerDifferentRate() public {
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        lendOffer.offering = borrower;
+        lendOffer.rate = 0;
+        lendOffer.nonce = 1;
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
+    }
+
     function testRepaySecondaryWithBorrower() public {
         terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
 
@@ -141,7 +152,8 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), otherBorrower, 135);
         terms.supplyCollateral(term, address(collateralToken1), 135, otherBorrower);
         borrowOffer.offering = otherBorrower;
-        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, otherBorrowerSK));
+        borrowOffer.rate = 0.03e18 / 100;
+        terms.take(term, 99, borrower, borrowOffer, sig(borrowOffer, otherBorrowerSK));
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -150,12 +162,12 @@ contract TakeTest is BaseTest {
         assertEq(terms.debtOf(otherBorrower, id), 101, "other borrower debt");
         assertEq(terms.totalBonds(id), 101, "total bonds");
         assertEq(terms.totalShares(id), 101, "total shares");
-        assertEq(terms.consumed(otherBorrower, 0), 100, "other borrower nonce");
-        assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
-        assertEq(loanToken.balanceOf(otherBorrower), 100, "other borrower balance");
+        assertEq(terms.consumed(otherBorrower, 0), 99, "other borrower consumed");
+        assertEq(loanToken.balanceOf(borrower), 1, "borrower balance");
+        assertEq(loanToken.balanceOf(otherBorrower), 99, "other borrower balance");
     }
 
-    function testRepaySecondaryWithLender() public {
+    function testRepaySecondaryWithLenderSameRate() public {
         terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
 
         borrowOffer.offering = lender;
@@ -171,6 +183,28 @@ contract TakeTest is BaseTest {
         assertEq(terms.consumed(lender, 1), 100, "lender nonce");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 100, "lender balance");
+    }
+
+    function testRepaySecondaryWithLenderDifferentRate() public {
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+
+        borrowOffer.offering = lender;
+        borrowOffer.rate = 0;
+        borrowOffer.nonce = 1;
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK));
+    }
+
+    function testLendPrimaryDifferentRate() public {
+        lendOffer.rate = 0;
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+    }
+
+    function testBorrowPrimaryDifferentRate() public {
+        borrowOffer.rate = 0;
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
     }
 
     function testMatch() public {
@@ -307,5 +341,50 @@ contract TakeTest is BaseTest {
     function testTakeInvalidSignature() public {
         vm.expectRevert("Invalid signature");
         terms.take(term, 100, borrower, lendOffer, Signature(0, 0, 0));
+    }
+
+    function testCantLoanZeroPrimary() public {
+        (address cheapBorrower, uint256 cheapBorrowerSK) = makeAddrAndKey("cheap borrower");
+
+        vm.prank(lender);
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+
+        console.log("DEBT");
+        console.log(terms.debtOf(borrower, id));
+
+        deal(address(loanToken), borrower, 101); // flashloan
+        vm.prank(borrower);
+        terms.repayDebt(term, 101, borrower);
+        assertEq(terms.withdrawable(id), 101);
+
+        // Try to create 0% loan to self
+
+        deal(address(loanToken), cheapBorrower, 101);
+        deal(address(collateralToken1), cheapBorrower, 135);
+
+        vm.startPrank(cheapBorrower);
+        collateralToken1.approve(address(terms), type(uint256).max);
+        loanToken.approve(address(terms), type(uint256).max);
+        terms.supplyCollateral(term, address(collateralToken1), 135, cheapBorrower);
+        vm.stopPrank();
+
+        lendOffer.offering = cheapBorrower;
+        lendOffer.assets = 101;
+        lendOffer.rate = 0;
+
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 101, cheapBorrower, lendOffer, sig(lendOffer, cheapBorrowerSK));
+    }
+
+    function testCantRepayPrimaryCheaply() public {
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+
+        lendOffer.offering = borrower;
+        lendOffer.assets = 100;
+        lendOffer.rate = 0;
+        lendOffer.nonce = 1;
+
+        vm.expectRevert("primary trading with wrong rate");
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
     }
 }
