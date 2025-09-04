@@ -349,9 +349,6 @@ contract TakeTest is BaseTest {
         vm.prank(lender);
         terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
 
-        console.log("DEBT");
-        console.log(terms.debtOf(borrower, id));
-
         deal(address(loanToken), borrower, 101); // flashloan
         vm.prank(borrower);
         terms.repayDebt(term, 101, borrower);
