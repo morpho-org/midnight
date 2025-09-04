@@ -308,4 +308,46 @@ contract TakeTest is BaseTest {
         vm.expectRevert("Invalid signature");
         terms.take(term, 100, borrower, lendOffer, Signature(0, 0, 0));
     }
+
+    function testCanLoanZeroPrimary() public {
+        (address cheapBorrower, uint256 cheapBorrowerSK) = makeAddrAndKey("cheap borrower");
+
+        vm.prank(lender);
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+
+        deal(address(loanToken), borrower, 101);
+        vm.prank(borrower);
+        terms.repayDebt(term, 101, borrower);
+        assertEq(terms.withdrawable(id), 101);
+
+        // Flashloan
+        deal(address(loanToken), address(this), 101);
+        loanToken.transfer(cheapBorrower, 101);
+        deal(address(collateralToken1), cheapBorrower, 135);
+
+        // Create 0% loan to self
+
+        vm.startPrank(cheapBorrower);
+        collateralToken1.approve(address(terms), type(uint256).max);
+        loanToken.approve(address(terms), type(uint256).max);
+        terms.supplyCollateral(term, address(collateralToken1), 135, cheapBorrower);
+        vm.stopPrank();
+
+        lendOffer.offering = cheapBorrower;
+        lendOffer.assets = 101;
+        lendOffer.rate = 0;
+
+        terms.take(term, 101, cheapBorrower, lendOffer, sig(lendOffer, cheapBorrowerSK));
+
+        // Repay flashloan
+        vm.prank(cheapBorrower);
+        loanToken.transfer(address(this), 101);
+
+        // Withdraw assets
+        vm.prank(cheapBorrower);
+        terms.withdrawBond(term, 101, 0, cheapBorrower);
+
+        assertEq(terms.debtOf(cheapBorrower, id), 101, "debt");
+        assertEq(loanToken.balanceOf(cheapBorrower), 101, "balance");
+    }
 }
