@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.28;
+pragma solidity ^0.8.28;
 
 import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
@@ -65,16 +65,14 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory sig)
-        public
-    {
+    function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory) public {
         require(block.timestamp >= offer.offerStart, "offer not started");
         require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(term.maturity >= block.timestamp, "bond maturity");
-        _checkSignature(offer, sig);
+        //_checkSignature(offer, sig);
         _checkOffer(term, offer);
 
-        uint256 bonds = assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18;
+        uint256 bonds = (assets * (1e18 + (term.maturity - block.timestamp) * offer.rate)) / 1e18;
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
@@ -113,8 +111,11 @@ contract Terms is ITerms {
         require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) {
+            shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        } else {
+            bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        }
 
         bondSharesOf[onBehalf][id] -= shares;
         withdrawable[id] -= bonds;
@@ -221,7 +222,9 @@ contract Terms is ITerms {
 
         withdrawable[id] += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) {
+            IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        }
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
