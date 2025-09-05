@@ -169,33 +169,9 @@ contract Terms is ITerms {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
                         .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
                 }
-
-                totalRepaid += seizures[i].repaidBonds;
-                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-
-                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
-
-        uint256 originalDebt = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
-
-        // Realize bad debt
-        if (vars.repayableDebt < originalDebt) {
-            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
-            // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
-            debtOf[borrower][id] -= badDebt;
-            totalBonds[id] -= badDebt;
-        }
-
-        withdrawable[id] += totalRepaid;
-
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
-
-        return seizures;
+        return liquidateInternal(term, seizures, borrower, data);
     }
 
     function postMaturityLiquidation(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
@@ -228,12 +204,23 @@ contract Terms is ITerms {
                 } else {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(ORACLE_PRICE_SCALE, auctionPrice);
                 }
-
-                totalRepaid += seizures[i].repaidBonds;
-                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-
-                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
+        }
+        return liquidateInternal(term, seizures, borrower, data);
+    }
+
+    function liquidateInternal(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
+        internal
+        returns (Seizure[] memory)
+    {
+        bytes32 id = _id(term);
+        uint256 totalRepaid = 0;
+
+        for (uint256 i = 0; i < seizures.length; i++) {
+            totalRepaid += seizures[i].repaidBonds;
+            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+
+            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
         uint256 originalDebt = debtOf[borrower][id];
