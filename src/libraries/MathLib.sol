@@ -12,4 +12,14 @@ library MathLib {
     function mulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y + (d - 1)) / d;
     }
+
+    /// @dev Returns (`x` * `y`) / `d` rounded down.
+    function mulDivDown(int256 x, int256 y, int256 d) internal pure returns (int256) {
+        return (x * y) / d;
+    }
+
+    /// @dev Returns (`x` * `y`) / `d` rounded up.
+    function mulDivUp(int256 x, int256 y, int256 d) internal pure returns (int256) {
+        return (x * y + (d - 1)) / d;
+    }
 }
