@@ -8,6 +8,7 @@ import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
+import "forge-std/console.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -148,6 +149,10 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
+
+        console.log("=====LIQUIDATE======");
+        console.log("initial maxDebt", vars.maxDebt);
+        console.log("initial debtOf", debtOf[borrower][id]);
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
@@ -175,14 +180,23 @@ contract Terms is ITerms {
             }
         }
 
+        console.log("total repaid", totalRepaid);
+
+
         uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
+
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
+
             uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
+            console.log("before bad debt, debt", debtOf[borrower][id]);
+            console.log("is healthy", _isHealthy(term, borrower));
+            console.log("badDebt", badDebt);
+            console.log("repayable", vars.repayableDebt);
             debtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
@@ -241,8 +255,13 @@ contract Terms is ITerms {
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
+                console.log("collateral quoted", collateralQuoted);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             }
+
+        console.log("_isHealthy");
+        console.log("maxDebt", maxDebt);
+        console.log("debtOf", debt);
 
             return debt <= maxDebt;
         }

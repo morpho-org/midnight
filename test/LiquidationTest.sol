@@ -95,6 +95,58 @@ contract LiquidationTest is BaseTest {
         assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
     }
 
+    function testLiquidateWrongBadDebt() public {
+        // Setup
+        // setupBond(term, 101);
+
+        term.collaterals[0].lltv = 0.5e18;
+        term.collaterals[1].oracle = address(new Oracle());
+        term.collaterals[1].lltv = 0.9e18;
+
+        uint c0 = 230;
+        uint c1 = 100;
+        uint loanAmount = 100+88;
+
+        deal(address(loanToken), lender, 100e18);
+        deal(address(term.collaterals[0].token), address(this), c0);
+        deal(address(term.collaterals[1].token), address(this), c1);
+
+        terms.supplyCollateral(term, address(term.collaterals[0].token), c0, borrower);
+        terms.supplyCollateral(term, address(term.collaterals[1].token), c1, borrower);
+
+
+
+
+
+        Offer memory borrowOffer = Offer({
+            buy: false,
+            offering: borrower,
+            assets: loanAmount,
+            loanToken: term.loanToken,
+            collaterals: term.collaterals,
+            maturity: block.timestamp + 100,
+            offerStart: block.timestamp,
+            offerExpiry: block.timestamp + 200,
+            rate: 0,
+            nonce: 0
+        });
+
+        terms.take(term, loanAmount, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+
+        oracle.setPrice(1e36/2-1);
+        deal(address(loanToken), address(this), 100e18);
+
+        // Test
+        Seizure[] memory seizures = new Seizure[](2);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 230});
+        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        terms.liquidate(term, seizures, borrower, "");
+        // assertEq(loanToken.balanceOf(address(this)), 0);
+        // assertEq(terms.debtOf(borrower, id), 99);
+        // assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133e6);
+    }
+
+
     function testLiquidateBadDebt() public {
         // Setup
         setupBond(term, 100);
