@@ -109,6 +109,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawInconsistentInput() public {
+        vm.warp(term.maturity + 1);
         vm.expectRevert("INCONSISTENT_INPUT");
         terms.withdrawBond(term, 1, 1, lender);
 
@@ -123,6 +124,8 @@ contract OtherFunctionsTest is BaseTest {
         testCover(bonds, withdraw);
 
         // Test
+
+        vm.warp(term.maturity + 1);
         vm.prank(lender);
         terms.withdrawBond(term, withdraw, 0, lender);
 
@@ -132,6 +135,49 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
 
+    function testWithdrawBondsBeforeMaturity(uint bonds, uint withdraw, uint maturity, uint skipDuration) public {
+
+        bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
+        withdraw = bound(withdraw, 0, bonds);
+        maturity = bound(maturity, block.timestamp, block.timestamp + 365 days);
+        skipDuration = bound(skipDuration, 0, maturity - block.timestamp);
+        term.maturity = maturity;
+
+        uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
+
+        deal(address(loanToken), lender, bonds);
+        deal(address(term.collaterals[0].token), address(this), collateral);
+
+        terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
+        Offer memory borrowOffer = Offer({
+            buy: false,
+            offering: borrower,
+            assets: bonds,
+            loanToken: term.loanToken,
+            collaterals: term.collaterals,
+            maturity: term.maturity,
+            offerStart: block.timestamp,
+            offerExpiry: block.timestamp + 200,
+            rate: 0,
+            nonce: 0
+        });
+
+        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+
+        skip(skipDuration);
+
+        deal(address(loanToken), address(borrower), withdraw);
+
+        vm.prank(borrower);
+        terms.supplyCover(term, withdraw, borrower);
+
+        // Test
+        vm.prank(lender);
+        vm.expectRevert("bond maturity");
+        terms.withdrawBond(term, withdraw, 0, lender);
+    }
+
+
     function testWithdrawWithShares(uint256 bonds, uint256 shares) public {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
@@ -140,6 +186,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // Test
         // TODO: sharesPrice != 1
+        vm.warp(term.maturity + 1);
         vm.prank(lender);
         terms.withdrawBond(term, 0, shares, lender);
 

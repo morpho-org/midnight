@@ -94,6 +94,7 @@ contract Terms is ITerms {
 
     /// @dev Will revert if there is no withdrawable funds.
     function withdrawBond(Term memory term, uint256 bonds, uint256 bondShares, address onBehalf) external {
+        require(term.maturity < block.timestamp, "bond maturity");
         require(UtilsLib.exactlyOneZero(bonds, bondShares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
