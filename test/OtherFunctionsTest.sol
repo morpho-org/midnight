@@ -135,8 +135,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
 
-    function testWithdrawBondsBeforeMaturity(uint bonds, uint withdraw, uint maturity, uint skipDuration) public {
-
+    function testWithdrawBondsBeforeMaturity(uint256 bonds, uint256 withdraw, uint256 maturity, uint256 skipDuration)
+        public
+    {
         bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 0, bonds);
         maturity = bound(maturity, block.timestamp, block.timestamp + 365 days);
@@ -176,7 +177,6 @@ contract OtherFunctionsTest is BaseTest {
         vm.expectRevert("bond maturity");
         terms.withdrawBond(term, withdraw, 0, lender);
     }
-
 
     function testWithdrawWithShares(uint256 bonds, uint256 shares) public {
         // Setup
