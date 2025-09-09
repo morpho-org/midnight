@@ -89,22 +89,22 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
     }
 
-    function testRepay(uint256 bonds, uint256 repaid) public {
+    function testCover(uint256 bonds, uint256 covered) public {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
         bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
-        repaid = bound(repaid, 0, bonds);
+        covered = bound(covered, 0, bonds);
         setupBond(term, bonds);
 
         vm.warp(block.timestamp + 99);
 
-        deal(address(loanToken), address(borrower), repaid);
+        deal(address(loanToken), address(borrower), covered);
 
         vm.prank(borrower);
-        terms.repayDebt(term, repaid, borrower);
+        terms.supplyCover(term, covered, borrower);
 
-        assertEq(terms.debtOf(borrower, id), bonds - repaid);
-        assertEq(terms.withdrawable(id), repaid);
-        assertEq(loanToken.balanceOf(address(terms)), repaid);
+        assertEq(terms.debtOf(borrower, id), bonds - covered);
+        assertEq(terms.totalCover(id), covered);
+        assertEq(loanToken.balanceOf(address(terms)), covered);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
@@ -120,14 +120,14 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, bonds);
-        testRepay(bonds, withdraw);
+        testCover(bonds, withdraw);
 
         // Test
         vm.prank(lender);
         terms.withdrawBond(term, withdraw, 0, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
-        assertEq(terms.withdrawable(id), 0, "withdrawable");
+        assertEq(terms.totalCover(id), 0, "total cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
@@ -136,7 +136,7 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, bonds);
-        testRepay(bonds, shares);
+        testCover(bonds, shares);
 
         // Test
         // TODO: sharesPrice != 1
@@ -144,7 +144,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawBond(term, 0, shares, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
-        assertEq(terms.withdrawable(id), 0, "withdrawable");
+        assertEq(terms.totalCover(id), 0, "total cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
     }

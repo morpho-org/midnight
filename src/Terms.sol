@@ -24,10 +24,14 @@ contract Terms is ITerms {
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public withdrawable;
+    mapping(address => mapping(bytes32 => uint256)) public debtSharesOf;
+    mapping(address => mapping(bytes32 => uint256)) public coverSharesOf;
     mapping(bytes32 => uint256) public totalBonds;
-    mapping(bytes32 => uint256) public totalShares;
+    mapping(bytes32 => uint256) public totalBondShares;
+    mapping(bytes32 => uint256) public totalDebt;
+    mapping(bytes32 => uint256) public totalDebtShares;
+    mapping(bytes32 => uint256) public totalCover;
+    mapping(bytes32 => uint256) public totalCoverShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
@@ -57,22 +61,30 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         {
-            uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+            uint256 repaid =
+                UtilsLib.min(debtSharesOf[buyer][id].mulDivUp(totalDebt[id] + 1, totalDebtShares[id] + 1), bonds);
+            uint256 repaidShares = repaid.mulDivDown(totalDebtShares[id] + 1, totalDebt[id] + 1);
             uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
+            uint256 boughtShares = bought.mulDivDown(totalBondShares[id] + 1, totalBonds[id] + 1);
             uint256 withdrawn =
-                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalBondShares[id] + 1), bonds);
+            uint256 withdrawnShares = withdrawn.mulDivUp(totalBondShares[id] + 1, totalBonds[id] + 1);
+            uint256 borrowed = bonds - withdrawn;
+            uint256 borrowedShares = borrowed.mulDivUp(totalDebtShares[id] + 1, totalDebt[id] + 1);
 
-            debtOf[buyer][id] -= repaid;
+            debtSharesOf[buyer][id] -= repaidShares;
             bondSharesOf[buyer][id] += boughtShares;
             bondSharesOf[seller][id] -= withdrawnShares;
-            debtOf[seller][id] += bonds - withdrawn;
+            debtSharesOf[seller][id] += borrowedShares;
 
-            totalShares[id] += boughtShares;
-            totalShares[id] -= withdrawnShares;
+            totalBondShares[id] += boughtShares;
+            totalBondShares[id] -= withdrawnShares;
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
+            totalDebtShares[id] += borrowedShares;
+            totalDebtShares[id] -= repaidShares;
+            totalDebt[id] += borrowed;
+            totalDebt[id] -= repaid;
 
             require(_isHealthy(term, seller), "Seller is unhealthy");
         }
@@ -81,29 +93,20 @@ contract Terms is ITerms {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
-        require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
+    function withdrawBond(Term memory term, uint256 bonds, uint256 bondShares, address onBehalf) external {
+        require(UtilsLib.exactlyOneZero(bonds, bondShares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) bondShares = bonds.mulDivUp(totalBondShares[id] + 1, totalBonds[id] + 1);
+        else bonds = bondShares.mulDivDown(totalBonds[id] + 1, totalBondShares[id] + 1);
 
-        bondSharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= bonds;
+        bondSharesOf[onBehalf][id] -= bondShares;
 
-        totalShares[id] -= shares;
+        totalBondShares[id] -= bondShares;
         totalBonds[id] -= bonds;
+        totalCover[id] -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
-    }
-
-    function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
-        bytes32 id = _id(term);
-
-        debtOf[onBehalf][id] -= bonds;
-        withdrawable[id] += bonds;
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
@@ -119,6 +122,27 @@ contract Terms is ITerms {
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
+    function supplyCover(Term memory term, uint256 assets, address onBehalf) external {
+        bytes32 id = _id(term);
+        uint256 coverShares = assets.mulDivDown(totalCoverShares[id] + 1, totalCover[id] + 1);
+        coverSharesOf[onBehalf][id] += coverShares;
+        totalCoverShares[id] += coverShares;
+        totalCover[id] += assets;
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), assets);
+    }
+
+    function withdrawCover(Term memory term, uint256 assets, address onBehalf) external {
+        bytes32 id = _id(term);
+        uint256 coverShares = assets.mulDivUp(totalCoverShares[id] + 1, totalCover[id] + 1);
+        coverSharesOf[onBehalf][id] -= coverShares;
+        totalCoverShares[id] -= coverShares;
+        totalCover[id] -= assets;
+
+        require(_isHealthy(term, onBehalf), "Unhealthy borrower");
+
+        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, assets);
+    }
+
     struct Vars {
         uint256 maxDebt;
         uint256 repayableDebt;
@@ -126,6 +150,7 @@ contract Terms is ITerms {
 
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
     /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
+    /// @dev Covered debt cannot be liquidated.
     /// @param term The term of the bond.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// term's collateral assets.
@@ -148,7 +173,7 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+        require(debtOf(borrower, id) > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
 
@@ -175,25 +200,36 @@ contract Terms is ITerms {
             }
         }
 
-        uint256 originalDebt = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
+        uint256 originalDebt = debtOf(borrower, id);
+        uint256 coverShares = totalRepaid.mulDivDown(totalCoverShares[id] + 1, totalCover[id] + 1);
+        coverSharesOf[borrower][id] += coverShares;
+        totalCoverShares[id] += coverShares;
+        totalCover[id] += totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - vars.repayableDebt);
-            debtOf[borrower][id] -= badDebt;
+            uint256 badDebt = UtilsLib.min(debtOf(borrower, id), originalDebt - vars.repayableDebt);
+            debtSharesOf[borrower][id] -= badDebt.mulDivUp(totalDebtShares[id] + 1, totalDebt[id] + 1);
             totalBonds[id] -= badDebt;
         }
-
-        withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
         return seizures;
+    }
+
+    /// VIEWS ///
+
+    /// @notice The debt of the borrower excluding the covered amount.
+    function debtOf(address borrower, bytes32 id) public view returns (uint256) {
+        uint256 debt = debtSharesOf[borrower][id].mulDivUp(totalDebt[id] + 1, totalDebtShares[id] + 1);
+        uint256 cover = coverSharesOf[borrower][id].mulDivDown(totalCover[id] + 1, totalCoverShares[id] + 1);
+
+        return MathLib.zeroFloorSub(debt, cover);
     }
 
     /// INTERNAL ///
@@ -232,7 +268,7 @@ contract Terms is ITerms {
 
     function _isHealthy(Term memory term, address borrower) internal view returns (bool) {
         bytes32 id = _id(term);
-        uint256 debt = debtOf[borrower][id];
+        uint256 debt = debtOf(borrower, id);
         if (debt == 0) {
             return true;
         } else {
