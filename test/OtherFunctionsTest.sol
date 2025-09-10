@@ -158,7 +158,7 @@ contract OtherFunctionsTest is BaseTest {
             vm.prank(borrower);
             terms.withdrawCover(term, withdrawn, borrower);
         } else {
-            vm.expectRevert("no new debt after maturity");
+            vm.expectRevert("only excess cover can be removed after maturity");
             vm.prank(borrower);
             terms.withdrawCover(term, withdrawn, borrower);
         }

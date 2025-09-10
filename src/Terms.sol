@@ -112,6 +112,7 @@ contract Terms is ITerms {
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
+    /// @dev Cover supplied in excess of the debt may not be withdrawable until all debt has been repaid.
     function supplyCover(Term memory term, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
         coverOf[onBehalf][id] += assets;
@@ -127,7 +128,7 @@ contract Terms is ITerms {
         if (term.maturity >= block.timestamp) {
             require(_isHealthy(term, onBehalf), "Unhealthy borrower");
         } else {
-            require(debtOf(onBehalf, id) == 0, "no new debt after maturity");
+            require(debtOf(onBehalf, id) == 0, "only excess cover can be removed after maturity");
         }
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, assets);
