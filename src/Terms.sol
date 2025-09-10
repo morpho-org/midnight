@@ -26,9 +26,9 @@ contract Terms is ITerms {
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtAndCoveredDebtOf;
     mapping(address => mapping(bytes32 => uint256)) public coverOf;
-    mapping(bytes32 => uint256) public totalBonds;
-    mapping(bytes32 => uint256) public totalBondShares;
     mapping(bytes32 => uint256) public availableCover;
+    mapping(bytes32 => uint256) public totalBonds;
+    mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
@@ -60,10 +60,10 @@ contract Terms is ITerms {
         {
             uint256 repaid = UtilsLib.min(debtAndCoveredDebtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
-            uint256 boughtShares = bought.mulDivDown(totalBondShares[id] + 1, totalBonds[id] + 1);
+            uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
             uint256 withdrawn =
-                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalBondShares[id] + 1), bonds);
-            uint256 withdrawnShares = withdrawn.mulDivUp(totalBondShares[id] + 1, totalBonds[id] + 1);
+                UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+            uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
             uint256 borrowed = bonds - withdrawn;
 
             debtAndCoveredDebtOf[buyer][id] -= repaid;
@@ -71,8 +71,8 @@ contract Terms is ITerms {
             bondSharesOf[seller][id] -= withdrawnShares;
             debtAndCoveredDebtOf[seller][id] += borrowed;
 
-            totalBondShares[id] += boughtShares;
-            totalBondShares[id] -= withdrawnShares;
+            totalShares[id] += boughtShares;
+            totalShares[id] -= withdrawnShares;
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
 
@@ -88,12 +88,12 @@ contract Terms is ITerms {
         require(UtilsLib.exactlyOneZero(bonds, bondShares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (bonds > 0) bondShares = bonds.mulDivUp(totalBondShares[id] + 1, totalBonds[id] + 1);
-        else bonds = bondShares.mulDivDown(totalBonds[id] + 1, totalBondShares[id] + 1);
+        if (bonds > 0) bondShares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        else bonds = bondShares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
         bondSharesOf[onBehalf][id] -= bondShares;
 
-        totalBondShares[id] -= bondShares;
+        totalShares[id] -= bondShares;
         totalBonds[id] -= bonds;
         availableCover[id] -= bonds;
 
