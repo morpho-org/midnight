@@ -206,7 +206,7 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, bonds);
-        testCover(bonds, withdraw);
+        _testCover(bonds, withdraw, term.maturity);
 
         // Test
 
@@ -248,7 +248,7 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, bonds);
-        testCover(bonds, shares);
+        _testCover(bonds, shares,term.maturity);
 
         // Test
         // TODO: sharesPrice != 1
