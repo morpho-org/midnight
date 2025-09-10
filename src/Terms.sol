@@ -91,10 +91,10 @@ contract Terms is ITerms {
         else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
         bondSharesOf[onBehalf][id] -= shares;
+        availableCover[id] -= bonds;
 
         totalShares[id] -= shares;
         totalBonds[id] -= bonds;
-        availableCover[id] -= bonds;
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
