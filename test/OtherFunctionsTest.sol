@@ -103,7 +103,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.supplyCover(term, covered, borrower);
 
         assertEq(terms.debtOf(borrower, id), bonds - covered);
-        assertEq(terms.totalCover(id), covered);
+        assertEq(terms.availableCover(id), covered);
         assertEq(loanToken.balanceOf(address(terms)), covered);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
@@ -130,7 +130,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawBond(term, withdraw, 0, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
-        assertEq(terms.totalCover(id), 0, "total cover");
+        assertEq(terms.availableCover(id), 0, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
@@ -191,7 +191,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawBond(term, 0, shares, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
-        assertEq(terms.totalCover(id), 0, "total cover");
+        assertEq(terms.availableCover(id), 0, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
     }
