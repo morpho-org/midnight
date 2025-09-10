@@ -125,11 +125,8 @@ contract Terms is ITerms {
         coverOf[onBehalf][id] -= assets;
         availableCover[id] -= assets;
 
-        if (term.maturity >= block.timestamp) {
-            require(_isHealthy(term, onBehalf), "Unhealthy borrower");
-        } else {
-            require(debtOf(onBehalf, id) == 0, "only excess cover can be removed after maturity");
-        }
+        if (term.maturity >= block.timestamp) require(_isHealthy(term, onBehalf), "Unhealthy borrower");
+        else require(debtOf(onBehalf, id) == 0, "only excess cover can be removed after maturity");
 
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, assets);
     }
