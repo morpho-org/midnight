@@ -175,8 +175,6 @@ contract OtherFunctionsTest is BaseTest {
 
         setupBond(term, bonds, maturity);
 
-        // vm.warp(block.timestamp + 99);
-
         deal(address(loanToken), address(borrower), covered);
 
         terms.debtOf(borrower, id);
@@ -232,27 +230,6 @@ contract OtherFunctionsTest is BaseTest {
         term.maturity = maturity;
 
         setupBond(term, bonds, maturity);
-
-        // uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
-
-        // deal(address(loanToken), lender, bonds);
-        // deal(address(term.collaterals[0].token), address(this), collateral);
-
-        // terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
-        // Offer memory borrowOffer = Offer({
-        //     buy: false,
-        //     offering: borrower,
-        //     assets: bonds,
-        //     loanToken: term.loanToken,
-        //     collaterals: term.collaterals,
-        //     maturity: term.maturity,
-        //     offerStart: block.timestamp,
-        //     offerExpiry: block.timestamp + 200,
-        //     rate: 0,
-        //     nonce: 0
-        // });
-
-        // terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
 
         skip(skipDuration);
 
