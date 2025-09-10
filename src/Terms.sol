@@ -82,17 +82,17 @@ contract Terms is ITerms {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdrawBond(Term memory term, uint256 bonds, uint256 bondShares, address onBehalf) external {
+    function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
         require(term.maturity < block.timestamp, "bond maturity");
-        require(UtilsLib.exactlyOneZero(bonds, bondShares), "INCONSISTENT_INPUT");
+        require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
-        if (bonds > 0) bondShares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        else bonds = bondShares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
+        if (bonds > 0) shares = bonds.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
-        bondSharesOf[onBehalf][id] -= bondShares;
+        bondSharesOf[onBehalf][id] -= shares;
 
-        totalShares[id] -= bondShares;
+        totalShares[id] -= shares;
         totalBonds[id] -= bonds;
         availableCover[id] -= bonds;
 
