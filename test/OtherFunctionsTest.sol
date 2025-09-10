@@ -63,7 +63,7 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, 0, (supply - minCollateral) / 2);
         deal(address(collateralToken1), address(this), supply);
-        setupBond(term, bonds, supply);
+        setupBond(term, bonds, supply, term.maturity);
 
         // Test
         terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
@@ -82,30 +82,117 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, supply - minCollateral + 1, supply);
         deal(address(collateralToken1), address(this), supply);
-        setupBond(term, bonds, supply);
+        setupBond(term, bonds, supply, term.maturity);
 
         // Test
         vm.expectRevert("Unhealthy borrower");
         terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
     }
 
-    function testCover(uint256 bonds, uint256 covered) public {
-        // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
+    function testWithdrawCoverOk(uint256 bonds, uint256 covered, uint256 withdrawn, uint256 termLength, uint256 skipped)
+        public
+    {
+        uint256 originalTimestamp = block.timestamp;
         bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
         covered = bound(covered, 0, bonds);
-        setupBond(term, bonds);
+        withdrawn = bound(withdrawn, 0, covered);
+        termLength = bound(termLength, 1, 365 days);
+        skipped = bound(skipped, 0, termLength);
+        uint256 maturity = originalTimestamp + termLength;
 
-        vm.warp(block.timestamp + 99);
+        term.maturity = maturity;
+        _testCover(bonds, covered, term.maturity);
+
+        skip(skipped);
+        vm.prank(borrower);
+        terms.withdrawCover(term, withdrawn, borrower);
+
+        assertEq(terms.coverOf(borrower, id), covered - withdrawn, "cover of");
+        assertEq(terms.availableCover(id), covered - withdrawn, "available cover");
+        assertEq(loanToken.balanceOf(address(terms)), covered - withdrawn, "balance of terms");
+        assertEq(loanToken.balanceOf(borrower), withdrawn, "balance of lender");
+    }
+
+    function testWithdrawCoverUnhealthy(uint256 bonds, uint256 covered, uint256 withdrawn, uint256 termLength) public {
+        uint256 originalTimestamp = block.timestamp;
+        bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
+        covered = bound(covered, 1, bonds);
+        withdrawn = bound(withdrawn, 1, covered);
+        termLength = bound(termLength, 1, 365 days);
+        uint256 maturity = originalTimestamp + termLength;
+
+        term.maturity = maturity;
+        _testCover(bonds, covered, term.maturity);
+
+        deal(address(loanToken), borrower, bonds - covered);
+        vm.prank(borrower);
+        terms.supplyCover(term, bonds - covered, borrower);
+        vm.prank(borrower);
+        terms.withdrawCollateral(
+            term, term.collaterals[0].token, terms.collateralOf(borrower, id, term.collaterals[0].token), borrower
+        );
+        vm.expectRevert("Unhealthy borrower");
+        terms.withdrawCover(term, withdrawn, borrower);
+    }
+
+    function testWithdrawCoverAfterMaturity(
+        uint256 bonds,
+        uint256 covered,
+        uint256 withdrawn,
+        uint256 termLength,
+        uint256 skipped
+    ) public {
+        uint256 originalTimestamp = block.timestamp;
+        bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
+        covered = bound(covered, 1, MAX_TEST_AMOUNT);
+        withdrawn = bound(withdrawn, 0, covered);
+        termLength = bound(termLength, 1, 365 days);
+        uint256 maturity = originalTimestamp + termLength;
+
+        term.maturity = maturity;
+        _testCover(bonds, covered, term.maturity);
+
+        skip(termLength + bound(skipped, 1, 365 days));
+
+        if (covered - withdrawn >= bonds) {
+            vm.prank(borrower);
+            terms.withdrawCover(term, withdrawn, borrower);
+        } else {
+            vm.expectRevert("no new debt after maturity");
+            vm.prank(borrower);
+            terms.withdrawCover(term, withdrawn, borrower);
+        }
+    }
+
+    function testCover(uint256 bonds, uint256 covered) public {
+        bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
+        covered = bound(covered, 0, bonds);
+        _testCover(bonds, covered, term.maturity);
+    }
+
+    function _testCover(uint256 bonds, uint256 covered, uint256 maturity) public {
+        id = toId(term);
+
+        setupBond(term, bonds, maturity);
+
+        // vm.warp(block.timestamp + 99);
 
         deal(address(loanToken), address(borrower), covered);
+
+        terms.debtOf(borrower, id);
+        terms.debtAndCoveredDebtOf(borrower, id);
 
         vm.prank(borrower);
         terms.supplyCover(term, covered, borrower);
 
-        assertEq(terms.debtOf(borrower, id), bonds - covered);
-        assertEq(terms.availableCover(id), covered);
-        assertEq(loanToken.balanceOf(address(terms)), covered);
-        assertEq(loanToken.balanceOf(borrower), 0);
+        if (bonds > covered) {
+            assertEq(terms.debtOf(borrower, id), bonds - covered, "debt of");
+        } else {
+            assertEq(terms.debtOf(borrower, id), 0, "debt of");
+        }
+        assertEq(terms.availableCover(id), covered, "available cover");
+        assertEq(loanToken.balanceOf(address(terms)), covered, "balance of terms");
+        assertEq(loanToken.balanceOf(borrower), 0, "balance of borrower");
     }
 
     function testWithdrawInconsistentInput() public {
@@ -144,26 +231,28 @@ contract OtherFunctionsTest is BaseTest {
         skipDuration = bound(skipDuration, 0, maturity - block.timestamp);
         term.maturity = maturity;
 
-        uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
+        setupBond(term, bonds, maturity);
 
-        deal(address(loanToken), lender, bonds);
-        deal(address(term.collaterals[0].token), address(this), collateral);
+        // uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
 
-        terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
-        Offer memory borrowOffer = Offer({
-            buy: false,
-            offering: borrower,
-            assets: bonds,
-            loanToken: term.loanToken,
-            collaterals: term.collaterals,
-            maturity: term.maturity,
-            offerStart: block.timestamp,
-            offerExpiry: block.timestamp + 200,
-            rate: 0,
-            nonce: 0
-        });
+        // deal(address(loanToken), lender, bonds);
+        // deal(address(term.collaterals[0].token), address(this), collateral);
 
-        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        // terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
+        // Offer memory borrowOffer = Offer({
+        //     buy: false,
+        //     offering: borrower,
+        //     assets: bonds,
+        //     loanToken: term.loanToken,
+        //     collaterals: term.collaterals,
+        //     maturity: term.maturity,
+        //     offerStart: block.timestamp,
+        //     offerExpiry: block.timestamp + 200,
+        //     rate: 0,
+        //     nonce: 0
+        // });
+
+        // terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
 
         skip(skipDuration);
 

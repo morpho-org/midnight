@@ -79,10 +79,15 @@ abstract contract BaseTest is Test {
 
     function setupBond(Term memory term, uint256 bonds) internal {
         uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
-        setupBond(term, bonds, collateral);
+        setupBond(term, bonds, collateral, term.maturity);
     }
 
-    function setupBond(Term memory term, uint256 bonds, uint256 collateral) internal {
+    function setupBond(Term memory term, uint256 bonds, uint256 offerMaturity) internal {
+        uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
+        setupBond(term, bonds, collateral, offerMaturity);
+    }
+
+    function setupBond(Term memory term, uint256 bonds, uint256 collateral, uint256 offerMaturity) internal {
         deal(address(loanToken), lender, bonds);
         deal(address(term.collaterals[0].token), address(this), collateral);
 
@@ -93,7 +98,7 @@ abstract contract BaseTest is Test {
             assets: bonds,
             loanToken: term.loanToken,
             collaterals: term.collaterals,
-            maturity: block.timestamp + 100,
+            maturity: offerMaturity,
             offerStart: block.timestamp,
             offerExpiry: block.timestamp + 200,
             rate: 0,
