@@ -177,9 +177,6 @@ contract OtherFunctionsTest is BaseTest {
 
         deal(address(loanToken), address(borrower), covered);
 
-        terms.debtOf(borrower, id);
-        terms.debtAndCoveredDebtOf(borrower, id);
-
         vm.prank(borrower);
         terms.supplyCover(term, covered, borrower);
 
