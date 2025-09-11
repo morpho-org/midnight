@@ -264,12 +264,10 @@ contract Terms is ITerms {
         bytes calldata data,
         uint256 debtToRepay
     )
-        // uint256 repaidByCover
         internal
         returns (Seizure[] memory)
     {
         bytes32 id = _id(term);
-        // uint256 totalRepaid = repaidByCover;
         uint256 totalRepaid = 0;
 
         for (uint256 i = 0; i < seizures.length; i++) {
@@ -280,7 +278,6 @@ contract Terms is ITerms {
             SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
-        // uint256 originalDebt = debtOf[borrower][id];
         debtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
