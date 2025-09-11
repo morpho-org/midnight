@@ -161,7 +161,6 @@ contract Terms is ITerms {
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
-                require(term.collaterals[i].token != term.loanToken, "cannot liquidate loan token");
                 require(
                     UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
                 );
@@ -192,7 +191,13 @@ contract Terms is ITerms {
         int256 logCliff = -1.60943791243e18; // ln(20%)
         uint256 auctionDuration = 1 hours;
 
-        uint256 totalRepaid = 0;
+        uint256 repaidByCover = UtilsLib.min(debtOf[borrower][id], collateralOf[borrower][id][term.loanToken]);
+
+        debtOf -= repaidByCover;
+        collateralOf[borrower][id][term.loanToken] -= repaidByCover;
+
+        uint256 totalRepaid;
+
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 priceDiscountFactor = uint256(
@@ -215,14 +220,18 @@ contract Terms is ITerms {
         return liquidateInternal(term, seizures, borrower, data, true);
     }
 
-    function liquidateInternal(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data, bool repay)
-        internal
-        returns (Seizure[] memory)
-    {
+    function liquidateInternal(
+        Term memory term,
+        Seizure[] memory seizures,
+        address borrower,
+        bytes calldata data,
+        bool repay
+    ) internal returns (Seizure[] memory) {
         bytes32 id = _id(term);
         uint256 totalRepaid = 0;
 
         for (uint256 i = 0; i < seizures.length; i++) {
+            require(term.collaterals[i].token != term.loanToken, "loan token in collateral list");
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
@@ -245,9 +254,11 @@ contract Terms is ITerms {
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
-        if (repay)
+        if (repay) {
             SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
-        else collateralOf[borrower][id][term.loanToken] += totalRepaid;
+        } else {
+            collateralOf[borrower][id][term.loanToken] += totalRepaid;
+        }
 
         return seizures;
     }
@@ -301,6 +312,7 @@ contract Terms is ITerms {
             return true;
         } else {
             for (uint256 i = 0; i < term.collaterals.length; i++) {
+                require(term.collaterals[i].token != term.loanToken, "loan token in collateral list");
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
