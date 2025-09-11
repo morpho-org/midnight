@@ -108,7 +108,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawCover(term, withdrawn, borrower);
 
         assertEq(terms.coverOf(borrower, id), covered - withdrawn, "cover of");
-        assertEq(terms.availableCover(id), covered - withdrawn, "available cover");
+        assertEq(terms.withdrawable(id), covered - withdrawn, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), covered - withdrawn, "balance of terms");
         assertEq(loanToken.balanceOf(borrower), withdrawn, "balance of lender");
     }
@@ -185,7 +185,7 @@ contract OtherFunctionsTest is BaseTest {
         } else {
             assertEq(terms.debtOf(borrower, id), 0, "debt of");
         }
-        assertEq(terms.availableCover(id), covered, "available cover");
+        assertEq(terms.withdrawable(id), covered, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), covered, "balance of terms");
         assertEq(loanToken.balanceOf(borrower), 0, "balance of borrower");
     }
@@ -212,7 +212,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawBond(term, withdraw, 0, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - withdraw, "bondSharesOf");
-        assertEq(terms.availableCover(id), 0, "available cover");
+        assertEq(terms.withdrawable(id), 0, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
@@ -254,7 +254,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawBond(term, 0, shares, lender);
 
         assertEq(terms.bondSharesOf(lender, id), bonds - shares, "bondSharesOf");
-        assertEq(terms.availableCover(id), 0, "available cover");
+        assertEq(terms.withdrawable(id), 0, "available cover");
         assertEq(loanToken.balanceOf(address(terms)), 0, "balance of terms");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
     }

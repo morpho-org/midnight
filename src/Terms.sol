@@ -26,7 +26,7 @@ contract Terms is ITerms {
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtAndCoveredDebtOf;
     mapping(address => mapping(bytes32 => uint256)) public coverOf;
-    mapping(bytes32 => uint256) public availableCover;
+    mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalBonds;
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
@@ -91,7 +91,7 @@ contract Terms is ITerms {
         else bonds = shares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
 
         bondSharesOf[onBehalf][id] -= shares;
-        availableCover[id] -= bonds;
+        withdrawable[id] -= bonds;
 
         totalShares[id] -= shares;
         totalBonds[id] -= bonds;
@@ -116,14 +116,14 @@ contract Terms is ITerms {
     function supplyCover(Term memory term, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
         coverOf[onBehalf][id] += assets;
-        availableCover[id] += assets;
+        withdrawable[id] += assets;
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), assets);
     }
 
     function withdrawCover(Term memory term, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
         coverOf[onBehalf][id] -= assets;
-        availableCover[id] -= assets;
+        withdrawable[id] -= assets;
 
         if (term.maturity >= block.timestamp) require(_isHealthy(term, onBehalf), "Unhealthy borrower");
         else require(debtOf(onBehalf, id) == 0, "only excess cover can be removed after maturity");
@@ -190,7 +190,7 @@ contract Terms is ITerms {
 
         uint256 originalDebt = debtOf(borrower, id);
         coverOf[borrower][id] += totalRepaid;
-        availableCover[id] += totalRepaid;
+        withdrawable[id] += totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
