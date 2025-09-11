@@ -112,15 +112,8 @@ contract Terms is ITerms {
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
         collateralOf[onBehalf][id][collateral] -= assets;
-        if (collateral == term.loanToken) {
-            withdrawable[id] -= assets;
-            if (term.maturity < block.timestamp) {
-                require(debtOf[onBehalf][id] == 0, "only excess cover can be removed after maturity");
-            }
-        }
-        if (collateral != term.loanToken || term.maturity >= block.timestamp) {
-            require(_isHealthy(term, onBehalf), "Unhealthy borrower");
-        }
+        if (collateral == term.loanToken) withdrawable[id] -= assets;
+        if (collateral != term.loanToken || term.maturity >= block.timestamp) require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
