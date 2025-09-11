@@ -189,8 +189,6 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
-        coverOf[borrower][id] += totalRepaid;
-        withdrawable[id] += totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
@@ -200,6 +198,9 @@ contract Terms is ITerms {
             debtAndCoveredDebtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
+
+        coverOf[borrower][id] += totalRepaid;
+        withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
