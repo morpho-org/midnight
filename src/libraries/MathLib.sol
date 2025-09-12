@@ -22,11 +22,4 @@ library MathLib {
     function mulDivUp(int256 x, int256 y, int256 d) internal pure returns (int256) {
         return (x * y + (d - 1)) / d;
     }
-
-    /// @dev Returns max(0, x - y).
-    function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        assembly {
-            z := mul(gt(x, y), sub(x, y))
-        }
-    }
 }

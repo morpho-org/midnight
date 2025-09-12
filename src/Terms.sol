@@ -136,13 +136,10 @@ contract Terms is ITerms {
         external
         returns (Seizure[] memory)
     {
-        require(seizures.length == term.collaterals.length, "should have all collats");
+        require(seizures.length == term.collaterals.length+1, "should have all collats");
 
         Vars memory vars;
         bytes32 id = _id(term);
-
-        uint256 uncoveredDebt =
-            debtOf[borrower][id] - UtilsLib.min(debtOf[borrower][id], collateralOf[borrower][id][term.loanToken]);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
@@ -151,15 +148,21 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(uncoveredDebt > vars.maxDebt, "position is healthy");
 
-        for (uint256 i = 0; i < term.collaterals.length; i++) {
+        vars.maxDebt += collateralOf[borrower][id][term.loanToken];
+        vars.repayableDebt += debtOf[borrower][id].mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+
+        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+
+        for (uint256 i = 0; i < seizures.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
                     UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
                 );
 
-                uint256 collateralPrice = IOracle(term.collaterals[i].oracle).price();
+                uint256 collateralPrice;
+                if (i == term.collaterals.length) collateralPrice = ORACLE_PRICE_SCALE;
+                else collateralPrice = IOracle(term.collaterals[i].oracle).price();
 
                 if (seizures[i].seizedAssets > 0) {
                     seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE)
@@ -176,21 +179,23 @@ contract Terms is ITerms {
         for (uint256 i = 0; i < seizures.length; i++) {
             require(term.collaterals[i].token != term.loanToken, "loan token in collateral list");
             totalRepaid += seizures[i].repaidBonds;
-            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+            address collateralToken = i==term.collaterals.length ? term.loanToken : term.collaterals[i].token;
+            collateralOf[borrower][id][collateralToken] -= seizures[i].seizedAssets;
 
             SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
-        collateralOf[borrower][id][term.loanToken] += totalRepaid;
+        uint256 originalDebt = debtOf[borrower][id];
 
         // Realize bad debt
-        if (vars.repayableDebt < uncoveredDebt) {
-            uint256 badDebt = UtilsLib.min(uncoveredDebt - vars.repayableDebt, uncoveredDebt - totalRepaid);
+        if (vars.repayableDebt < originalDebt) {
+            uint256 badDebt = UtilsLib.min(originalDebt - totalRepaid, originalDebt - vars.repayableDebt);
             debtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
 
         withdrawable[id] += totalRepaid;
+        collateralOf[borrower][id][term.loanToken] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
@@ -204,23 +209,25 @@ contract Terms is ITerms {
         returns (Seizure[] memory)
     {
         require(block.timestamp >= term.maturity, "post maturity liquidation is after maturity");
-        require(seizures.length == term.collaterals.length, "should have all collats");
+        require(seizures.length == term.collaterals.length+1, "should have all collats");
 
         bytes32 id = _id(term);
 
         int256 logCliff = -1.60943791243e18; // ln(20%)
         uint256 auctionDuration = 1 hours;
 
-        uint256 debtCover = UtilsLib.min(debtOf[borrower][id], collateralOf[borrower][id][term.loanToken]);
-        debtOf[borrower][id] -= debtCover;
-        collateralOf[borrower][id][term.loanToken] -= debtCover;
 
         for (uint256 i = 0; i < seizures.length; i++) {
-            uint256 price = IOracle(term.collaterals[i].oracle).price();
-            uint256 priceDiscountFactor = uint256(
-                ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
-            );
-            uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+            uint auctionPrice;
+            if (i==term.collaterals.length) {
+                auctionPrice = ORACLE_PRICE_SCALE;
+            } else {
+                uint256 price = IOracle(term.collaterals[i].oracle).price();
+                uint256 priceDiscountFactor = uint256(
+                    ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
+                );
+                auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+            }
 
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -298,12 +305,6 @@ contract Terms is ITerms {
     }
 
     /// VIEWS ///
-
-    /// @notice The debt of the borrower excluding the covered amount.
-    function uncoveredDebtOf(address borrower, Term calldata term) public view returns (uint256) {
-        bytes32 id = _id(term);
-        return MathLib.zeroFloorSub(debtOf[borrower][id], collateralOf[borrower][id][term.loanToken]);
-    }
 
     /// INTERNAL ///
 
