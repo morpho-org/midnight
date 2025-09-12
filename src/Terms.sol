@@ -258,45 +258,6 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function liquidateInternal(
-        Term memory term,
-        Seizure[] memory seizures,
-        address borrower,
-        bytes calldata data,
-        uint256 debtToRepay
-    )
-        internal
-        returns (Seizure[] memory)
-    {
-        bytes32 id = _id(term);
-        uint256 totalRepaid = 0;
-
-        for (uint256 i = 0; i < seizures.length; i++) {
-            require(term.collaterals[i].token != term.loanToken, "loan token in collateral list");
-            totalRepaid += seizures[i].repaidBonds;
-            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-
-            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
-        }
-
-        debtOf[borrower][id] -= totalRepaid;
-
-        // Realize bad debt
-        if (totalRepaid > debtToRepay) {
-            uint256 badDebt = debtToRepay - totalRepaid;
-            debtOf[borrower][id] -= badDebt;
-            totalBonds[id] -= badDebt;
-        }
-
-        withdrawable[id] += totalRepaid;
-
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
-
-        return seizures;
-    }
-
     /// VIEWS ///
 
     /// @notice The debt of the borrower excluding the covered amount.
