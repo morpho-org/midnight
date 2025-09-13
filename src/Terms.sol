@@ -48,6 +48,10 @@ contract Terms is ITerms {
         require(block.timestamp >= offer.offerStart, "offer not started");
         require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(term.maturity >= block.timestamp, "bond maturity");
+        require(
+            term.collaterals[0] == term.loanToken && term.collaterals[0].oracle == address(0),
+            "loan token not first collateral"
+        );
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
 
@@ -144,7 +148,7 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            uint256 price = IOracle(term.collaterals[i].oracle).price();
+            uint256 price = i == 0 ? ORACLE_PRICE_SCALE : IOracle(term.collaterals[i].oracle).price();
             uint256 collateralQuoted =
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
@@ -171,7 +175,12 @@ contract Terms is ITerms {
                 }
             }
         }
-        return liquidateInternal(term, seizures, borrower, data);
+
+        totalRepaid = liquidateInternal(term, seizures, borrower, data);
+
+        collateralOf[borrower][id][term.loanToken] += totalRepaid;
+
+        return seizures;
     }
 
     function postMaturityLiquidation(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
@@ -189,9 +198,11 @@ contract Terms is ITerms {
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
-            uint256 priceDiscountFactor = uint256(
-                ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
-            );
+            uint256 priceDiscountFactor = i == 0
+                ? 1e18
+                : uint256(
+                    ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
+                );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
 
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
@@ -206,12 +217,20 @@ contract Terms is ITerms {
                 }
             }
         }
-        return liquidateInternal(term, seizures, borrower, data);
+        totalRepaid = liquidateInternal(term, seizures, borrower, data);
+
+        withdrawable[id] += totalRepaid;
+
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
     }
 
     function liquidateInternal(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
         internal
-        returns (Seizure[] memory)
+        returns (uint256)
     {
         bytes32 id = _id(term);
         uint256 totalRepaid = 0;
@@ -235,13 +254,7 @@ contract Terms is ITerms {
             totalBonds[id] -= badDebt;
         }
 
-        withdrawable[id] += totalRepaid;
-
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
-
-        return seizures;
+        return totalRepaid;
     }
 
     /// INTERNAL ///
@@ -286,7 +299,7 @@ contract Terms is ITerms {
         } else {
             uint256 maxDebt;
             for (uint256 i = 0; i < term.collaterals.length; i++) {
-                uint256 price = IOracle(term.collaterals[i].oracle).price();
+                uint256 price = i == 0 ? ORACLE_PRICE_SCALE : IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
