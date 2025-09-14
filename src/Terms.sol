@@ -185,7 +185,7 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
-        collateralOf[borrower][id][term.loanToken] += totalRepaid;
+        coverOf[borrower][id] += totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
@@ -315,7 +315,6 @@ contract Terms is ITerms {
         } else {
             uint256 maxDebt;
             for (uint256 i = 0; i < term.collaterals.length; i++) {
-                require(term.collaterals[i].token != term.loanToken, "loan token is collateral");
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
