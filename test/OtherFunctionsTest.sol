@@ -105,7 +105,7 @@ contract OtherFunctionsTest is BaseTest {
 
         skip(skipped);
         vm.prank(borrower);
-        terms.withdrawCover(term, withdrawn, borrower);
+        terms.withdrawCollateral(term, term.loanToken, withdrawn, borrower);
 
         assertEq(terms.coverOf(borrower, id), covered - withdrawn, "cover of");
         assertEq(terms.withdrawable(id), covered - withdrawn, "available cover");
@@ -126,13 +126,13 @@ contract OtherFunctionsTest is BaseTest {
 
         deal(address(loanToken), borrower, bonds - covered);
         vm.prank(borrower);
-        terms.supplyCover(term, bonds - covered, borrower);
+        terms.supplyCollateral(term, term.loanToken, bonds - covered, borrower);
         vm.prank(borrower);
         terms.withdrawCollateral(
             term, term.collaterals[0].token, terms.collateralOf(borrower, id, term.collaterals[0].token), borrower
         );
         vm.expectRevert("Unhealthy borrower");
-        terms.withdrawCover(term, withdrawn, borrower);
+        terms.withdrawCollateral(term, term.loanToken, withdrawn, borrower);
     }
 
     function testWithdrawCoverAfterMaturity(
@@ -156,11 +156,11 @@ contract OtherFunctionsTest is BaseTest {
 
         if (covered - withdrawn >= bonds) {
             vm.prank(borrower);
-            terms.withdrawCover(term, withdrawn, borrower);
+            terms.withdrawCollateral(term, term.loanToken, withdrawn, borrower);
         } else {
             vm.expectRevert("only excess cover can be removed after maturity");
             vm.prank(borrower);
-            terms.withdrawCover(term, withdrawn, borrower);
+            terms.withdrawCollateral(term, term.loanToken, withdrawn, borrower);
         }
     }
 
@@ -178,7 +178,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), covered);
 
         vm.prank(borrower);
-        terms.supplyCover(term, covered, borrower);
+        terms.supplyCollateral(term, term.loanToken, covered, borrower);
 
         if (bonds > covered) {
             assertEq(terms.debtOf(borrower, id), bonds - covered, "debt of");
@@ -233,7 +233,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), withdraw);
 
         vm.prank(borrower);
-        terms.supplyCover(term, withdraw, borrower);
+        terms.supplyCollateral(term, term.loanToken, withdraw, borrower);
 
         // Test
         vm.prank(lender);

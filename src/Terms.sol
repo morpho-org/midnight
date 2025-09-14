@@ -26,7 +26,7 @@ contract Terms is ITerms {
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtAndCoveredDebtOf;
+    mapping(address => mapping(bytes32 => uint256)) public fullDebtOf;
     mapping(address => mapping(bytes32 => uint256)) public coverOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalBonds;
@@ -60,17 +60,17 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         {
-            uint256 repaid = UtilsLib.min(debtAndCoveredDebtOf[buyer][id], bonds);
+            uint256 repaid = UtilsLib.min(fullDebtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
             uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
             uint256 withdrawn =
                 UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
-            debtAndCoveredDebtOf[buyer][id] -= repaid;
+            fullDebtOf[buyer][id] -= repaid;
             bondSharesOf[buyer][id] += boughtShares;
             bondSharesOf[seller][id] -= withdrawnShares;
-            debtAndCoveredDebtOf[seller][id] += bonds - withdrawn;
+            fullDebtOf[seller][id] += bonds - withdrawn;
 
             totalShares[id] += boughtShares;
             totalShares[id] -= withdrawnShares;
@@ -103,14 +103,23 @@ contract Terms is ITerms {
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
-        collateralOf[onBehalf][id][collateral] += assets;
-        if (collateral == term.loanToken) withdrawable[id] += assets;
+        if (collateral == term.loanToken) {
+            coverOf[onBehalf][id] += assets;
+            withdrawable[id] += assets;
+        } else {
+            collateralOf[onBehalf][id][collateral] += assets;
+        }
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= assets;
-        if (collateral == term.loanToken) withdrawable[id] -= assets;
+        bytes32 id = _id(term);
+        if (collateral == term.loanToken) {
+            coverOf[onBehalf][id] -= assets;
+            withdrawable[id] -= assets;
+        } else {
+            collateralOf[onBehalf][id][collateral] -= assets;
+        }
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
@@ -183,7 +192,7 @@ contract Terms is ITerms {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(debtOf(borrower, id), originalDebt - vars.repayableDebt);
-            debtAndCoveredDebtOf[borrower][id] -= badDebt;
+            fullDebtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
 
@@ -237,14 +246,14 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
-        debtAndCoveredDebtOf[borrower][id] -= totalRepaid;
+        fullDebtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
         if (totalRepaid > originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - totalRepaid);
-            debtOf[borrower][id] -= badDebt;
+            uint256 badDebt = UtilsLib.min(fullDebtOf[borrower][id], originalDebt - totalRepaid);
+            fullDebtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
 
@@ -261,7 +270,7 @@ contract Terms is ITerms {
 
     /// @notice The debt of the borrower excluding the covered amount.
     function debtOf(address borrower, bytes32 id) public view returns (uint256) {
-        return MathLib.zeroFloorSub(debtAndCoveredDebtOf[borrower][id], coverOf[borrower][id]);
+        return MathLib.zeroFloorSub(fullDebtOf[borrower][id], coverOf[borrower][id]);
     }
 
     /// INTERNAL ///
