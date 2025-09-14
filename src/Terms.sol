@@ -178,7 +178,7 @@ contract Terms is ITerms {
         uint256 originalDebt = debtOf(borrower, id);
         collateralOf[borrower][id][term.loanToken] += totalRepaid;
 
-         // Realize bad debt
+        // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
