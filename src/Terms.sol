@@ -102,35 +102,19 @@ contract Terms is ITerms {
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] += assets;
+        bytes32 id = _id(term);
+        collateralOf[onBehalf][id][collateral] += assets;
+        if (collateral == term.loanToken) withdrawable[id] += assets;
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         collateralOf[onBehalf][_id(term)][collateral] -= assets;
+        if (collateral == term.loanToken) withdrawable[id] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
-    }
-
-    /// @dev Cover supplied in excess of the debt may not be withdrawable until all debt has been repaid.
-    function supplyCover(Term memory term, uint256 assets, address onBehalf) external {
-        bytes32 id = _id(term);
-        coverOf[onBehalf][id] += assets;
-        withdrawable[id] += assets;
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), assets);
-    }
-
-    function withdrawCover(Term memory term, uint256 assets, address onBehalf) external {
-        bytes32 id = _id(term);
-        coverOf[onBehalf][id] -= assets;
-        withdrawable[id] -= assets;
-
-        if (term.maturity >= block.timestamp) require(_isHealthy(term, onBehalf), "Unhealthy borrower");
-        else require(debtOf(onBehalf, id) == 0, "only excess cover can be removed after maturity");
-
-        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, assets);
     }
 
     struct Vars {
@@ -165,8 +149,6 @@ contract Terms is ITerms {
         }
         require(debtOf(borrower, id) > vars.maxDebt, "position is healthy");
 
-        uint256 totalRepaid;
-
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -184,7 +166,34 @@ contract Terms is ITerms {
                 }
             }
         }
-        return liquidateInternal(term, seizures, borrower, data);
+
+        uint256 totalRepaid = 0;
+        for (uint256 i = 0; i < seizures.length; i++) {
+            totalRepaid += seizures[i].repaidBonds;
+            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+
+            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
+        }
+
+        uint256 originalDebt = debtOf(borrower, id);
+        collateralOf[borrower][id][term.loanToken] += totalRepaid;
+
+         // Realize bad debt
+        if (vars.repayableDebt < originalDebt) {
+            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
+            // debt minus the theoretical repayable debt.
+            uint256 badDebt = UtilsLib.min(debtOf(borrower, id), originalDebt - vars.repayableDebt);
+            debtAndCoveredDebtOf[borrower][id] -= badDebt;
+            totalBonds[id] -= badDebt;
+        }
+
+        withdrawable[id] += totalRepaid;
+
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
     }
 
     function postMaturityLiquidation(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
@@ -199,7 +208,6 @@ contract Terms is ITerms {
         int256 logCliff = -1.60943791243e18; // ln(20%)
         uint256 auctionDuration = 1 hours;
 
-        uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 priceDiscountFactor = uint256(
@@ -219,16 +227,8 @@ contract Terms is ITerms {
                 }
             }
         }
-        return liquidateInternal(term, seizures, borrower, data);
-    }
 
-    function liquidateInternal(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
-        internal
-        returns (Seizure[] memory)
-    {
-        bytes32 id = _id(term);
         uint256 totalRepaid = 0;
-
         for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
@@ -237,6 +237,7 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
+        debtAndCoveredDebtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
         if (totalRepaid > originalDebt) {
@@ -247,7 +248,6 @@ contract Terms is ITerms {
             totalBonds[id] -= badDebt;
         }
 
-        coverOf[borrower][id] += totalRepaid;
         withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
@@ -306,6 +306,7 @@ contract Terms is ITerms {
         } else {
             uint256 maxDebt;
             for (uint256 i = 0; i < term.collaterals.length; i++) {
+                require(term.collaterals[i].token != term.loanToken, "loan token is collateral");
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
                     collateralOf[borrower][id][term.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE);
