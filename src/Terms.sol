@@ -222,6 +222,8 @@ contract Terms is ITerms {
         int256 logCliff = -1.60943791243e18; // ln(20%)
         uint256 auctionDuration = 1 hours;
 
+        uint256 totalRepaid;
+
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 priceDiscountFactor = uint256(
@@ -240,10 +242,7 @@ contract Terms is ITerms {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(ORACLE_PRICE_SCALE, auctionPrice);
                 }
             }
-        }
 
-        uint256 totalRepaid = 0;
-        for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
