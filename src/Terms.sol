@@ -5,12 +5,14 @@ pragma solidity 0.8.28;
 import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
+import "./libraries/ExpLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
+    using MathLib for int256;
 
     /// CONSTANTS ///
 
@@ -24,7 +26,7 @@ contract Terms is ITerms {
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtAndCoveredDebtOf;
+    mapping(address => mapping(bytes32 => uint256)) public fullDebtOf;
     mapping(address => mapping(bytes32 => uint256)) public coverOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalBonds;
@@ -58,17 +60,17 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         {
-            uint256 repaid = UtilsLib.min(debtAndCoveredDebtOf[buyer][id], bonds);
+            uint256 repaid = UtilsLib.min(fullDebtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
             uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
             uint256 withdrawn =
                 UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
-            debtAndCoveredDebtOf[buyer][id] -= repaid;
+            fullDebtOf[buyer][id] -= repaid;
             bondSharesOf[buyer][id] += boughtShares;
             bondSharesOf[seller][id] -= withdrawnShares;
-            debtAndCoveredDebtOf[seller][id] += bonds - withdrawn;
+            fullDebtOf[seller][id] += bonds - withdrawn;
 
             totalShares[id] += boughtShares;
             totalShares[id] -= withdrawnShares;
@@ -195,7 +197,7 @@ contract Terms is ITerms {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
             uint256 badDebt = UtilsLib.min(debtOf(borrower, id), originalDebt - vars.repayableDebt);
-            debtAndCoveredDebtOf[borrower][id] -= badDebt;
+            fullDebtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
 
@@ -209,11 +211,72 @@ contract Terms is ITerms {
         return seizures;
     }
 
+    function postMaturityLiquidation(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
+        external
+        returns (Seizure[] memory)
+    {
+        require(block.timestamp >= term.maturity, "post maturity liquidation is after maturity");
+        require(seizures.length == term.collaterals.length, "should have all collats");
+
+        bytes32 id = _id(term);
+
+        int256 logCliff = -1.60943791243e18; // ln(20%)
+        uint256 auctionDuration = 1 hours;
+
+        for (uint256 i = 0; i < seizures.length; i++) {
+            uint256 price = IOracle(term.collaterals[i].oracle).price();
+            uint256 priceDiscountFactor = uint256(
+                ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
+            );
+            uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+
+            if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
+                require(
+                    UtilsLib.exactlyOneZero(seizures[i].repaidBonds, seizures[i].seizedAssets), "INCONSISTENT_INPUT"
+                );
+
+                if (seizures[i].seizedAssets > 0) {
+                    seizures[i].repaidBonds = seizures[i].seizedAssets.mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
+                } else {
+                    seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(ORACLE_PRICE_SCALE, auctionPrice);
+                }
+            }
+        }
+
+        uint256 totalRepaid = 0;
+        for (uint256 i = 0; i < seizures.length; i++) {
+            totalRepaid += seizures[i].repaidBonds;
+            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+
+            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
+        }
+
+        uint256 originalDebt = debtOf(borrower, id);
+        fullDebtOf[borrower][id] -= totalRepaid;
+
+        // Realize bad debt
+        if (totalRepaid > originalDebt) {
+            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
+            // debt minus the theoretical repayable debt.
+            uint256 badDebt = UtilsLib.min(fullDebtOf[borrower][id], originalDebt - totalRepaid);
+            fullDebtOf[borrower][id] -= badDebt;
+            totalBonds[id] -= badDebt;
+        }
+
+        withdrawable[id] += totalRepaid;
+
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
+    }
+
     /// VIEWS ///
 
     /// @notice The debt of the borrower excluding the covered amount.
     function debtOf(address borrower, bytes32 id) public view returns (uint256) {
-        return MathLib.zeroFloorSub(debtAndCoveredDebtOf[borrower][id], coverOf[borrower][id]);
+        return MathLib.zeroFloorSub(fullDebtOf[borrower][id], coverOf[borrower][id]);
     }
 
     /// INTERNAL ///
