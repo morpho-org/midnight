@@ -158,6 +158,8 @@ contract Terms is ITerms {
         }
         require(debtOf(borrower, id) > vars.maxDebt, "position is healthy");
 
+        uint256 totalRepaid = 0;
+
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -174,10 +176,7 @@ contract Terms is ITerms {
                         .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
                 }
             }
-        }
 
-        uint256 totalRepaid = 0;
-        for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
@@ -185,7 +184,6 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
-        coverOf[borrower][id] += totalRepaid;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
@@ -196,6 +194,7 @@ contract Terms is ITerms {
             totalBonds[id] -= badDebt;
         }
 
+        coverOf[borrower][id] += totalRepaid;
         withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
