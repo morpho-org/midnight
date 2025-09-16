@@ -539,7 +539,7 @@ contract TakeTest is BaseTest {
         terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(1, 0, 0)), address(0), hex"");
     }
 
-    function testEnableSignature() public {
+    function testRatified() public {
         Signature memory zeroSig;
 
         vm.expectRevert("offer not ratified");
@@ -552,7 +552,7 @@ contract TakeTest is BaseTest {
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
     }
 
-    function testDisableSignature() public {
+    function testDeRatified() public {
         Signature memory zeroSig;
 
         vm.prank(borrower);
