@@ -11,6 +11,8 @@ struct Offer {
     address loanToken;
     Collateral[] collaterals;
     uint256 maturity;
+    uint256 offerStart;
+    uint256 offerExpiry;
     // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
     // 1% APR.
     uint256 rate;
@@ -44,6 +46,8 @@ contract Matching is IHook {
         external
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
+        require(block.timestamp >= offer.offerStart, "offer not started");
+        require(block.timestamp <= offer.offerExpiry, "offer expired");        
         require(offer.buy == buy, "not a buy");
         require(offer.offering == user, "not offering");
         consumed[user][offer.nonce] += assets;
