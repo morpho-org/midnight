@@ -47,7 +47,7 @@ contract Matching is IHook {
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         require(block.timestamp >= offer.offerStart, "offer not started");
-        require(block.timestamp <= offer.offerExpiry, "offer expired");        
+        require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(offer.buy == buy, "not a buy");
         require(offer.offering == user, "not offering");
         consumed[user][offer.nonce] += assets;
