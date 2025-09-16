@@ -113,7 +113,6 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
         collateralOf[onBehalf][id][collateral] -= assets;
         if (collateral == term.loanToken) withdrawable[id] -= assets;
-        // Prematurity health check when withdrawing loan asset is done for nothing.
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
