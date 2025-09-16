@@ -13,12 +13,17 @@ contract LiquidationTest is BaseTest {
     address internal recordedLiquidator;
     bytes internal recordedData;
 
+    Oracle internal oracle2;
+
     function setUp() public override {
         super.setUp();
 
+        oracle2 = new Oracle();
+
         Collateral[] memory collaterals = new Collateral[](2);
         collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)});
+
         collaterals = sortCollaterals(collaterals);
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
@@ -47,6 +52,8 @@ contract LiquidationTest is BaseTest {
     function testLiquidateNoOp() public {
         setupBond(term, 100);
         oracle.setPrice(0);
+        oracle2.setPrice(0);
+
 
         terms.liquidate(term, new Seizure[](2), borrower, "");
     }
@@ -54,6 +61,7 @@ contract LiquidationTest is BaseTest {
     function testLiquidateInconsistentInput() public {
         setupBond(term, 100);
         oracle.setPrice(0);
+        oracle2.setPrice(0);
 
         Seizure[] memory seizures = new Seizure[](2);
         seizures[0] = Seizure({repaidBonds: 1, seizedAssets: 1});
@@ -67,6 +75,8 @@ contract LiquidationTest is BaseTest {
         // Setup
         setupBond(term, 100);
         oracle.setPrice(1e36 - 1);
+        oracle2.setPrice(1e36 - 1);
+
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -83,6 +93,7 @@ contract LiquidationTest is BaseTest {
         // Setup
         setupBond(term, 100);
         oracle.setPrice(1e36 - 1);
+        oracle2.setPrice(1e36 - 1);
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -99,6 +110,7 @@ contract LiquidationTest is BaseTest {
         // Setup
         setupBond(term, 100);
         oracle.setPrice(0.5e36);
+        oracle2.setPrice(0.5e36);
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -116,6 +128,7 @@ contract LiquidationTest is BaseTest {
         // Setup
         setupBond(term, 100);
         oracle.setPrice(1e36 - 1);
+        oracle2.setPrice(1e36 - 1);
         deal(address(loanToken), address(this), 1);
 
         // Test
@@ -132,6 +145,30 @@ contract LiquidationTest is BaseTest {
         assertEq(recordedBorrower, borrower, "borrower");
         assertEq(recordedLiquidator, address(this), "liquidator");
         assertEq(recordedData, data, "data");
+    }
+
+    // Check that it is possible to seize all assets even if rounding overestimates repaid bonds.
+    function testTotalRepaidTooHigh() public {
+        setupMaxBondWithCollaterals(term, 100, 100);
+        uint256 price = 1e36 * 1e18 / terms.LIQUIDATION_INCENTIVE_FACTOR() * 98 / 100;
+        uint256 price2 = 1e36 * 1e18 / terms.LIQUIDATION_INCENTIVE_FACTOR();
+        oracle.setPrice(price);
+        oracle2.setPrice(price2);
+        deal(address(loanToken), address(this), 100e18);
+
+        Seizure[] memory seizures = new Seizure[](2);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 100});
+        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 100});
+
+        // repaying all bonds this way would leave some assets behind
+        // seizures[0] = Seizure({repaidBonds: 75, seizedAssets: 0});
+        // seizures[1] = Seizure({repaidBonds: 75, seizedAssets: 0});
+
+        terms.liquidate(term, seizures, borrower, "");
+
+        assertEq(terms.debtOf(borrower, id), 0, "debt");
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 0, "collateral 0");
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[1].token), 0, "collateral 1");
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) public {

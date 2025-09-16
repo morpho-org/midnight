@@ -200,6 +200,8 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf[borrower][id];
+
+        if (totalRepaid > originalDebt) totalRepaid = originalDebt;
         debtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt

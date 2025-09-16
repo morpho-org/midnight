@@ -105,4 +105,37 @@ abstract contract BaseTest is Test {
         // take `bonds` because the rate is 0.
         terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
+
+    function setupMaxBondWithCollaterals(Term memory term, uint256 collateral0, uint256 collateral1) internal {
+        uint256 maxDebt = (collateral0 * term.collaterals[0].lltv + collateral1 * term.collaterals[1].lltv) / 1e18;
+        setupBondWithCollaterals(term, maxDebt, collateral0, collateral1);
+    }
+
+    function setupBondWithCollaterals(Term memory term, uint256 bonds, uint256 collateral0, uint256 collateral1)
+        internal
+    {
+        deal(address(loanToken), lender, bonds);
+        deal(address(term.collaterals[0].token), address(this), collateral0);
+        deal(address(term.collaterals[1].token), address(this), collateral1);
+
+        terms.supplyCollateral(term, address(term.collaterals[0].token), collateral0, borrower);
+        terms.supplyCollateral(term, address(term.collaterals[1].token), collateral1, borrower);
+        Offer memory borrowOffer = Offer({
+            buy: false,
+            offering: borrower,
+            assets: bonds,
+            loanToken: term.loanToken,
+            collaterals: term.collaterals,
+            maturity: block.timestamp + 100,
+            offerStart: block.timestamp,
+            offerExpiry: block.timestamp + 200,
+            rate: 0,
+            nonce: 0,
+            callbackAddress: address(0),
+            callbackData: ""
+        });
+
+        // take `bonds` because the rate is 0.
+        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK),address(0),hex"");
+    }
 }
