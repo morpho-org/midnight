@@ -11,6 +11,8 @@ struct Offer {
     address loanToken;
     Collateral[] collaterals;
     uint256 maturity;
+    uint256 offerStart;
+    uint256 offerExpiry;
     // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
     // 1% APR.
     uint256 rate;

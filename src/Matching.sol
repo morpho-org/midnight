@@ -29,7 +29,8 @@ contract Matching is IMatching {
         returns (bool buy, address counterparty, uint256 bonds)
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
-
+        require(block.timestamp >= offer.offerStart, "offer not started");
+        require(block.timestamp <= offer.offerExpiry, "offer expired");
         _checkCanUseOffer(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
