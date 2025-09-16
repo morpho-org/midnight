@@ -99,7 +99,9 @@ abstract contract BaseTest is Test {
             assets: bonds,
             loanToken: term.loanToken,
             collaterals: term.collaterals,
-            maturity: term.maturity,
+            maturity: block.timestamp + 100,
+            offerStart: block.timestamp,
+            offerExpiry: block.timestamp + 200,
             rate: 0,
             nonce: 0
         });

@@ -40,6 +40,7 @@ contract TakeTest is BaseTest {
         lendOffer.assets = 100;
         lendOffer.loanToken = address(loanToken);
         lendOffer.maturity = block.timestamp + 100;
+        lendOffer.offerExpiry = block.timestamp + 200;
         lendOffer.rate = 0.01e18 / 100;
         lendOffer.nonce = 0;
 
@@ -52,6 +53,7 @@ contract TakeTest is BaseTest {
         borrowOffer.assets = 100;
         borrowOffer.loanToken = address(loanToken);
         borrowOffer.maturity = block.timestamp + 100;
+        borrowOffer.offerExpiry = block.timestamp + 200;
         borrowOffer.rate = 0.01e18 / 100;
         borrowOffer.nonce = 0;
 
@@ -66,6 +68,7 @@ contract TakeTest is BaseTest {
         maturity = bound(maturity, 0, block.timestamp - 1);
         term.maturity = maturity;
         Offer memory offer;
+        offer.offerExpiry = block.timestamp;
         Signature memory sig;
         vm.expectRevert("maturity");
         terms.take(term, 100, 0, 101, lender, address(matching), abi.encode(offer, sig), borrower, address(0), hex"");
@@ -402,6 +405,7 @@ contract TakeTest is BaseTest {
         lendOffer.rate = 0; // to simplify inputs
         Offer memory lendOffer2 = lendOffer;
         lendOffer2.maturity = block.timestamp + 200;
+        lendOffer2.offerExpiry = block.timestamp + 200;
         Term memory term2 = term;
         term2.maturity = block.timestamp + 200;
         terms.supplyCollateral(term2, address(collateralToken1), 135, borrower);
@@ -622,6 +626,7 @@ contract TakeTest is BaseTest {
     function testTakeOfferWrongLoanToken(address _loanToken) public {
         vm.assume(_loanToken != address(loanToken));
         lendOffer.loanToken = _loanToken;
+        lendOffer.offerExpiry = block.timestamp + 200;
         vm.expectRevert("Loan tokens do not match");
         vm.prank(borrower);
         terms.take(
@@ -641,6 +646,7 @@ contract TakeTest is BaseTest {
     function testTakeOfferWrongMaturity(uint256 _maturity) public {
         vm.assume(_maturity != term.maturity);
         lendOffer.maturity = _maturity;
+        lendOffer.offerExpiry = block.timestamp + 200;
         vm.expectRevert("Maturities do not match");
         vm.prank(borrower);
         terms.take(
@@ -659,6 +665,8 @@ contract TakeTest is BaseTest {
 
     function testTakeWrongSignature(Offer memory _offer) public {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
+        vm.assume(_offer.offerStart <= block.timestamp);
+        vm.assume(_offer.offerExpiry >= block.timestamp);
         vm.expectRevert("Invalid signature");
         vm.prank(borrower);
         terms.take(
