@@ -23,7 +23,7 @@ contract Matching is IMatching {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    mapping(address => mapping(bytes => bool)) public ratified;
+    mapping(address user => mapping(offer => bool)) public ratified;
 
     /// FUNCTIONS ///
 
