@@ -2,19 +2,22 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-struct Trade {
-    Offer offer;
-    bytes check;
-}
-
-struct Offer {
+struct Take {
     address owner;
-    Hook[] hooks;
+    uint256 assets;
+    uint256 bonds;
+    address hook;
+    bytes hookData;
 }
 
-struct Hook {
-    address to;
-    bytes data;
+struct Make {
+    address loanToken;
+    bool buying;
+    address owner;
+    address matching;
+    bytes matchingData;
+    address hook;
+    bytes hookData;
 }
 
 struct Term {
@@ -38,3 +41,9 @@ struct Seizure {
 }
 
 interface ITerms {}
+
+struct Signature {
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}

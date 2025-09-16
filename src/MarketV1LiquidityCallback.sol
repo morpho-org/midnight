@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import "./interfaces/IHook.sol";
 import "./libraries/ConstantsLib.sol";
-import "../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 
 contract MarketV1LiquidityCallback {
     address public immutable TERMS;
@@ -15,13 +15,12 @@ contract MarketV1LiquidityCallback {
         MARKET_V1 = marketV1;
     }
 
-    function hook(Term calldata, uint256 assets, uint256, bool, Trade calldata trade, uint256 index) external {
+    function hook(Term calldata, address owner, uint256 assets, uint256, bytes calldata data) external {
         require(msg.sender == TERMS, "unauthorized");
 
-        (MarketParams memory marketParams, address onBehalf) =
-            abi.decode(trade.offer.hooks[index].data, (MarketParams, address));
+        (MarketParams memory marketParams, address onBehalf) = abi.decode(data, (MarketParams, address));
 
-        require(IMorpho(MARKET_V1).isAuthorized(trade.offer.owner, onBehalf), "unauthorized");
-        IMorpho(MARKET_V1).withdraw(marketParams, assets, 0, onBehalf, trade.offer.owner);
+        require(IMorpho(MARKET_V1).isAuthorized(owner, onBehalf), "unauthorized");
+        IMorpho(MARKET_V1).withdraw(marketParams, assets, 0, onBehalf, owner);
     }
 }

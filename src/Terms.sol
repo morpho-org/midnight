@@ -9,6 +9,8 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
 import "./interfaces/IHook.sol";
+import "./interfaces/IMatching.sol";
+import "./libraries/ConstantsLib.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -26,56 +28,56 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalBonds;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address user => mapping(address hook => bool)) public isFirstHook;
     mapping(address owner => mapping(address spender => bool)) isAuthorized;
+    mapping(address => mapping(bytes => bool)) public enabled;
 
     /// ENTRY-POINTS ///
 
-    /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
-    /// position at the end.
-    /// @dev The hook of the maker is validated.
-    function take(Term memory term, uint256 assets, uint256 bonds, Trade calldata buy, Trade calldata sell) external {
-        address buyer = buy.offer.owner;
-        Hook[] calldata buyHooks = buy.offer.hooks;
-        address buyMatching;
-        if (buy.offer.hooks.length > 0) buyMatching = buyHooks[0].to;
-
-        address seller = sell.offer.owner;
-        Hook[] calldata sellHooks = sell.offer.hooks;
-        address sellMatching;
-        if (sell.offer.hooks.length > 0) sellMatching = sellHooks[0].to;
-
+    function fill(
+        Term memory term,
+        Take memory take,
+        Signature memory takeSig,
+        Make memory make,
+        Signature memory makeSig
+    ) external {
         require(term.maturity >= block.timestamp, "maturity");
-        require(buyer == msg.sender || isAuthorized[buyer][msg.sender] || isFirstHook[buyer][buyMatching], "invalid buy");
-        require(seller == msg.sender || isAuthorized[seller][msg.sender] || isFirstHook[seller][sellMatching], "invalid sell");
+        _checkTake(take, takeSig);
+        _checkMake(make, makeSig);
+        IMatching(make.matching).check(term, take.assets, take.bonds, make);
 
         bytes32 id = _id(term);
 
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
-        uint256 bought = bonds - repaid;
+        (address buyer, address seller) = make.buying ? (make.owner, take.owner) : (take.owner, make.owner);
+
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], take.bonds);
+        uint256 bought = take.bonds - repaid;
         uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), take.bonds);
         uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
         bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += bonds - withdrawn;
+        debtOf[seller][id] += take.bonds - withdrawn;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        for (uint256 i = 0; i < buyHooks.length; i++) {
-            IHook(buyHooks[i].to).hook(term, assets, bonds, true, buy, i);
+        (address buyHook, bytes memory buyHookData, address sellHook, bytes memory sellHookData) = make.buying
+            ? (make.hook, make.hookData, take.hook, take.hookData)
+            : (take.hook, take.hookData, make.hook, make.hookData);
+
+        if (buyHook != address(0)) {
+            IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData);
         }
 
-        IERC20(term.loanToken).transferFrom(buyer, seller, assets);
+        IERC20(term.loanToken).transferFrom(buyer, seller, take.assets);
 
-        for (uint256 i = 0; i < sellHooks.length; i++) {
-            IHook(sellHooks[i].to).hook(term, assets, bonds, false, sell, i);
+        if (sellHook != address(0)) {
+            IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData);
         }
 
         require(_isHealthy(term, seller), "Seller is unhealthy");
@@ -197,12 +199,40 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function setFirstHook(address hook, bool _isFirstHook) external {
-        isFirstHook[msg.sender][hook] = _isFirstHook;
-    }
-
     function setIsAuthorized(address spender, bool _isAuthorized) external {
         isAuthorized[msg.sender][spender] = _isAuthorized;
+    }
+
+    function _checkTake(Take memory take, Signature memory sig) internal view {
+        if (take.owner != msg.sender && !isAuthorized[take.owner][msg.sender]) {
+            bytes32 hashStruct = keccak256(abi.encode(TAKE_TYPEHASH, take));
+            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
+            require(signatory != address(0) && take.owner == signatory, "invalid take");
+        }
+    }
+
+    function _checkMake(Make memory make, Signature memory sig) internal view {
+        if (sig.v == 0) {
+            require(enabled[make.owner][abi.encode(make)], "offer not enabled");
+        } else if (sig.v == 1) {
+            require(make.owner == make.hook, "invalid hook address");
+        } else {
+            bytes32 hashStruct = keccak256(abi.encode(MAKE_TYPEHASH, make));
+            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
+            require(signatory != address(0) && make.owner == signatory, "Invalid make");
+        }
+    }
+
+    function enableMake(Make memory make) external {
+        enabled[msg.sender][abi.encode(make)] = true;
+    }
+
+    function disableMake(Make memory make) external {
+        enabled[msg.sender][abi.encode(make)] = false;
     }
 
     /// INTERNAL ///

@@ -2,10 +2,10 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import "./interfaces/IHook.sol";
+import "./interfaces/IMatching.sol";
 import "./libraries/ConstantsLib.sol";
 
-struct MatchingDetails {
+struct MatchingData {
     bool buying;
     uint256 assets;
     address loanToken;
@@ -17,17 +17,7 @@ struct MatchingDetails {
     uint256 nonce;
 }
 
-struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
-contract Matching is IHook {
-    /// CONSTANTS ///
-
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
-
+contract Matching is IMatching {
     /// STORAGE ///
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
@@ -37,26 +27,16 @@ contract Matching is IHook {
 
     /// FUNCTIONS ///
 
-    function hook(Term memory term, uint256 assets, uint256 bonds, bool buying, Trade calldata trade, uint256 index)
-        external
-    {
-        MatchingDetails memory details = abi.decode(trade.offer.hooks[index].data, (MatchingDetails));
-        require(buying == details.buying, "buy sell mismatch");
-        consumed[trade.offer.owner][details.nonce] += assets;
-        require(consumed[trade.offer.owner][details.nonce] <= details.assets, "consumed");
-        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * details.rate) / 1e18, "bonds");
-        _checkSignature(trade.offer, abi.decode(trade.check, (Signature)));
-        _checkMatching(term, details);
-    }
+    function check(Term memory term, uint256 assets, uint256 bonds, Make memory make) external {
+        MatchingData memory data = abi.decode(make.matchingData, (MatchingData));
+        consumed[make.owner][data.nonce] += assets;
+        require(consumed[make.owner][data.nonce] <= data.assets, "consumed");
+        require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * data.rate) / 1e18, "bonds");
+        require(data.loanToken == term.loanToken, "Loan tokens do not match");
+        require(data.maturity == term.maturity, "Maturities do not match");
 
-    /// INTERNAL ///
-
-    function _checkMatching(Term memory term, MatchingDetails memory details) internal pure {
-        require(details.loanToken == term.loanToken, "Loan tokens do not match");
-        require(details.maturity == term.maturity, "Maturities do not match");
-
-        Collateral[] memory subset = details.buying ? term.collaterals : details.collaterals;
-        Collateral[] memory superset = details.buying ? details.collaterals : term.collaterals;
+        Collateral[] memory subset = data.buying ? term.collaterals : data.collaterals;
+        Collateral[] memory superset = data.buying ? data.collaterals : term.collaterals;
 
         uint256 j = 0;
         for (uint256 i = 0; i < subset.length; i++) {
@@ -68,14 +48,5 @@ contract Matching is IHook {
             require(subset[i].oracle == superset[j].oracle, "Oracles do not match");
             j++;
         }
-    }
-
-    function _checkSignature(Offer memory offer, Signature memory signature) internal view {
-        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
-
-        require(signatory != address(0) && offer.owner == signatory, "Invalid signature");
     }
 }
