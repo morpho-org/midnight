@@ -16,10 +16,14 @@ struct Offer {
     address loanToken;
     Collateral[] collaterals;
     uint256 maturity;
+    uint256 offerStart;
+    uint256 offerExpiry;
     // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
     // 1% APR.
     uint256 rate;
     uint256 nonce;
+    address callbackAddress;
+    bytes callbackData;
 }
 
 struct Signature {
@@ -31,5 +35,12 @@ struct Signature {
 interface IMatching {
     function take(Term memory term, uint256 assets, bytes calldata data)
         external
-        returns (bool buy, bool asBorrower, address counterparty, uint256 bonds);
+        returns (
+            bool buy,
+            bool asBorrower,
+            address counterparty,
+            uint256 bonds,
+            address makerCallbackAddress,
+            bytes memory makerCallbackData
+        );
 }

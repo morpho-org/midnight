@@ -100,12 +100,24 @@ abstract contract BaseTest is Test {
             assets: bonds,
             loanToken: term.loanToken,
             collaterals: term.collaterals,
-            maturity: term.maturity,
+            maturity: block.timestamp + 100,
+            offerStart: block.timestamp,
+            offerExpiry: block.timestamp + 200,
             rate: 0,
-            nonce: 0
+            nonce: 0,
+            callbackAddress: address(0),
+            callbackData: ""
         });
 
         // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, address(matching), abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)));
+        terms.take(
+            term,
+            bonds,
+            lender,
+            address(matching),
+            abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
+            address(0),
+            hex""
+        );
     }
 }
