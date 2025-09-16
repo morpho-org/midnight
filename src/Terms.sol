@@ -15,6 +15,11 @@ import "./libraries/ConstantsLib.sol";
 contract Terms is ITerms {
     using MathLib for uint256;
 
+    /// EVENTS ///
+
+    event SetRatified(address indexed sender, Make make, bool ratified);
+    event SetAuthorized(address indexed sender, address indexed spender, bool authorized);
+
     /// CONSTANTS ///
 
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
@@ -195,12 +200,14 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function setIsAuthorized(address spender, bool _isAuthorized) external {
-        authorized[msg.sender][spender] = _isAuthorized;
+    function setAuthorized(address spender, bool isAuthorized) external {
+        authorized[msg.sender][spender] = isAuthorized;
+        emit SetAuthorized(msg.sender, spender, isAuthorized);
     }
 
-    function setIsRatified(Make memory make, bool _isRatified) external {
-        ratified[msg.sender][abi.encode(make)] = _isRatified;
+    function setRatified(Make memory make, bool isRatified) external {
+        ratified[msg.sender][abi.encode(make)] = isRatified;
+        emit SetRatified(msg.sender, make, isRatified);
     }
 
     function _checkTake(Take memory take, Signature memory sig) internal view {
