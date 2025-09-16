@@ -299,16 +299,16 @@ contract TakeTest is BaseTest {
 
     function testTakeWrongSignature(Offer memory _offer) public {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
-        vm.expectRevert("Invalid signature");
+        vm.expectRevert("Invalid sig");
         terms.take(term, 100, borrower, address(matching), abi.encode(_offer, sig(_offer, lenderSK)));
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("Invalid signature");
+        vm.expectRevert("Invalid sig");
         terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(1, 0, 0)));
     }
 
-    function testContractSignature() public {
+    function testEnableSignature() public {
         Signature memory zeroSig;
 
         vm.expectRevert("offer not enabled");
@@ -316,11 +316,19 @@ contract TakeTest is BaseTest {
 
         vm.prank(borrower);
         matching.enableOffer(borrowOffer);
+        assertTrue(matching.enabled(borrower, abi.encode(borrowOffer)));
 
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
+    }
+
+    function testDisableSignature() public {
+        Signature memory zeroSig;
 
         vm.prank(borrower);
+        matching.enableOffer(borrowOffer);
+        vm.prank(borrower);
         matching.disableOffer(borrowOffer);
+        assertFalse(matching.enabled(borrower, abi.encode(borrowOffer)));
         vm.expectRevert("offer not enabled");
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig));
     }

@@ -20,7 +20,7 @@ contract Matching is IMatching {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    mapping(address => mapping(bytes => bool)) enabled;
+    mapping(address => mapping(bytes => bool)) public enabled;
 
     /// FUNCTIONS ///
 
@@ -30,7 +30,7 @@ contract Matching is IMatching {
     {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
 
-        _checkCanUseOffer(offer,sig);
+        _checkCanUseOffer(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
         return (offer.buy, offer.offering, assets * (1e18 + (term.maturity - block.timestamp) * offer.rate) / 1e18);
