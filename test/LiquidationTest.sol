@@ -54,7 +54,6 @@ contract LiquidationTest is BaseTest {
         oracle.setPrice(0);
         oracle2.setPrice(0);
 
-
         terms.liquidate(term, new Seizure[](2), borrower, "");
     }
 
