@@ -28,8 +28,8 @@ contract Terms is ITerms {
     mapping(bytes32 => uint256) public totalBonds;
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
-    mapping(address => mapping(address => bool)) isAuthorized;
-    mapping(address => mapping(bytes => bool)) public enabled;
+    mapping(address => mapping(address => bool)) public authorized;
+    mapping(address => mapping(bytes => bool)) public ratified;
 
     /// ENTRY-POINTS ///
 
@@ -196,11 +196,15 @@ contract Terms is ITerms {
     }
 
     function setIsAuthorized(address spender, bool _isAuthorized) external {
-        isAuthorized[msg.sender][spender] = _isAuthorized;
+        authorized[msg.sender][spender] = _isAuthorized;
+    }
+
+    function setIsRatified(Make memory make, bool _isRatified) external {
+        ratified[msg.sender][abi.encode(make)] = _isRatified;
     }
 
     function _checkTake(Take memory take, Signature memory sig) internal view {
-        if (take.owner != msg.sender && !isAuthorized[take.owner][msg.sender]) {
+        if (take.owner != msg.sender && !authorized[take.owner][msg.sender]) {
             bytes32 hashStruct = keccak256(abi.encode(TAKE_TYPEHASH, take));
             bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
@@ -211,7 +215,7 @@ contract Terms is ITerms {
 
     function _checkMake(Make memory make, Signature memory sig) internal view {
         if (sig.v == 0) {
-            require(enabled[make.owner][abi.encode(make)], "offer not enabled");
+            require(ratified[make.owner][abi.encode(make)], "offer not enabled");
         } else if (sig.v == 1) {
             require(make.owner == make.hook, "invalid hook address");
         } else {
@@ -221,14 +225,6 @@ contract Terms is ITerms {
             address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
             require(signatory != address(0) && make.owner == signatory, "Invalid make");
         }
-    }
-
-    function enableMake(Make memory make) external {
-        enabled[msg.sender][abi.encode(make)] = true;
-    }
-
-    function disableMake(Make memory make) external {
-        enabled[msg.sender][abi.encode(make)] = false;
     }
 
     /// INTERNAL ///
