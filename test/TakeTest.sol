@@ -40,6 +40,7 @@ contract TakeTest is BaseTest {
         lendOffer.assets = 100;
         lendOffer.loanToken = address(loanToken);
         lendOffer.maturity = block.timestamp + 100;
+        lendOffer.offerExpiry = block.timestamp + 200;
         lendOffer.rate = 0.01e18 / 100;
         lendOffer.nonce = 0;
         lendOffer.index = 1;
@@ -53,6 +54,7 @@ contract TakeTest is BaseTest {
         borrowOffer.assets = 100;
         borrowOffer.loanToken = address(loanToken);
         borrowOffer.maturity = block.timestamp + 100;
+        borrowOffer.offerExpiry = block.timestamp + 200;
         borrowOffer.rate = 0.01e18 / 100;
         borrowOffer.nonce = 0;
         borrowOffer.index = 1;
@@ -68,13 +70,14 @@ contract TakeTest is BaseTest {
         maturity = bound(maturity, 0, block.timestamp - 1);
         term.maturity = maturity;
         Offer memory offer;
+        offer.offerExpiry = block.timestamp;
         Signature memory sig;
-        vm.expectRevert("maturity");
-        terms.take(term, 100, lender, offer, sig);
+        vm.expectRevert("bond maturity");
+        terms.take(term, 100, lender, offer, sig, address(0), hex"");
     }
 
     function testLend() public {
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
         assertEq(terms.debtOf(borrower, id), 101, "borrower debt");
@@ -86,7 +89,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBorrow() public {
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 101, "bond shares");
         assertEq(terms.debtOf(borrower, id), 101, "lender debt");
@@ -98,14 +101,14 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithLender() public {
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
 
         (address otherLender, uint256 otherLenderSK) = makeAddrAndKey("otherLender");
         vm.prank(otherLender);
         loanToken.approve(address(terms), 100);
         deal(address(loanToken), otherLender, 100);
         lendOffer.offering = otherLender;
-        terms.take(term, 100, lender, lendOffer, sig(lendOffer, otherLenderSK));
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, otherLenderSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(otherLender, id), 101, "other lender bond shares");
@@ -117,10 +120,10 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithBorrower() public {
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
         lendOffer.offering = borrower;
         lendOffer.nonce = 1;
-        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK));
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, borrowerSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -132,7 +135,7 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithBorrower() public {
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         (address otherBorrower, uint256 otherBorrowerSK) = makeAddrAndKey("otherBorrower");
         vm.prank(otherBorrower);
@@ -140,7 +143,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), otherBorrower, 135);
         terms.supplyCollateral(term, address(collateralToken1), 135, otherBorrower);
         borrowOffer.offering = otherBorrower;
-        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, otherBorrowerSK));
+        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, otherBorrowerSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 101, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -155,11 +158,11 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithLender() public {
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         borrowOffer.offering = lender;
         borrowOffer.nonce = 1;
-        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK));
+        terms.take(term, 100, borrower, borrowOffer, sig(borrowOffer, lenderSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(lender, id), 0, "lender bond shares");
         assertEq(terms.bondSharesOf(borrower, id), 0, "borrower bond shares");
@@ -173,8 +176,8 @@ contract TakeTest is BaseTest {
     }
 
     function testMatch() public {
-        terms.take(term, 100, address(this), borrowOffer, sig(borrowOffer, borrowerSK));
-        terms.take(term, 100, address(this), lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, address(this), borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
+        terms.take(term, 100, address(this), lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         assertEq(terms.bondSharesOf(address(this), id), 0, "bond shares");
         assertEq(terms.debtOf(address(this), id), 0, "debt");
@@ -184,21 +187,21 @@ contract TakeTest is BaseTest {
     }
 
     function testConsumed() public {
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         vm.expectRevert("consumed");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakePartialFill() public {
-        terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         assertEq(terms.group(lender, 0).consumed, 50);
 
         vm.expectRevert("consumed");
-        terms.take(term, 51, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 51, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
-        terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 50, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         assertEq(terms.group(lender, 0).consumed, 100);
     }
@@ -206,102 +209,193 @@ contract TakeTest is BaseTest {
     function testTakeOCO() public {
         Offer memory lendOffer2 = lendOffer;
         lendOffer2.maturity = block.timestamp + 200;
+        lendOffer2.offerExpiry = block.timestamp + 200;
         Term memory term2 = term;
         term2.maturity = block.timestamp + 200;
 
-        terms.take(term, 70, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 70, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
 
         vm.expectRevert("consumed");
-        terms.take(term2, 31, borrower, lendOffer2, sig(lendOffer2, lenderSK));
+        terms.take(term2, 31, borrower, lendOffer2, sig(lendOffer2, lenderSK), address(0), hex"");
 
         terms.supplyCollateral(term2, address(collateralToken1), 134, borrower);
 
-        terms.take(term2, 30, borrower, lendOffer2, sig(lendOffer2, lenderSK));
+        terms.take(term2, 30, borrower, lendOffer2, sig(lendOffer2, lenderSK), address(0), hex"");
         assertEq(terms.group(lender, 0).consumed, 100);
+    }
+
+    function testTakeLendBorrowCallback() public {
+        (address otherBorrower, uint256 otherBorrowerSK) = makeAddrAndKey("otherBorrower");
+        borrowOffer.callbackAddress = address(new BorrowCallback());
+        borrowOffer.callbackData = abi.encode(address(collateralToken1), 135);
+        borrowOffer.offering = address(otherBorrower);
+        deal(address(collateralToken1), borrowOffer.callbackAddress, 135);
+        assertEq(terms.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
+
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, otherBorrowerSK), address(0), hex"");
+        assertEq(terms.collateralOf(otherBorrower, id, address(collateralToken1)), 135);
+        assertEq(BorrowCallback(borrowOffer.callbackAddress).recordedData(), borrowOffer.callbackData);
+    }
+
+    function testTakeBorrowBorrowCallback() public {
+        (address otherBorrower,) = makeAddrAndKey("otherBorrower");
+        address callbackAddress = address(new BorrowCallback());
+        deal(address(collateralToken1), callbackAddress, 135);
+        assertEq(terms.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
+
+        terms.take(
+            term,
+            100,
+            otherBorrower,
+            lendOffer,
+            sig(lendOffer, lenderSK),
+            callbackAddress,
+            abi.encode(address(collateralToken1), 135)
+        );
+        assertEq(terms.collateralOf(otherBorrower, id, address(collateralToken1)), 135);
+        assertEq(BorrowCallback(callbackAddress).recordedData(), abi.encode(address(collateralToken1), 135));
+    }
+
+    function testTakeBorrowLendCallback() public {
+        (address otherLender, uint256 otherLenderSK) = makeAddrAndKey("otherLender");
+        vm.prank(otherLender);
+        loanToken.approve(address(terms), 100);
+        lendOffer.callbackAddress = address(new LendCallback());
+        lendOffer.callbackData = abi.encode(address(loanToken), 100);
+        lendOffer.offering = address(otherLender);
+        deal(address(loanToken), lendOffer.callbackAddress, 100);
+
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, otherLenderSK), address(0), hex"");
+        assertEq(LendCallback(lendOffer.callbackAddress).recordedData(), lendOffer.callbackData);
+    }
+
+    function testTakeLendLendCallback() public {
+        (address otherLender,) = makeAddrAndKey("otherLender");
+        vm.prank(otherLender);
+        loanToken.approve(address(terms), 100);
+        address callbackAddress = address(new LendCallback());
+        deal(address(loanToken), callbackAddress, 100);
+
+        terms.take(
+            term,
+            100,
+            otherLender,
+            borrowOffer,
+            sig(borrowOffer, borrowerSK),
+            callbackAddress,
+            abi.encode(address(loanToken), 100)
+        );
+        assertEq(LendCallback(callbackAddress).recordedData(), abi.encode(address(loanToken), 100));
     }
 
     function testTakeMaturityPassed() public {
         vm.warp(block.timestamp + 101);
-        vm.expectRevert("maturity");
-        terms.take(term, 100, lender, lendOffer, sig(lendOffer, lenderSK));
+        vm.expectRevert("bond maturity");
+        terms.take(term, 100, lender, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeLendOfferCollateralMissing() public {
         lendOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeLendOfferLLTVMismatch() public {
         lendOffer.collaterals[0].lltv = 0.5e18;
 
         vm.expectRevert("LLTVs do not match");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeLendOfferOraclesMismatch() public {
         lendOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeBorrowOfferTooMuchCollaterals() public {
         borrowOffer.collaterals[0].token = address(0);
 
         vm.expectRevert(stdError.indexOOBError);
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 
     function testTakeBorrowOfferLLTVMismatch() public {
         borrowOffer.collaterals[0].lltv = 0.99e18;
 
         vm.expectRevert("LLTVs do not match");
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 
     function testTakeBorrowOfferOraclesMismatch() public {
         borrowOffer.collaterals[0].oracle = address(0);
 
         vm.expectRevert("Oracles do not match");
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 
     function testTakeSellerMakerNotHealthyMaker() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, 100, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 
     function testTakeSellerTakerNotHealthy() public {
         terms.withdrawCollateral(term, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeOfferWrongLoanToken(address _loanToken) public {
         vm.assume(_loanToken != address(loanToken));
         lendOffer.loanToken = _loanToken;
+        lendOffer.offerExpiry = block.timestamp + 200;
         vm.expectRevert("Loan tokens do not match");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeOfferWrongMaturity(uint256 _maturity) public {
         vm.assume(_maturity != term.maturity);
         lendOffer.maturity = _maturity;
+        lendOffer.offerExpiry = block.timestamp + 200;
         vm.expectRevert("Maturities do not match");
-        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
     function testTakeWrongSignature(Offer memory _offer) public {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
         vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, lendOffer, sig(_offer, lenderSK));
+        terms.take(term, 100, borrower, lendOffer, sig(_offer, lenderSK), address(0), hex"");
     }
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, lendOffer, Signature(0, 0, 0));
+        terms.take(term, 100, borrower, lendOffer, Signature(0, 0, 0), address(0), hex"");
     }
+}
+
+contract BorrowCallback is ICallbacks {
+    bytes public recordedData;
+
+    function onTake(Term memory term, address borrower, uint256, bytes memory data) external {
+        recordedData = data;
+        (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
+        ERC20(collateralToken).approve(msg.sender, amount);
+        Terms(msg.sender).supplyCollateral(term, collateralToken, amount, borrower);
+    }
+
+    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+}
+
+contract LendCallback is ICallbacks {
+    bytes public recordedData;
+
+    function onTake(Term memory term, address offering, uint256 assets, bytes memory data) external {
+        recordedData = data;
+        ERC20(term.loanToken).transfer(offering, assets);
+    }
+
+    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 }

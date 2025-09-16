@@ -3,11 +3,11 @@
 pragma solidity 0.8.28;
 
 import "./libraries/UtilsLib.sol";
+import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
-import "./interfaces/IERC20.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
-import "./interfaces/IMorphoLiquidationCallback.sol";
+import "./interfaces/ICallbacks.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -16,7 +16,7 @@ contract Terms is ITerms {
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
     bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce, uint256 index)"
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 offerStart,uint256 offerExpiry,uint256 rate,uint256 nonce, uint256 index)"
     );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
     uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
@@ -40,10 +40,18 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory sig)
-        public
-    {
-        require(term.maturity >= block.timestamp, "maturity");
+    function take(
+        Term memory term,
+        uint256 assets,
+        address onBehalf,
+        Offer memory offer,
+        Signature memory sig,
+        address callbackAddress,
+        bytes memory callbackData
+    ) public {
+        require(block.timestamp >= offer.offerStart, "offer not started");
+        require(block.timestamp <= offer.offerExpiry, "offer expired");
+        require(term.maturity >= block.timestamp, "bond maturity");
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
 
@@ -56,7 +64,17 @@ contract Terms is ITerms {
         require((offerGroup.consumed += assets.toUint240()) <= offer.assets, "consumed");
         offerGroup.selected = offer.index;
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
+        (
+            address buyer,
+            address buyerCallbackAddress,
+            bytes memory buyerCallbackData,
+            address seller,
+            address sellerCallbackAddress,
+            bytes memory sellerCallbackData
+        ) = offer.buy
+            ? (offer.offering, offer.callbackAddress, offer.callbackData, onBehalf, callbackAddress, callbackData)
+            : (onBehalf, callbackAddress, callbackData, offer.offering, offer.callbackAddress, offer.callbackData);
+
         bytes32 id = _id(term);
 
         {
@@ -76,11 +94,19 @@ contract Terms is ITerms {
             totalShares[id] -= withdrawnShares;
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
-
-            require(_isHealthy(term, seller), "Seller is unhealthy");
         }
 
-        IERC20(offer.loanToken).transferFrom(buyer, seller, assets);
+        if (buyerCallbackAddress != address(0)) {
+            ICallbacks(buyerCallbackAddress).onTake(term, buyer, assets, buyerCallbackData);
+        }
+
+        SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
+
+        if (sellerCallbackAddress != address(0)) {
+            ICallbacks(sellerCallbackAddress).onTake(term, seller, assets, sellerCallbackData);
+        }
+
+        require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -97,7 +123,7 @@ contract Terms is ITerms {
         totalShares[id] -= shares;
         totalBonds[id] -= bonds;
 
-        IERC20(term.loanToken).transfer(msg.sender, bonds);
+        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
@@ -106,12 +132,12 @@ contract Terms is ITerms {
         debtOf[onBehalf][id] -= bonds;
         withdrawable[id] += bonds;
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), bonds);
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         collateralOf[onBehalf][_id(term)][collateral] += assets;
-        IERC20(collateral).transferFrom(msg.sender, address(this), assets);
+        SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
@@ -119,7 +145,7 @@ contract Terms is ITerms {
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        IERC20(collateral).transfer(msg.sender, assets);
+        SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
     struct Vars {
@@ -174,7 +200,7 @@ contract Terms is ITerms {
                 totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
-                IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
+                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
 
@@ -192,9 +218,9 @@ contract Terms is ITerms {
 
         withdrawable[id] += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), totalRepaid);
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
         return seizures;
     }
