@@ -37,4 +37,6 @@ interface IMatching {
             address makerCallbackAddress,
             bytes memory makerCallbackData
         );
+
+    function setRatified(Offer memory offer, bool ratified) external;
 }

@@ -3,9 +3,12 @@
 pragma solidity 0.8.28;
 
 import "./interfaces/IMatching.sol";
-import "./libraries/EventsLib.sol";
 
 contract Matching is IMatching {
+    /// EVENTS ///
+
+    event SetRatified(address indexed sender, Offer offer, bool ratified);
+
     /// CONSTANTS ///
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
@@ -20,7 +23,7 @@ contract Matching is IMatching {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    mapping(address => mapping(bytes => bool)) public enabled;
+    mapping(address => mapping(bytes => bool)) public ratified;
 
     /// FUNCTIONS ///
 
@@ -72,7 +75,7 @@ contract Matching is IMatching {
 
     function _checkCanUseOffer(Offer memory offer, Signature memory sig) internal view {
         if (sig.v == 0) {
-            require(enabled[offer.offering][abi.encode(offer)], "offer not enabled");
+            require(ratified[offer.offering][abi.encode(offer)], "offer not ratified");
         } else {
             bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
             bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
@@ -82,13 +85,8 @@ contract Matching is IMatching {
         }
     }
 
-    function enableOffer(Offer memory offer) external {
-        enabled[msg.sender][abi.encode(offer)] = true;
-        emit EventsLib.EnableOffer(msg.sender, offer);
-    }
-
-    function disableOffer(Offer memory offer) external {
-        enabled[msg.sender][abi.encode(offer)] = false;
-        emit EventsLib.DisableOffer(msg.sender, offer);
+    function setRatified(Offer memory offer, bool newRatified) external {
+        ratified[msg.sender][abi.encode(offer)] = newRatified;
+        emit SetRatified(msg.sender, offer, newRatified);
     }
 }

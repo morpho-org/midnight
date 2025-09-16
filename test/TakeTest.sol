@@ -542,12 +542,12 @@ contract TakeTest is BaseTest {
     function testEnableSignature() public {
         Signature memory zeroSig;
 
-        vm.expectRevert("offer not enabled");
+        vm.expectRevert("offer not ratified");
         terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
 
         vm.prank(borrower);
-        matching.enableOffer(borrowOffer);
-        assertTrue(matching.enabled(borrower, abi.encode(borrowOffer)));
+        matching.setRatified(borrowOffer, true);
+        assertTrue(matching.ratified(borrower, abi.encode(borrowOffer)));
 
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
     }
@@ -556,11 +556,11 @@ contract TakeTest is BaseTest {
         Signature memory zeroSig;
 
         vm.prank(borrower);
-        matching.enableOffer(borrowOffer);
+        matching.setRatified(borrowOffer, true);
         vm.prank(borrower);
-        matching.disableOffer(borrowOffer);
-        assertFalse(matching.enabled(borrower, abi.encode(borrowOffer)));
-        vm.expectRevert("offer not enabled");
+        matching.setRatified(borrowOffer, false);
+        assertFalse(matching.ratified(borrower, abi.encode(borrowOffer)));
+        vm.expectRevert("offer not ratified");
         terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
     }
 }
