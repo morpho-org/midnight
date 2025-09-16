@@ -530,13 +530,38 @@ contract TakeTest is BaseTest {
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
         vm.assume(_offer.offerStart <= block.timestamp);
         vm.assume(_offer.offerExpiry >= block.timestamp);
-        vm.expectRevert("Invalid signature");
+        vm.expectRevert("Invalid sig");
         terms.take(term, 100, borrower, address(matching), abi.encode(_offer, sig(_offer, lenderSK)), address(0), hex"");
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("Invalid signature");
-        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(0, 0, 0)), address(0), hex"");
+        vm.expectRevert("Invalid sig");
+        terms.take(term, 100, borrower, address(matching), abi.encode(lendOffer, Signature(1, 0, 0)), address(0), hex"");
+    }
+
+    function testRatified() public {
+        Signature memory zeroSig;
+
+        vm.expectRevert("offer not ratified");
+        terms.take(term, 100, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
+
+        vm.prank(borrower);
+        matching.setRatified(borrowOffer, true);
+        assertTrue(matching.ratified(borrower, abi.encode(borrowOffer)));
+
+        terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
+    }
+
+    function testDeRatified() public {
+        Signature memory zeroSig;
+
+        vm.prank(borrower);
+        matching.setRatified(borrowOffer, true);
+        vm.prank(borrower);
+        matching.setRatified(borrowOffer, false);
+        assertFalse(matching.ratified(borrower, abi.encode(borrowOffer)));
+        vm.expectRevert("offer not ratified");
+        terms.take(term, 1, lender, address(matching), abi.encode(borrowOffer, zeroSig), address(0), hex"");
     }
 }
 

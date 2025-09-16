@@ -5,6 +5,10 @@ pragma solidity 0.8.28;
 import "./interfaces/IMatching.sol";
 
 contract Matching is IMatching {
+    /// EVENTS ///
+
+    event SetRatified(address indexed sender, Offer offer, bool ratified);
+
     /// CONSTANTS ///
 
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
@@ -18,6 +22,8 @@ contract Matching is IMatching {
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+
+    mapping(address user => mapping(bytes offer => bool)) public ratified;
 
     /// FUNCTIONS ///
 
@@ -34,7 +40,7 @@ contract Matching is IMatching {
         (Offer memory offer, Signature memory sig) = abi.decode(data, (Offer, Signature));
         require(block.timestamp >= offer.offerStart, "offer not started");
         require(block.timestamp <= offer.offerExpiry, "offer expired");
-        _checkSignature(offer, sig);
+        _checkCanUseOffer(offer, sig);
         _checkOffer(term, offer);
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
         return (
@@ -67,12 +73,20 @@ contract Matching is IMatching {
         }
     }
 
-    function _checkSignature(Offer memory offer, Signature memory signature) internal view {
-        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+    function _checkCanUseOffer(Offer memory offer, Signature memory sig) internal view {
+        if (sig.v == 0) {
+            require(ratified[offer.offering][abi.encode(offer)], "offer not ratified");
+        } else {
+            bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
+            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
+            require(signatory != address(0) && offer.offering == signatory, "Invalid sig");
+        }
+    }
 
-        require(signatory != address(0) && offer.offering == signatory, "Invalid signature");
+    function setRatified(Offer memory offer, bool newRatified) external {
+        ratified[msg.sender][abi.encode(offer)] = newRatified;
+        emit SetRatified(msg.sender, offer, newRatified);
     }
 }
