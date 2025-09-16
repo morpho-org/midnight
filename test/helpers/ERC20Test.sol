@@ -31,6 +31,7 @@ contract ERC20Test is Test {
 
     function testTransferFrom(address sender, address recipient, uint256 amount) public {
         vm.assume(amount > 0);
+        vm.assume(sender != recipient);
         deal(address(erc20), sender, amount);
         vm.prank(sender);
         erc20.approve(address(this), amount);

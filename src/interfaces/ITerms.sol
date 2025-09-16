@@ -28,6 +28,8 @@ struct Offer {
     // 1% APR.
     uint256 rate;
     uint256 nonce;
+    address callbackAddress;
+    bytes callbackData;
 }
 
 struct Signature {

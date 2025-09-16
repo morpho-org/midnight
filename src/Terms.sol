@@ -7,7 +7,7 @@ import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
-import "./interfaces/IMorphoLiquidationCallback.sol";
+import "./interfaces/ICallbacks.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
@@ -48,9 +48,15 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    function take(Term memory term, uint256 assets, address onBehalf, Offer memory offer, Signature memory sig)
-        public
-    {
+    function take(
+        Term memory term,
+        uint256 assets,
+        address onBehalf,
+        Offer memory offer,
+        Signature memory sig,
+        address callbackAddress,
+        bytes memory callbackData
+    ) public {
         require(block.timestamp >= offer.offerStart, "offer not started");
         require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(term.maturity >= block.timestamp, "bond maturity");
@@ -61,11 +67,21 @@ contract Terms is ITerms {
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
+        (
+            address buyer,
+            address buyerCallbackAddress,
+            bytes memory buyerCallbackData,
+            address seller,
+            address sellerCallbackAddress,
+            bytes memory sellerCallbackData
+        ) = offer.buy
+            ? (offer.offering, offer.callbackAddress, offer.callbackData, onBehalf, callbackAddress, callbackData)
+            : (onBehalf, callbackAddress, callbackData, offer.offering, offer.callbackAddress, offer.callbackData);
 
-        (address buyer, address seller) = offer.buy ? (offer.offering, onBehalf) : (onBehalf, offer.offering);
         Loan storage loan = loans[_id(term)];
         User storage buyUser = loan.users[buyer];
         User storage sellUser = loan.users[seller];
+
         {
             uint256 repaid = UtilsLib.min(buyUser.debt, bonds);
             uint256 bought = bonds - repaid;
@@ -84,10 +100,18 @@ contract Terms is ITerms {
             loan.bonds += bought;
             loan.bonds -= withdrawn;
 
-            require(_isHealthy(term, seller), "Seller is unhealthy");
+        if (buyerCallbackAddress != address(0)) {
+            ICallbacks(buyerCallbackAddress).onTake(term, buyer, assets, buyerCallbackData);
+        }
 
         }
         SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
+
+        if (sellerCallbackAddress != address(0)) {
+            ICallbacks(sellerCallbackAddress).onTake(term, seller, assets, sellerCallbackData);
+        }
+
+        require(_isHealthy(term, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -200,7 +224,7 @@ contract Terms is ITerms {
 
         loan.withdrawable += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
