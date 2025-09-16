@@ -26,7 +26,7 @@ contract Terms is ITerms {
     struct User {
         uint256 debt;
         uint256 shares;
-        mapping (address => uint256) collateral;
+        mapping(address => uint256) collateral;
     }
 
     struct Loan {
@@ -86,8 +86,7 @@ contract Terms is ITerms {
             uint256 repaid = UtilsLib.min(buyUser.debt, bonds);
             uint256 bought = bonds - repaid;
             uint256 boughtShares = bought.mulDivDown(loan.shares + 1, loan.bonds + 1);
-            uint256 withdrawn =
-                UtilsLib.min(sellUser.shares.mulDivDown(loan.bonds + 1, loan.shares + 1), bonds);
+            uint256 withdrawn = UtilsLib.min(sellUser.shares.mulDivDown(loan.bonds + 1, loan.shares + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(loan.shares + 1, loan.bonds + 1);
 
             buyUser.debt -= repaid;
@@ -100,10 +99,9 @@ contract Terms is ITerms {
             loan.bonds += bought;
             loan.bonds -= withdrawn;
 
-        if (buyerCallbackAddress != address(0)) {
-            ICallbacks(buyerCallbackAddress).onTake(term, buyer, assets, buyerCallbackData);
-        }
-
+            if (buyerCallbackAddress != address(0)) {
+                ICallbacks(buyerCallbackAddress).onTake(term, buyer, assets, buyerCallbackData);
+            }
         }
         SafeTransferLib.safeTransferFrom(offer.loanToken, buyer, seller, assets);
 
@@ -309,5 +307,4 @@ contract Terms is ITerms {
     function loanShares(bytes32 termId) external view returns (uint256) {
         return loans[termId].shares;
     }
-
 }
