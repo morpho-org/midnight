@@ -22,13 +22,13 @@ contract Terms is ITerms {
 
     /// STORAGE ///
 
-    mapping(address user => mapping(bytes32 termId => uint256)) public bondSharesOf;
-    mapping(address user => mapping(bytes32 termId => uint256)) public debtOf;
-    mapping(bytes32 termId => uint256) public withdrawable;
-    mapping(bytes32 termId => uint256) public totalBonds;
-    mapping(bytes32 termId => uint256) public totalShares;
-    mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address owner => mapping(address spender => bool)) isAuthorized;
+    mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
+    mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(bytes32 => uint256) public withdrawable;
+    mapping(bytes32 => uint256) public totalBonds;
+    mapping(bytes32 => uint256) public totalShares;
+    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    mapping(address => mapping(address => bool)) isAuthorized;
     mapping(address => mapping(bytes => bool)) public enabled;
 
     /// ENTRY-POINTS ///
