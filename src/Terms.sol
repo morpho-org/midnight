@@ -152,8 +152,6 @@ contract Terms is ITerms {
         }
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
-        uint256 totalRepaid;
-
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -181,12 +179,9 @@ contract Terms is ITerms {
         require(block.timestamp >= term.maturity, "post maturity liquidation is after maturity");
         require(seizures.length == term.collaterals.length, "should have all collats");
 
-        bytes32 id = _id(term);
-
         int256 logCliff = -1.60943791243e18; // ln(20%)
         uint256 auctionDuration = 1 hours;
 
-        uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
             uint256 priceDiscountFactor = uint256(
@@ -230,7 +225,7 @@ contract Terms is ITerms {
         if (totalRepaid > originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - totalRepaid);
+            uint256 badDebt = originalDebt - totalRepaid;
             debtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
