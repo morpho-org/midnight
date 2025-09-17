@@ -24,6 +24,8 @@ struct Make {
     address hook;
     bytes hookData;
     uint256 nonce;
+    uint256 start;
+    uint256 expiry;
 }
 
 struct Term {

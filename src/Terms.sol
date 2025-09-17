@@ -49,6 +49,8 @@ contract Terms is ITerms {
         Make memory make,
         Signature memory makeSig
     ) external {
+        require(block.timestamp >= make.start, "make offer not started");
+        require(block.timestamp <= make.expiry, "make offer expired");
         require(term.maturity >= block.timestamp, "maturity");
         _checkTake(take, takeSig);
         _checkMake(make, makeSig);
