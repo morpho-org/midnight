@@ -84,11 +84,11 @@ contract Terms is ITerms {
             ? (make.hook, make.hookData, take.hook, take.hookData)
             : (take.hook, take.hookData, make.hook, make.hookData);
 
-        if (buyHook != address(0)) IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData);
+        if (buyHook != address(0)) require(IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData) == HOOK_SUCCESS, "buy hook");
 
         IERC20(term.loanToken).transferFrom(buyer, seller, take.assets);
 
-        if (sellHook != address(0)) IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData);
+        if (sellHook != address(0)) require(IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData) == HOOK_SUCCESS, "sell hook");
 
         require(_isHealthy(term, seller), "Seller is unhealthy");
     }

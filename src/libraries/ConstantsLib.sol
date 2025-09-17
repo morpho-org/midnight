@@ -7,3 +7,4 @@ bytes32 constant MAKE_TYPEHASH = keccak256(
     "Make(address loanToken, bool buying, address owner, address matching, bytes matchingData, address hook, bytes hookData)"
 );
 bytes32 constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
+bytes32 constant HOOK_SUCCESS = keccak256("Morpho Market V2 Hook Success");
