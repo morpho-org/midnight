@@ -3,11 +3,11 @@
 pragma solidity 0.8.28;
 
 import "./libraries/UtilsLib.sol";
+import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
-import "./interfaces/IERC20.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
-import "./interfaces/IMorphoLiquidationCallback.sol";
+import "./interfaces/ICallbacks.sol";
 import "./interfaces/IHook.sol";
 import "./interfaces/IMatching.sol";
 import "./libraries/ConstantsLib.sol";
@@ -84,11 +84,17 @@ contract Terms is ITerms {
             ? (make.hook, make.hookData, take.hook, take.hookData)
             : (take.hook, take.hookData, make.hook, make.hookData);
 
-        if (buyHook != address(0)) require(IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData) == HOOK_SUCCESS, "buy hook");
+        if (buyHook != address(0)) {
+            require(IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData) == HOOK_SUCCESS, "buy hook");
+        }
 
-        IERC20(term.loanToken).transferFrom(buyer, seller, take.assets);
+        SafeTransferLib.safeTransferFrom(make.loanToken, buyer, seller, take.assets);
 
-        if (sellHook != address(0)) require(IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData) == HOOK_SUCCESS, "sell hook");
+        if (sellHook != address(0)) {
+            require(
+                IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData) == HOOK_SUCCESS, "sell hook"
+            );
+        }
 
         require(_isHealthy(term, seller), "Seller is unhealthy");
     }
@@ -107,7 +113,7 @@ contract Terms is ITerms {
         totalShares[id] -= shares;
         totalBonds[id] -= bonds;
 
-        IERC20(term.loanToken).transfer(msg.sender, bonds);
+        SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
 
     function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
@@ -116,12 +122,12 @@ contract Terms is ITerms {
         debtOf[onBehalf][id] -= bonds;
         withdrawable[id] += bonds;
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), bonds);
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         collateralOf[onBehalf][_id(term)][collateral] += assets;
-        IERC20(collateral).transferFrom(msg.sender, address(this), assets);
+        SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
@@ -129,7 +135,7 @@ contract Terms is ITerms {
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
-        IERC20(collateral).transfer(msg.sender, assets);
+        SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
     struct Vars {
@@ -184,7 +190,7 @@ contract Terms is ITerms {
                 totalRepaid += seizures[i].repaidBonds;
                 collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
-                IERC20(term.collaterals[i].token).transfer(msg.sender, seizures[i].seizedAssets);
+                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
 
@@ -202,9 +208,9 @@ contract Terms is ITerms {
 
         withdrawable[id] += totalRepaid;
 
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
-        IERC20(term.loanToken).transferFrom(msg.sender, address(this), totalRepaid);
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
         return seizures;
     }
