@@ -65,11 +65,15 @@ contract Terms is ITerms {
         uint256 withdrawn =
             UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), take.bonds);
         uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
+        uint256 borrowed = take.bonds - withdrawn;
+
+        if (make.owner == buyer) require((make.asBorrower ? bought : repaid) == 0, "buyer role");
+        else require((make.asBorrower ? withdrawn : borrowed) == 0, "seller role");
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
         bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += take.bonds - withdrawn;
+        debtOf[seller][id] += borrowed;
 
         totalShares[id] += boughtShares;
         totalShares[id] -= withdrawnShares;

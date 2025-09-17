@@ -10,9 +10,14 @@ struct Take {
     bytes hookData;
 }
 
+// Buying as a borrower is repaying.
+// Buying as a lender is lending.
+// Selling as a borrower is borrowing.
+// Selling as a lender is withdrawing.
 struct Make {
     address loanToken;
     bool buying;
+    bool asBorrower;
     address owner;
     address matching;
     bytes matchingData;
