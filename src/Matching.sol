@@ -14,23 +14,13 @@ struct MatchingData {
     // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
     // 1% APR.
     uint256 rate;
-    uint256 nonce;
 }
 
 contract Matching is IMatching {
-    /// STORAGE ///
-
-    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
-    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
-    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
-
     /// FUNCTIONS ///
 
     function check(Term memory term, uint256 assets, uint256 bonds, Make memory make) external {
         MatchingData memory data = abi.decode(make.matchingData, (MatchingData));
-        consumed[make.owner][data.nonce] += assets;
-        require(consumed[make.owner][data.nonce] <= data.assets, "consumed");
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * data.rate) / 1e18, "bonds");
         require(data.loanToken == term.loanToken, "Loan tokens do not match");
         require(data.maturity == term.maturity, "Maturities do not match");

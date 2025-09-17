@@ -18,6 +18,7 @@ struct Make {
     bytes matchingData;
     address hook;
     bytes hookData;
+    uint256 nonce;
 }
 
 struct Term {

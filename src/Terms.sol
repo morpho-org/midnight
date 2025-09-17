@@ -27,6 +27,10 @@ contract Terms is ITerms {
 
     /// STORAGE ///
 
+    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
+    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
+    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
+    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
     mapping(bytes32 => uint256) public withdrawable;
@@ -48,6 +52,7 @@ contract Terms is ITerms {
         require(term.maturity >= block.timestamp, "maturity");
         _checkTake(take, takeSig);
         _checkMake(make, makeSig);
+        consumed[make.owner][make.nonce] += take.assets;
         IMatching(make.matching).check(term, take.assets, take.bonds, make);
 
         bytes32 id = _id(term);
@@ -220,6 +225,9 @@ contract Terms is ITerms {
         }
     }
 
+    /// @dev sig.v == 0 means the make was ratified
+    /// @dev sig.v == 1 means the make owner will be called in the callback
+    /// @dev any other sig.v means the signature will be validated
     function _checkMake(Make memory make, Signature memory sig) internal view {
         if (sig.v == 0) {
             require(ratified[make.owner][abi.encode(make)], "offer not enabled");
