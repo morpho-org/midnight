@@ -8,13 +8,17 @@ import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/ICallbacks.sol";
-import "./interfaces/IMatching.sol";
+import "./interfaces/IValidation.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
 
     /// CONSTANTS ///
 
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
+    bytes32 public constant OFFER_TYPEHASH = keccak256(
+        "Offer(bool lend,address offering,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 rate,uint256 nonce)"
+    );
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
     uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
 
@@ -26,7 +30,13 @@ contract Terms is ITerms {
     mapping(bytes32 termId => uint256) public totalBonds;
     mapping(bytes32 termId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 termId => mapping(address collateralToken => uint256))) public collateralOf;
-    mapping(address user => mapping(address matching => bool)) public isMatching;
+
+    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
+    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
+    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
+    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+
+    mapping(address user => mapping(bytes offer => bool)) public ratified;
 
     /// ENTRY-POINTS ///
 
@@ -35,23 +45,19 @@ contract Terms is ITerms {
     /// position at the end.
     function take(
         Term memory term,
+        Offer memory offer,
+        Signature memory sig,
         uint256 assets,
+        uint256 bonds,
         address onBehalf,
-        address matching,
-        bytes calldata data,
         address callbackAddress,
         bytes memory callbackData
     ) public {
         require(term.maturity >= block.timestamp, "bond maturity");
-
-        (
-            bool buyOffer,
-            address counterparty,
-            uint256 bonds,
-            address makerCallbackAddress,
-            bytes memory makerCallbackData
-        ) = IMatching(matching).take(term, assets, data);
-        require(isMatching[counterparty][matching], "not a matching contract");
+        require(block.timestamp >= offer.offerStart, "offer not started");
+        require(block.timestamp <= offer.offerExpiry, "offer expired");
+        require(IValidation(offer.validation).validate(term, assets, offer.offerData), "invalid offer");
+        require(_canUseOffer(offer, sig), "invalid offer");
 
         (
             address buyer,
@@ -60,11 +66,13 @@ contract Terms is ITerms {
             address seller,
             address sellerCallbackAddress,
             bytes memory sellerCallbackData
-        ) = buyOffer
-            ? (counterparty, makerCallbackAddress, makerCallbackData, onBehalf, callbackAddress, callbackData)
-            : (onBehalf, callbackAddress, callbackData, counterparty, makerCallbackAddress, makerCallbackData);
+        ) = offer.buy
+            ? (offer.offering, offer.callbackAddress, offer.callbackData, onBehalf, callbackAddress, callbackData)
+            : (onBehalf, callbackAddress, callbackData, offer.offering, offer.callbackAddress, offer.callbackData);
 
         bytes32 id = _id(term);
+
+        require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
         {
             uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
@@ -214,8 +222,8 @@ contract Terms is ITerms {
         return seizures;
     }
 
-    function setMatching(address matching, bool _isMatching) external {
-        isMatching[msg.sender][matching] = _isMatching;
+    function setRatified(Offer memory offer, bool newRatified) external {
+        ratified[msg.sender][abi.encode(offer)] = newRatified;
     }
 
     /// INTERNAL ///
@@ -239,6 +247,18 @@ contract Terms is ITerms {
             }
 
             return debt <= maxDebt;
+        }
+    }
+
+    function _canUseOffer(Offer memory offer, Signature memory sig) internal view returns (bool) {
+        if (sig.v == 0) {
+            return ratified[offer.offering][abi.encode(offer)];
+        } else {
+            bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
+            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
+            return signatory != address(0) && offer.offering == signatory;
         }
     }
 }

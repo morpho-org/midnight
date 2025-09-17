@@ -6,13 +6,13 @@ import "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import "../src/Terms.sol";
-import "../src/Matching.sol";
+import "../src/Validation.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
 abstract contract BaseTest is Test {
     Terms internal terms;
-    Matching internal matching;
+    IValidation internal validation;
     ERC20 internal loanToken;
     ERC20 internal collateralToken1;
     ERC20 internal collateralToken2;
@@ -27,10 +27,10 @@ abstract contract BaseTest is Test {
 
     function setUp() public virtual {
         terms = new Terms();
-        matching = new Matching();
+        validation = new RateOfferValidation();
 
-        offerTypehash = matching.OFFER_TYPEHASH();
-        domainTypehash = matching.DOMAIN_TYPEHASH();
+        offerTypehash = terms.OFFER_TYPEHASH();
+        domainTypehash = terms.DOMAIN_TYPEHASH();
 
         (borrower, borrowerSK) = makeAddrAndKey("borrower");
         (lender, lenderSK) = makeAddrAndKey("lender");
@@ -43,10 +43,8 @@ abstract contract BaseTest is Test {
 
         vm.startPrank(lender);
         loanToken.approve(address(terms), type(uint256).max);
-        terms.setMatching(address(matching), true);
         vm.startPrank(borrower);
         loanToken.approve(address(terms), type(uint256).max);
-        terms.setMatching(address(matching), true);
         vm.startPrank(liquidator);
         loanToken.approve(address(terms), type(uint256).max);
         vm.stopPrank();
@@ -62,7 +60,7 @@ abstract contract BaseTest is Test {
 
     function sig(Offer memory offer, uint256 sk) internal view returns (Signature memory) {
         bytes32 hashStruct = keccak256(abi.encode(offerTypehash, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(domainTypehash, block.chainid, address(matching)));
+        bytes32 domainSeparator = keccak256(abi.encode(domainTypehash, block.chainid, address(validation)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
 
         Signature memory signature;
@@ -99,7 +97,7 @@ abstract contract BaseTest is Test {
             assets: bonds,
             loanToken: term.loanToken,
             collaterals: term.collaterals,
-            maturity: block.timestamp + 100,
+
             offerStart: block.timestamp,
             offerExpiry: block.timestamp + 200,
             rate: 0,
@@ -113,7 +111,7 @@ abstract contract BaseTest is Test {
             term,
             bonds,
             lender,
-            address(matching),
+            address(validation),
             abi.encode(borrowOffer, sig(borrowOffer, borrowerSK)),
             address(0),
             hex""
