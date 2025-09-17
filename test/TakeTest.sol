@@ -384,7 +384,13 @@ contract BorrowCallback is ICallbacks {
         Terms(msg.sender).supplyCollateral(term, collateralToken, amount, borrower);
     }
 
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onLiquidate(
+        uint256 repaidBonds,
+        uint256 seizedAssets,
+        address borrower,
+        address liquidator,
+        bytes memory data
+    ) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -395,5 +401,11 @@ contract LendCallback is ICallbacks {
         ERC20(term.loanToken).transfer(offering, assets);
     }
 
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onLiquidate(
+        uint256 repaidBonds,
+        uint256 seizedAssets,
+        address borrower,
+        address liquidator,
+        bytes memory data
+    ) external {}
 }

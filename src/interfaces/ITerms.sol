@@ -38,11 +38,4 @@ struct Signature {
     bytes32 s;
 }
 
-struct Seizure {
-    // Amount of bonds to repay.
-    uint256 repaidBonds;
-    // Amount of collateral asset to seize.
-    uint256 seizedAssets;
-}
-
 interface ITerms {}
