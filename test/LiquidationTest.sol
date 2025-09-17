@@ -37,18 +37,18 @@ contract LiquidationTest is BaseTest {
         setupBond(term, 100);
 
         vm.expectRevert("position is healthy");
-        terms.liquidate(term, address(collateralToken1), 0, 0, borrower, "");
+        terms.liquidate(term, 0, 0, 0, borrower, "");
         assertEq(terms.debtOf(borrower, id), 100);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 134);
     }
 
     function testLiquidateNoOp() public {
         setupBond(term, 100);
-        oracle.setPrice(0);
+        oracle.setPrice(1e36 - 1);
 
-        terms.liquidate(term, address(collateralToken1), 0, 0, borrower, "");
+        terms.liquidate(term, 0, 0, 0, borrower, "");
         assertEq(terms.debtOf(borrower, id), 100);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 134);
     }
 
     function testLiquidateInconsistentInput() public {
@@ -56,9 +56,7 @@ contract LiquidationTest is BaseTest {
         oracle.setPrice(0);
 
         vm.expectRevert("INCONSISTENT_INPUT");
-        terms.liquidate(term, address(collateralToken1), 1, 100, borrower, "");
-        assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 132);
+        terms.liquidate(term, 0, 1, 100, borrower, "");
     }
 
     function testLiquidateBondsInput() public {
@@ -68,7 +66,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), 1);
 
         // Test
-        terms.liquidate(term, address(collateralToken1), 1, 0, borrower, "");
+        terms.liquidate(term, 0, 1, 0, borrower, "");
         assertEq(terms.debtOf(borrower, id), 99);
         assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
         assertEq(loanToken.balanceOf(address(this)), 0);
@@ -81,7 +79,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), 1);
 
         // Test
-        terms.liquidate(term, address(collateralToken1), 0, 1, borrower, "");
+        terms.liquidate(term, 0, 0, 1, borrower, "");
         assertEq(loanToken.balanceOf(address(this)), 0);
         assertEq(terms.debtOf(borrower, id), 99);
         assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 133);
@@ -94,9 +92,9 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), 1);
 
         // Test
-        terms.liquidate(term, address(collateralToken1), 1, 0, borrower, "");
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 132);
-        assertEq(terms.debtOf(borrower, id), 99);
+        terms.liquidate(term, 0, 0, 0, borrower, "");
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 134);
+        assertEq(terms.debtOf(borrower, id), 59);
     }
 
     function testLiquidateCallback(bytes memory data) public {
@@ -108,7 +106,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), 1);
 
         // Test
-        terms.liquidate(term, address(collateralToken1), 1, 0, borrower, data);
+        terms.liquidate(term, 0, 1, 0, borrower, data);
 
         assertEq(recordedRepaidBonds, 1, "repaid bonds");
         assertEq(recordedSeizedAssets, 1, "seized assets");

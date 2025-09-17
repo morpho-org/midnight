@@ -147,7 +147,7 @@ contract Terms is ITerms {
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
     /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
     /// @param term The term of the bond.
-    /// @param collateral The collateral to seize.
+    /// @param collateralIndex The collateral to seize.
     /// @param repaidBonds The amount of debt to repay.
     /// @param seizedAssets The amount of assets to seize.
     /// @param borrower The debtor of the loan.
@@ -155,18 +155,18 @@ contract Terms is ITerms {
     /// @return The actual amounts of debt repaid or asset seized with the collateral index.
     function liquidate(
         Term memory term,
-        address collateral,
+        uint256 collateralIndex,
         uint256 repaidBonds,
         uint256 seizedAssets,
         address borrower,
         bytes calldata data
     ) external returns (uint256, uint256) {
-        require(UtilsLib.exactlyOneZero(repaidBonds, seizedAssets), "INCONSISTENT_INPUT");
-
-        uint256 maxDebt;
-        uint256 repayableDebt;
+        require(UtilsLib.atLeastOneZero(repaidBonds, seizedAssets), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
+
         if (!TransientLib.getMapping(borrower)) {
+            uint256 maxDebt;
+            uint256 repayableDebt;
             for (uint256 i = 0; i < term.collaterals.length; i++) {
                 uint256 price = IOracle(term.collaterals[i].oracle).price();
                 uint256 collateralQuoted =
@@ -177,32 +177,29 @@ contract Terms is ITerms {
             require(debtOf[borrower][id] > maxDebt, "position is healthy");
             TransientLib.setMapping(borrower, true);
 
-            // Realize bad debt
             if (repayableDebt < debtOf[borrower][id]) {
-                // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
-                // debt minus the theoretical repayable debt.
-                uint256 badDebt = UtilsLib.min(debtOf[borrower][id], debtOf[borrower][id] - repayableDebt);
+                uint256 badDebt = debtOf[borrower][id] - repayableDebt;
                 debtOf[borrower][id] -= badDebt;
                 totalBonds[id] -= badDebt;
             }
         }
 
-        uint256 collateralPrice = IOracle(collateral).price();
+        uint256 collateralPrice = IOracle(term.collaterals[collateralIndex].oracle).price();
 
         if (seizedAssets > 0) {
             repaidBonds =
                 seizedAssets.mulDivUp(collateralPrice, ORACLE_PRICE_SCALE).mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
-        } else {
+        } else if (repaidBonds > 0) {
             seizedAssets = repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
                 ORACLE_PRICE_SCALE, collateralPrice
             );
         }
 
-        collateralOf[borrower][id][collateral] -= seizedAssets;
+        collateralOf[borrower][id][term.collaterals[collateralIndex].token] -= seizedAssets;
         debtOf[borrower][id] -= repaidBonds;
         withdrawable[id] += repaidBonds;
 
-        SafeTransferLib.safeTransfer(collateral, msg.sender, seizedAssets);
+        SafeTransferLib.safeTransfer(term.collaterals[collateralIndex].token, msg.sender, seizedAssets);
         if (data.length > 0) ICallbacks(msg.sender).onLiquidate(repaidBonds, seizedAssets, borrower, msg.sender, data);
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), repaidBonds);
         return (repaidBonds, seizedAssets);
