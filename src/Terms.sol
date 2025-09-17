@@ -87,14 +87,18 @@ contract Terms is ITerms {
             : (take.hook, take.hookData, make.hook, make.hookData);
 
         if (buyHook != address(0)) {
-            require(IHook(buyHook).hook(term, buyer, take.assets, take.bonds, buyHookData) == HOOK_SUCCESS, "buy hook");
+            require(
+                IHook(buyHook).hook(term, buyer, take.assets, take.bonds, make, makeSig, buyHookData) == HOOK_SUCCESS,
+                "buy hook"
+            );
         }
 
         SafeTransferLib.safeTransferFrom(make.loanToken, buyer, seller, take.assets);
 
         if (sellHook != address(0)) {
             require(
-                IHook(sellHook).hook(term, seller, take.assets, take.bonds, sellHookData) == HOOK_SUCCESS, "sell hook"
+                IHook(sellHook).hook(term, seller, take.assets, take.bonds, make, makeSig, sellHookData) == HOOK_SUCCESS,
+                "sell hook"
             );
         }
 

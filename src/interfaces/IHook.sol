@@ -5,7 +5,13 @@ pragma solidity ^0.8.0;
 import "./ITerms.sol";
 
 interface IHook {
-    function hook(Term memory term, address owner, uint256 assets, uint256 bonds, bytes calldata)
-        external
-        returns (bytes32);
+    function hook(
+        Term memory term,
+        address owner,
+        uint256 assets,
+        uint256 bonds,
+        Make memory make,
+        Signature memory makeSig,
+        bytes calldata hookData
+    ) external returns (bytes32);
 }
