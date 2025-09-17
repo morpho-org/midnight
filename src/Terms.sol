@@ -144,8 +144,7 @@ contract Terms is ITerms {
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
-    /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
-    /// @dev On each seizure either `repaidAmounts` or `seizedAssets` should be equal to zero.
+    /// @notice Liquidates the given `borrower` on the given `term`.
     /// @param term The term of the bond.
     /// @param collateralIndex The collateral to seize.
     /// @param repaidBonds The amount of debt to repay.
