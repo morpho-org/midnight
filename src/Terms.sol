@@ -219,6 +219,8 @@ contract Terms is ITerms {
         emit SetRatified(msg.sender, make, isRatified);
     }
 
+    /// INTERNAL ///
+
     function _checkTake(Take memory take, Signature memory sig) internal view {
         if (take.owner != msg.sender && !authorized[take.owner][msg.sender]) {
             bytes32 hashStruct = keccak256(abi.encode(TAKE_TYPEHASH, take));
@@ -245,8 +247,6 @@ contract Terms is ITerms {
             require(signatory != address(0) && make.owner == signatory, "Invalid make");
         }
     }
-
-    /// INTERNAL ///
 
     function _id(Term memory term) internal pure returns (bytes32) {
         return keccak256(abi.encode(term));
