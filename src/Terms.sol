@@ -54,7 +54,8 @@ contract Terms is ITerms {
         require(term.maturity >= block.timestamp, "maturity");
         _checkTake(take, takeSig);
         _checkMake(make, makeSig);
-        consumed[make.owner][make.nonce] += take.assets;
+        require((consumed[make.owner][make.nonce] += take.assets) <= make.size, "consumed");
+
         IMatching(make.matching).check(term, take.assets, take.bonds, make);
 
         bytes32 id = _id(term);

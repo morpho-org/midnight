@@ -19,6 +19,7 @@ struct Make {
     bool buying;
     bool asBorrower;
     address owner;
+    uint256 size;
     address matching;
     bytes matchingData;
     address hook;
