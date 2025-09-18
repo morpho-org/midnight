@@ -45,4 +45,9 @@ struct Seizure {
     uint256 seizedAssets;
 }
 
+struct Health {
+    uint256 maxDebt;
+    uint256 collateralValue;
+}
+
 interface ITerms {}
