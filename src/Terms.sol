@@ -75,7 +75,7 @@ contract Terms is ITerms {
             totalBonds[id] += bought;
             totalBonds[id] -= withdrawn;
 
-            (uint maxDebt, ) = health(term,seller);
+            (uint256 maxDebt,) = health(term, seller);
             require(debtOf[seller][id] <= maxDebt, "Seller is unhealthy");
         }
 
@@ -117,7 +117,7 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
         collateralOf[onBehalf][id][collateral] -= assets;
 
-        (uint maxDebt, ) = health(term,onBehalf);
+        (uint256 maxDebt,) = health(term, onBehalf);
         require(debtOf[onBehalf][id] <= maxDebt, "Unhealthy borrower");
 
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
@@ -135,7 +135,7 @@ contract Terms is ITerms {
         external
         returns (Seizure[] memory)
     {
-        (uint maxDebt, uint repayableDebt) = health(term,borrower);
+        (uint256 maxDebt, uint256 repayableDebt) = health(term, borrower);
         bytes32 id = _id(term);
         uint256 originalDebt = debtOf[borrower][id];
         require(originalDebt > repayableDebt, "position is healthy");
@@ -147,11 +147,12 @@ contract Terms is ITerms {
             seizure = seizures[i];
             require(UtilsLib.exactlyOneZero(seizure.repaidBonds, seizure.seizedAssets), "INCONSISTENT_INPUT");
 
-            uint price = IOracle(term.collaterals[seizure.collateralIndex].oracle).price();
+            uint256 price = IOracle(term.collaterals[seizure.collateralIndex].oracle).price();
 
             if (seizure.seizedAssets > 0) {
-                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(price, ORACLE_PRICE_SCALE)
-                    .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(
+                    1e18, LIQUIDATION_INCENTIVE_FACTOR
+                );
             } else {
                 seizure.seizedAssets = seizure.repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
                     ORACLE_PRICE_SCALE, price
@@ -226,7 +227,7 @@ contract Terms is ITerms {
     }
 
     ///@dev Returns the max debt and the repayable debt.
-    function health(Term memory term, address borrower) public view returns (uint,uint) {
+    function health(Term memory term, address borrower) public view returns (uint256, uint256) {
         bytes32 id = _id(term);
         uint256 totalCollateralValue;
         for (uint256 i = 0; i < term.collaterals.length; i++) {
