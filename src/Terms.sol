@@ -180,6 +180,10 @@ contract Terms is ITerms {
 
         collateralOf[borrower][id][term.loanToken] += totalRepaid;
 
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
         return seizures;
     }
 
