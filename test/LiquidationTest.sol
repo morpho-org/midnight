@@ -19,7 +19,6 @@ contract LiquidationTest is BaseTest {
         Collateral[] memory collaterals = new Collateral[](2);
         collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
         collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-
         collaterals = sortCollaterals(collaterals);
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
@@ -68,7 +67,6 @@ contract LiquidationTest is BaseTest {
         // Setup
         setupBond(term, 100);
         oracle.setPrice(1e36 - 1);
-
         deal(address(loanToken), address(this), 1);
 
         // Test
