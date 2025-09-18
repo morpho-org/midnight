@@ -223,6 +223,8 @@ contract Terms is ITerms {
         }
         totalRepaid = liquidateInternal(term, seizures, borrower, data);
 
+        if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
+        debtOf[borrower][id] -= totalRepaid;
         withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
