@@ -7,6 +7,7 @@ import "./libraries/SafeTransferLib.sol";
 import "./libraries/ConstantsLib.sol";
 import "./libraries/MathLib.sol";
 import "./libraries/ExpLib.sol";
+import "./libraries/LogLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IMorphoV2.sol";
 import "./interfaces/ICallbacks.sol";
@@ -237,9 +238,7 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = _id(obligation);
 
         // Auction parameters
-        int256 logCliff = -1.60943791243e18; // ln(20%)
-        uint256 auctionMin = 0.2e18;
-        uint256 auctionDuration = 1 hours;
+        uint256 auctionTimeToTarget = 15 minutes;
 
         uint256 maxRepayableDebt = 0;
         uint256 totalRepaid = 0;
@@ -247,12 +246,10 @@ contract MorphoV2 is IMorphoV2 {
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-            uint256 priceDiscountFactor = UtilsLib.max(
-                auctionMin,
-                uint256(
-                    ExpLib.wExp(
-                        logCliff.mulDivDown(int256(block.timestamp - obligation.maturity), int256(auctionDuration))
-                    )
+            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR - 1e18));
+            uint256 priceDiscountFactor = uint256(
+                ExpLib.wExp(
+                    -base.mulDivDown(int256(block.timestamp - obligation.maturity), int256(auctionTimeToTarget))
                 )
             );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
