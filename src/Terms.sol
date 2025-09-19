@@ -26,7 +26,7 @@ contract Terms is ITerms {
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(address => mapping(bytes32 => uint256)) public fullDebtOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalBonds;
     mapping(bytes32 => uint256) public totalShares;
@@ -36,6 +36,12 @@ contract Terms is ITerms {
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+
+    /// GETTERS ///
+
+    function debtOf(address borrower, bytes32 id) external view returns (uint256) {
+        return fullDebtOf[borrower][id] - collateralOf[borrower][id][address(0)];
+    }
 
     /// ENTRY-POINTS ///
 
@@ -63,17 +69,17 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         {
-            uint256 repaid = UtilsLib.min(debtOf[buyer][id], bonds);
+            uint256 repaid = UtilsLib.min(fullDebtOf[buyer][id], bonds);
             uint256 bought = bonds - repaid;
             uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
             uint256 withdrawn =
                 UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bonds);
             uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
 
-            debtOf[buyer][id] -= repaid;
+            fullDebtOf[buyer][id] -= repaid;
             bondSharesOf[buyer][id] += boughtShares;
             bondSharesOf[seller][id] -= withdrawnShares;
-            debtOf[seller][id] += bonds - withdrawn;
+            fullDebtOf[seller][id] += bonds - withdrawn;
 
             totalShares[id] += boughtShares;
             totalShares[id] -= withdrawnShares;
@@ -104,26 +110,15 @@ contract Terms is ITerms {
         SafeTransferLib.safeTransfer(term.loanToken, msg.sender, bonds);
     }
 
-    function repayDebt(Term memory term, uint256 bonds, address onBehalf) external {
-        bytes32 id = _id(term);
-
-        debtOf[onBehalf][id] -= bonds;
-        withdrawable[id] += bonds;
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), bonds);
-    }
-
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
-        collateralOf[onBehalf][id][collateral] += assets;
-        if (collateral == term.loanToken) withdrawable[id] += assets;
+        addCollateral(term, collateral, assets, onBehalf);
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
         bytes32 id = _id(term);
-        collateralOf[onBehalf][id][collateral] -= assets;
-        if (collateral == term.loanToken) withdrawable[id] -= assets;
+        removeCollateral(term, collateral, assets, onBehalf);
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
@@ -159,7 +154,7 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
-        require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
+        require(fullDebtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid;
 
@@ -183,8 +178,7 @@ contract Terms is ITerms {
 
         totalRepaid = liquidateInternal(term, seizures, borrower, data);
 
-        collateralOf[borrower][id][term.loanToken] += totalRepaid;
-        withdrawable[id] += totalRepaid;
+        addCollateral(term, term.loanToken, totalRepaid, borrower);
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
@@ -229,8 +223,8 @@ contract Terms is ITerms {
         }
         totalRepaid = liquidateInternal(term, seizures, borrower, data);
 
-        if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
+        if (totalRepaid > fullDebtOf[borrower][id]) totalRepaid = fullDebtOf[borrower][id];
+        fullDebtOf[borrower][id] -= totalRepaid;
         withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
@@ -249,21 +243,20 @@ contract Terms is ITerms {
 
         for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
-            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-            if (term.collaterals[i].token == term.loanToken) withdrawable[id] -= seizures[i].seizedAssets;
+            removeCollateral(term, term.collaterals[i].token, seizures[i].seizedAssets, borrower);
 
             SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
-        uint256 originalDebt = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
+        uint256 originalDebt = fullDebtOf[borrower][id];
+        fullDebtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
         if (totalRepaid > originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - totalRepaid);
-            debtOf[borrower][id] -= badDebt;
+            uint256 badDebt = UtilsLib.min(fullDebtOf[borrower][id], originalDebt - totalRepaid);
+            fullDebtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
 
@@ -306,7 +299,7 @@ contract Terms is ITerms {
 
     function _isHealthy(Term memory term, address borrower) internal view returns (bool) {
         bytes32 id = _id(term);
-        uint256 debt = debtOf[borrower][id];
+        uint256 debt = fullDebtOf[borrower][id];
         if (debt == 0) {
             return true;
         } else {
@@ -321,4 +314,25 @@ contract Terms is ITerms {
             return debt <= maxDebt;
         }
     }
+
+    function _addCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) internal {
+        bytes32 id = _id(term);
+        if (collateral == term.loanToken) {
+            collateralOf[onBehalf][id][address(0)] += assets;
+            withdrawable[id] += assets;
+        } else {
+            collateralOf[onBehalf][id][collateral] += assets;
+        }
+    }
+
+    function _removeCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) internal {
+        bytes32 id = _id(term);
+        if (collateral == term.loanToken) {
+            collateralOf[onBehalf][id][address(0)] -= assets;
+            withdrawable[id] -= assets;
+        } else {
+            collateralOf[onBehalf][id][collateral] -= assets;
+        }
+    }
+
 }
