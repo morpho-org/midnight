@@ -215,11 +215,10 @@ contract Terms is ITerms {
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
-            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR-1e18));
-            uint256 priceDiscountFactor =
-                uint256(
-                    ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
-                );
+            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR - 1e18));
+            uint256 priceDiscountFactor = uint256(
+                ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
+            );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
             maxRepayableDebt +=
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);

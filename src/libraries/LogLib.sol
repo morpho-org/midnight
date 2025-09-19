@@ -11,7 +11,7 @@ library LogLib {
     /// @dev Returns an approximation of ln.
     function wLn(int256 x) internal pure returns (int256 y) {
         unchecked {
-            y = x - x * x / (2*WAD_INT) + x * x / WAD_INT * x / (3*WAD_INT);
+            y = x - x * x / (2 * WAD_INT) + x * x / WAD_INT * x / (3 * WAD_INT);
         }
     }
 }
