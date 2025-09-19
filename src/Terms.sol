@@ -88,6 +88,7 @@ contract Terms is ITerms {
 
     /// @dev Will revert if there is no withdrawable funds.
     function withdrawBond(Term memory term, uint256 bonds, uint256 shares, address onBehalf) external {
+        require(term.maturity >= block.timestamp, "bond maturity");
         require(UtilsLib.exactlyOneZero(bonds, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(term);
 
@@ -113,12 +114,16 @@ contract Terms is ITerms {
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] += assets;
+        bytes32 id = _id(term);
+        collateralOf[onBehalf][id][collateral] += assets;
+        if (collateral == term.loanToken) withdrawable[id] += assets;
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        collateralOf[onBehalf][_id(term)][collateral] -= assets;
+        bytes32 id = _id(term);
+        collateralOf[onBehalf][id][collateral] -= assets;
+        if (collateral == term.loanToken) withdrawable[id] -= assets;
 
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
 
@@ -179,6 +184,7 @@ contract Terms is ITerms {
         totalRepaid = liquidateInternal(term, seizures, borrower, data);
 
         collateralOf[borrower][id][term.loanToken] += totalRepaid;
+        withdrawable[id] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
@@ -244,6 +250,7 @@ contract Terms is ITerms {
         for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+            if (term.collaterals[i].token == term.loanToken) withdrawable[id] -= seizures[i].seizedAssets;
 
             SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
