@@ -6,12 +6,14 @@ import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
 import "./libraries/ConstantsLib.sol";
 import "./libraries/MathLib.sol";
+import "./libraries/ExpLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IMorphoV2.sol";
 import "./interfaces/ICallbacks.sol";
 
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
+    using MathLib for int256;
 
     /// STORAGE ///
 
@@ -215,6 +217,77 @@ contract MorphoV2 is IMorphoV2 {
                 obligation.collaterals[seizure.collateralIndex].token, msg.sender, seizure.seized
             );
         }
+
+        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
+    }
+
+    function postMaturityLiquidation(
+        Obligation memory obligation,
+        Seizure[] memory seizures,
+        address borrower,
+        bytes calldata data
+    ) external returns (Seizure[] memory) {
+        require(block.timestamp >= obligation.maturity, "post maturity liquidation is after maturity");
+        require(seizures.length == obligation.collaterals.length, "should have all collats");
+
+        bytes32 id = _id(obligation);
+
+        // Auction parameters
+        int256 logCliff = -1.60943791243e18; // ln(20%)
+        uint256 auctionMin = 0.2e18;
+        uint256 auctionDuration = 1 hours;
+
+        uint256 maxRepayableDebt = 0;
+        uint256 totalRepaid = 0;
+        uint256[] memory auctionPrices = new uint256[](obligation.collaterals.length);
+
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            uint256 price = IOracle(obligation.collaterals[i].oracle).price();
+            uint256 priceDiscountFactor = UtilsLib.max(
+                auctionMin,
+                uint256(
+                    ExpLib.wExp(
+                        logCliff.mulDivDown(int256(block.timestamp - obligation.maturity), int256(auctionDuration))
+                    )
+                )
+            );
+            uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+            auctionPrices[i] = auctionPrice;
+            maxRepayableDebt +=
+                collateralOf[borrower][id][obligation.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
+        }
+
+        for (uint256 i = 0; i < seizures.length; i++) {
+            if (seizures[i].repaid + seizures[i].seized > 0) {
+                require(UtilsLib.exactlyOneZero(seizures[i].repaid, seizures[i].seized), "INCONSISTENT_INPUT");
+                uint256 auctionPrice = auctionPrices[seizures[i].collateralIndex];
+
+                if (seizures[i].seized > 0) {
+                    seizures[i].repaid = seizures[i].seized.mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
+                } else {
+                    seizures[i].seized = seizures[i].repaid.mulDivDown(ORACLE_PRICE_SCALE, auctionPrice);
+                }
+            }
+            totalRepaid += seizures[i].repaid;
+            collateralOf[borrower][id][obligation.collaterals[i].token] -= seizures[i].seized;
+
+            SafeTransferLib.safeTransfer(obligation.collaterals[i].token, msg.sender, seizures[i].seized);
+        }
+
+        uint256 originalDebt = debtOf[borrower][id];
+        debtOf[borrower][id] -= totalRepaid;
+
+        // Realize bad debt
+        if (originalDebt > maxRepayableDebt) {
+            uint256 badDebt = originalDebt - maxRepayableDebt;
+            debtOf[borrower][id] -= badDebt;
+            totalUnits[id] -= badDebt;
+        }
+        withdrawable[id] += totalRepaid;
 
         if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 

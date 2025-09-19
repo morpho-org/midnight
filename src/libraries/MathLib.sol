@@ -13,7 +13,7 @@ library MathLib {
         return (x * y + (d - 1)) / d;
     }
 
-  /// @dev Returns (`x` * `y`) / `d` rounded down.
+    /// @dev Returns (`x` * `y`) / `d` rounded down.
     function mulDivDown(int256 x, int256 y, int256 d) internal pure returns (int256) {
         return (x * y) / d;
     }
@@ -43,5 +43,5 @@ library MathLib {
     /// @dev Returns the concatenation of x and y, sorted lexicographically.
     function sort(bytes32 x, bytes32 y) internal pure returns (bytes memory) {
         return x < y ? abi.encodePacked(x, y) : abi.encodePacked(y, x);
-
+    }
 }
