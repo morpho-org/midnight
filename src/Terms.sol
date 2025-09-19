@@ -111,17 +111,13 @@ contract Terms is ITerms {
     }
 
     function supplyCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        bytes32 id = _id(term);
         addCollateral(term, collateral, assets, onBehalf);
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
     function withdrawCollateral(Term memory term, address collateral, uint256 assets, address onBehalf) external {
-        bytes32 id = _id(term);
         removeCollateral(term, collateral, assets, onBehalf);
-
         require(_isHealthy(term, onBehalf), "Unhealthy borrower");
-
         SafeTransferLib.safeTransfer(collateral, msg.sender, assets);
     }
 
