@@ -244,8 +244,7 @@ contract Terms is ITerms {
             SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
-        uint256 originalDebt = fullDebtOf[borrower][id];
-        fullDebtOf[borrower][id] -= totalRepaid;
+        uint256 originalDebt = debtOf[borrower][id];
 
         // Realize bad debt
         if (totalRepaid > originalDebt) {
