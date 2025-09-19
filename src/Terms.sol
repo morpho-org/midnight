@@ -6,6 +6,7 @@ import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
 import "./libraries/ExpLib.sol";
+import "./libraries/LogLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
@@ -208,22 +209,18 @@ contract Terms is ITerms {
         bytes32 id = _id(term);
 
         // Auction parameters
-        int256 logCliff = -1.60943791243e18; // ln(20%)
-        uint256 auctionMin = 0.2e18;
-        uint256 auctionDuration = 1 hours;
+        uint256 auctionTimeToTarget = 15 minutes;
 
         uint256 maxRepayableDebt = 0;
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
-            uint256 priceDiscountFactor = UtilsLib.max(
-                auctionMin,
+            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR-1e18));
+            uint256 priceDiscountFactor =
                 uint256(
-                    ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
-                )
-            );
+                    ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
+                );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
-
             maxRepayableDebt +=
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
 

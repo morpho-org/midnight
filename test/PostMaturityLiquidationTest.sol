@@ -83,12 +83,12 @@ contract PostMaturityLiquidationTest is BaseTest {
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 
-    function testPostMaturityLiquidateMid() public {
+    function testPostMaturityLiquidateTarget() public {
         // Setup
         setupBond(term, 100, 200);
         deal(address(loanToken), address(this), 1);
 
-        vm.warp(term.maturity + 1551);
+        vm.warp(term.maturity + 15 minutes);
 
         // Test
         Seizure[] memory seizures = new Seizure[](2);
@@ -96,7 +96,7 @@ contract PostMaturityLiquidationTest is BaseTest {
         seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
         terms.postMaturityLiquidation(term, seizures, borrower, "");
         assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 198);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 199);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 
@@ -105,7 +105,7 @@ contract PostMaturityLiquidationTest is BaseTest {
         setupBond(term, 100, 200);
         deal(address(loanToken), address(this), 1);
 
-        vm.warp(term.maturity + 3800);
+        vm.warp(term.maturity + 10500); // 20% of oracle price
 
         // Test
         Seizure[] memory seizures = new Seizure[](2);
