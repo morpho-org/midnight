@@ -6,6 +6,7 @@ import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
 import "./libraries/ExpLib.sol";
+import "./libraries/LogLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
 import "./interfaces/IMorphoLiquidationCallback.sol";
@@ -156,8 +157,7 @@ contract Terms is ITerms {
         }
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
-        uint256 totalRepaid;
-
+        uint256 totalRepaid = 0;
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -173,11 +173,26 @@ contract Terms is ITerms {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
                         .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
                 }
+
+                totalRepaid += seizures[i].repaidBonds;
+                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+
+                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
         }
 
-        totalRepaid = liquidateInternal(term, seizures, borrower, data);
+        uint256 originalDebt = debtOf[borrower][id];
 
+        // Realize bad debt
+        if (vars.repayableDebt < originalDebt) {
+            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
+            // debt minus the theoretical repayable debt.
+            uint256 badDebt = UtilsLib.min(debtOf[borrower][id] - totalRepaid, originalDebt - vars.repayableDebt);
+            debtOf[borrower][id] -= badDebt;
+            totalBonds[id] -= badDebt;
+        }
+
+        withdrawable[id] += totalRepaid;
         collateralOf[borrower][id][term.loanToken] += totalRepaid;
 
         if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
@@ -196,18 +211,20 @@ contract Terms is ITerms {
 
         bytes32 id = _id(term);
 
-        int256 logCliff = -1.60943791243e18; // ln(20%)
-        uint256 auctionDuration = 1 hours;
+        // Auction parameters
+        uint256 auctionTimeToTarget = 15 minutes;
 
+        uint256 maxRepayableDebt = 0;
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
             uint256 price = IOracle(term.collaterals[i].oracle).price();
-            uint256 priceDiscountFactor = i == 0
-                ? 1e18
-                : uint256(
-                    ExpLib.wExp(logCliff.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionDuration)))
-                );
+            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR - 1e18));
+            uint256 priceDiscountFactor = i==0 ? 1e18 :uint256(
+                ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
+            );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+            maxRepayableDebt +=
+                collateralOf[borrower][id][term.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
 
             if (seizures[i].repaidBonds + seizures[i].seizedAssets > 0) {
                 require(
@@ -220,28 +237,6 @@ contract Terms is ITerms {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(ORACLE_PRICE_SCALE, auctionPrice);
                 }
             }
-        }
-        totalRepaid = liquidateInternal(term, seizures, borrower, data);
-
-        if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
-        debtOf[borrower][id] -= totalRepaid;
-        withdrawable[id] += totalRepaid;
-
-        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
-
-        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
-
-        return seizures;
-    }
-
-    function liquidateInternal(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
-        internal
-        returns (uint256)
-    {
-        bytes32 id = _id(term);
-        uint256 totalRepaid = 0;
-
-        for (uint256 i = 0; i < seizures.length; i++) {
             totalRepaid += seizures[i].repaidBonds;
             collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
 
@@ -251,15 +246,19 @@ contract Terms is ITerms {
         uint256 originalDebt = debtOf[borrower][id];
 
         // Realize bad debt
-        if (totalRepaid > originalDebt) {
-            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
-            // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id], originalDebt - totalRepaid);
+        if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
+        if (originalDebt > maxRepayableDebt) {
+            uint256 badDebt = originalDebt - maxRepayableDebt;
             debtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
+        withdrawable[id] += totalRepaid;
 
-        return totalRepaid;
+        if (data.length > 0) IMorphoLiquidationCallback(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
     }
 
     /// INTERNAL ///
