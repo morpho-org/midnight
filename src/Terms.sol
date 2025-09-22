@@ -178,6 +178,7 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = fullDebtOf[borrower][id];
+        if (totalRepaid > originalDebt) totalRepaid = originalDebt;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
@@ -270,7 +271,7 @@ contract Terms is ITerms {
         require(offer.loanToken == term.loanToken, "Loan tokens do not match");
         require(offer.maturity == term.maturity, "Maturities do not match");
 
-        // Relies on the fact that the collaterals are sorted.
+        // Relies on the fact that the collaterals are sorted, except for the first collateral (the loan token).
         // Note that we actually never check that.
         // If they are not, the matching could fail.
         // Always ignore first collateral of term (the loan token).
