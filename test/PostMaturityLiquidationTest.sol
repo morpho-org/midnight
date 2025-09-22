@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
@@ -16,10 +16,11 @@ contract PostMaturityLiquidationTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
+        Collateral[] memory collaterals = new Collateral[](3);
+        collaterals[0] = Collateral({token: address(loanToken), lltv: 1e18, oracle: address(0)});
+        collaterals[1] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals[2] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals = sortCollateralsExceptFirst(collaterals);
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
@@ -57,12 +58,13 @@ contract PostMaturityLiquidationTest is BaseTest {
         vm.warp(term.maturity);
 
         // Test
-        Seizure[] memory seizures = new Seizure[](2);
-        seizures[0] = Seizure({repaidBonds: 1, seizedAssets: 0});
-        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        Seizure[] memory seizures = new Seizure[](3);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        seizures[1] = Seizure({repaidBonds: 1, seizedAssets: 0});
+        seizures[2] = Seizure({repaidBonds: 0, seizedAssets: 0});
         terms.postMaturityLiquidation(term, seizures, borrower, "");
         assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 199);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[1].token), 199);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 
@@ -74,29 +76,31 @@ contract PostMaturityLiquidationTest is BaseTest {
         vm.warp(term.maturity);
 
         // Test
-        Seizure[] memory seizures = new Seizure[](2);
-        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 1});
-        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        Seizure[] memory seizures = new Seizure[](3);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 1});
+        seizures[2] = Seizure({repaidBonds: 0, seizedAssets: 0});
         terms.postMaturityLiquidation(term, seizures, borrower, "");
         assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 199);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[1].token), 199);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 
-    function testPostMaturityLiquidateMid() public {
+    function testPostMaturityLiquidateTarget() public {
         // Setup
         setupBond(term, 100, 200);
         deal(address(loanToken), address(this), 1);
 
-        vm.warp(term.maturity + 1551);
+        vm.warp(term.maturity + 15 minutes);
 
         // Test
-        Seizure[] memory seizures = new Seizure[](2);
-        seizures[0] = Seizure({repaidBonds: 1, seizedAssets: 0});
-        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        Seizure[] memory seizures = new Seizure[](3);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        seizures[1] = Seizure({repaidBonds: 1, seizedAssets: 0});
+        seizures[2] = Seizure({repaidBonds: 0, seizedAssets: 0});
         terms.postMaturityLiquidation(term, seizures, borrower, "");
         assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 198);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[1].token), 199);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 
@@ -105,15 +109,17 @@ contract PostMaturityLiquidationTest is BaseTest {
         setupBond(term, 100, 200);
         deal(address(loanToken), address(this), 1);
 
-        vm.warp(term.maturity + 3600);
+        vm.warp(term.maturity + 10500); // 20% of oracle price
 
         // Test
-        Seizure[] memory seizures = new Seizure[](2);
-        seizures[0] = Seizure({repaidBonds: 1, seizedAssets: 0});
-        seizures[1] = Seizure({repaidBonds: 0, seizedAssets: 0});
-        terms.postMaturityLiquidation(term, seizures, borrower, "");
-        assertEq(terms.debtOf(borrower, id), 99);
-        assertEq(terms.collateralOf(borrower, id, term.collaterals[0].token), 196);
+        Seizure[] memory seizures = new Seizure[](3);
+        seizures[0] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        seizures[1] = Seizure({repaidBonds: 1, seizedAssets: 0});
+        seizures[2] = Seizure({repaidBonds: 0, seizedAssets: 0});
+        Seizure[] memory res = terms.postMaturityLiquidation(term, seizures, borrower, "");
+        console.log(res[1].repaidBonds, res[1].seizedAssets);
+        assertEq(terms.debtOf(borrower, id), 39);
+        assertEq(terms.collateralOf(borrower, id, term.collaterals[1].token), 195);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
 }

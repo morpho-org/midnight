@@ -64,10 +64,10 @@ abstract contract BaseTest is Test {
         return signature;
     }
 
-    function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
-        for (uint256 i = 1; i < arr.length; i++) {
+    function sortCollateralsExceptFirst(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
+        for (uint256 i = 2; i < arr.length; i++) {
             uint256 j = i;
-            while (j > 0 && bytes20(arr[j].token) < bytes20(arr[j - 1].token)) {
+            while (j > 1 && bytes20(arr[j].token) < bytes20(arr[j - 1].token)) {
                 Collateral memory temp = arr[j];
                 arr[j] = arr[j - 1];
                 arr[j - 1] = temp;
@@ -78,27 +78,31 @@ abstract contract BaseTest is Test {
     }
 
     function setupBond(Term memory term, uint256 bonds) internal {
-        uint256 collateral = (bonds * 1e18 + term.collaterals[0].lltv - 1) / term.collaterals[0].lltv;
+        uint256 collateral = (bonds * 1e18 + term.collaterals[1].lltv - 1) / term.collaterals[1].lltv;
         setupBond(term, bonds, collateral);
     }
 
     function setupBond(Term memory term, uint256 bonds, uint256 collateral) internal {
         deal(address(loanToken), lender, bonds);
-        deal(address(term.collaterals[0].token), address(this), collateral);
+        deal(address(term.collaterals[1].token), address(this), collateral);
 
-        terms.supplyCollateral(term, address(term.collaterals[0].token), collateral, borrower);
+        terms.supplyCollateral(term, address(term.collaterals[1].token), collateral, borrower);
         Offer memory borrowOffer = Offer({
             buy: false,
             offering: borrower,
             assets: bonds,
             loanToken: term.loanToken,
-            collaterals: term.collaterals,
+            collaterals: new Collateral[](term.collaterals.length - 1),
             maturity: block.timestamp + 100,
             offerStart: block.timestamp,
             offerExpiry: block.timestamp + 200,
             rate: 0,
             nonce: 0
         });
+
+        for (uint256 i = 1; i < term.collaterals.length; i++) {
+            borrowOffer.collaterals[i - 1] = term.collaterals[i];
+        }
 
         // take `bonds` because the rate is 0.
         terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));

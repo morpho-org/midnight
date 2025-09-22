@@ -11,9 +11,10 @@ contract OtherFunctionsTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
+        Collateral[] memory collaterals = new Collateral[](3);
+        collaterals[0] = Collateral({token: address(loanToken), lltv: 1e18, oracle: address(0)});
+        collaterals[1] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals[2] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
@@ -27,6 +28,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSupplyCollateral(address user, uint256 amount) public {
+        vm.assume(user != address(terms));
         // Setup
         ERC20 collateralToken = new ERC20("collat", "c");
         deal(address(collateralToken), address(this), amount);
@@ -89,7 +91,7 @@ contract OtherFunctionsTest is BaseTest {
         terms.withdrawCollateral(term, address(collateralToken1), withdraw, borrower);
     }
 
-    function testRepay(uint256 bonds, uint256 repaid) public {
+    function testRepayBySupplyingCollateral(uint256 bonds, uint256 repaid) public {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
         bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
         repaid = bound(repaid, 0, bonds);
@@ -100,7 +102,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        terms.repayDebt(term, repaid, borrower);
+        terms.supplyCollateral(term, address(loanToken), repaid, borrower);
 
         assertEq(terms.debtOf(borrower, id), bonds - repaid);
         assertEq(terms.withdrawable(id), repaid);
@@ -120,7 +122,7 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, bonds);
-        testRepay(bonds, withdraw);
+        testRepayBySupplyingCollateral(bonds, withdraw);
 
         // Test
         vm.prank(lender);
@@ -136,7 +138,7 @@ contract OtherFunctionsTest is BaseTest {
         // Setup
         bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, bonds);
-        testRepay(bonds, shares);
+        testRepayBySupplyingCollateral(bonds, shares);
 
         // Test
         // TODO: sharesPrice != 1

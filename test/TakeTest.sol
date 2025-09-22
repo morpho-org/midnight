@@ -20,10 +20,11 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), address(this), 135);
         deal(address(collateralToken1), address(this), type(uint256).max);
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
+        Collateral[] memory collaterals = new Collateral[](3);
+        collaterals[0] = Collateral({token: address(loanToken), lltv: 1e18, oracle: address(0)});
+        collaterals[1] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals[2] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals = sortCollateralsExceptFirst(collaterals);
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
@@ -44,7 +45,7 @@ contract TakeTest is BaseTest {
         lendOffer.rate = 0.01e18 / 100;
         lendOffer.nonce = 0;
 
-        for (uint256 i = 0; i < collaterals.length; i++) {
+        for (uint256 i = 1; i < collaterals.length; i++) {
             lendOffer.collaterals.push(collaterals[i]);
         }
 
@@ -57,7 +58,7 @@ contract TakeTest is BaseTest {
         borrowOffer.rate = 0.01e18 / 100;
         borrowOffer.nonce = 0;
 
-        for (uint256 i = 0; i < collaterals.length; i++) {
+        for (uint256 i = 1; i < collaterals.length; i++) {
             borrowOffer.collaterals.push(collaterals[i]);
         }
 
