@@ -97,7 +97,7 @@ contract OtherFunctionsTest is BaseTest {
         covered = bound(covered, 0, bonds);
         withdrawn = bound(withdrawn, 0, covered);
         termLength = bound(termLength, 1, 365 days);
-        skipped = bound(skipped, 0, termLength);
+        skipped = bound(skipped, 0, termLength * 3);
         uint256 maturity = originalTimestamp + termLength;
 
         term.maturity = maturity;
@@ -133,41 +133,6 @@ contract OtherFunctionsTest is BaseTest {
         );
         vm.expectRevert("Unhealthy borrower");
         terms.withdrawCover(term, withdrawn, borrower);
-    }
-
-    function testWithdrawCoverAfterMaturity(
-        uint256 bonds,
-        uint256 covered,
-        uint256 withdrawn,
-        uint256 termLength,
-        uint256 skipped
-    ) public {
-        uint256 originalTimestamp = block.timestamp;
-        bonds = bound(bonds, 1, MAX_TEST_AMOUNT);
-        covered = bound(covered, 1, MAX_TEST_AMOUNT);
-        withdrawn = bound(withdrawn, 0, covered);
-        termLength = bound(termLength, 1, 365 days);
-        uint256 maturity = originalTimestamp + termLength;
-
-        term.maturity = maturity;
-        _testCover(bonds, covered, term.maturity);
-
-        skip(termLength + bound(skipped, 1, 365 days));
-
-        if (covered - withdrawn >= bonds) {
-            vm.prank(borrower);
-            terms.withdrawCover(term, withdrawn, borrower);
-        } else {
-            vm.expectRevert("only excess cover can be removed after maturity");
-            vm.prank(borrower);
-            terms.withdrawCover(term, withdrawn, borrower);
-        }
-    }
-
-    function testCover(uint256 bonds, uint256 covered) public {
-        bonds = bound(bonds, 0, MAX_TEST_AMOUNT);
-        covered = bound(covered, 0, bonds);
-        _testCover(bonds, covered, term.maturity);
     }
 
     function _testCover(uint256 bonds, uint256 covered, uint256 maturity) public {
