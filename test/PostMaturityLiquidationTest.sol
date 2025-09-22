@@ -51,7 +51,7 @@ contract PostMaturityLiquidationTest is BaseTest {
 
     function testPostMaturityLiquidateBondsInput() public {
         // Setup
-        setupBond(term, 100, 200);
+        setupBond(term, 100, 200, term.maturity);
         deal(address(loanToken), address(this), 1);
 
         vm.warp(term.maturity);
@@ -68,7 +68,7 @@ contract PostMaturityLiquidationTest is BaseTest {
 
     function testPostMaturityLiquidateCollateralInput() public {
         // Setup
-        setupBond(term, 100, 200);
+        setupBond(term, 100, 200, term.maturity);
         deal(address(loanToken), address(this), 1);
 
         vm.warp(term.maturity);
@@ -85,7 +85,7 @@ contract PostMaturityLiquidationTest is BaseTest {
 
     function testPostMaturityLiquidateMid() public {
         // Setup
-        setupBond(term, 100, 200);
+        setupBond(term, 100, 200, term.maturity);
         deal(address(loanToken), address(this), 1);
 
         vm.warp(term.maturity + 1551);
@@ -102,7 +102,7 @@ contract PostMaturityLiquidationTest is BaseTest {
 
     function testPostMaturityLiquidateLate() public {
         // Setup
-        setupBond(term, 100, 200);
+        setupBond(term, 100, 200, term.maturity);
         deal(address(loanToken), address(this), 1);
 
         vm.warp(term.maturity + 3600);
