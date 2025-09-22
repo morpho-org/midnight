@@ -155,6 +155,7 @@ contract Terms is ITerms {
             vars.maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
             vars.repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
         }
+
         require(debtOf[borrower][id] > vars.maxDebt, "position is healthy");
 
         uint256 totalRepaid = 0;
@@ -182,12 +183,13 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf[borrower][id];
+        if (totalRepaid > originalDebt) totalRepaid = originalDebt;
 
         // Realize bad debt
         if (vars.repayableDebt < originalDebt) {
             // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
             // debt minus the theoretical repayable debt.
-            uint256 badDebt = UtilsLib.min(debtOf[borrower][id] - totalRepaid, originalDebt - vars.repayableDebt);
+            uint256 badDebt = UtilsLib.min(originalDebt - totalRepaid, originalDebt - vars.repayableDebt);
             debtOf[borrower][id] -= badDebt;
             totalBonds[id] -= badDebt;
         }
@@ -246,10 +248,10 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf[borrower][id];
+        if (totalRepaid > originalDebt) totalRepaid = originalDebt;
         debtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
-        if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
         if (originalDebt > maxRepayableDebt) {
             uint256 badDebt = originalDebt - maxRepayableDebt;
             debtOf[borrower][id] -= badDebt;
@@ -274,7 +276,7 @@ contract Terms is ITerms {
         require(offer.loanToken == term.loanToken, "Loan tokens do not match");
         require(offer.maturity == term.maturity, "Maturities do not match");
 
-        // Relies on the fact that the collaterals are sorted.
+        // Relies on the fact that the collaterals are sorted, except for the first collateral (the loan token).
         // Note that we actually never check that.
         // If they are not, the matching could fail.
         // Always ignore first collateral of term (the loan token).
