@@ -11,9 +11,10 @@ contract OtherFunctionsTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
+        Collateral[] memory collaterals = new Collateral[](3);
+        collaterals[0] = Collateral({token: address(loanToken), lltv: 1e18, oracle: address(0)});
+        collaterals[1] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
+        collaterals[2] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.

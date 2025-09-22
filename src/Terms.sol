@@ -50,8 +50,8 @@ contract Terms is ITerms {
         require(block.timestamp <= offer.offerExpiry, "offer expired");
         require(term.maturity >= block.timestamp, "bond maturity");
         require(
-            term.collaterals[0] == term.loanToken && term.collaterals[0].oracle == address(0),
-            "loan token not first collateral"
+            term.collaterals[0].token == term.loanToken && term.collaterals[0].oracle == address(0),
+            "loan token without oracle not first collateral"
         );
         _checkSignature(offer, sig);
         _checkOffer(term, offer);
@@ -217,11 +217,13 @@ contract Terms is ITerms {
         uint256 maxRepayableDebt = 0;
         uint256 totalRepaid = 0;
         for (uint256 i = 0; i < seizures.length; i++) {
-            uint256 price = IOracle(term.collaterals[i].oracle).price();
+            uint256 price = i == 0 ? ORACLE_PRICE_SCALE : IOracle(term.collaterals[i].oracle).price();
             int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR - 1e18));
-            uint256 priceDiscountFactor = i==0 ? 1e18 :uint256(
-                ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
-            );
+            uint256 priceDiscountFactor = i == 0
+                ? 1e18
+                : uint256(
+                    ExpLib.wExp(-base.mulDivDown(int256(block.timestamp - term.maturity), int256(auctionTimeToTarget)))
+                );
             uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
             maxRepayableDebt +=
                 collateralOf[borrower][id][term.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
@@ -244,6 +246,7 @@ contract Terms is ITerms {
         }
 
         uint256 originalDebt = debtOf[borrower][id];
+        debtOf[borrower][id] -= totalRepaid;
 
         // Realize bad debt
         if (totalRepaid > debtOf[borrower][id]) totalRepaid = debtOf[borrower][id];
@@ -271,18 +274,29 @@ contract Terms is ITerms {
         require(offer.loanToken == term.loanToken, "Loan tokens do not match");
         require(offer.maturity == term.maturity, "Maturities do not match");
 
-        Collateral[] memory subset = offer.buy ? term.collaterals : offer.collaterals;
-        Collateral[] memory superset = offer.buy ? offer.collaterals : term.collaterals;
+        // Relies on the fact that the collaterals are sorted.
+        // Note that we actually never check that.
+        // If they are not, the matching could fail.
+        // Always ignore first collateral of term (the loan token).
 
-        uint256 j = 0;
-        for (uint256 i = 0; i < subset.length; i++) {
-            // Relies on the fact that the collaterals are sorted.
-            // Note that we actually never check that.
-            // If they are not, the matching could fail.
-            while (superset[j].token != subset[i].token) j++;
-            require(superset[j].lltv >= subset[i].lltv, "LLTVs do not match");
-            require(subset[i].oracle == superset[j].oracle, "Oracles do not match");
-            j++;
+        // Check that the term collaterals are allowed by the lender.
+        if (offer.buy) {
+            uint256 j = 0;
+            for (uint256 i = 1; i < term.collaterals.length; i++) {
+                while (offer.collaterals[j].token != term.collaterals[i].token) j++;
+                require(offer.collaterals[j].lltv >= term.collaterals[i].lltv, "LLTVs do not match");
+                require(term.collaterals[i].oracle == offer.collaterals[j].oracle, "Oracles do not match");
+                j++;
+            }
+            // Check that the offer collaterals are allowed by the term.
+        } else {
+            uint256 j = 1;
+            for (uint256 i = 0; i < offer.collaterals.length; i++) {
+                while (term.collaterals[j].token != offer.collaterals[i].token) j++;
+                require(term.collaterals[j].lltv >= offer.collaterals[i].lltv, "LLTVs do not match");
+                require(offer.collaterals[i].oracle == term.collaterals[j].oracle, "Oracles do not match");
+                j++;
+            }
         }
     }
 
