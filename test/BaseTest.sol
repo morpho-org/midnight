@@ -97,11 +97,13 @@ abstract contract BaseTest is Test {
             offerStart: block.timestamp,
             offerExpiry: block.timestamp + 200,
             rate: 0,
-            nonce: 0
+            nonce: 0,
+            callbackAddress: address(0),
+            callbackData: ""
         });
 
         // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 
     function setupMaxBondWithCollaterals(Term memory term, uint256 collateral0, uint256 collateral1) internal {
@@ -128,10 +130,12 @@ abstract contract BaseTest is Test {
             offerStart: block.timestamp,
             offerExpiry: block.timestamp + 200,
             rate: 0,
-            nonce: 0
+            nonce: 0,
+            callbackAddress: address(0),
+            callbackData: ""
         });
 
         // take `bonds` because the rate is 0.
-        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, bonds, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
     }
 }

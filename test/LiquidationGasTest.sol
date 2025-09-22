@@ -56,10 +56,12 @@ contract LiquidationTest is BaseTest {
             offerExpiry: block.timestamp + 100,
             maturity: block.timestamp + 100,
             rate: 0,
-            nonce: 0
+            nonce: 0,
+            callbackAddress: address(0),
+            callbackData: ""
         });
 
-        terms.take(term, maxDebt, lender, borrowOffer, sig(borrowOffer, borrowerSK));
+        terms.take(term, maxDebt, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
 
         // Setup liquidation
         for (uint256 i = 0; i < numCollaterals; i++) {
