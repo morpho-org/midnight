@@ -7,8 +7,7 @@ import "./libraries/SafeTransferLib.sol";
 import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ITerms.sol";
-import "./interfaces/ICallbacks.sol";
-import "./interfaces/IHook.sol";
+import "./interfaces/IHooks.sol";
 import "./interfaces/IMatching.sol";
 import "./libraries/ConstantsLib.sol";
 
@@ -17,7 +16,7 @@ contract Terms is ITerms {
 
     /// EVENTS ///
 
-    event SetRatified(address indexed sender, Make make, bool ratified);
+    event SetRatified(address indexed sender, Offer offer, bool isRatified);
     event SetAuthorized(address indexed sender, address indexed spender, bool authorized);
 
     /// CONSTANTS ///
@@ -30,7 +29,7 @@ contract Terms is ITerms {
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    mapping(address => mapping(uint256 => uint256)) public consumed;
     mapping(address => mapping(bytes32 => uint256)) public bondSharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
     mapping(bytes32 => uint256) public withdrawable;
@@ -38,40 +37,35 @@ contract Terms is ITerms {
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
     mapping(address => mapping(address => bool)) public authorized;
-    mapping(address => mapping(bytes => bool)) public ratified;
+    mapping(bytes => bool) public ratified;
 
     /// ENTRY-POINTS ///
 
-    function fill(
-        Term memory term,
-        Take memory take,
-        Signature memory takeSig,
-        Make memory make,
-        Signature memory makeSig
-    ) external {
-        require(block.timestamp >= make.start, "make offer not started");
-        require(block.timestamp <= make.expiry, "make offer expired");
-        require(term.maturity >= block.timestamp, "maturity");
-        _checkTake(take, takeSig);
-        _checkMake(make, makeSig);
-        require((consumed[make.owner][make.nonce] += take.assets) <= make.size, "consumed");
-
-        IMatching(make.matching).check(term, take.assets, take.bonds, make);
+    function take(Term memory term, Order memory order, Offer memory offer) external {
+        require(block.timestamp >= offer.start, "offer offer not started");
+        require(block.timestamp <= offer.expiry, "offer offer expired");
+        require(term.maturity >= block.timestamp, "bond maturity");
+        require(msg.sender == order.owner || authorized[order.owner][msg.sender], "order not authorized");
+        require(
+            msg.sender == offer.owner || authorized[offer.owner][msg.sender] || ratified[abi.encode(offer)],
+            "offer not authorized"
+        );
+        require((consumed[offer.owner][offer.nonce] += order.assets) <= offer.assets, "consumed");
+        IMatching(offer.matching).check(term, order.assets, order.bonds, offer);
 
         bytes32 id = _id(term);
+        (address buyer, address seller) = offer.buying ? (offer.owner, order.owner) : (order.owner, offer.owner);
 
-        (address buyer, address seller) = make.buying ? (make.owner, take.owner) : (take.owner, make.owner);
-
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], take.bonds);
-        uint256 bought = take.bonds - repaid;
+        uint256 repaid = UtilsLib.min(debtOf[buyer][id], order.bonds);
+        uint256 bought = order.bonds - repaid;
         uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), take.bonds);
+            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), order.bonds);
         uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-        uint256 borrowed = take.bonds - withdrawn;
+        uint256 borrowed = order.bonds - withdrawn;
 
-        if (make.owner == buyer) require((make.asBorrower ? bought : repaid) == 0, "buyer role");
-        else require((make.asBorrower ? withdrawn : borrowed) == 0, "seller role");
+        if (offer.owner == buyer) require((offer.asBorrower ? bought : repaid) == 0, "buyer role");
+        else require((offer.asBorrower ? withdrawn : borrowed) == 0, "seller role");
 
         debtOf[buyer][id] -= repaid;
         bondSharesOf[buyer][id] += boughtShares;
@@ -83,25 +77,17 @@ contract Terms is ITerms {
         totalBonds[id] += bought;
         totalBonds[id] -= withdrawn;
 
-        (address buyHook, bytes memory buyHookData, address sellHook, bytes memory sellHookData) = make.buying
-            ? (make.hook, make.hookData, take.hook, take.hookData)
-            : (take.hook, take.hookData, make.hook, make.hookData);
+        (address buyHook, bytes memory buyHookData, address sellHook, bytes memory sellHookData) = offer.buying
+            ? (offer.hook, offer.hookData, order.hook, order.hookData)
+            : (order.hook, order.hookData, offer.hook, offer.hookData);
 
         if (buyHook != address(0)) {
-            require(
-                IHook(buyHook).hook(term, buyer, take.assets, take.bonds, make, makeSig, buyHookData) == HOOK_SUCCESS,
-                "buy hook"
-            );
+            IBuyer(buyHook).onBuy(term, order.assets, order.bonds, buyer, buyHookData);
         }
 
-        SafeTransferLib.safeTransferFrom(make.loanToken, buyer, seller, take.assets);
+        SafeTransferLib.safeTransferFrom(term.loanToken, buyer, seller, order.assets);
 
-        if (sellHook != address(0)) {
-            require(
-                IHook(sellHook).hook(term, seller, take.assets, take.bonds, make, makeSig, sellHookData) == HOOK_SUCCESS,
-                "sell hook"
-            );
-        }
+        if (sellHook != address(0)) ISeller(sellHook).onSell(term, order.assets, order.bonds, seller, sellHookData);
 
         require(_isHealthy(term, seller), "Seller is unhealthy");
     }
@@ -215,7 +201,7 @@ contract Terms is ITerms {
 
         withdrawable[id] += totalRepaid;
 
-        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) ILiquidator(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
@@ -227,39 +213,33 @@ contract Terms is ITerms {
         emit SetAuthorized(msg.sender, spender, isAuthorized);
     }
 
-    function setRatified(Make memory make, bool isRatified) external {
-        ratified[msg.sender][abi.encode(make)] = isRatified;
-        emit SetRatified(msg.sender, make, isRatified);
+    /// @dev If the caller is the owner or is authorized by the owner, the last 2 arguments are ignored.
+    function setRatified(Offer memory offer, bool isRatified) external {
+        require(msg.sender == offer.owner || authorized[offer.owner][msg.sender], "ratification not authorized");
+        ratified[abi.encode(offer)] = isRatified;
+        emit SetRatified(msg.sender, offer, isRatified);
+    }
+
+    function setRatifiedByCallback(Offer memory offer, bool isRatified, bytes memory data) external {
+        require(
+            IRatifier(offer.owner).checkRatified(offer, isRatified, data) == RATIFICATION_RESPONSE,
+            "Invalid ratification callback response"
+        );
+        ratified[abi.encode(offer)] = isRatified;
+        emit SetRatified(msg.sender, offer, isRatified);
+    }
+
+    function setRatifiedBySignature(Offer memory offer, bool isRatified, Signature calldata signature) external {
+        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(offer.owner != address(0) && offer.owner == signatory, "Invalid ratification signature");
+        ratified[abi.encode(offer)] = isRatified;
+        emit SetRatified(msg.sender, offer, isRatified);
     }
 
     /// INTERNAL ///
-
-    function _checkTake(Take memory take, Signature memory sig) internal view {
-        if (take.owner != msg.sender && !authorized[take.owner][msg.sender]) {
-            bytes32 hashStruct = keccak256(abi.encode(TAKE_TYPEHASH, take));
-            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
-            require(signatory != address(0) && take.owner == signatory, "invalid take");
-        }
-    }
-
-    /// @dev sig.v == 0 means the make was ratified
-    /// @dev sig.v == 1 means the make owner will be called in the callback
-    /// @dev any other sig.v means the signature will be validated
-    function _checkMake(Make memory make, Signature memory sig) internal view {
-        if (sig.v == 0) {
-            require(ratified[make.owner][abi.encode(make)], "offer not enabled");
-        } else if (sig.v == 1) {
-            require(make.owner == make.hook, "invalid hook address");
-        } else {
-            bytes32 hashStruct = keccak256(abi.encode(MAKE_TYPEHASH, make));
-            bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
-            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-            address signatory = ecrecover(digest, sig.v, sig.r, sig.s);
-            require(signatory != address(0) && make.owner == signatory, "Invalid make");
-        }
-    }
 
     function _id(Term memory term) internal pure returns (bytes32) {
         return keccak256(abi.encode(term));

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import "./interfaces/IHook.sol";
+import "./interfaces/IHooks.sol";
 import "./libraries/ConstantsLib.sol";
 import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 

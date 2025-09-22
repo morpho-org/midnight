@@ -5,28 +5,17 @@ pragma solidity 0.8.28;
 import "./interfaces/IMatching.sol";
 import "./libraries/ConstantsLib.sol";
 
-struct MatchingData {
-    bool buying;
-    uint256 assets;
-    address loanToken;
-    Collateral[] collaterals;
-    uint256 maturity;
-    // The rate is expressed in percentage per second and is scaled by WAD, so `0.01e18 / uint256(365 days)` represents
-    // 1% APR.
-    uint256 rate;
-}
-
 contract Matching is IMatching {
     /// FUNCTIONS ///
 
-    function check(Term memory term, uint256 assets, uint256 bonds, Make memory make) external {
-        MatchingData memory data = abi.decode(make.matchingData, (MatchingData));
+    function check(Term memory term, uint256 assets, uint256 bonds, Offer memory offer) external view {
+        MatchData memory data = abi.decode(offer.matchData, (MatchData));
         require(bonds == assets * (1e18 + (term.maturity - block.timestamp) * data.rate) / 1e18, "bonds");
         require(data.loanToken == term.loanToken, "Loan tokens do not match");
         require(data.maturity == term.maturity, "Maturities do not match");
 
-        Collateral[] memory subset = data.buying ? term.collaterals : data.collaterals;
-        Collateral[] memory superset = data.buying ? data.collaterals : term.collaterals;
+        Collateral[] memory subset = offer.buying ? term.collaterals : data.collaterals;
+        Collateral[] memory superset = offer.buying ? data.collaterals : term.collaterals;
 
         uint256 j = 0;
         for (uint256 i = 0; i < subset.length; i++) {

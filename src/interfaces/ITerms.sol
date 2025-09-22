@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-struct Take {
+struct Order {
     address owner;
     uint256 assets;
     uint256 bonds;
@@ -14,14 +14,13 @@ struct Take {
 // Buying as a lender is lending.
 // Selling as a borrower is borrowing.
 // Selling as a lender is withdrawing.
-struct Make {
-    address loanToken;
+struct Offer {
     bool buying;
     bool asBorrower;
     address owner;
-    uint256 size;
+    uint256 assets;
     address matching;
-    bytes matchingData;
+    bytes matchData;
     address hook;
     bytes hookData;
     uint256 nonce;
