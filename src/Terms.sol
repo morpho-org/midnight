@@ -175,6 +175,11 @@ contract Terms is ITerms {
                     seizures[i].seizedAssets = seizures[i].repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18)
                         .mulDivDown(ORACLE_PRICE_SCALE, collateralPrice);
                 }
+
+                totalRepaid += seizures[i].repaidBonds;
+                collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
+
+                SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
 
             totalRepaid += seizures[i].repaidBonds;
