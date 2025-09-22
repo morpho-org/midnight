@@ -181,11 +181,6 @@ contract Terms is ITerms {
 
                 SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
             }
-
-            totalRepaid += seizures[i].repaidBonds;
-            collateralOf[borrower][id][term.collaterals[i].token] -= seizures[i].seizedAssets;
-
-            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, seizures[i].seizedAssets);
         }
 
         uint256 originalDebt = debtOf(borrower, id);
