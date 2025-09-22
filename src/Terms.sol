@@ -101,7 +101,6 @@ contract Terms is ITerms {
             ICallbacks(sellerCallbackAddress).onTake(term, seller, assets, sellerCallbackData);
         }
 
-
         (uint256 maxDebt,) = health(term, seller);
         require(debtOf[seller][id] <= maxDebt, "Seller is unhealthy");
     }
