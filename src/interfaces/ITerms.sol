@@ -38,6 +38,11 @@ struct Signature {
     bytes32 s;
 }
 
+struct Price {
+    uint248 price;
+    bool seen;
+}
+
 struct Seizure {
     // Index of the collateral in the term's collateral assets.
     uint256 collateralIndex;

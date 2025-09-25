@@ -11,6 +11,7 @@ import "./interfaces/ICallbacks.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
+    using UtilsLib for uint256;
 
     /// CONSTANTS ///
 
@@ -158,14 +159,14 @@ contract Terms is ITerms {
         uint256 repayableDebt;
         uint256 maxDebt;
         bytes32 id = _id(term);
-        uint256[] memory prices = new uint256[](term.collaterals.length);
+        Price[] memory prices = new Price[](term.collaterals.length);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            prices[i] = IOracle(term.collaterals[i].oracle).price();
+            prices[i].price = IOracle(term.collaterals[i].oracle).price().toUint248();
             {
                 address collateralToken = term.collaterals[i].token;
                 uint256 collateralQuoted =
-                    collateralOf[borrower][id][collateralToken].mulDivDown(prices[i], ORACLE_PRICE_SCALE);
+                    collateralOf[borrower][id][collateralToken].mulDivDown(prices[i].price, ORACLE_PRICE_SCALE);
                 maxDebt += collateralQuoted.mulDivDown(term.collaterals[i].lltv, 1e18);
                 repayableDebt += collateralQuoted.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
             }
@@ -179,14 +180,18 @@ contract Terms is ITerms {
 
         for (uint256 i = 0; i < seizures.length; i++) {
             seizure = seizures[i];
+            require(!prices[seizure.collateralIndex].seen, "price already seen");
+            prices[seizure.collateralIndex].seen = true;
+            uint256 price = prices[seizure.collateralIndex].price;
             require(UtilsLib.exactlyOneZero(seizure.repaidBonds, seizure.seizedAssets), "INCONSISTENT_INPUT");
 
             if (seizure.seizedAssets > 0) {
-                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE)
-                    .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
+                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(
+                    1e18, LIQUIDATION_INCENTIVE_FACTOR
+                );
             } else {
                 seizure.seizedAssets = seizure.repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
-                    ORACLE_PRICE_SCALE, prices[seizure.collateralIndex]
+                    ORACLE_PRICE_SCALE, price
                 );
             }
 

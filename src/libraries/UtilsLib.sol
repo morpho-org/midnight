@@ -21,4 +21,10 @@ library UtilsLib {
             z := xor(x, mul(xor(x, y), lt(y, x)))
         }
     }
+
+    /// @dev Returns `x` safely cast to uint248.
+    function toUint248(uint256 x) internal pure returns (uint248) {
+        require(x <= type(uint248).max, "max uint248 exceeded");
+        return uint248(x);
+    }
 }
