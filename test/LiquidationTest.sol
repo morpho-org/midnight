@@ -122,7 +122,8 @@ contract LiquidationTest is BaseTest {
         assertEq(recordedData, data, "data");
     }
 
-    // Check that it is not always possible to seize all assets due to roundings.
+    // Check that due to roundings, even if there is bad debt it is not always possible to seize all assets or repay all
+    // debt.
     function testTotalRepaidTooHigh() public {
         Oracle oracle2 = new Oracle();
         term.collaterals[1].oracle = address(oracle2);
@@ -147,8 +148,8 @@ contract LiquidationTest is BaseTest {
         // Repaying all bonds can leave some assets behind
         seizures[0] = Seizure({collateralIndex: 0, repaidBonds: 75, seizedAssets: 0});
         seizures[1] = Seizure({collateralIndex: 1, repaidBonds: 75, seizedAssets: 0});
+        vm.expectRevert(stdError.arithmeticError);
         terms.liquidate(term, seizures, borrower, "");
-        vm.assertGt(terms.collateralOf(borrower, id, term.collaterals[1].token), 0);
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) public {
