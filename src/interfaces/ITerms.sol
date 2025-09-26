@@ -39,7 +39,7 @@ struct Signature {
 }
 
 struct Price {
-    uint248 price;
+    uint256 price;
     bool seen;
 }
 

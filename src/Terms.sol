@@ -11,7 +11,6 @@ import "./interfaces/ICallbacks.sol";
 
 contract Terms is ITerms {
     using MathLib for uint256;
-    using UtilsLib for uint256;
 
     /// CONSTANTS ///
 
@@ -162,7 +161,7 @@ contract Terms is ITerms {
         Price[] memory prices = new Price[](term.collaterals.length);
 
         for (uint256 i = 0; i < term.collaterals.length; i++) {
-            prices[i].price = IOracle(term.collaterals[i].oracle).price().toUint248();
+            prices[i].price = IOracle(term.collaterals[i].oracle).price();
             {
                 address collateralToken = term.collaterals[i].token;
                 uint256 collateralQuoted =
