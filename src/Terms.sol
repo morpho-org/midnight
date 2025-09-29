@@ -40,6 +40,7 @@ contract Terms is ITerms {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
+    /// @dev "Crossing" is prevented.
     function take(
         Term memory term,
         uint256 assets,
@@ -80,8 +81,10 @@ contract Terms is ITerms {
 
         if (assets > 0) {
             bondsUnits = assets.mulDivDown(1e18, price);
+            bondsShares = bondsUnits.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         } else if (bondsUnits > 0) {
             assets = bondsUnits.mulDivDown(price, 1e18);
+            bondsShares = bondsUnits.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
         } else {
             bondsUnits = bondsShares.mulDivDown(totalBonds[id] + 1, totalShares[id] + 1);
             assets = bondsUnits.mulDivDown(price, 1e18);
@@ -89,22 +92,27 @@ contract Terms is ITerms {
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], bondsUnits);
-        uint256 bought = bondsUnits - repaid;
-        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalBonds[id] + 1);
-        uint256 withdrawn =
-            UtilsLib.min(bondSharesOf[seller][id].mulDivDown(totalBonds[id] + 1, totalShares[id] + 1), bondsUnits);
-        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalBonds[id] + 1);
-
-        debtOf[buyer][id] -= repaid;
-        bondSharesOf[buyer][id] += boughtShares;
-        bondSharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += bondsUnits - withdrawn;
-
-        totalShares[id] += boughtShares;
-        totalShares[id] -= withdrawnShares;
-        totalBonds[id] += bought;
-        totalBonds[id] -= withdrawn;
+        if (debtOf[buyer][id] == 0) {
+            if (bondSharesOf[seller][id] == 0) {
+                bondSharesOf[buyer][id] += bondsShares;
+                debtOf[seller][id] += bondsUnits;
+                totalShares[id] += bondsShares;
+                totalBonds[id] += bondsUnits;
+            } else {
+                bondSharesOf[buyer][id] += bondsShares;
+                bondSharesOf[seller][id] -= bondsShares;
+            }
+        } else {
+            if (bondSharesOf[seller][id] == 0) {
+                debtOf[buyer][id] -= bondsUnits;
+                debtOf[seller][id] += bondsUnits;
+            } else {
+                debtOf[buyer][id] -= bondsUnits;
+                bondSharesOf[seller][id] -= bondsShares;
+                totalShares[id] -= bondsShares;
+                totalBonds[id] -= bondsUnits;
+            }
+        }
 
         if (buyerCallbackAddress != address(0)) {
             ICallbacks(buyerCallbackAddress).onTake(term, buyer, assets, buyerCallbackData);
