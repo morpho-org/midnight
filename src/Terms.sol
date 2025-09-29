@@ -156,89 +156,86 @@ contract Terms is ITerms {
     /// @notice Execute the given collection of `seizures` on the given `term` of the given `borrower`.
     /// @dev On each seizure either `repaidBonds` or `seizedAssets` should be equal to zero.
     /// @param term The term of the bond.
-    /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
+    /// @param seizeCollaterals Whether to seize the collaterals.
+    /// @param amounts An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// term's collateral assets.
     /// @param borrower The debtor of the loan.
     /// @param data Arbitrary data to pass to the callback. Pass empty data if not needed.
-    /// @return A collection of the actual amounts of debt repaid or asset seized with the collateral index.
-    function liquidate(Term memory term, Seizure[] memory seizures, address borrower, bytes calldata data)
-        external
-        returns (Seizure[] memory)
-    {
-        uint256 repayableDebt;
-        uint256 maxDebt;
+    /// @return The total amount of debt repaid and the amounts of assets seized.
+    function liquidate(
+        Term memory term,
+        bool seizeCollaterals,
+        uint256[] memory amounts,
+        address borrower,
+        bytes calldata data
+    ) external returns (uint256, uint256[] memory) {
         bytes32 id = _id(term);
         uint256[] memory prices = new uint256[](term.collaterals.length);
 
+        require(amounts.length == term.collaterals.length, "INCONSISTENT_INPUT");
+
+        uint256 maxDebt;
+        uint256 repayableDebt;
+        uint256 totalRepaid;
         for (uint256 i = 0; i < term.collaterals.length; i++) {
             prices[i] = IOracle(term.collaterals[i].oracle).price();
             {
+                uint256 repaidBonds;
+                uint256 seizedAssets;
                 address collateralToken = term.collaterals[i].token;
-                uint256 collateralAmount = collateralOf[borrower][id][collateralToken];
-                maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE).mulDivDown(
+                uint256 borrowerCollateral = collateralOf[borrower][id][collateralToken];
+
+                maxDebt += borrowerCollateral.mulDivDown(prices[i], ORACLE_PRICE_SCALE).mulDivDown(
                     term.collaterals[i].lltv, 1e18
                 );
-                repayableDebt += collateralAmount.mulDivUp(prices[i], ORACLE_PRICE_SCALE).mulDivDown(
+                uint256 currentRepayableDebt = borrowerCollateral.mulDivUp(prices[i], ORACLE_PRICE_SCALE).mulDivDown(
                     1e18, LIQUIDATION_INCENTIVE_FACTOR
                 );
+                repayableDebt += currentRepayableDebt;
+
+                if (seizeCollaterals) {
+                    seizedAssets = amounts[i];
+                    repaidBonds = seizedAssets.mulDivUp(prices[i], ORACLE_PRICE_SCALE).mulDivUp(
+                        1e18, LIQUIDATION_INCENTIVE_FACTOR
+                    );
+                } else {
+                    repaidBonds = amounts[i];
+                    require(repaidBonds <= currentRepayableDebt, "INCONSISTENT_INPUT");
+
+                    seizedAssets = repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
+                        ORACLE_PRICE_SCALE, prices[i]
+                    );
+                    amounts[i] = seizedAssets;
+                }
+
+                totalRepaid += repaidBonds;
+                collateralOf[borrower][id][collateralToken] -= seizedAssets;
             }
         }
 
         uint256 originalDebt = debtOf[borrower][id];
         require(originalDebt > maxDebt, "position is healthy");
 
-        uint256 totalRepaid;
-
-        for (uint256 i = 0; i < seizures.length; i++) {
-            Seizure memory seizure = seizures[i];
-            require(UtilsLib.exactlyOneZero(seizure.repaidBonds, seizure.seizedAssets), "INCONSISTENT_INPUT");
-
-            if (seizure.seizedAssets > 0) {
-                seizure.repaidBonds = seizure.seizedAssets.mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE)
-                    .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
-            } else {
-                // Would be nice to cache this in the fist loop above.
-                uint256 currentRepayableDebt = collateralOf[borrower][id][term.collaterals[seizure.collateralIndex]
-                    .token].mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE).mulDivUp(
-                    1e18, LIQUIDATION_INCENTIVE_FACTOR
-                );
-                require(seizure.repaidBonds <= currentRepayableDebt, "INCONSISTENT_INPUT");
-
-                seizure.seizedAssets = seizure.repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
-                    ORACLE_PRICE_SCALE, prices[seizure.collateralIndex]
-                );
-            }
-
-            totalRepaid += seizure.repaidBonds;
-            address collateralToken = term.collaterals[seizure.collateralIndex].token;
-            collateralOf[borrower][id][collateralToken] -= seizure.seizedAssets;
-        }
-
         // Realize bad debt
         uint256 badDebt;
 
         if (repayableDebt < originalDebt) {
-            // Because roundings are not aligned the effective bad debt is either the remaining debt or the original
-            // debt minus the theoretical repayable debt.
-            badDebt = UtilsLib.min(originalDebt - totalRepaid, originalDebt - repayableDebt);
+            badDebt = originalDebt - repayableDebt;
             totalBonds[id] -= badDebt;
         }
 
         withdrawable[id] += totalRepaid;
         debtOf[borrower][id] = originalDebt - totalRepaid - badDebt;
 
-        for (uint256 i = 0; i < seizures.length; i++) {
-            Seizure memory seizure = seizures[i];
-            SafeTransferLib.safeTransfer(
-                term.collaterals[seizure.collateralIndex].token, msg.sender, seizure.seizedAssets
-            );
+        for (uint256 i = 0; i < term.collaterals.length; i++) {
+            SafeTransferLib.safeTransfer(term.collaterals[i].token, msg.sender, amounts[i]);
         }
 
-        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+        if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizeCollaterals, amounts, borrower, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(term.loanToken, msg.sender, address(this), totalRepaid);
 
-        return seizures;
+        return (totalRepaid, amounts);
     }
 
     /// INTERNAL ///

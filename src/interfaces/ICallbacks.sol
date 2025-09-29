@@ -2,9 +2,15 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import {Seizure, Term} from "./ITerms.sol";
+import {Term} from "./ITerms.sol";
 
 interface ICallbacks {
     function onTake(Term memory term, address borrower, uint256 assets, bytes memory data) external;
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external;
+    function onLiquidate(
+        bool seizeCollaterals,
+        uint256[] memory amounts,
+        address borrower,
+        address liquidator,
+        bytes memory data
+    ) external;
 }
