@@ -92,26 +92,22 @@ contract Terms is ITerms {
 
         require((consumed[offer.offering][offer.nonce] += assets) <= offer.assets, "consumed");
 
-        if (debtOf[buyer][id] == 0) {
-            if (bondSharesOf[seller][id] == 0) {
-                bondSharesOf[buyer][id] += bondsShares;
-                debtOf[seller][id] += bondsUnits;
-                totalShares[id] += bondsShares;
-                totalBonds[id] += bondsUnits;
-            } else {
-                bondSharesOf[buyer][id] += bondsShares;
-                bondSharesOf[seller][id] -= bondsShares;
-            }
+        if (debtOf[buyer][id] == 0 && bondSharesOf[seller][id] == 0) {
+            bondSharesOf[buyer][id] += bondsShares;
+            debtOf[seller][id] += bondsUnits;
+            totalShares[id] += bondsShares;
+            totalBonds[id] += bondsUnits;
+        } else if (debtOf[buyer][id] == 0 && bondSharesOf[seller][id] > 0) {
+            bondSharesOf[buyer][id] += bondsShares;
+            bondSharesOf[seller][id] -= bondsShares;
+        } else if (debtOf[buyer][id] > 0 && bondSharesOf[seller][id] == 0) {
+            debtOf[buyer][id] -= bondsUnits;
+            debtOf[seller][id] += bondsUnits;
         } else {
-            if (bondSharesOf[seller][id] == 0) {
-                debtOf[buyer][id] -= bondsUnits;
-                debtOf[seller][id] += bondsUnits;
-            } else {
-                debtOf[buyer][id] -= bondsUnits;
-                bondSharesOf[seller][id] -= bondsShares;
-                totalShares[id] -= bondsShares;
-                totalBonds[id] -= bondsUnits;
-            }
+            debtOf[buyer][id] -= bondsUnits;
+            bondSharesOf[seller][id] -= bondsShares;
+            totalShares[id] -= bondsShares;
+            totalBonds[id] -= bondsUnits;
         }
 
         if (buyerCallbackAddress != address(0)) {
