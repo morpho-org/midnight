@@ -197,6 +197,13 @@ contract Terms is ITerms {
                 seizure.repaidBonds = seizure.seizedAssets.mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE)
                     .mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR);
             } else {
+                // Would be nice to cache this in the fist loop above.
+                uint256 currentRepayableDebt = collateralOf[borrower][id][term.collaterals[seizure.collateralIndex]
+                    .token].mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE).mulDivUp(
+                    1e18, LIQUIDATION_INCENTIVE_FACTOR
+                );
+                require(seizure.repaidBonds <= currentRepayableDebt, "INCONSISTENT_INPUT");
+
                 seizure.seizedAssets = seizure.repaidBonds.mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18).mulDivDown(
                     ORACLE_PRICE_SCALE, prices[seizure.collateralIndex]
                 );
