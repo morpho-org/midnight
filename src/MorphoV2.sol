@@ -12,6 +12,8 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/IMorphoV2.sol";
 import "./interfaces/ICallbacks.sol";
 
+import {FixedPointMathLib} from "lib/solady/src/utils/FixedPointMathLib.sol";
+
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
     using MathLib for int256;
@@ -246,9 +248,9 @@ contract MorphoV2 is IMorphoV2 {
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-            int256 base = LogLib.wLn(int256(LIQUIDATION_INCENTIVE_FACTOR - 1e18));
+            int256 base = FixedPointMathLib.lnWad(int256(LIQUIDATION_INCENTIVE_FACTOR));
             uint256 priceDiscountFactor = uint256(
-                ExpLib.wExp(
+                FixedPointMathLib.expWad(
                     -base.mulDivDown(int256(block.timestamp - obligation.maturity), int256(auctionTimeToTarget))
                 )
             );
