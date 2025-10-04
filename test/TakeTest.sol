@@ -420,7 +420,7 @@ contract TakeTest is BaseTest {
         morphoV2.take(obligation, 0, 0, taker, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
-    function testOfferAuthorization(uint256 makerSK, address sender, uint256 otherSK) public {
+    function testOfferAuthorization(uint256 makerSK, address sender, uint256 otherSK, bytes32 data) public {
         makerSK = boundPrivateKey(makerSK);
         otherSK = boundPrivateKey(otherSK);
         vm.assume(otherSK != makerSK);
@@ -451,12 +451,25 @@ contract TakeTest is BaseTest {
         vm.prank(sender);
         morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
 
-        vm.revertToStateAndDelete(snap);
+        vm.revertToState(snap);
 
         vm.prank(maker);
         morphoV2.setRatified(lendOffer, true);
         vm.prank(sender);
         morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
+
+        vm.revertToStateAndDelete(snap);
+
+        RatifyCallback ratifier = new RatifyCallback();
+        lendOffer.ratifier = address(ratifier);
+        lendOffer.ratifierData = bytes.concat(data);
+
+        vm.prank(maker);
+        morphoV2.setAuthorized(address(ratifier), true);
+        vm.prank(sender);
+        morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(ratifier), hex"");
+        assertEq(bytes32(ratifier.recordedData()), data);
+
     }
 }
 
@@ -471,6 +484,7 @@ contract BorrowCallback is ICallbacks {
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onRatify(Obligation memory obligation, Offer memory offer, Signature memory sig) external returns (bool) {}
 }
 
 contract LendCallback is ICallbacks {
@@ -482,4 +496,18 @@ contract LendCallback is ICallbacks {
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onRatify(Obligation memory obligation, Offer memory offer, Signature memory sig) external returns (bool) {}
+}
+
+contract RatifyCallback is ICallbacks {
+    bytes public recordedData;
+
+    function onTake(Obligation memory obligation, address maker, uint256 assets, bytes memory data) external {}
+    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+
+    function onRatify(Obligation memory, Offer memory offer, Signature memory) external returns (bool) {
+        recordedData = offer.ratifierData;
+        return true;
+
+    }
 }

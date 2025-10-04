@@ -2,9 +2,10 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import {Seizure, Obligation} from "./IMorphoV2.sol";
+import {Seizure, Obligation, Offer, Signature} from "./IMorphoV2.sol";
 
 interface ICallbacks {
     function onTake(Obligation memory obligation, address borrower, uint256 assets, bytes memory data) external;
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external;
+    function onRatify(Obligation memory obligation, Offer memory offer, Signature memory sig) external returns (bool);
 }

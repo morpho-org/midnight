@@ -66,6 +66,7 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
         require(
             msg.sender == offer.maker
+            || (offer.ratifier != address(0) && authorized[offer.maker][offer.ratifier] && ICallbacks(offer.ratifier).onRatify(obligation,offer,sig))
                 || (sig.v != 0 && _signatureIsValid(abi.encode(OFFER_TYPEHASH, offer), sig, offer.maker))
                 || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
             "offer not ratified"
