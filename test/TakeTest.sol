@@ -399,7 +399,7 @@ contract TakeTest is BaseTest {
         morphoV2.take(obligation, 100, 0, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
-    function testOrderNotAuthorized(address taker, address sender) public {
+    function testOrderAuthorization(address taker, address sender) public {
         vm.assume(sender != address(this));
         vm.assume(taker != sender);
 
@@ -420,7 +420,7 @@ contract TakeTest is BaseTest {
         morphoV2.take(obligation, 0, 0, taker, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
     }
 
-    function testOfferNotAuthorized(uint256 makerSK, address sender, uint256 otherSK) public {
+    function testOfferAuthorization(uint256 makerSK, address sender, uint256 otherSK) public {
         makerSK = boundPrivateKey(makerSK);
         otherSK = boundPrivateKey(otherSK);
         vm.assume(otherSK != makerSK);
