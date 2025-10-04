@@ -469,7 +469,6 @@ contract TakeTest is BaseTest {
         vm.prank(sender);
         morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(ratifier), hex"");
         assertEq(bytes32(ratifier.recordedData()), data);
-
     }
 }
 
@@ -508,6 +507,5 @@ contract RatifyCallback is ICallbacks {
     function onRatify(Obligation memory, Offer memory offer, Signature memory) external returns (bool) {
         recordedData = offer.ratifierData;
         return true;
-
     }
 }
