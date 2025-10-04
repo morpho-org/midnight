@@ -249,7 +249,6 @@ contract MorphoV2 is IMorphoV2 {
         return _ratified[abi.encode(offer)];
     }
 
-    /// @dev No ratification by callback, use multicall.
     /// @dev No ratification by signature, check the signature in the caller.
     function setRatified(Offer memory offer, bool newRatified) external {
         require(msg.sender == offer.maker || authorized[offer.maker][msg.sender], "ratification not authorized");
