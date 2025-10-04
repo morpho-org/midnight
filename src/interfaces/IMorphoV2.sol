@@ -39,7 +39,6 @@ struct Signature {
 
 struct Authorization {
     address authorizer;
-    // authorized -> authorizee (compared to Blue)
     address authorizee;
     bool authorized;
     uint256 nonce;
