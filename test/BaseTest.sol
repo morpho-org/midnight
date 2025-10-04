@@ -48,6 +48,11 @@ abstract contract BaseTest is Test {
         loanToken.approve(address(morphoV2), type(uint256).max);
         collateralToken1.approve(address(morphoV2), type(uint256).max);
         collateralToken2.approve(address(morphoV2), type(uint256).max);
+
+        vm.prank(lender);
+        morphoV2.setAuthorized(address(this), true);
+        vm.prank(borrower);
+        morphoV2.setAuthorized(address(this), true);
     }
 
     function toId(Obligation memory obligation) internal pure returns (bytes32) {

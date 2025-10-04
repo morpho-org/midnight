@@ -244,6 +244,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), callbackAddress, 135);
         assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
 
+        vm.prank(otherBorrower);
         morphoV2.take(
             obligation,
             100,
@@ -278,6 +279,7 @@ contract TakeTest is BaseTest {
         address callbackAddress = address(new LendCallback());
         deal(address(loanToken), callbackAddress, 100);
 
+        vm.prank(otherLender);
         morphoV2.take(
             obligation,
             100,
@@ -375,13 +377,18 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeWrongSignature(Offer memory _offer) public {
+        vm.prank(lendOffer.maker);
+        morphoV2.setAuthorized(address(this), false);
         vm.assume(keccak256(abi.encode(_offer)) != keccak256(abi.encode(lendOffer)));
-        vm.expectRevert("Invalid signature");
+        vm.expectRevert("offer not ratified");
         morphoV2.take(obligation, 100, 0, borrower, lendOffer, sig(_offer, lenderSK), address(0), hex"");
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("Invalid signature");
+        vm.prank(lendOffer.maker);
+        morphoV2.setAuthorized(address(this), false);
+
+        vm.expectRevert("offer not ratified");
         morphoV2.take(obligation, 100, 0, borrower, lendOffer, Signature(0, 0, 0), address(0), hex"");
     }
 
@@ -390,6 +397,66 @@ contract TakeTest is BaseTest {
         lendOffer.expiry = lendOffer.start;
         vm.expectRevert("inconsistent prices");
         morphoV2.take(obligation, 100, 0, borrower, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
+    }
+
+    function testOrderNotAuthorized(address taker, address sender) public {
+        vm.assume(sender != address(this));
+        vm.assume(taker != sender);
+
+        vm.expectRevert("order not authorized");
+        vm.prank(sender);
+        morphoV2.take(obligation, 100, 0, taker, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
+
+        uint256 snap = vm.snapshotState();
+
+        vm.prank(taker);
+        morphoV2.take(obligation, 0, 0, taker, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
+
+        vm.revertToState(snap);
+
+        vm.prank(taker);
+        morphoV2.setAuthorized(sender, true);
+        vm.prank(sender);
+        morphoV2.take(obligation, 0, 0, taker, lendOffer, sig(lendOffer, lenderSK), address(0), hex"");
+    }
+
+    function testOfferNotAuthorized(uint256 makerSK, address sender, uint256 otherSK) public {
+        makerSK = boundPrivateKey(makerSK);
+        otherSK = boundPrivateKey(otherSK);
+        vm.assume(otherSK != makerSK);
+        address maker = vm.addr(makerSK);
+        vm.assume(sender != maker);
+        vm.assume(sender != address(this));
+
+        lendOffer.maker = maker;
+
+        vm.expectRevert("offer not ratified");
+        vm.prank(sender);
+        morphoV2.take(obligation, 100, 0, sender, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
+
+        uint256 snap = vm.snapshotState();
+
+        vm.prank(maker);
+        morphoV2.take(obligation, 0, 0, maker, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
+
+        vm.revertToState(snap);
+
+        vm.prank(sender);
+        morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, makerSK), address(0), hex"");
+
+        vm.revertToState(snap);
+
+        vm.prank(maker);
+        morphoV2.setAuthorized(sender, true);
+        vm.prank(sender);
+        morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
+
+        vm.revertToStateAndDelete(snap);
+
+        vm.prank(maker);
+        morphoV2.setRatified(lendOffer, true);
+        vm.prank(sender);
+        morphoV2.take(obligation, 0, 0, sender, lendOffer, sig(lendOffer, otherSK), address(0), hex"");
     }
 }
 

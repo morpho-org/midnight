@@ -37,6 +37,15 @@ struct Signature {
     bytes32 s;
 }
 
+struct Authorization {
+    address authorizer;
+    // authorized -> authorizee (compared to Blue)
+    address authorizee;
+    bool authorized;
+    uint256 nonce;
+    uint256 deadline;
+}
+
 struct Seizure {
     // Index of the collateral in the obligation's collateral assets.
     uint256 collateralIndex;

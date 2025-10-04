@@ -18,6 +18,9 @@ contract MorphoV2 is IMorphoV2 {
     bytes32 public constant OFFER_TYPEHASH = keccak256(
         "Offer(bool lend,address maker,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 start,uint256 expiry,uint256 startPrice,uint256 expiryPrice,uint256 nonce)"
     );
+    bytes32 public constant AUTHORIZATION_TYPEHASH =
+        keccak256("Authorization(address authorizer,address authorizee,bool authorized,uint256 nonce,uint256 deadline)");
+
     uint256 public constant ORACLE_PRICE_SCALE = 1e36;
     uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
 
@@ -29,6 +32,9 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    mapping(address => mapping(address => bool)) public authorized;
+    mapping(address => uint256) public authorizationNonce;
+    mapping(bytes => bool) public _ratified;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
@@ -57,7 +63,13 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.loanToken == obligation.loanToken, "Loan tokens do not match");
         require(offer.maturity == obligation.maturity, "Maturities do not match");
         require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
-        require(signatureIsValid(offer, sig), "Invalid signature");
+        require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
+        require(
+            msg.sender == offer.maker
+                || (sig.v != 0 && _signatureIsValid(abi.encode(OFFER_TYPEHASH, offer), sig, offer.maker))
+                || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
+            "offer not ratified"
+        );
         _checkCollateralInclusion(obligation, offer);
 
         (
@@ -232,6 +244,33 @@ contract MorphoV2 is IMorphoV2 {
         return seizures;
     }
 
+    function ratified(Offer memory offer) external view returns (bool) {
+        return _ratified[abi.encode(offer)];
+    }
+
+    /// @dev No ratification by callback, use multicall.
+    /// @dev No ratification by signature, check the signature in the caller.
+    function setRatified(Offer memory offer, bool newRatified) external {
+        require(msg.sender == offer.maker || authorized[offer.maker][msg.sender], "ratification not authorized");
+        _ratified[abi.encode(offer)] = newRatified;
+    }
+
+    function setAuthorized(address authorizee, bool newAuthorized) external {
+        authorized[msg.sender][authorizee] = newAuthorized;
+    }
+
+    function setAuthorizedWithSig(Authorization memory authorization, Signature calldata signature) external {
+        /// Do not check whether authorization is already set because the nonce increment is a desired side effect.
+        require(block.timestamp <= authorization.deadline, "expired");
+        require(authorization.nonce == authorizationNonce[authorization.authorizer]++, "invalid nonce");
+        require(
+            _signatureIsValid(abi.encode(AUTHORIZATION_TYPEHASH, authorization), signature, authorization.authorizer),
+            "invalid signature"
+        );
+
+        authorized[authorization.authorizer][authorization.authorizee] = authorization.authorized;
+    }
+
     /// INTERNAL ///
 
     function _id(Obligation memory obligation) internal pure returns (bytes32) {
@@ -278,5 +317,16 @@ contract MorphoV2 is IMorphoV2 {
 
             return debt <= maxDebt;
         }
+    }
+
+    function _signatureIsValid(bytes memory typedStruct, Signature memory signature, address expectedSignatory)
+        internal
+        view
+        returns (bool)
+    {
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, keccak256(typedStruct)));
+        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+        return signatory != address(0) && signatory == expectedSignatory;
     }
 }
