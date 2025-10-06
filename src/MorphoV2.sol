@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
+import "./libraries/ConstantsLib.sol";
 import "./libraries/MathLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IMorphoV2.sol";
@@ -11,18 +12,6 @@ import "./interfaces/ICallbacks.sol";
 
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
-
-    /// CONSTANTS ///
-
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
-    bytes32 public constant OFFER_TYPEHASH = keccak256(
-        "Offer(bool lend,address maker,uint256 assets,address loanToken,Collateral[] collaterals,uint256 maturity,uint256 start,uint256 expiry,uint256 startPrice,uint256 expiryPrice,uint256 nonce)"
-    );
-    bytes32 public constant AUTHORIZATION_TYPEHASH =
-        keccak256("Authorization(address authorizer,address authorizee,bool authorized,uint256 nonce,uint256 deadline)");
-
-    uint256 public constant ORACLE_PRICE_SCALE = 1e36;
-    uint256 public constant LIQUIDATION_INCENTIVE_FACTOR = 1.15e18;
 
     /// STORAGE ///
 

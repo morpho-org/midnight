@@ -185,8 +185,8 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function _authorizationDigest(Authorization memory authorization) internal view returns (bytes32) {
-        bytes32 hashStruct = keccak256(abi.encode(morphoV2.AUTHORIZATION_TYPEHASH(), authorization));
-        bytes32 domainSeparator = keccak256(abi.encode(morphoV2.DOMAIN_TYPEHASH(), block.chainid, address(morphoV2)));
+        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
         return keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
     }
 

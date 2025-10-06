@@ -20,14 +20,9 @@ abstract contract BaseTest is Test {
     uint256 internal lenderSK;
     address internal lender;
     address internal liquidator = makeAddr("liquidator");
-    bytes32 internal offerTypehash; // to avoid calls.
-    bytes32 internal domainTypehash; // to avoid calls.
 
     function setUp() public virtual {
         morphoV2 = new MorphoV2();
-
-        offerTypehash = morphoV2.OFFER_TYPEHASH();
-        domainTypehash = morphoV2.DOMAIN_TYPEHASH();
 
         (borrower, borrowerSK) = makeAddrAndKey("borrower");
         (lender, lenderSK) = makeAddrAndKey("lender");
@@ -60,8 +55,8 @@ abstract contract BaseTest is Test {
     }
 
     function sig(Offer memory offer, uint256 sk) internal view returns (Signature memory) {
-        bytes32 hashStruct = keccak256(abi.encode(offerTypehash, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(domainTypehash, block.chainid, address(morphoV2)));
+        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
 
         Signature memory signature;
