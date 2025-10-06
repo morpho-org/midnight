@@ -223,6 +223,10 @@ contract OtherFunctionsTest is BaseTest {
 
         authorization.deadline = vm.getBlockTimestamp() + 1;
 
+        sig.v = 1; // make ecrecover return 0
+        vm.expectRevert("invalid signature");
+        morphoV2.setAuthorizedWithSig(authorization, sig);
+
         (sig.v, sig.r, sig.s) = vm.sign(otherPK, _authorizationDigest(authorization));
 
         vm.expectRevert("invalid signature");
