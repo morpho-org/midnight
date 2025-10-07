@@ -652,7 +652,7 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onTake(Obligation memory obligation, address borrower, uint256, bytes memory data) external {
+    function onTake(Obligation memory obligation, address borrower, uint256, uint256, bytes memory data) external {
         recordedData = data;
         (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
         ERC20(collateralToken).approve(msg.sender, amount);
@@ -665,7 +665,7 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    function onTake(Obligation memory obligation, address maker, uint256 assets, bytes memory data) external {
+    function onTake(Obligation memory obligation, address maker, uint256 assets, uint256, bytes memory data) external {
         recordedData = data;
         ERC20(obligation.loanToken).transfer(maker, assets);
     }

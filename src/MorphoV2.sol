@@ -93,13 +93,13 @@ contract MorphoV2 is IMorphoV2 {
         totalUnits[id] -= withdrawn;
 
         if (buyerCallbackAddress != address(0)) {
-            ICallbacks(buyerCallbackAddress).onTake(offer.obligation, buyer, assets, buyerCallbackData);
+            ICallbacks(buyerCallbackAddress).onTake(offer.obligation, buyer, assets, price, buyerCallbackData);
         }
 
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, assets);
 
         if (sellerCallbackAddress != address(0)) {
-            ICallbacks(sellerCallbackAddress).onTake(offer.obligation, seller, assets, sellerCallbackData);
+            ICallbacks(sellerCallbackAddress).onTake(offer.obligation, seller, assets, price, sellerCallbackData);
         }
 
         require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
