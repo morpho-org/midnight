@@ -23,6 +23,7 @@ contract LiquidationTest is BaseTest {
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
+        obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         for (uint256 i = 0; i < collaterals.length; i++) {
@@ -129,8 +130,8 @@ contract LiquidationTest is BaseTest {
         id = toId(obligation);
 
         setupMaxObligationWithCollaterals(obligation, 100, 100);
-        uint256 price = 1e36 * 1e18 / morphoV2.LIQUIDATION_INCENTIVE_FACTOR() * 95 / 100;
-        uint256 price2 = 1e36 * 1e18 / morphoV2.LIQUIDATION_INCENTIVE_FACTOR();
+        uint256 price = 1e36 * 1e18 / LIQUIDATION_INCENTIVE_FACTOR * 95 / 100;
+        uint256 price2 = 1e36 * 1e18 / LIQUIDATION_INCENTIVE_FACTOR;
         oracle.setPrice(price);
         oracle2.setPrice(price2);
         deal(address(loanToken), address(this), 100e18);

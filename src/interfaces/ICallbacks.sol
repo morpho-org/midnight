@@ -7,5 +7,7 @@ import {Seizure, Obligation, Offer, Signature} from "./IMorphoV2.sol";
 interface ICallbacks {
     function onTake(Obligation memory obligation, address borrower, uint256 assets, bytes memory data) external;
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external;
-    function onRatify(Obligation memory obligation, Offer memory offer, Signature memory sig) external returns (bool);
+    function onRatify(Offer memory offer, Signature memory sig, bytes32 root, bytes32[] memory proof)
+        external
+        returns (bool);
 }

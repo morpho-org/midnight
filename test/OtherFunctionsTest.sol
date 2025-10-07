@@ -17,6 +17,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
+        obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         for (uint256 i = 0; i < collaterals.length; i++) {
@@ -185,8 +186,8 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function _authorizationDigest(Authorization memory authorization) internal view returns (bytes32) {
-        bytes32 hashStruct = keccak256(abi.encode(morphoV2.AUTHORIZATION_TYPEHASH(), authorization));
-        bytes32 domainSeparator = keccak256(abi.encode(morphoV2.DOMAIN_TYPEHASH(), block.chainid, address(morphoV2)));
+        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
         return keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
     }
 
@@ -222,6 +223,10 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.setAuthorizedWithSig(authorization, sig);
 
         authorization.deadline = vm.getBlockTimestamp() + 1;
+
+        sig.v = 1; // make ecrecover return 0
+        vm.expectRevert("invalid signature");
+        morphoV2.setAuthorizedWithSig(authorization, sig);
 
         (sig.v, sig.r, sig.s) = vm.sign(otherPK, _authorizationDigest(authorization));
 
