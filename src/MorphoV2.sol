@@ -102,7 +102,7 @@ contract MorphoV2 is IMorphoV2 {
             ICallbacks(sellerCallbackAddress).onTake(offer.obligation, seller, assets, sellerCallbackData);
         }
 
-        require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
+        if (debtOf[seller][id] > 0) require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -238,19 +238,13 @@ contract MorphoV2 is IMorphoV2 {
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
-        uint256 debt = debtOf[borrower][id];
-        if (debt == 0) {
-            return true;
-        } else {
-            uint256 maxDebt;
-            for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-                uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token].mulDivDown(
-                    price, ORACLE_PRICE_SCALE
-                ).mulDivDown(obligation.collaterals[i].lltv, 1e18);
-            }
-
-            return debt <= maxDebt;
+        uint256 maxDebt;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            uint256 price = IOracle(obligation.collaterals[i].oracle).price();
+            maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token].mulDivDown(price, ORACLE_PRICE_SCALE)
+                .mulDivDown(obligation.collaterals[i].lltv, 1e18);
         }
+
+        return debtOf[borrower][id] <= maxDebt;
     }
 }
