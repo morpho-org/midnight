@@ -17,6 +17,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
         // solc legacy pipeline.
+        obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         for (uint256 i = 0; i < collaterals.length; i++) {

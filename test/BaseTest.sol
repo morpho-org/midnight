@@ -54,13 +54,29 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(obligation));
     }
 
-    function sig(Offer memory offer, uint256 sk) internal view returns (Signature memory) {
-        bytes32 hashStruct = keccak256(abi.encode(OFFER_TYPEHASH, offer));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+    function root(Offer[1] memory offers) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offers[0]));
+    }
 
+    function root(Offer[2] memory offers) internal pure returns (bytes32) {
+        return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
+    }
+
+    function proof(Offer[1] memory offers) internal pure returns (bytes32[] memory) {
+        return new bytes32[](0);
+    }
+
+    // assumes the offer is the first one!
+    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = keccak256(abi.encode(offers[1]));
+        return proof;
+    }
+
+    function sig(bytes32 _root, uint256 sk) internal view returns (Signature memory) {
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
         Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(sk, digest);
+        (signature.v, signature.r, signature.s) = vm.sign(sk, messageHash);
         return signature;
     }
 
@@ -89,12 +105,10 @@ abstract contract BaseTest is Test {
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
         Offer memory borrowOffer = Offer({
+            obligation: obligation,
             buy: false,
             maker: borrower,
             assets: obligationUnits,
-            loanToken: obligation.loanToken,
-            collaterals: obligation.collaterals,
-            maturity: block.timestamp + 100,
             start: block.timestamp,
             expiry: block.timestamp,
             startPrice: 1 ether,
@@ -105,7 +119,15 @@ abstract contract BaseTest is Test {
         });
 
         morphoV2.take(
-            obligation, 0, obligationUnits, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex""
+            0,
+            obligationUnits,
+            lender,
+            borrowOffer,
+            sig(root([borrowOffer]), borrowerSK),
+            root([borrowOffer]),
+            proof([borrowOffer]),
+            address(0),
+            hex""
         );
     }
 
@@ -133,9 +155,7 @@ abstract contract BaseTest is Test {
             buy: false,
             maker: borrower,
             assets: obligationUnits,
-            loanToken: obligation.loanToken,
-            collaterals: obligation.collaterals,
-            maturity: block.timestamp + 100,
+            obligation: obligation,
             start: block.timestamp,
             expiry: block.timestamp + 200,
             startPrice: 1e18,
@@ -146,7 +166,15 @@ abstract contract BaseTest is Test {
         });
 
         morphoV2.take(
-            obligation, 0, obligationUnits, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex""
+            0,
+            obligationUnits,
+            lender,
+            borrowOffer,
+            sig(root([borrowOffer]), borrowerSK),
+            root([borrowOffer]),
+            proof([borrowOffer]),
+            address(0),
+            hex""
         );
     }
 }

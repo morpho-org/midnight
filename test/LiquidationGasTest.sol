@@ -26,6 +26,7 @@ contract LiquidationTest is BaseTest {
 
         // Populate obligation
 
+        obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
 
@@ -48,22 +49,30 @@ contract LiquidationTest is BaseTest {
 
         id = toId(obligation);
         Offer memory borrowOffer = Offer({
+            obligation: obligation,
             buy: false,
             maker: borrower,
             assets: maxDebt,
-            loanToken: obligation.loanToken,
-            collaterals: obligation.collaterals,
             start: block.timestamp,
             expiry: block.timestamp + 100,
             startPrice: 1e18,
             expiryPrice: 1e18,
-            maturity: block.timestamp + 100,
             nonce: 0,
             callbackAddress: address(0),
             callbackData: ""
         });
 
-        morphoV2.take(obligation, 0, maxDebt, lender, borrowOffer, sig(borrowOffer, borrowerSK), address(0), hex"");
+        morphoV2.take(
+            0,
+            maxDebt,
+            lender,
+            borrowOffer,
+            sig(root([borrowOffer]), borrowerSK),
+            root([borrowOffer]),
+            proof([borrowOffer]),
+            address(0),
+            hex""
+        );
 
         // Setup liquidation
         for (uint256 i = 0; i < numCollaterals; i++) {

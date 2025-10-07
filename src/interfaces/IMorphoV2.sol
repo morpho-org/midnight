@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 struct Obligation {
+    uint256 chainId;
     address loanToken;
     // Must be sorted by address.
     Collateral[] collaterals;
@@ -16,12 +17,10 @@ struct Collateral {
 }
 
 struct Offer {
+    Obligation obligation;
     bool buy;
     address maker;
     uint256 assets;
-    address loanToken;
-    Collateral[] collaterals;
-    uint256 maturity;
     uint256 start;
     uint256 expiry;
     uint256 startPrice;
