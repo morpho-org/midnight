@@ -64,17 +64,7 @@ contract LiquidationTest is BaseTest {
             ratifierData: ""
         });
 
-        morphoV2.take(
-            0,
-            maxDebt,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, maxDebt, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
 
         // Setup liquidation
         for (uint256 i = 0; i < numCollaterals; i++) {

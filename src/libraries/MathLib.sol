@@ -30,6 +30,13 @@ library MathLib {
         return currentHash == root;
     }
 
+    function signer(bytes32 data, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", data));
+        address tentativeSigner = ecrecover(messageHash, v, r, s);
+        require(tentativeSigner != address(0), "invalid signature");
+        return tentativeSigner;
+    }
+
     /// @dev Returns the concatenation of x and y, sorted lexicographically.
     function sort(bytes32 x, bytes32 y) internal pure returns (bytes memory) {
         return x < y ? abi.encodePacked(x, y) : abi.encodePacked(y, x);

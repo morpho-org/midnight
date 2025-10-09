@@ -54,6 +54,28 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(obligation));
     }
 
+    function signProof(Offer[1] memory offers, uint256 sk) internal pure returns (bytes memory) {
+        bytes32 _root = root(offers);
+        SignedProof memory signedProof;
+        signedProof.root = _root;
+        signedProof.path = new bytes32[](0);
+        (signedProof.v, signedProof.r, signedProof.s) = sign(_root, sk);
+        return abi.encode(signedProof);
+    }
+
+    // assumes the offer is the first one!
+    function signProof(Offer[2] memory offers, uint256 sk) internal pure returns (bytes memory) {
+        bytes32[] memory path = new bytes32[](1);
+        path[0] = keccak256(abi.encode(offers[1]));
+
+        bytes32 _root = root(offers);
+        SignedProof memory signedProof;
+        signedProof.root = _root;
+        signedProof.path = path;
+        (signedProof.v, signedProof.r, signedProof.s) = sign(_root, sk);
+        return abi.encode(signedProof);
+    }
+
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
         return keccak256(abi.encode(offers[0]));
     }
@@ -62,22 +84,9 @@ abstract contract BaseTest is Test {
         return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
     }
 
-    function proof(Offer[1] memory offers) internal pure returns (bytes32[] memory) {
-        return new bytes32[](0);
-    }
-
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = keccak256(abi.encode(offers[1]));
-        return proof;
-    }
-
-    function sig(bytes32 _root, uint256 sk) internal view returns (Signature memory) {
+    function sign(bytes32 _root, uint256 sk) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
-        Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(sk, messageHash);
-        return signature;
+        return vm.sign(sk, messageHash);
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
@@ -120,17 +129,7 @@ abstract contract BaseTest is Test {
             ratifierData: ""
         });
 
-        morphoV2.take(
-            0,
-            obligationUnits,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
     }
 
     function setupMaxObligationWithCollaterals(Obligation memory obligation, uint256 collateral0, uint256 collateral1)
@@ -169,16 +168,6 @@ abstract contract BaseTest is Test {
             ratifierData: ""
         });
 
-        morphoV2.take(
-            0,
-            obligationUnits,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
     }
 }

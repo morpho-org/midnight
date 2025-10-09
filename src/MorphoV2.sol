@@ -40,9 +40,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationUnits,
         address taker,
         Offer memory offer,
-        Signature memory sig,
-        bytes32 root,
-        bytes32[] memory proof,
+        bytes memory ratification,
         address takerCallbackAddress,
         bytes memory takerCallbackData
     ) public {
@@ -57,15 +55,11 @@ contract MorphoV2 is IMorphoV2 {
             msg.sender == offer.maker
                 || (
                     offer.ratifier != address(0) && authorized[offer.maker][offer.ratifier]
-                        && ICallbacks(offer.ratifier).onRatify(offer, sig, root, proof)
-                )
-                || (
-                    sig.v != 0 && _signer(root, sig) == offer.maker
-                        && MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof)
-                ) || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
+                        && ICallbacks(offer.ratifier).onRatify(offer, ratification)
+                ) || (ratification.length > 0 && _ratifyBySignedProof(offer, ratification))
+                || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
             "offer not ratified"
         );
-
         (
             address buyer,
             address buyerCallbackAddress,
@@ -271,11 +265,11 @@ contract MorphoV2 is IMorphoV2 {
         return keccak256(abi.encode(obligation));
     }
 
-    function _signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
-        address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
+    function _ratifyBySignedProof(Offer memory offer, bytes memory ratification) internal pure returns (bool) {
+        SignedProof memory signedProof = abi.decode(ratification, (SignedProof));
+        address tentativeSigner = MathLib.signer(signedProof.root, signedProof.v, signedProof.r, signedProof.s);
+        return tentativeSigner != address(0) && tentativeSigner == offer.maker
+            && MathLib.isLeaf(signedProof.root, keccak256(abi.encode(offer)), signedProof.path);
     }
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {

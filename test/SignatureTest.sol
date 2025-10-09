@@ -14,15 +14,15 @@ function toEthSignedMessageHash(bytes32 messageHash) pure returns (bytes32 diges
 }
 
 contract SignatureTest is Test, MorphoV2 {
-    function testFormat(bytes32 root) public {
+    function testFormat(bytes32 root) public pure {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
         assertEq(toEthSignedMessageHash(root), messageHash);
     }
 
-    function testSigner(bytes32 root, uint256 sk) public {
+    function testSigner(bytes32 root, uint256 sk) public pure {
         sk = boundPrivateKey(sk);
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(sk, messageHash);
-        assertEq(_signer(root, Signature({v: v, r: r, s: s})), vm.addr(sk));
+        assertEq(MathLib.signer(root, v, r, s), vm.addr(sk));
     }
 }

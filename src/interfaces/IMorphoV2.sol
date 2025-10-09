@@ -38,6 +38,14 @@ struct Signature {
     bytes32 s;
 }
 
+struct SignedProof {
+    bytes32 root;
+    bytes32[] path;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
+
 struct Authorization {
     address authorizer;
     address authorizee;

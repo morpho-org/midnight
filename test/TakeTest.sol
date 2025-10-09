@@ -62,23 +62,12 @@ contract TakeTest is BaseTest {
         obligation.maturity = maturity;
         Offer memory offer;
         offer.expiry = block.timestamp;
-        Signature memory sig;
         vm.expectRevert("maturity");
-        morphoV2.take(100, 0, lender, offer, sig, root([offer]), proof([offer]), address(0), hex"");
+        morphoV2.take(100, 0, lender, offer, signProof([offer], borrowerSK), address(0), hex"");
     }
 
     function testLend() public {
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 101, "lender obligation shares");
         assertEq(morphoV2.debtOf(borrower, id), 101, "borrower debt");
@@ -90,17 +79,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBorrow() public {
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 101, "obligation shares");
         assertEq(morphoV2.debtOf(borrower, id), 101, "lender debt");
@@ -113,34 +92,14 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithLender() public {
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
 
         (address otherLender, uint256 otherLenderSK) = makeAddrAndKey("otherLender");
         vm.prank(otherLender);
         loanToken.approve(address(morphoV2), 100);
         deal(address(loanToken), otherLender, 100);
         lendOffer.maker = otherLender;
-        morphoV2.take(
-            0,
-            101,
-            lender,
-            lendOffer,
-            sig(root([lendOffer]), otherLenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 101, lender, lendOffer, signProof([lendOffer], otherLenderSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 0, "lender obligation shares");
         assertEq(morphoV2.sharesOf(otherLender, id), 101, "other lender obligation shares");
@@ -152,30 +111,10 @@ contract TakeTest is BaseTest {
     }
 
     function testWithdrawSecondaryWithBorrower() public {
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
         lendOffer.maker = borrower;
         lendOffer.nonce = 1;
-        morphoV2.take(
-            0,
-            101,
-            lender,
-            lendOffer,
-            sig(root([lendOffer]), borrowerSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 101, lender, lendOffer, signProof([lendOffer], borrowerSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 0, "lender obligation shares");
         assertEq(morphoV2.sharesOf(borrower, id), 0, "borrower obligation shares");
@@ -187,17 +126,7 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithBorrower() public {
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         (address otherBorrower, uint256 otherBorrowerSK) = makeAddrAndKey("otherBorrower");
         vm.prank(otherBorrower);
@@ -205,17 +134,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), otherBorrower, 135);
         morphoV2.supplyCollateral(obligation, address(collateralToken1), 135, otherBorrower);
         borrowOffer.maker = otherBorrower;
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            borrowOffer,
-            sig(root([borrowOffer]), otherBorrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, borrowOffer, signProof([borrowOffer], otherBorrowerSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 101, "lender obligation shares");
         assertEq(morphoV2.sharesOf(borrower, id), 0, "borrower obligation shares");
@@ -230,31 +149,11 @@ contract TakeTest is BaseTest {
     }
 
     function testRepaySecondaryWithLender() public {
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         borrowOffer.maker = lender;
         borrowOffer.nonce = 1;
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            borrowOffer,
-            sig(root([borrowOffer]), lenderSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, borrowOffer, signProof([borrowOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 0, "lender obligation shares");
         assertEq(morphoV2.sharesOf(borrower, id), 0, "borrower obligation shares");
@@ -268,28 +167,8 @@ contract TakeTest is BaseTest {
     }
 
     function testMatch() public {
-        morphoV2.take(
-            100,
-            0,
-            address(this),
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
-        morphoV2.take(
-            0,
-            101,
-            address(this),
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, address(this), borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
+        morphoV2.take(0, 101, address(this), lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(address(this), id), 0, "obligation shares");
         assertEq(morphoV2.debtOf(address(this), id), 0, "debt");
@@ -299,71 +178,21 @@ contract TakeTest is BaseTest {
     }
 
     function testConsumed() public {
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         vm.expectRevert("consumed");
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
     }
 
     function testTakePartialFill() public {
-        morphoV2.take(
-            50,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(50, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.consumed(lender, 0), 50);
 
         vm.expectRevert("consumed");
-        morphoV2.take(
-            51,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(51, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
-        morphoV2.take(
-            50,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(50, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.consumed(lender, 0), 100);
     }
@@ -375,44 +204,14 @@ contract TakeTest is BaseTest {
         Obligation memory obligation2 = obligation;
         obligation2.maturity = block.timestamp + 200;
 
-        morphoV2.take(
-            70,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(70, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         vm.expectRevert("consumed");
-        morphoV2.take(
-            31,
-            0,
-            borrower,
-            lendOffer2,
-            sig(root([lendOffer2]), lenderSK),
-            root([lendOffer2]),
-            proof([lendOffer2]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(31, 0, borrower, lendOffer2, signProof([lendOffer2], lenderSK), address(0), hex"");
 
         morphoV2.supplyCollateral(obligation2, address(collateralToken1), 134, borrower);
 
-        morphoV2.take(
-            30,
-            0,
-            borrower,
-            lendOffer2,
-            sig(root([lendOffer2]), lenderSK),
-            root([lendOffer2]),
-            proof([lendOffer2]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(30, 0, borrower, lendOffer2, signProof([lendOffer2], lenderSK), address(0), hex"");
         assertEq(morphoV2.consumed(lender, 0), 100);
     }
 
@@ -424,17 +223,7 @@ contract TakeTest is BaseTest {
         deal(address(collateralToken1), borrowOffer.callbackAddress, 135);
         assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
 
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), otherBorrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, borrowOffer, signProof([borrowOffer], otherBorrowerSK), address(0), hex"");
         assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 135);
         assertEq(BorrowCallback(borrowOffer.callbackAddress).recordedData(), borrowOffer.callbackData);
     }
@@ -451,9 +240,7 @@ contract TakeTest is BaseTest {
             0,
             otherBorrower,
             lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
+            signProof([lendOffer], lenderSK),
             callbackAddress,
             abi.encode(address(collateralToken1), 135)
         );
@@ -470,17 +257,7 @@ contract TakeTest is BaseTest {
         lendOffer.maker = address(otherLender);
         deal(address(loanToken), lendOffer.callbackAddress, 100);
 
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), otherLenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], otherLenderSK), address(0), hex"");
         assertEq(LendCallback(lendOffer.callbackAddress).recordedData(), lendOffer.callbackData);
     }
 
@@ -497,9 +274,7 @@ contract TakeTest is BaseTest {
             0,
             otherLender,
             borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            signProof([borrowOffer], borrowerSK),
             callbackAddress,
             abi.encode(address(loanToken), 100)
         );
@@ -508,17 +283,7 @@ contract TakeTest is BaseTest {
 
     function testTakeConsistentPrices() public {
         lendOffer.expiry = lendOffer.start;
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         assertEq(morphoV2.sharesOf(lender, id), 101, "lender bond shares");
     }
@@ -526,49 +291,19 @@ contract TakeTest is BaseTest {
     function testTakeMaturityPassed() public {
         vm.warp(block.timestamp + 101);
         vm.expectRevert("maturity");
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
     }
 
     function testTakeSellerMakerNotHealthyMaker() public {
         morphoV2.withdrawCollateral(obligation, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        morphoV2.take(
-            100,
-            0,
-            lender,
-            borrowOffer,
-            sig(root([borrowOffer]), borrowerSK),
-            root([borrowOffer]),
-            proof([borrowOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
     }
 
     function testTakeSellerTakerNotHealthy() public {
         morphoV2.withdrawCollateral(obligation, address(collateralToken1), 1, borrower);
         vm.expectRevert("Seller is unhealthy");
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
     }
 
     function testTakeWrongSignature(bytes32 wrongRoot) public {
@@ -576,86 +311,64 @@ contract TakeTest is BaseTest {
         morphoV2.setAuthorized(address(this), false);
         vm.assume(wrongRoot != root([lendOffer]));
         vm.expectRevert("offer not ratified");
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(wrongRoot, lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+
+        SignedProof memory signedProof;
+        signedProof.root = root([lendOffer]);
+        signedProof.path = new bytes32[](0);
+        (signedProof.v, signedProof.r, signedProof.s) = sign(wrongRoot, lenderSK);
+
+        morphoV2.take(100, 0, borrower, lendOffer, abi.encode(signedProof), address(0), hex"");
     }
 
     function testTakeInvalidSignature() public {
         vm.prank(lendOffer.maker);
         morphoV2.setAuthorized(address(this), false);
-        vm.expectRevert("offer not ratified");
-        morphoV2.take(
-            100, 0, borrower, lendOffer, Signature(0, 0, 0), root([lendOffer]), proof([lendOffer]), address(0), hex""
-        );
+        vm.expectRevert("invalid signature");
+
+        SignedProof memory signedProof =
+            SignedProof({root: root([lendOffer]), path: new bytes32[](0), v: 0, r: 0, s: 0});
+
+        morphoV2.take(100, 0, borrower, lendOffer, abi.encode(signedProof), address(0), hex"");
     }
 
     function testTakeInconsistentPrices() public {
         lendOffer.expiryPrice = 0.98 ether;
         lendOffer.expiry = lendOffer.start;
         vm.expectRevert("inconsistent prices");
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
     }
 
-    function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
+    function testTakeInvalidPathOneLeaf(bytes32[] memory path) public {
         vm.prank(lendOffer.maker);
         morphoV2.setAuthorized(address(this), false);
-        vm.assume(proof.length >= 1);
+        vm.assume(path.length >= 1);
         vm.expectRevert("offer not ratified");
-        morphoV2.take(
-            100, 0, borrower, lendOffer, sig(root([lendOffer]), lenderSK), root([lendOffer]), proof, address(0), hex""
-        );
+
+        SignedProof memory signedProof;
+        signedProof.root = root([lendOffer]);
+        signedProof.path = path;
+        (signedProof.v, signedProof.r, signedProof.s) = sign(signedProof.root, lenderSK);
+
+        morphoV2.take(100, 0, borrower, lendOffer, abi.encode(signedProof), address(0), hex"");
     }
 
-    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory proof) public {
+    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory path) public {
         vm.prank(lendOffer.maker);
         morphoV2.setAuthorized(address(this), false);
-        vm.assume(proof.length >= 1);
-        vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
+        vm.assume(path.length >= 1);
+        vm.assume(path[0] != keccak256(abi.encode(otherOffer)));
+
+        SignedProof memory signedProof;
+        signedProof.root = root([lendOffer, otherOffer]);
+        signedProof.path = path;
+        (signedProof.v, signedProof.r, signedProof.s) = sign(signedProof.root, lenderSK);
+
         vm.expectRevert("offer not ratified");
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer, otherOffer]), lenderSK),
-            root([lendOffer, otherOffer]),
-            proof,
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, abi.encode(signedProof), address(0), hex"");
     }
 
     function testTakeTwoLeaves(Offer memory otherOffer) public {
-        morphoV2.take(
-            100,
-            0,
-            borrower,
-            lendOffer,
-            sig(root([lendOffer, otherOffer]), lenderSK),
-            root([lendOffer, otherOffer]),
-            proof([lendOffer, otherOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, borrower, lendOffer, signProof([lendOffer, otherOffer], lenderSK), address(0), hex"");
     }
 
     function testOrderAuthorization(address taker, address sender) public {
@@ -664,49 +377,19 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert("order not authorized");
         vm.prank(sender);
-        morphoV2.take(
-            100,
-            0,
-            taker,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, taker, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         uint256 snap = vm.snapshotState();
 
         vm.prank(taker);
-        morphoV2.take(
-            0,
-            0,
-            taker,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, taker, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
 
         vm.revertToState(snap);
 
         vm.prank(taker);
         morphoV2.setAuthorized(sender, true);
         vm.prank(sender);
-        morphoV2.take(
-            0,
-            0,
-            taker,
-            lendOffer,
-            sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, taker, lendOffer, signProof([lendOffer], lenderSK), address(0), hex"");
     }
 
     function testOfferAuthorization(uint256 makerSK, address sender, uint256 otherSK, bytes32 data) public {
@@ -721,81 +404,31 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert("offer not ratified");
         vm.prank(sender);
-        morphoV2.take(
-            100,
-            0,
-            sender,
-            lendOffer,
-            sig(root([lendOffer]), otherSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(100, 0, sender, lendOffer, signProof([lendOffer], otherSK), address(0), hex"");
 
         uint256 snap = vm.snapshotState();
 
         vm.prank(maker);
-        morphoV2.take(
-            0,
-            0,
-            maker,
-            lendOffer,
-            sig(root([lendOffer]), otherSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, maker, lendOffer, signProof([lendOffer], otherSK), address(0), hex"");
 
         vm.revertToState(snap);
 
         vm.prank(sender);
-        morphoV2.take(
-            0,
-            0,
-            sender,
-            lendOffer,
-            sig(root([lendOffer]), makerSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, sender, lendOffer, signProof([lendOffer], makerSK), address(0), hex"");
 
         vm.revertToState(snap);
 
         vm.prank(maker);
         morphoV2.setAuthorized(sender, true);
         vm.prank(sender);
-        morphoV2.take(
-            0,
-            0,
-            sender,
-            lendOffer,
-            sig(root([lendOffer]), otherSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, sender, lendOffer, signProof([lendOffer], otherSK), address(0), hex"");
 
         vm.revertToState(snap);
 
         vm.prank(maker);
         morphoV2.setRatified(lendOffer, true);
         vm.prank(sender);
-        morphoV2.take(
-            0,
-            0,
-            sender,
-            lendOffer,
-            sig(root([lendOffer]), otherSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, sender, lendOffer, signProof([lendOffer], otherSK), address(0), hex"");
 
         vm.revertToStateAndDelete(snap);
 
@@ -806,17 +439,7 @@ contract TakeTest is BaseTest {
         vm.prank(maker);
         morphoV2.setAuthorized(address(ratifier), true);
         vm.prank(sender);
-        morphoV2.take(
-            0,
-            0,
-            sender,
-            lendOffer,
-            sig(root([lendOffer]), otherSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(ratifier),
-            hex""
-        );
+        morphoV2.take(0, 0, sender, lendOffer, signProof([lendOffer], otherSK), address(ratifier), hex"");
         assertEq(bytes32(ratifier.recordedData()), data);
     }
 }
@@ -832,10 +455,7 @@ contract BorrowCallback is ICallbacks {
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
-    function onRatify(Offer memory offer, Signature memory sig, bytes32 root, bytes32[] memory proof)
-        external
-        returns (bool)
-    {}
+    function onRatify(Offer memory offer, bytes memory ratification) external returns (bool) {}
 }
 
 contract LendCallback is ICallbacks {
@@ -847,10 +467,7 @@ contract LendCallback is ICallbacks {
     }
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
-    function onRatify(Offer memory offer, Signature memory sig, bytes32 root, bytes32[] memory proof)
-        external
-        returns (bool)
-    {}
+    function onRatify(Offer memory offer, bytes memory ratification) external returns (bool) {}
 }
 
 contract RatifyCallback is ICallbacks {
@@ -859,10 +476,7 @@ contract RatifyCallback is ICallbacks {
     function onTake(Obligation memory obligation, address maker, uint256 assets, bytes memory data) external {}
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 
-    function onRatify(Offer memory offer, Signature memory, bytes32 root, bytes32[] memory proof)
-        external
-        returns (bool)
-    {
+    function onRatify(Offer memory offer, bytes memory) external returns (bool) {
         recordedData = offer.ratifierData;
         return true;
     }
