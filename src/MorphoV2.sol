@@ -6,13 +6,9 @@ import "./libraries/UtilsLib.sol";
 import "./libraries/SafeTransferLib.sol";
 import "./libraries/ConstantsLib.sol";
 import "./libraries/MathLib.sol";
-import "./libraries/ExpLib.sol";
-import "./libraries/LogLib.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IMorphoV2.sol";
 import "./interfaces/ICallbacks.sol";
-
-import {FixedPointMathLib} from "lib/solady/src/utils/FixedPointMathLib.sol";
 
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
@@ -248,13 +244,13 @@ contract MorphoV2 is IMorphoV2 {
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-            int256 base = FixedPointMathLib.lnWad(int256(LIQUIDATION_INCENTIVE_FACTOR));
-            uint256 priceDiscountFactor = uint256(
-                FixedPointMathLib.expWad(
-                    -base.mulDivDown(int256(block.timestamp - obligation.maturity), int256(auctionTimeToTarget))
-                )
-            );
-            uint256 auctionPrice = price.mulDivDown(uint256(priceDiscountFactor), 1e18);
+
+            uint256 discountFactor = 1e18
+                - (1e18 - 1e36 / LIQUIDATION_INCENTIVE_FACTOR).mulDivDown(
+                    UtilsLib.min(1e18 * (block.timestamp - obligation.maturity) / auctionTimeToTarget, 1e18), 1e18
+                );
+
+            uint256 auctionPrice = price.mulDivDown(discountFactor, 1e18);
             auctionPrices[i] = auctionPrice;
             maxRepayableDebt +=
                 collateralOf[borrower][id][obligation.collaterals[i].token].mulDivUp(auctionPrice, ORACLE_PRICE_SCALE);
