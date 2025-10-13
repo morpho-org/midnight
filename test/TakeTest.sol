@@ -38,7 +38,6 @@ contract TakeTest is BaseTest {
         id = keccak256(abi.encode(obligation));
 
         lendOffer.buy = true;
-        lendOffer.maker = lender;
         lendOffer.assets = 100;
         lendOffer.obligation = obligation;
         lendOffer.start = block.timestamp;
@@ -48,7 +47,6 @@ contract TakeTest is BaseTest {
         lendOffer.nonce = 0;
 
         borrowOffer.buy = false;
-        borrowOffer.maker = borrower;
         borrowOffer.assets = 100;
         borrowOffer.obligation = obligation;
         borrowOffer.expiry = block.timestamp + 200;
@@ -137,7 +135,6 @@ contract TakeTest is BaseTest {
         vm.prank(otherLender);
         loanToken.approve(address(morphoV2), 100);
         deal(address(loanToken), otherLender, 100);
-        lendOffer.maker = otherLender;
         morphoV2.take(
             0,
             0,
@@ -175,7 +172,6 @@ contract TakeTest is BaseTest {
             address(0),
             hex""
         );
-        lendOffer.maker = borrower;
         lendOffer.nonce = 1;
         morphoV2.take(
             0,
@@ -220,7 +216,6 @@ contract TakeTest is BaseTest {
         collateralToken1.approve(address(morphoV2), 135);
         deal(address(collateralToken1), otherBorrower, 135);
         morphoV2.supplyCollateral(obligation, address(collateralToken1), 135, otherBorrower);
-        borrowOffer.maker = otherBorrower;
         morphoV2.take(
             100,
             0,
@@ -262,7 +257,6 @@ contract TakeTest is BaseTest {
             hex""
         );
 
-        borrowOffer.maker = lender;
         borrowOffer.nonce = 1;
         morphoV2.take(
             100,
@@ -462,7 +456,6 @@ contract TakeTest is BaseTest {
         (address otherBorrower, uint256 otherBorrowerSK) = makeAddrAndKey("otherBorrower");
         borrowOffer.callbackAddress = address(new BorrowCallback());
         borrowOffer.callbackData = abi.encode(address(collateralToken1), 135);
-        borrowOffer.maker = address(otherBorrower);
         deal(address(collateralToken1), borrowOffer.callbackAddress, 135);
         assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
 
@@ -512,7 +505,6 @@ contract TakeTest is BaseTest {
         loanToken.approve(address(morphoV2), 100);
         lendOffer.callbackAddress = address(new LendCallback());
         lendOffer.callbackData = abi.encode(address(loanToken), 100);
-        lendOffer.maker = address(otherLender);
         deal(address(loanToken), lendOffer.callbackAddress, 100);
 
         morphoV2.take(
@@ -620,24 +612,6 @@ contract TakeTest is BaseTest {
             borrower,
             lendOffer,
             sig(root([lendOffer]), lenderSK),
-            root([lendOffer]),
-            proof([lendOffer]),
-            address(0),
-            hex""
-        );
-    }
-
-    function testTakeWrongSignature(bytes32 wrongRoot) public {
-        vm.assume(wrongRoot != root([lendOffer]));
-        vm.expectRevert("invalid signature");
-        morphoV2.take(
-            100,
-            0,
-            0,
-            0,
-            borrower,
-            lendOffer,
-            sig(wrongRoot, lenderSK),
             root([lendOffer]),
             proof([lendOffer]),
             address(0),

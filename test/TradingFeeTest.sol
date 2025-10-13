@@ -37,7 +37,6 @@ contract TradingFeeTest is BaseTest {
 
         lendOffer.obligation = obligation;
         lendOffer.buy = true;
-        lendOffer.maker = lender;
         lendOffer.assets = 100 ether;
         lendOffer.start = block.timestamp;
         lendOffer.expiry = block.timestamp + 200;
@@ -47,7 +46,6 @@ contract TradingFeeTest is BaseTest {
 
         borrowOffer.obligation = obligation;
         borrowOffer.buy = false;
-        borrowOffer.maker = borrower;
         borrowOffer.assets = 100 ether;
         borrowOffer.expiry = block.timestamp + 200;
         borrowOffer.startPrice = 1 ether;

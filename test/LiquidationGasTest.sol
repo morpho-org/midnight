@@ -51,7 +51,6 @@ contract LiquidationTest is BaseTest {
         Offer memory borrowOffer = Offer({
             obligation: obligation,
             buy: false,
-            maker: borrower,
             assets: maxDebt,
             start: block.timestamp,
             expiry: block.timestamp + 100,

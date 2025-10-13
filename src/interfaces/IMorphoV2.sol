@@ -19,7 +19,6 @@ struct Collateral {
 struct Offer {
     Obligation obligation;
     bool buy;
-    address maker;
     uint256 assets;
     uint256 start;
     uint256 expiry;
