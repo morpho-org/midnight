@@ -13,6 +13,11 @@ library MathLib {
         return (x * y + (d - 1)) / d;
     }
 
+    /// @dev Returns (`x` * `y`) / `d` rounded up or down.
+    function mulDiv(uint256 x, uint256 y, uint256 d, bool roundUp) internal pure returns (uint256) {
+        return roundUp ? mulDivUp(x, y, d) : mulDivDown(x, y, d);
+    }
+
     /// @dev Returns max(0, x - y).
     function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {

@@ -111,20 +111,22 @@ contract MorphoV2 is IMorphoV2 {
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
         uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
 
+        bool primary = debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0;
+
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(1e18, buyerPrice);
             sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            obligationShares = obligationUnits.mulDiv(totalShares[id] + 1, totalUnits[id] + 1, primary);
         } else if (sellerAssets > 0) {
             obligationUnits = sellerAssets.mulDivDown(1e18, sellerPrice);
             buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            obligationShares = obligationUnits.mulDiv(totalShares[id] + 1, totalUnits[id] + 1, primary);
         } else if (obligationUnits > 0) {
             buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            obligationShares = obligationUnits.mulDiv(totalShares[id] + 1, totalUnits[id] + 1, primary);
         } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            obligationUnits = obligationShares.mulDiv(totalUnits[id] + 1, totalShares[id] + 1, !primary);
             buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
         }
