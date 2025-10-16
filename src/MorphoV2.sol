@@ -17,6 +17,7 @@ contract MorphoV2 is IMorphoV2 {
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(address => mapping(bytes32 => uint256)) public earlyWithdrawableOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
@@ -191,6 +192,7 @@ contract MorphoV2 is IMorphoV2 {
 
         sharesOf[onBehalf][id] -= shares;
         withdrawable[id] -= obligationUnits;
+        if (obligation.maturity <= block.timestamp) earlyWithdrawableOf[onBehalf][id] -= obligationUnits;
 
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
@@ -203,6 +205,7 @@ contract MorphoV2 is IMorphoV2 {
 
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
+        earlyWithdrawableOf[onBehalf][id] += obligationUnits;
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
@@ -280,6 +283,7 @@ contract MorphoV2 is IMorphoV2 {
 
         withdrawable[id] += totalRepaid;
         debtOf[borrower][id] -= totalRepaid;
+        earlyWithdrawableOf[borrower][id] += totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
