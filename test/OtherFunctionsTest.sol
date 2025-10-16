@@ -110,7 +110,7 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.repay(obligation, repaid, borrower);
 
         assertEq(morphoV2.debtOf(borrower, id), obligations);
-        assertEq(morphoV2.preRepaid(borrower, id), repaid);
+        assertEq(morphoV2.preRepaidOf(borrower, id), repaid);
         assertEq(morphoV2.totalPreRepaid(id), repaid);
         assertEq(loanToken.balanceOf(address(morphoV2)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);

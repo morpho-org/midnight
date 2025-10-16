@@ -17,7 +17,7 @@ contract MorphoV2 is IMorphoV2 {
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(address => mapping(bytes32 => uint256)) public preRepaid;
+    mapping(address => mapping(bytes32 => uint256)) public preRepaidOf;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
     mapping(bytes32 => uint256) public totalPreRepaid;
     mapping(bytes32 => uint256) public totalUnits;
@@ -200,14 +200,16 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function repay(Obligation memory obligation, uint256 assets, address onBehalf) external {
-        preRepaid[onBehalf][_id(obligation)] += assets;
-        totalPreRepaid[_id(obligation)] += assets;
+        bytes32 id = _id(obligation);
+        preRepaidOf[onBehalf][id] += assets;
+        totalPreRepaid[id] += assets;
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), assets);
     }
 
     function withdrawRepaid(Obligation memory obligation, uint256 assets, address onBehalf) external {
-        preRepaid[onBehalf][_id(obligation)] -= assets;
-        totalPreRepaid[_id(obligation)] -= assets;
+        bytes32 id = _id(obligation);
+        preRepaidOf[onBehalf][id] -= assets;
+        totalPreRepaid[id] -= assets;
         require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
     }
@@ -241,9 +243,9 @@ contract MorphoV2 is IMorphoV2 {
         external
         returns (Seizure[] memory)
     {
-        uint256 repayableDebt;
-        uint256 maxDebt;
         bytes32 id = _id(obligation);
+        uint256 repayableDebt = preRepaidOf[borrower][id];
+        uint256 maxDebt = preRepaidOf[borrower][id];
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
@@ -284,7 +286,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         totalPreRepaid[id] += _repaid;
-        preRepaid[borrower][id] += _repaid;
+        preRepaidOf[borrower][id] += _repaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
@@ -319,7 +321,7 @@ contract MorphoV2 is IMorphoV2 {
         if (debt == 0) {
             return true;
         } else {
-            uint256 maxDebt = totalPreRepaid[id];
+            uint256 maxDebt = preRepaidOf[borrower][id];
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 uint256 price = IOracle(obligation.collaterals[i].oracle).price();
                 maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token]
