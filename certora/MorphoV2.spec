@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
-    function totalPreRepaid(address owner, bytes32 id) external returns uint256 envfree;
+    function totalPreRepaid(bytes32 id) external returns uint256 envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function totalShares(bytes32 id) external returns (uint256) envfree;
     function sharesOf(address owner, bytes32 id) external returns (uint256) envfree;
