@@ -109,8 +109,9 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         morphoV2.repay(obligation, repaid, borrower);
 
-        assertEq(morphoV2.debtOf(borrower, id), obligations - repaid);
-        assertEq(morphoV2.withdrawable(id), repaid);
+        assertEq(morphoV2.debtOf(borrower, id), obligations);
+        assertEq(morphoV2.preRepaid(borrower, id), repaid);
+        assertEq(morphoV2.totalPreRepaid(id), repaid);
         assertEq(loanToken.balanceOf(address(morphoV2)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
@@ -131,7 +132,7 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.withdraw(obligation, withdraw, 0, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), obligations - withdraw, "obligationSharesOf");
-        assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
+        assertEq(morphoV2.totalPreRepaid(id), 0, "totalPreRepaid");
         assertEq(morphoV2.totalShares(id), obligations - withdraw, "totalShares");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
@@ -149,7 +150,7 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.withdraw(obligation, 0, shares, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), obligations - shares, "obligationSharesOf");
-        assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
+        assertEq(morphoV2.totalPreRepaid(id), 0, "totalPreRepaid");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
     }

@@ -72,7 +72,9 @@ contract LiquidationTest is BaseTest {
         Seizure[] memory seizures = new Seizure[](1);
         seizures[0] = Seizure({collateralIndex: 0, repaid: 1, seized: 0});
         morphoV2.liquidate(obligation, seizures, borrower, "");
-        assertEq(morphoV2.debtOf(borrower, id), 99);
+        assertEq(morphoV2.debtOf(borrower, id), 100);
+        assertEq(morphoV2.totalPreRepaid(id), 1);
+        assertEq(morphoV2.preRepaid(borrower, id), 1);
         assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), 133);
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
@@ -88,7 +90,8 @@ contract LiquidationTest is BaseTest {
         seizures[0] = Seizure({collateralIndex: 0, repaid: 0, seized: 1});
         morphoV2.liquidate(obligation, seizures, borrower, "");
         assertEq(loanToken.balanceOf(address(this)), 0);
-        assertEq(morphoV2.debtOf(borrower, id), 99);
+        assertEq(morphoV2.debtOf(borrower, id), 100);
+        assertEq(morphoV2.preRepaid(borrower, id), 1);
         assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), 133);
     }
 

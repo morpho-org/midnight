@@ -17,10 +17,11 @@ contract MorphoV2 is IMorphoV2 {
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public withdrawable;
+    mapping(address => mapping(bytes32 => uint256)) public preRepaid;
+    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    mapping(bytes32 => uint256) public totalPreRepaid;
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
-    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
@@ -179,10 +180,10 @@ contract MorphoV2 is IMorphoV2 {
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
-    /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
+        require(obligation.maturity > block.timestamp, "maturity not reached");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
@@ -190,7 +191,7 @@ contract MorphoV2 is IMorphoV2 {
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
 
         sharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= obligationUnits;
+        totalPreRepaid[id] -= obligationUnits;
 
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
@@ -198,13 +199,17 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
 
-    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
-        bytes32 id = _id(obligation);
+    function repay(Obligation memory obligation, uint256 assets, address onBehalf) external {
+        preRepaid[onBehalf][_id(obligation)] += assets;
+        totalPreRepaid[_id(obligation)] += assets;
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), assets);
+    }
 
-        debtOf[onBehalf][id] -= obligationUnits;
-        withdrawable[id] += obligationUnits;
-
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
+    function withdrawRepaid(Obligation memory obligation, uint256 assets, address onBehalf) external {
+        preRepaid[onBehalf][_id(obligation)] -= assets;
+        totalPreRepaid[_id(obligation)] -= assets;
+        require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
     }
 
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
@@ -259,7 +264,7 @@ contract MorphoV2 is IMorphoV2 {
             totalUnits[id] -= badDebt;
         }
 
-        uint256 totalRepaid;
+        uint256 _repaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
@@ -273,13 +278,13 @@ contract MorphoV2 is IMorphoV2 {
                     .mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18);
             }
 
-            totalRepaid += seizure.repaid;
+            _repaid += seizure.repaid;
             address collateralToken = obligation.collaterals[seizure.collateralIndex].token;
             collateralOf[borrower][id][collateralToken] -= seizure.seized;
         }
 
-        withdrawable[id] += totalRepaid;
-        debtOf[borrower][id] -= totalRepaid;
+        totalPreRepaid[id] += _repaid;
+        preRepaid[borrower][id] += _repaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
@@ -290,7 +295,7 @@ contract MorphoV2 is IMorphoV2 {
 
         if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), _repaid);
 
         return seizures;
     }
@@ -314,7 +319,7 @@ contract MorphoV2 is IMorphoV2 {
         if (debt == 0) {
             return true;
         } else {
-            uint256 maxDebt;
+            uint256 maxDebt = totalPreRepaid[id];
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 uint256 price = IOracle(obligation.collaterals[i].oracle).price();
                 maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token]
