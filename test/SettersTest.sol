@@ -21,46 +21,27 @@ contract SettersTest is BaseTest {
         morphoV2.setOwner(makeAddr("newOwner"));
     }
 
-    function testSetFeeSetterSuccess(address feeSetter) public {
-        morphoV2.setFeeSetter(feeSetter);
-        assertEq(morphoV2.feeSetter(), feeSetter);
+    function testSetObligationCreatorSuccess(address obligationCreator) public {
+        morphoV2.setObligationCreator(obligationCreator);
+        assertEq(morphoV2.obligationCreator(), obligationCreator);
     }
 
-    function testSetFeeSetterOnlyOwner(address rdm) public {
+    function testSetObligationCreatorOnlyOwner(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("Only owner");
-        morphoV2.setFeeSetter(makeAddr("newFeeSetter"));
+        morphoV2.setObligationCreator(makeAddr("newObligationCreator"));
     }
 
-    function testSetTradingFeeSuccess(bytes32 id, uint256 fee) public {
-        vm.assume(fee <= 1e18);
-        morphoV2.setTradingFee(id, fee);
-        assertEq(morphoV2.tradingFee(id), fee);
+    function testCreateObligationSuccess(bytes32 id) public {
+        morphoV2.createObligation(id);
+        assertEq(morphoV2.isObligation(id), true);
     }
 
-    function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
+    function testCreateObligationOnlyObligationCreator(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("Only feeSetter");
-        morphoV2.setTradingFee(id, 0.1e18);
-    }
-
-    function testSetTradingFeeTooHigh(bytes32 id, uint256 fee) public {
-        vm.assume(fee > 1e18);
-        vm.expectRevert("Fee too high");
-        morphoV2.setTradingFee(id, fee);
-    }
-
-    function testSetTradingFeeRecipientSuccess(address recipient) public {
-        morphoV2.setTradingFeeRecipient(recipient);
-        assertEq(morphoV2.tradingFeeRecipient(), recipient, "recipient set");
-    }
-
-    function testSetTradingFeeRecipientOnlyOwner(address rdm) public {
-        vm.assume(rdm != address(this));
-        vm.prank(rdm);
-        vm.expectRevert("Only owner");
-        morphoV2.setTradingFeeRecipient(makeAddr("newRecipient"));
+        vm.expectRevert("Only obligationCreator");
+        morphoV2.createObligation(id);
     }
 }

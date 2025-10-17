@@ -26,7 +26,7 @@ abstract contract BaseTest is Test {
     function setUp() public virtual {
         morphoV2 = new MorphoV2();
 
-        morphoV2.setFeeSetter(address(this));
+        morphoV2.setObligationCreator(address(this));
 
         (borrower, borrowerSecretKey) = makeAddrAndKey("borrower");
         (lender, lenderSecretKey) = makeAddrAndKey("lender");

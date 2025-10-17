@@ -27,15 +27,13 @@ contract MorphoV2 is IMorphoV2 {
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
 
-    /// @dev Cut on interest at each trade for a given obligation id.
-    mapping(bytes32 id => uint256) public tradingFee;
-    address public tradingFeeRecipient;
+    mapping(bytes32 id => bool) public isObligation;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
 
     /// @dev Address that can set trading fees.
-    address public feeSetter;
+    address public obligationCreator;
 
     /// CONSTRUCTOR ///
 
@@ -50,20 +48,14 @@ contract MorphoV2 is IMorphoV2 {
         owner = newOwner;
     }
 
-    function setFeeSetter(address newFeeSetter) external {
+    function setObligationCreator(address newObligationCreator) external {
         require(msg.sender == owner, "Only owner");
-        feeSetter = newFeeSetter;
+        obligationCreator = newObligationCreator;
     }
 
-    function setTradingFee(bytes32 id, uint256 fee) external {
-        require(msg.sender == feeSetter, "Only feeSetter");
-        require(fee <= 1e18, "Fee too high");
-        tradingFee[id] = fee;
-    }
-
-    function setTradingFeeRecipient(address recipient) external {
-        require(msg.sender == owner, "Only owner");
-        tradingFeeRecipient = recipient;
+    function createObligation(bytes32 id) external {
+        require(msg.sender == obligationCreator, "Only obligationCreator");
+        isObligation[id] = true;
     }
 
     /// ENTRY-POINTS ///
@@ -117,7 +109,7 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= 1e18, "price too high");
 
-        uint256 _tradingFee = tradingFee[id];
+        uint256 _tradingFee = offer.obligation.tradingFee;
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
         uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
 
@@ -166,7 +158,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken, buyer, offer.obligation.tradingFeeRecipient, buyerAssets - sellerAssets
         );
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
 

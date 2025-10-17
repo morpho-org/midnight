@@ -35,6 +35,8 @@ contract TradingFeeTest is BaseTest {
         for (uint256 i = 0; i < collaterals.length; i++) {
             obligation.collaterals.push(collaterals[i]);
         }
+        obligation.tradingFee = 0.05e18;
+        obligation.tradingFeeRecipient = feeRecipient;
 
         id = keccak256(abi.encode(obligation));
 
@@ -59,14 +61,7 @@ contract TradingFeeTest is BaseTest {
 
         morphoV2.supplyCollateral(obligation, address(collateralToken1), 200 ether, borrower);
 
-        // Set up trading fee for tests
-        morphoV2.setTradingFee(id, 0.05e18); // 5%
-        morphoV2.setTradingFeeRecipient(feeRecipient);
-    }
-
-    function testTradingFeeSetup() public view {
-        assertEq(morphoV2.tradingFee(id), 0.05e18, "trading fee percentage");
-        assertEq(morphoV2.tradingFeeRecipient(), feeRecipient, "fee recipient");
+        morphoV2.createObligation(id);
     }
 
     function testBuyerAssetsWithFee() public {
@@ -180,7 +175,8 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testZeroTradingFee() public {
-        morphoV2.setTradingFee(id, 0);
+        obligation.tradingFee = 0;
+        morphoV2.createObligation(toId(obligation));
         uint256 buyerAssets = 100 ether;
         borrowOffer.startPrice = 0.9 ether;
         borrowOffer.expiryPrice = 0.9 ether;

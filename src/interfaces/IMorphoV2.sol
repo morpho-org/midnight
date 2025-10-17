@@ -8,6 +8,8 @@ struct Obligation {
     // Must be sorted by address.
     Collateral[] collaterals;
     uint256 maturity;
+    uint256 tradingFee;
+    address tradingFeeRecipient;
 }
 
 struct Collateral {
