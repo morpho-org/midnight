@@ -10,6 +10,8 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks} from "./interfaces/ICallbacks.sol";
 
+/// OBLIGATIONS
+/// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
 
@@ -307,10 +309,14 @@ contract MorphoV2 is IMorphoV2 {
             return true;
         } else {
             uint256 maxDebt;
+            address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+                address currentCollateralToken = obligation.collaterals[i].token;
+                require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token]
-                    .mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(obligation.collaterals[i].lltv, 1e18);
+                maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(obligation.collaterals[i].lltv, 1e18);
+                previousCollateralToken = currentCollateralToken;
             }
 
             return debt <= maxDebt;
