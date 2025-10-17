@@ -9,7 +9,6 @@ import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks} from "./interfaces/ICallbacks.sol";
-import "forge-std/console.sol";
 
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
@@ -264,9 +263,6 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         uint256 originalDebt = debtOf(borrower, id);
-        console.log("originalDebt", originalDebt);
-        console.log("coveredDebt", coveredDebtOf[borrower][id]);
-        console.log("maxDebt", maxDebt);
         require(originalDebt > maxDebt, "position is healthy");
 
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
