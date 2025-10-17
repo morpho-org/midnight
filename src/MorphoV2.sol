@@ -9,6 +9,7 @@ import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks} from "./interfaces/ICallbacks.sol";
+import "forge-std/console.sol";
 
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
@@ -16,7 +17,8 @@ contract MorphoV2 is IMorphoV2 {
     /// STORAGE ///
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(address => mapping(bytes32 => uint256)) public fullDebtOf;
+    mapping(address => mapping(bytes32 => uint256)) public coveredDebtOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
@@ -143,19 +145,19 @@ contract MorphoV2 is IMorphoV2 {
             (consumed[offer.maker][offer.nonce] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
         );
 
-        if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
+        if (fullDebtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
             sharesOf[buyer][id] += obligationShares;
-            debtOf[seller][id] += obligationUnits;
+            fullDebtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
-        } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
+        } else if (fullDebtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
-        } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
-            debtOf[buyer][id] -= obligationUnits;
-            debtOf[seller][id] += obligationUnits;
+        } else if (fullDebtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
+            fullDebtOf[buyer][id] -= obligationUnits;
+            fullDebtOf[seller][id] += obligationUnits;
         } else {
-            debtOf[buyer][id] -= obligationUnits;
+            fullDebtOf[buyer][id] -= obligationUnits;
             sharesOf[seller][id] -= obligationShares;
             totalShares[id] -= obligationShares;
             totalUnits[id] -= obligationUnits;
@@ -183,6 +185,7 @@ contract MorphoV2 is IMorphoV2 {
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
+        require(obligation.maturity < block.timestamp, "obligation maturity");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
@@ -198,13 +201,22 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
 
-    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
+    function coverDebt(Obligation memory obligation, uint256 assets, address onBehalf) external {
         bytes32 id = _id(obligation);
+        coveredDebtOf[onBehalf][id] += assets;
+        withdrawable[id] += assets;
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), assets);
+    }
 
-        debtOf[onBehalf][id] -= obligationUnits;
-        withdrawable[id] += obligationUnits;
+    function uncoverDebt(Obligation memory obligation, uint256 assets, address onBehalf) external {
+        bytes32 id = _id(obligation);
+        coveredDebtOf[onBehalf][id] -= assets;
+        withdrawable[id] -= assets;
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
+        if (obligation.maturity < block.timestamp) require(debtOf(onBehalf, id) == 0, "no debt");
+        else require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
     }
 
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
@@ -226,6 +238,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @notice Execute the given collection of `seizures` on the given `obligation` of the given `borrower`.
     /// @dev On each seizure either `repaid` or `seized` should be equal to zero.
+    /// @dev Covered debt cannot be liquidated.
     /// @param obligation The obligation.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// obligation's collateral assets.
@@ -250,12 +263,15 @@ contract MorphoV2 is IMorphoV2 {
                 .mulDivUp(prices[i], ORACLE_PRICE_SCALE);
         }
 
-        uint256 originalDebt = debtOf[borrower][id];
+        uint256 originalDebt = debtOf(borrower, id);
+        console.log("originalDebt", originalDebt);
+        console.log("coveredDebt", coveredDebtOf[borrower][id]);
+        console.log("maxDebt", maxDebt);
         require(originalDebt > maxDebt, "position is healthy");
 
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
-            debtOf[borrower][id] -= badDebt;
+            fullDebtOf[borrower][id] -= badDebt;
             totalUnits[id] -= badDebt;
         }
 
@@ -279,7 +295,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         withdrawable[id] += totalRepaid;
-        debtOf[borrower][id] -= totalRepaid;
+        coveredDebtOf[borrower][id] += totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
@@ -293,6 +309,11 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
 
         return seizures;
+    }
+
+    /// @notice The debt of the borrower excluding the covered amount.
+    function debtOf(address borrower, bytes32 id) public view returns (uint256) {
+        return MathLib.zeroFloorSub(fullDebtOf[borrower][id], coveredDebtOf[borrower][id]);
     }
 
     /// INTERNAL ///
@@ -310,7 +331,7 @@ contract MorphoV2 is IMorphoV2 {
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
-        uint256 debt = debtOf[borrower][id];
+        uint256 debt = debtOf(borrower, id);
         if (debt == 0) {
             return true;
         } else {

@@ -95,12 +95,25 @@ abstract contract BaseTest is Test {
     function setupObligation(Obligation memory obligation, uint256 obligationUnits) internal {
         uint256 collateral =
             (obligationUnits * 1e18 + obligation.collaterals[0].lltv - 1) / obligation.collaterals[0].lltv;
-        setupObligation(obligation, obligationUnits, collateral);
+        setupObligation(obligation, obligationUnits, collateral, obligation.maturity);
     }
 
-    function setupObligation(Obligation memory obligation, uint256 obligationUnits, uint256 collateral) internal {
+    function setupObligation(Obligation memory obligation, uint256 obligationUnits, uint256 offerMaturity) internal {
+        uint256 collateral =
+            (obligationUnits * 1e18 + obligation.collaterals[0].lltv - 1) / obligation.collaterals[0].lltv;
+        setupObligation(obligation, obligationUnits, collateral, offerMaturity);
+    }
+
+    function setupObligation(
+        Obligation memory obligation,
+        uint256 obligationUnits,
+        uint256 collateral,
+        uint256 offerMaturity
+    ) internal {
         deal(address(loanToken), lender, obligationUnits);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
+
+        obligation.maturity = offerMaturity;
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
         Offer memory borrowOffer = Offer({
