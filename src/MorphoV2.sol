@@ -17,7 +17,7 @@ contract MorphoV2 is IMorphoV2 {
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(address => mapping(bytes32 => uint256)) public earlyWithdrawableOf;
+    mapping(address => mapping(bytes32 => uint256)) public withdrawableEarlyOf;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
@@ -190,12 +190,18 @@ contract MorphoV2 is IMorphoV2 {
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
 
-        sharesOf[onBehalf][id] -= shares;
-        withdrawable[id] -= obligationUnits;
-        if (obligation.maturity <= block.timestamp) earlyWithdrawableOf[onBehalf][id] -= obligationUnits;
+        if (sharesOf[onBehalf][id] > 0) {
+            sharesOf[onBehalf][id] -= shares;
+            totalShares[id] -= shares;
+            totalUnits[id] -= obligationUnits;
+        } else {
+            require(block.timestamp <= obligation.maturity, "Maturity");
+            debtOf[onBehalf][id] += obligationUnits;
+            require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        }
 
-        totalShares[id] -= shares;
-        totalUnits[id] -= obligationUnits;
+        withdrawable[id] -= obligationUnits;
+        if (block.timestamp <= obligation.maturity) withdrawableEarlyOf[onBehalf][id] -= obligationUnits;
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
@@ -205,7 +211,7 @@ contract MorphoV2 is IMorphoV2 {
 
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
-        earlyWithdrawableOf[onBehalf][id] += obligationUnits;
+        withdrawableEarlyOf[onBehalf][id] += obligationUnits;
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
@@ -283,7 +289,7 @@ contract MorphoV2 is IMorphoV2 {
 
         withdrawable[id] += totalRepaid;
         debtOf[borrower][id] -= totalRepaid;
-        earlyWithdrawableOf[borrower][id] += totalRepaid;
+        withdrawableEarlyOf[borrower][id] += totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];

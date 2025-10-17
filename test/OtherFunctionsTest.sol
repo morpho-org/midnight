@@ -125,6 +125,7 @@ contract OtherFunctionsTest is BaseTest {
         obligations = bound(obligations, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, obligations);
         testRepay(obligations, withdraw);
+        skip(100);
 
         // Test
         vm.prank(lender);
@@ -142,6 +143,7 @@ contract OtherFunctionsTest is BaseTest {
         obligations = bound(obligations, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, obligations);
         testRepay(obligations, shares);
+        skip(100);
 
         // Test
         // TODO: sharesPrice != 1
