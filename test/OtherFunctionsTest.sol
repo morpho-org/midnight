@@ -116,7 +116,7 @@ contract OtherFunctionsTest is BaseTest {
 
         skip(skipped);
         vm.prank(borrower);
-        morphoV2.uncoverDebt(obligation, withdrawn, borrower);
+        morphoV2.withdraw(obligation, withdrawn, 0, borrower);
 
         assertEq(morphoV2.coveredDebtOf(borrower, id), covered - withdrawn, "cover of");
         assertEq(morphoV2.withdrawable(id), covered - withdrawn, "available cover");
@@ -144,7 +144,7 @@ contract OtherFunctionsTest is BaseTest {
 
         skip(skipped);
         vm.prank(borrower);
-        morphoV2.uncoverDebt(obligation, withdrawn, borrower);
+        morphoV2.withdraw(obligation, withdrawn, 0, borrower);
 
         assertEq(morphoV2.coveredDebtOf(borrower, id), covered - withdrawn, "cover of");
         assertEq(morphoV2.withdrawable(id), covered - withdrawn, "available cover");
@@ -170,7 +170,7 @@ contract OtherFunctionsTest is BaseTest {
 
         deal(address(loanToken), borrower, obligationUnits - covered);
         vm.prank(borrower);
-        morphoV2.coverDebt(obligation, obligationUnits - covered, borrower);
+        morphoV2.repay(obligation, obligationUnits - covered, borrower);
         vm.prank(borrower);
         morphoV2.withdrawCollateral(
             obligation,
@@ -179,7 +179,7 @@ contract OtherFunctionsTest is BaseTest {
             borrower
         );
         vm.expectRevert("Unhealthy borrower");
-        morphoV2.uncoverDebt(obligation, withdrawn, borrower);
+        morphoV2.withdraw(obligation, withdrawn, 0, borrower);
     }
 
     function _testCover(uint256 obligationUnits, uint256 covered, uint256 maturity) public {
@@ -190,7 +190,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), covered);
 
         vm.prank(borrower);
-        morphoV2.coverDebt(obligation, covered, borrower);
+        morphoV2.repay(obligation, covered, borrower);
 
         if (obligationUnits > covered) {
             assertEq(morphoV2.debtOf(borrower, id), obligationUnits - covered, "debt of");
@@ -232,7 +232,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 maturity,
         uint256 skipDuration
     ) public {
-        obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
+        obligationUnits = bound(obligationUnits, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 0, obligationUnits);
         maturity = bound(maturity, block.timestamp, block.timestamp + 365 days);
         skipDuration = bound(skipDuration, 0, maturity - block.timestamp);
@@ -245,7 +245,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), withdraw);
 
         vm.prank(borrower);
-        morphoV2.coverDebt(obligation, withdraw, borrower);
+        morphoV2.repay(obligation, withdraw, borrower);
 
         // Test
         vm.prank(lender);

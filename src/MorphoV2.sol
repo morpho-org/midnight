@@ -184,38 +184,32 @@ contract MorphoV2 is IMorphoV2 {
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
-        require(obligation.maturity < block.timestamp, "obligation maturity");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
 
-        sharesOf[onBehalf][id] -= shares;
+        if (sharesOf[onBehalf][id] > 0) {
+            require(obligation.maturity < block.timestamp, "obligation maturity");
+            sharesOf[onBehalf][id] -= shares;
+            totalShares[id] -= shares;
+            totalUnits[id] -= obligationUnits;
+        } else {
+            coveredDebtOf[onBehalf][id] -= obligationUnits;
+            if (obligation.maturity < block.timestamp) require(debtOf(onBehalf, id) == 0, "no debt");
+            else require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        }
         withdrawable[id] -= obligationUnits;
-
-        totalShares[id] -= shares;
-        totalUnits[id] -= obligationUnits;
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
 
-    function coverDebt(Obligation memory obligation, uint256 assets, address onBehalf) external {
+    function repay(Obligation memory obligation, uint256 assets, address onBehalf) external {
         bytes32 id = _id(obligation);
         coveredDebtOf[onBehalf][id] += assets;
         withdrawable[id] += assets;
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), assets);
-    }
-
-    function uncoverDebt(Obligation memory obligation, uint256 assets, address onBehalf) external {
-        bytes32 id = _id(obligation);
-        coveredDebtOf[onBehalf][id] -= assets;
-        withdrawable[id] -= assets;
-
-        if (obligation.maturity < block.timestamp) require(debtOf(onBehalf, id) == 0, "no debt");
-        else require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
-
-        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
     }
 
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
