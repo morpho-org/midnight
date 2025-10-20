@@ -233,7 +233,6 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @notice Execute the given collection of `seizures` on the given `obligation` of the given `borrower`.
     /// @dev On each seizure either `repaid` or `seized` should be equal to zero.
-    /// @dev Covered debt cannot be liquidated.
     /// @param obligation The obligation.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// obligation's collateral assets.
