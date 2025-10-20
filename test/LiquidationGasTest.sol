@@ -34,11 +34,9 @@ contract LiquidationTest is BaseTest {
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
+        obligation.collaterals = collaterals;
 
         uint256 collateral = 1e18;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
 
         for (uint256 i = 0; i < collaterals.length; i++) {
             deal(address(collaterals[i].token), address(this), collateral);

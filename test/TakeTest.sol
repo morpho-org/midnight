@@ -22,23 +22,14 @@ contract TakeTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        deal(address(loanToken), address(this), 100);
-        deal(address(loanToken), address(lender), 100);
-        deal(address(collateralToken1), address(this), type(uint256).max);
-
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
-
-        // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
-        // solc legacy pipeline.
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = keccak256(abi.encode(obligation));
 
@@ -61,7 +52,11 @@ contract TakeTest is BaseTest {
         borrowOffer.expiryPrice = 0.99 ether;
         borrowOffer.nonce = 0;
 
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), 135, borrower);
+        deal(address(loanToken), address(this), 100);
+        deal(address(loanToken), address(lender), 100);
+        deal(address(obligation.collaterals[0].token), address(this), type(uint256).max);
+
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, borrower);
     }
 
     function testTakePostMaturity(uint256 maturity) public {
@@ -222,9 +217,9 @@ contract TakeTest is BaseTest {
 
         (address otherBorrower, uint256 otherBorrowerSecretKey) = makeAddrAndKey("otherBorrower");
         vm.prank(otherBorrower);
-        collateralToken1.approve(address(morphoV2), 135);
-        deal(address(collateralToken1), otherBorrower, 135);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), 135, otherBorrower);
+        ERC20(obligation.collaterals[0].token).approve(address(morphoV2), 135);
+        deal(obligation.collaterals[0].token, otherBorrower, 135);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, otherBorrower);
         borrowOffer.maker = otherBorrower;
         morphoV2.take(
             100,
@@ -445,7 +440,7 @@ contract TakeTest is BaseTest {
             hex""
         );
 
-        morphoV2.supplyCollateral(obligation2, address(collateralToken1), 134, borrower);
+        morphoV2.supplyCollateral(obligation2, obligation2.collaterals[0].token, 134, borrower);
 
         morphoV2.take(
             30,
@@ -466,10 +461,10 @@ contract TakeTest is BaseTest {
     function testTakeLendBorrowCallback() public {
         (address otherBorrower, uint256 otherBorrowerSecretKey) = makeAddrAndKey("otherBorrower");
         borrowOffer.callbackAddress = address(new BorrowCallback());
-        borrowOffer.callbackData = abi.encode(address(collateralToken1), 135);
+        borrowOffer.callbackData = abi.encode(obligation.collaterals[0].token, 135);
         borrowOffer.maker = address(otherBorrower);
-        deal(address(collateralToken1), borrowOffer.callbackAddress, 135);
-        assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
+        deal(obligation.collaterals[0].token, borrowOffer.callbackAddress, 135);
+        assertEq(morphoV2.collateralOf(otherBorrower, id, obligation.collaterals[0].token), 0);
 
         morphoV2.take(
             100,
@@ -484,15 +479,15 @@ contract TakeTest is BaseTest {
             address(0),
             hex""
         );
-        assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 135);
+        assertEq(morphoV2.collateralOf(otherBorrower, id, obligation.collaterals[0].token), 135);
         assertEq(BorrowCallback(borrowOffer.callbackAddress).recordedData(), borrowOffer.callbackData);
     }
 
     function testTakeBorrowBorrowCallback() public {
         (address otherBorrower,) = makeAddrAndKey("otherBorrower");
         address callbackAddress = address(new BorrowCallback());
-        deal(address(collateralToken1), callbackAddress, 135);
-        assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 0);
+        deal(obligation.collaterals[0].token, callbackAddress, 135);
+        assertEq(morphoV2.collateralOf(otherBorrower, id, obligation.collaterals[0].token), 0);
 
         morphoV2.take(
             100,
@@ -505,10 +500,10 @@ contract TakeTest is BaseTest {
             root([lendOffer]),
             proof([lendOffer]),
             callbackAddress,
-            abi.encode(address(collateralToken1), 135)
+            abi.encode(obligation.collaterals[0].token, 135)
         );
-        assertEq(morphoV2.collateralOf(otherBorrower, id, address(collateralToken1)), 135);
-        assertEq(BorrowCallback(callbackAddress).recordedData(), abi.encode(address(collateralToken1), 135));
+        assertEq(morphoV2.collateralOf(otherBorrower, id, obligation.collaterals[0].token), 135);
+        assertEq(BorrowCallback(callbackAddress).recordedData(), abi.encode(obligation.collaterals[0].token, 135));
     }
 
     function testTakeBorrowLendCallback() public {
@@ -597,7 +592,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeSellerMakerNotHealthyMaker() public {
-        morphoV2.withdrawCollateral(obligation, address(collateralToken1), 1, borrower);
+        morphoV2.withdrawCollateral(obligation, obligation.collaterals[0].token, 1, borrower);
         vm.expectRevert("Seller is unhealthy");
         morphoV2.take(
             100,
@@ -615,7 +610,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeSellerTakerNotHealthy() public {
-        morphoV2.withdrawCollateral(obligation, address(collateralToken1), 1, borrower);
+        morphoV2.withdrawCollateral(obligation, obligation.collaterals[0].token, 1, borrower);
         vm.expectRevert("Seller is unhealthy");
         morphoV2.take(
             100,
@@ -746,8 +741,8 @@ contract TakeTest is BaseTest {
         morphoV2.setTradingFeeRecipient(address(this));
 
         address otherBorrower = makeAddr("otherBorrower");
-        deal(address(collateralToken1), address(this), 135);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), 135, otherBorrower);
+        deal(obligation.collaterals[0].token, address(this), 135);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, otherBorrower);
 
         uint256 initialNonce = lendOffer.nonce;
         lendOffer.nonce = uint256(keccak256("random"));
@@ -781,8 +776,8 @@ contract TakeTest is BaseTest {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         deal(address(loanToken), address(lender), buyerAssets);
 
-        deal(address(collateralToken1), address(this), buyerAssets * 2);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), buyerAssets * 2, borrower);
+        deal(obligation.collaterals[0].token, address(this), buyerAssets * 2);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, buyerAssets * 2, borrower);
 
         lendOffer.assets = buyerAssets;
 
@@ -809,8 +804,8 @@ contract TakeTest is BaseTest {
         sellerAssets = bound(sellerAssets, 0, maxAssets);
         deal(address(loanToken), address(lender), sellerAssets * 2);
 
-        deal(address(collateralToken1), address(this), sellerAssets * 2);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), sellerAssets * 2, borrower);
+        deal(obligation.collaterals[0].token, address(this), sellerAssets * 2);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, sellerAssets * 2, borrower);
 
         lendOffer.assets = sellerAssets * 2;
 
@@ -837,8 +832,8 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, 1, maxAssets);
         deal(address(loanToken), address(lender), obligationUnits);
 
-        deal(address(collateralToken1), address(this), obligationUnits * 2);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), obligationUnits * 2, borrower);
+        deal(obligation.collaterals[0].token, address(this), obligationUnits * 2);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, obligationUnits * 2, borrower);
 
         lendOffer.assets = obligationUnits;
 
@@ -863,8 +858,8 @@ contract TakeTest is BaseTest {
         obligationShares = bound(obligationShares, 1, maxAssets);
         deal(address(loanToken), address(lender), obligationShares);
 
-        deal(address(collateralToken1), address(this), obligationShares * 2);
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), obligationShares * 2, borrower);
+        deal(obligation.collaterals[0].token, address(this), obligationShares * 2);
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, obligationShares * 2, borrower);
 
         lendOffer.assets = obligationShares;
 

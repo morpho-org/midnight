@@ -19,22 +19,14 @@ contract TradingFeeTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        deal(address(loanToken), address(this), 1000 ether);
-        deal(address(loanToken), address(lender), 1000 ether);
-        deal(address(loanToken), address(borrower), 1000 ether);
-        deal(address(collateralToken1), address(this), type(uint256).max);
-
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
-
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = keccak256(abi.encode(obligation));
 
@@ -57,7 +49,12 @@ contract TradingFeeTest is BaseTest {
         borrowOffer.expiryPrice = 1 ether;
         borrowOffer.nonce = 0;
 
-        morphoV2.supplyCollateral(obligation, address(collateralToken1), 200 ether, borrower);
+        deal(address(loanToken), address(this), 1000 ether);
+        deal(address(loanToken), address(lender), 1000 ether);
+        deal(address(loanToken), address(borrower), 1000 ether);
+        deal(obligation.collaterals[0].token, address(this), type(uint256).max);
+
+        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 200 ether, borrower);
 
         // Set up trading fee for tests
         morphoV2.setTradingFee(id, 0.05e18); // 5%

@@ -20,19 +20,14 @@ contract LiquidationTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
-
-        // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
-        // solc legacy pipeline.
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = toId(obligation);
     }
