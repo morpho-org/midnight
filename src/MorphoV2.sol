@@ -300,8 +300,8 @@ contract MorphoV2 is IMorphoV2 {
         return seizures;
     }
 
-    function shuffleGlobalNonce() external {
-        globalNonce[msg.sender] = uint128(bytes16(keccak256(abi.encode(globalNonce[msg.sender], block.prevrandao))));
+    function shuffleGlobalNonce(uint256 salt) external {
+        globalNonce[msg.sender] = uint128(bytes16(keccak256(abi.encode(globalNonce[msg.sender], salt))));
     }
 
     /// INTERNAL ///
