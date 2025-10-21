@@ -28,6 +28,7 @@ contract MorphoV2 is IMorphoV2 {
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
     mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 root => bool)) public rootIsCancelled;
 
     /// @dev Cut on interest at each trade for a given obligation id.
     mapping(bytes32 id => uint256) public tradingFee;
@@ -101,6 +102,7 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(!rootIsCancelled[offer.maker][root], "root cancelled");
 
         (
             address buyer,
@@ -295,6 +297,10 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
 
         return seizures;
+    }
+
+    function cancel(bytes32 root) external {
+        rootIsCancelled[msg.sender][root] = true;
     }
 
     /// INTERNAL ///
