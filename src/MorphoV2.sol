@@ -24,10 +24,10 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
 
-    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
+    /// @dev Multiple offers can have the same root. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
-    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    /// otherwise one might not be takable anymore while an other one at the same root is still takeable.
+    mapping(address user => mapping(bytes32 root => uint256)) public consumed;
 
     /// @dev Cut on interest at each trade for a given obligation id.
     mapping(bytes32 id => uint256) public tradingFee;
@@ -141,9 +141,7 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
         }
 
-        require(
-            (consumed[offer.maker][offer.nonce] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
-        );
+        require((consumed[offer.maker][root] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed");
 
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
             sharesOf[buyer][id] += obligationShares;

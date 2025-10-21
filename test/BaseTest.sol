@@ -65,10 +65,10 @@ abstract contract BaseTest is Test {
         return new bytes32[](0);
     }
 
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+    // Just pass the other offer.
+    function proof(Offer memory offer) internal pure returns (bytes32[] memory) {
         bytes32[] memory res = new bytes32[](1);
-        res[0] = keccak256(abi.encode(offers[1]));
+        res[0] = keccak256(abi.encode(offer));
         return res;
     }
 
@@ -112,7 +112,6 @@ abstract contract BaseTest is Test {
             expiry: block.timestamp,
             startPrice: 1 ether,
             expiryPrice: 1 ether,
-            nonce: 0,
             callbackAddress: address(0),
             callbackData: ""
         });
@@ -161,7 +160,6 @@ abstract contract BaseTest is Test {
             expiry: block.timestamp + 200,
             startPrice: 1e18,
             expiryPrice: 1e18,
-            nonce: 0,
             callbackAddress: address(0),
             callbackData: ""
         });

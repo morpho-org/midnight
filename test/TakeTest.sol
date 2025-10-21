@@ -41,7 +41,6 @@ contract TakeTest is BaseTest {
         lendOffer.expiry = block.timestamp + 200;
         lendOffer.startPrice = 0.99 ether;
         lendOffer.expiryPrice = 0.99 ether;
-        lendOffer.nonce = 0;
 
         borrowOffer.buy = false;
         borrowOffer.maker = borrower;
@@ -50,7 +49,6 @@ contract TakeTest is BaseTest {
         borrowOffer.expiry = block.timestamp + 200;
         borrowOffer.startPrice = 0.99 ether;
         borrowOffer.expiryPrice = 0.99 ether;
-        borrowOffer.nonce = 0;
 
         deal(address(loanToken), address(this), 100);
         deal(address(loanToken), address(lender), 100);
@@ -90,7 +88,7 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.totalShares(id), 101, "total shares");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
-        assertEq(morphoV2.consumed(borrower, 0), 100, "borrower nonce");
+        assertEq(morphoV2.consumed(borrower, root([borrowOffer])), 100, "borrower consumed");
     }
 
     function testBorrow() public {
@@ -112,10 +110,9 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.debtOf(borrower, id), 101, "lender debt");
         assertEq(morphoV2.totalUnits(id), 101, "total obligations");
         assertEq(morphoV2.totalShares(id), 101, "total shares");
-        assertEq(morphoV2.consumed(lender, 0), 100, "lender nonce");
+        assertEq(morphoV2.consumed(lender, root([lendOffer])), 100, "lender consumed");
         assertEq(loanToken.balanceOf(borrower), 100, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
-        assertEq(morphoV2.consumed(lender, 0), 100, "lender nonce");
     }
 
     function testWithdrawSecondaryWithLender() public {
@@ -156,7 +153,7 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.sharesOf(otherLender, id), 101, "other lender obligation shares");
         assertEq(morphoV2.totalUnits(id), 101, "total obligations");
         assertEq(morphoV2.totalShares(id), 101, "total shares");
-        assertEq(morphoV2.consumed(otherLender, 0), 99, "other lender nonce");
+        assertEq(morphoV2.consumed(otherLender, root([lendOffer])), 99, "other lender consumed");
         assertEq(loanToken.balanceOf(lender), 99, "lender balance");
         assertEq(loanToken.balanceOf(otherLender), 1, "other lender balance");
     }
@@ -176,7 +173,6 @@ contract TakeTest is BaseTest {
             hex""
         );
         lendOffer.maker = borrower;
-        lendOffer.nonce = 1;
         morphoV2.take(
             0,
             0,
@@ -195,7 +191,7 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.sharesOf(borrower, id), 0, "borrower obligation shares");
         assertEq(morphoV2.totalUnits(id), 0, "total obligations");
         assertEq(morphoV2.totalShares(id), 0, "total shares");
-        assertEq(morphoV2.consumed(borrower, 1), 99, "borrower nonce");
+        assertEq(morphoV2.consumed(borrower, root([lendOffer])), 99, "borrower consumed");
         assertEq(loanToken.balanceOf(lender), 99, "lender balance");
         assertEq(loanToken.balanceOf(borrower), 1, "borrower balance");
     }
@@ -242,7 +238,7 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.debtOf(otherBorrower, id), 101, "other borrower debt");
         assertEq(morphoV2.totalUnits(id), 101, "total obligations");
         assertEq(morphoV2.totalShares(id), 101, "total shares");
-        assertEq(morphoV2.consumed(otherBorrower, 0), 100, "other borrower nonce");
+        assertEq(morphoV2.consumed(otherBorrower, root([borrowOffer])), 100, "other borrower consumed");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
         assertEq(loanToken.balanceOf(otherBorrower), 100, "other borrower balance");
     }
@@ -263,7 +259,6 @@ contract TakeTest is BaseTest {
         );
 
         borrowOffer.maker = lender;
-        borrowOffer.nonce = 1;
         morphoV2.take(
             100,
             0,
@@ -284,7 +279,7 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.debtOf(lender, id), 0, "lender debt");
         assertEq(morphoV2.totalUnits(id), 0, "total obligations");
         assertEq(morphoV2.totalShares(id), 0, "total shares");
-        assertEq(morphoV2.consumed(lender, 1), 100, "lender nonce");
+        assertEq(morphoV2.consumed(lender, root([borrowOffer])), 100, "lender consumed");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 100, "lender balance");
     }
@@ -320,8 +315,8 @@ contract TakeTest is BaseTest {
         assertEq(morphoV2.sharesOf(address(this), id), 0, "obligation shares");
         assertEq(morphoV2.debtOf(address(this), id), 0, "debt");
         assertEq(loanToken.balanceOf(address(this)), 99, "balance");
-        assertEq(morphoV2.consumed(lender, 0), 99, "lender nonce");
-        assertEq(morphoV2.consumed(borrower, 0), 100, "borrower nonce");
+        assertEq(morphoV2.consumed(lender, root([lendOffer])), 99, "lender consumed");
+        assertEq(morphoV2.consumed(borrower, root([borrowOffer])), 100, "borrower consumed");
     }
 
     function testConsumed() public {
@@ -370,7 +365,7 @@ contract TakeTest is BaseTest {
             hex""
         );
 
-        assertEq(morphoV2.consumed(lender, 0), 50);
+        assertEq(morphoV2.consumed(lender, root([lendOffer])), 50);
 
         vm.expectRevert("consumed");
         morphoV2.take(
@@ -401,7 +396,7 @@ contract TakeTest is BaseTest {
             hex""
         );
 
-        assertEq(morphoV2.consumed(lender, 0), 100);
+        assertEq(morphoV2.consumed(lender, root([lendOffer])), 100);
     }
 
     function testTakeOCO() public {
@@ -418,9 +413,9 @@ contract TakeTest is BaseTest {
             0,
             borrower,
             lendOffer,
-            sig(root([lendOffer]), lenderSecretKey),
-            root([lendOffer]),
-            proof([lendOffer]),
+            sig(root([lendOffer, lendOffer2]), lenderSecretKey),
+            root([lendOffer, lendOffer2]),
+            proof(lendOffer2),
             address(0),
             hex""
         );
@@ -433,9 +428,9 @@ contract TakeTest is BaseTest {
             0,
             borrower,
             lendOffer2,
-            sig(root([lendOffer2]), lenderSecretKey),
-            root([lendOffer2]),
-            proof([lendOffer2]),
+            sig(root([lendOffer, lendOffer2]), lenderSecretKey),
+            root([lendOffer, lendOffer2]),
+            proof(lendOffer),
             address(0),
             hex""
         );
@@ -449,13 +444,13 @@ contract TakeTest is BaseTest {
             0,
             borrower,
             lendOffer2,
-            sig(root([lendOffer2]), lenderSecretKey),
-            root([lendOffer2]),
-            proof([lendOffer2]),
+            sig(root([lendOffer, lendOffer2]), lenderSecretKey),
+            root([lendOffer, lendOffer2]),
+            proof(lendOffer),
             address(0),
             hex""
         );
-        assertEq(morphoV2.consumed(lender, 0), 100);
+        assertEq(morphoV2.consumed(lender, root([lendOffer, lendOffer2])), 100);
     }
 
     function testTakeLendBorrowCallback() public {
@@ -728,7 +723,7 @@ contract TakeTest is BaseTest {
             lendOffer,
             sig(root([lendOffer, otherOffer]), lenderSecretKey),
             root([lendOffer, otherOffer]),
-            proof([lendOffer, otherOffer]),
+            proof(otherOffer),
             address(0),
             hex""
         );
@@ -743,9 +738,6 @@ contract TakeTest is BaseTest {
         address otherBorrower = makeAddr("otherBorrower");
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, otherBorrower);
-
-        uint256 initialNonce = lendOffer.nonce;
-        lendOffer.nonce = uint256(keccak256("random"));
 
         // realize some bad debt
         morphoV2.take(
@@ -766,7 +758,6 @@ contract TakeTest is BaseTest {
         morphoV2.liquidate(obligation, new Seizure[](1), otherBorrower, "");
 
         // reset
-        lendOffer.nonce = initialNonce;
         Oracle(oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 

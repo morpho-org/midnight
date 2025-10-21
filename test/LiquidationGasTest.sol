@@ -60,7 +60,6 @@ contract LiquidationTest is BaseTest {
             expiry: block.timestamp + 100,
             startPrice: 1e18,
             expiryPrice: 1e18,
-            nonce: 0,
             callbackAddress: address(0),
             callbackData: ""
         });
