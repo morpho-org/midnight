@@ -61,7 +61,6 @@ contract LiquidationTest is BaseTest {
             startPrice: 1e18,
             expiryPrice: 1e18,
             nonce: 0,
-            globalNonce: 0,
             callbackAddress: address(0),
             callbackData: ""
         });

@@ -745,7 +745,7 @@ contract TakeTest is BaseTest {
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, otherBorrower);
 
         uint256 initialNonce = lendOffer.nonce;
-        lendOffer.nonce = uint256(keccak256("random"));
+        lendOffer.nonce = uint128(uint256(keccak256("random")));
 
         // realize some bad debt
         morphoV2.take(

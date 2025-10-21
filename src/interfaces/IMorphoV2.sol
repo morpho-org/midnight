@@ -25,8 +25,7 @@ struct Offer {
     uint256 expiry;
     uint256 startPrice;
     uint256 expiryPrice;
-    uint256 nonce;
-    uint256 globalNonce;
+    uint256 nonce; // first 128 bits are the global nonce, last 128 bits are the normal nonce.
     address callbackAddress;
     bytes callbackData;
 }

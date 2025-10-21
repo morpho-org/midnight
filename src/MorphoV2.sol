@@ -27,8 +27,8 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
     /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
-    mapping(address user => uint256) public globalNonce;
+    mapping(address user => mapping(uint128 nonce => uint256)) public consumed;
+    mapping(address user => uint128 globalNonce) public globalNonce;
 
     /// @dev Cut on interest at each trade for a given obligation id.
     mapping(bytes32 id => uint256) public tradingFee;
@@ -102,7 +102,7 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.globalNonce == globalNonce[offer.maker], "invalid global nonce");
+        require(offer.nonce >> 128 == globalNonce[offer.maker], "invalid global nonce");
 
         (
             address buyer,
@@ -144,7 +144,8 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         require(
-            (consumed[offer.maker][offer.nonce] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
+            (consumed[offer.maker][uint128(offer.nonce)] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets,
+            "consumed"
         );
 
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
@@ -300,7 +301,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function shuffleGlobalNonce() external {
-        globalNonce[msg.sender] = uint256(keccak256(abi.encode(globalNonce[msg.sender], block.prevrandao)));
+        globalNonce[msg.sender] = uint128(bytes16(keccak256(abi.encode(globalNonce[msg.sender], block.prevrandao))));
     }
 
     /// INTERNAL ///
