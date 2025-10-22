@@ -802,12 +802,17 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onTake(Obligation memory obligation, address borrower, uint256, bytes memory data) external {
+    function onSell(Obligation memory obligation, address seller, uint256 assets, uint256 units, bytes memory data)
+        external
+    {
         recordedData = data;
         (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
         ERC20(collateralToken).approve(msg.sender, amount);
-        MorphoV2(msg.sender).supplyCollateral(obligation, collateralToken, amount, borrower);
+        MorphoV2(msg.sender).supplyCollateral(obligation, collateralToken, amount, seller);
     }
+
+    function onBuy(Obligation memory obligation, address buyer, uint256 assets, uint256 units, bytes memory data)
+        external {}
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 }
@@ -815,10 +820,15 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    function onTake(Obligation memory obligation, address maker, uint256 assets, bytes memory data) external {
+    function onBuy(Obligation memory obligation, address buyer, uint256 assets, uint256 units, bytes memory data)
+        external
+    {
         recordedData = data;
-        ERC20(obligation.loanToken).transfer(maker, assets);
+        ERC20(obligation.loanToken).transfer(buyer, assets);
     }
+
+    function onSell(Obligation memory obligation, address seller, uint256 assets, uint256 units, bytes memory data)
+        external {}
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 }
