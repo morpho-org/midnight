@@ -59,7 +59,9 @@ contract LiquidationTest is BaseTest {
             expiryPrice: 1e18,
             nonce: 0,
             callbackAddress: address(0),
-            callbackData: ""
+            callbackData: "",
+            ratifier: address(0),
+            ratifierData: ""
         });
 
         morphoV2.take(

@@ -55,10 +55,14 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
         require(
             msg.sender == offer.maker
-                || (sig.v != 0
-                    && _signer(root, sig) == offer.maker
-                    && MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof)) || authorized[offer.maker][msg.sender]
-                || _ratified[abi.encode(offer)],
+                || (
+                    offer.ratifier != address(0) && authorized[offer.maker][offer.ratifier]
+                        && ICallbacks(offer.ratifier).onRatify(offer, sig, root, proof)
+                )
+                || (
+                    sig.v != 0 && _signer(root, sig) == offer.maker
+                        && MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof)
+                ) || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
             "offer not ratified"
         );
 
@@ -235,7 +239,6 @@ contract MorphoV2 is IMorphoV2 {
         return _ratified[abi.encode(offer)];
     }
 
-    /// @dev No ratification by callback, use multicall.
     /// @dev No ratification by signature, check the signature in the caller.
     function setRatified(Offer memory offer, bool newRatified) external {
         require(msg.sender == offer.maker || authorized[offer.maker][msg.sender], "ratification not authorized");

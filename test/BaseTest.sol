@@ -115,7 +115,9 @@ abstract contract BaseTest is Test {
             expiryPrice: 1 ether,
             nonce: 0,
             callbackAddress: address(0),
-            callbackData: ""
+            callbackData: "",
+            ratifier: address(0),
+            ratifierData: ""
         });
 
         morphoV2.take(
@@ -162,7 +164,9 @@ abstract contract BaseTest is Test {
             expiryPrice: 1e18,
             nonce: 0,
             callbackAddress: address(0),
-            callbackData: ""
+            callbackData: "",
+            ratifier: address(0),
+            ratifierData: ""
         });
 
         morphoV2.take(

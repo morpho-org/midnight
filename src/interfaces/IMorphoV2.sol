@@ -28,6 +28,8 @@ struct Offer {
     uint256 nonce;
     address callbackAddress;
     bytes callbackData;
+    address ratifier;
+    bytes ratifierData;
 }
 
 struct Signature {
