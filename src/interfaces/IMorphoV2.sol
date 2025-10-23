@@ -39,7 +39,7 @@ struct Signature {
 struct Authorization {
     address authorizer;
     address authorizee;
-    bool authorized;
+    bool isAuthorized;
     uint256 nonce;
     uint256 deadline;
 }

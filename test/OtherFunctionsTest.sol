@@ -195,7 +195,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 authorizerPK,
         uint256 elapsed,
         address authorizee,
-        bool authorized,
+        bool isAuthorized,
         uint256 otherPK,
         uint256 wrongNonce
     ) public {
@@ -209,7 +209,7 @@ contract OtherFunctionsTest is BaseTest {
         Authorization memory authorization = Authorization({
             authorizer: authorizer,
             authorizee: authorizee,
-            authorized: authorized,
+            isAuthorized: isAuthorized,
             nonce: 0,
             deadline: vm.getBlockTimestamp() - 1
         });
@@ -240,7 +240,7 @@ contract OtherFunctionsTest is BaseTest {
         authorization.nonce = 0;
         (sig.v, sig.r, sig.s) = vm.sign(authorizerPK, _authorizationDigest(authorization));
         morphoV2.setAuthorizedWithSig(authorization, sig);
-        assertEq(morphoV2.authorized(authorizer, authorizee), authorized);
+        assertEq(morphoV2.authorized(authorizer, authorizee), isAuthorized);
         assertEq(morphoV2.authorizationNonce(authorizer), 1);
 
         vm.expectRevert("invalid nonce");
