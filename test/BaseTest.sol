@@ -113,26 +113,21 @@ abstract contract BaseTest is Test {
         deal(address(obligation.collaterals[0].token), address(this), collateral);
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
-        Offer memory borrowOffer = Offer({
-            obligation: obligation,
-            buy: false,
-            maker: borrower,
-            assets: obligationUnits,
-            start: block.timestamp,
-            expiry: block.timestamp,
-            startPrice: 1 ether,
-            expiryPrice: 1 ether,
-            nonce: 0,
-            group: bytes32(uint256(0)),
-            callbackAddress: address(0),
-            callbackData: "",
-            ratifier: address(0)
-        });
+
+        Offer memory borrowOffer;
+        borrowOffer.obligation = obligation;
+        borrowOffer.buy = false;
+        borrowOffer.maker = borrower;
+        borrowOffer.assets = obligationUnits;
+        borrowOffer.start = block.timestamp;
+        borrowOffer.expiry = block.timestamp;
+        borrowOffer.startPrice = 1 ether;
+        borrowOffer.expiryPrice = 1 ether;
 
         morphoV2.take(
             0,
-            obligationUnits,
             0,
+            obligationUnits,
             0,
             lender,
             borrowOffer,
@@ -162,26 +157,21 @@ abstract contract BaseTest is Test {
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral0, borrower);
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[1].token), collateral1, borrower);
-        Offer memory borrowOffer = Offer({
-            buy: false,
-            maker: borrower,
-            assets: obligationUnits,
-            obligation: obligation,
-            start: block.timestamp,
-            expiry: block.timestamp + 200,
-            startPrice: 1e18,
-            expiryPrice: 1e18,
-            group: bytes32(uint256(0)),
-            nonce: 0,
-            callbackAddress: address(0),
-            callbackData: "",
-            ratifier: address(0)
-        });
+
+        Offer memory borrowOffer;
+        borrowOffer.buy = false;
+        borrowOffer.maker = borrower;
+        borrowOffer.assets = obligationUnits;
+        borrowOffer.obligation = obligation;
+        borrowOffer.start = block.timestamp;
+        borrowOffer.expiry = block.timestamp + 200;
+        borrowOffer.startPrice = 1e18;
+        borrowOffer.expiryPrice = 1e18;
 
         morphoV2.take(
             0,
-            obligationUnits,
             0,
+            obligationUnits,
             0,
             lender,
             borrowOffer,
