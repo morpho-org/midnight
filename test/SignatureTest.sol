@@ -2,7 +2,11 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import "./BaseTest.sol";
+import {Signature} from "../src/interfaces/IMorphoV2.sol";
+import {MorphoV2} from "../src/MorphoV2.sol";
+import {MathLib} from "../src/libraries/MathLib.sol";
+
+import {Test} from "../lib/forge-std/src/Test.sol";
 
 /// @dev Ref implem from OpenZeppelin.
 function toEthSignedMessageHash(bytes32 messageHash) pure returns (bytes32 digest) {

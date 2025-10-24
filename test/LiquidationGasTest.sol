@@ -2,7 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import "./BaseTest.sol";
+import {Obligation, Offer, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+
+import {console} from "../lib/forge-std/src/console.sol";
+import {ERC20} from "./helpers/ERC20.sol";
+import {Oracle} from "./helpers/Oracle.sol";
+import {BaseTest} from "./BaseTest.sol";
 
 contract LiquidationTest is BaseTest {
     Obligation internal obligation;
@@ -29,11 +34,9 @@ contract LiquidationTest is BaseTest {
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
+        obligation.collaterals = collaterals;
 
         uint256 collateral = 1e18;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
 
         for (uint256 i = 0; i < collaterals.length; i++) {
             deal(address(collaterals[i].token), address(this), collateral);
@@ -57,13 +60,16 @@ contract LiquidationTest is BaseTest {
             expiry: block.timestamp + 100,
             startPrice: 1e18,
             expiryPrice: 1e18,
+            group: bytes32(uint256(0)),
             nonce: 0,
             callbackAddress: address(0),
             callbackData: "",
             ratifier: address(0)
         });
 
-        morphoV2.take(0, maxDebt, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
+        morphoV2.take(
+            0, maxDebt, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
+        );
 
         // Setup liquidation
         for (uint256 i = 0; i < numCollaterals; i++) {

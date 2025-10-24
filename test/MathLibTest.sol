@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import "../lib/forge-std/src/Test.sol";
-import "../src/libraries/MathLib.sol";
+import {Test, stdError} from "../lib/forge-std/src/Test.sol";
+import {MathLib} from "../src/libraries/MathLib.sol";
 
 contract MathLibTest is Test {
     function testMulDivDown(uint256 x, uint256 y, uint256 d) public pure {

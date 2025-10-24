@@ -2,7 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {MorphoV2, Obligation, IERC20} from "../../src/MorphoV2.sol";
+import {IERC20} from "../../src/interfaces/IERC20.sol";
+import {MorphoV2, Obligation} from "../../src/MorphoV2.sol";
 
 contract MorphoV2Helpers is MorphoV2 {
     function balanceOf(address token, address account) external view returns (uint256) {

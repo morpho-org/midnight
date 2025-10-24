@@ -2,14 +2,22 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import "./libraries/UtilsLib.sol";
-import "./libraries/SafeTransferLib.sol";
-import "./libraries/ConstantsLib.sol";
-import "./libraries/MathLib.sol";
-import "./interfaces/IOracle.sol";
-import "./interfaces/IMorphoV2.sol";
-import "./interfaces/ICallbacks.sol";
+import {UtilsLib} from "./libraries/UtilsLib.sol";
+import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    LIQUIDATION_INCENTIVE_FACTOR,
+    DOMAIN_TYPEHASH,
+    AUTHORIZATION_TYPEHASH
+} from "./libraries/ConstantsLib.sol";
+import {MathLib} from "./libraries/MathLib.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
+import {IMorphoV2, Obligation, Offer, Signature, Seizure, Authorization} from "./interfaces/IMorphoV2.sol";
+import {ICallbacks} from "./interfaces/ICallbacks.sol";
 
+/// OBLIGATIONS
+/// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
 
@@ -25,31 +33,82 @@ contract MorphoV2 is IMorphoV2 {
     mapping(address => uint256) public authorizationNonce;
     mapping(address => mapping(bytes32 => bool)) public ratified;
 
-    /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
-    /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
-    /// otherwise one might not be takable anymore while an other one at the same nonce is still takeable.
-    mapping(address user => mapping(uint256 nonce => uint256)) public consumed;
+    /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
+    /// @dev To work as expected, all offers in a same group should have the same amount and the same loan asset.
+    mapping(address user => mapping(bytes32 group => uint256)) public consumed;
+
+    /// @dev Offers should have this exact nonce to be valid.
+    /// @dev The nonce can be shuffled by the user to cancel everything easily/efficiently.
+    mapping(address user => bytes32) public nonce;
+
+    /// @dev Cut on interest at each trade for a given obligation id.
+    mapping(bytes32 id => uint256) public tradingFee;
+    address public tradingFeeRecipient;
+
+    /// @dev Contract owner for administrative functions.
+    address public owner;
+
+    /// @dev Address that can set trading fees.
+    address public feeSetter;
+
+    /// CONSTRUCTOR ///
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /// ADMIN FUNCTIONS ///
+
+    function setOwner(address newOwner) external {
+        require(msg.sender == owner, "Only owner");
+        owner = newOwner;
+    }
+
+    function setFeeSetter(address newFeeSetter) external {
+        require(msg.sender == owner, "Only owner");
+        feeSetter = newFeeSetter;
+    }
+
+    function setTradingFee(bytes32 id, uint256 fee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(fee <= 1e18, "Fee too high");
+        tradingFee[id] = fee;
+    }
+
+    function setTradingFeeRecipient(address recipient) external {
+        require(msg.sender == owner, "Only owner");
+        tradingFeeRecipient = recipient;
+    }
 
     /// ENTRY-POINTS ///
 
+    /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
+    /// @dev Neither the taker nor the maker can pass from having obligation shares to having debt in one take.
     function take(
-        uint256 assets,
+        uint256 buyerAssets,
+        uint256 sellerAssets,
         uint256 obligationUnits,
+        uint256 obligationShares,
         address taker,
         Offer memory offer,
         bytes memory ratificationData,
         address takerCallbackAddress,
         bytes memory takerCallbackData
-    ) public {
-        require(assets == 0 || obligationUnits == 0, "inconsistent input");
+    ) public returns (uint256, uint256, uint256, uint256) {
+        bytes32 id = _id(offer.obligation);
+        require(
+            UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
+            "inconsistent input"
+        );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
-        require(offer.obligation.maturity >= block.timestamp, "maturity");
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
         require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
+        require(offer.maker != taker, "buyer and seller cannot be the same");
+        require(offer.nonce == nonce[offer.maker], "invalid nonce");
         require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
 
         if (offer.ratifier != address(0)) {
@@ -82,53 +141,79 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callbackAddress, offer.callbackData, taker, takerCallbackAddress, takerCallbackData)
             : (taker, takerCallbackAddress, takerCallbackData, offer.maker, offer.callbackAddress, offer.callbackData);
 
-        uint256 price = offer.expiry != offer.start
+        uint256 offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
                 / (offer.expiry - offer.start)
             : offer.startPrice;
+        require(offerPrice <= 1e18, "price too high");
 
-        if (assets > 0) obligationUnits = assets.mulDivDown(1e18, price);
-        else assets = obligationUnits.mulDivDown(price, 1e18);
+        uint256 _tradingFee = tradingFee[id];
+        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
+        uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
 
-        require((consumed[offer.maker][offer.nonce] += assets) <= offer.assets, "consumed");
-
-        bytes32 id = _id(offer.obligation);
-
-        uint256 repaid = UtilsLib.min(debtOf[buyer][id], obligationUnits);
-        uint256 bought = obligationUnits - repaid;
-        uint256 boughtShares = bought.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        uint256 withdrawn =
-            UtilsLib.min(sharesOf[seller][id].mulDivDown(totalUnits[id] + 1, totalShares[id] + 1), obligationUnits);
-        uint256 withdrawnShares = withdrawn.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
-
-        debtOf[buyer][id] -= repaid;
-        sharesOf[buyer][id] += boughtShares;
-        sharesOf[seller][id] -= withdrawnShares;
-        debtOf[seller][id] += obligationUnits - withdrawn;
-
-        totalShares[id] += boughtShares;
-        totalShares[id] -= withdrawnShares;
-        totalUnits[id] += bought;
-        totalUnits[id] -= withdrawn;
-
-        if (buyerCallbackAddress != address(0)) {
-            ICallbacks(buyerCallbackAddress).onTake(offer.obligation, buyer, assets, buyerCallbackData);
+        if (buyerAssets > 0) {
+            obligationUnits = buyerAssets.mulDivDown(1e18, buyerPrice);
+            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (sellerAssets > 0) {
+            obligationUnits = sellerAssets.mulDivDown(1e18, sellerPrice);
+            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (obligationUnits > 0) {
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else {
+            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, assets);
+        require(
+            (consumed[offer.maker][offer.group] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
+        );
+
+        if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
+            sharesOf[buyer][id] += obligationShares;
+            debtOf[seller][id] += obligationUnits;
+            totalShares[id] += obligationShares;
+            totalUnits[id] += obligationUnits;
+        } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
+            sharesOf[buyer][id] += obligationShares;
+            sharesOf[seller][id] -= obligationShares;
+        } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
+            debtOf[buyer][id] -= obligationUnits;
+            debtOf[seller][id] += obligationUnits;
+        } else {
+            debtOf[buyer][id] -= obligationUnits;
+            sharesOf[seller][id] -= obligationShares;
+            totalShares[id] -= obligationShares;
+            totalUnits[id] -= obligationUnits;
+        }
+
+        if (buyerCallbackAddress != address(0)) {
+            ICallbacks(buyerCallbackAddress).onTake(offer.obligation, buyer, buyerAssets, buyerCallbackData);
+        }
+
+        SafeTransferLib.safeTransferFrom(
+            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
 
         if (sellerCallbackAddress != address(0)) {
-            ICallbacks(sellerCallbackAddress).onTake(offer.obligation, seller, assets, sellerCallbackData);
+            ICallbacks(sellerCallbackAddress).onTake(offer.obligation, seller, sellerAssets, sellerCallbackData);
         }
 
         require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
+
+        return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
-        require(UtilsLib.exactlyOneZero(obligationUnits, shares), "INCONSISTENT_INPUT");
+        require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
@@ -208,7 +293,7 @@ contract MorphoV2 is IMorphoV2 {
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
-            require(UtilsLib.exactlyOneZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
+            require(UtilsLib.atMostOneNonZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
 
             if (seizure.seized > 0) {
                 seizure.repaid = seizure.seized.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR)
@@ -263,14 +348,20 @@ contract MorphoV2 is IMorphoV2 {
         authorized[authorization.authorizer][authorization.authorizee] = authorization.isAuthorized;
     }
 
+    function consume(bytes32 group, uint256 amount) external {
+        consumed[msg.sender][group] += amount;
+    }
+
+    /// @dev TODO: is it safe enough?
+    function shuffleNonce() external {
+        nonce[msg.sender] = keccak256(abi.encode(nonce[msg.sender], blockhash(block.number - 1)));
+    }
+
     /// INTERNAL ///
 
     function _id(Obligation memory obligation) internal pure returns (bytes32) {
         return keccak256(abi.encode(obligation));
     }
-
-    /// @dev Check if an offer is ratified by a signature, by storage, or by an authorized contract.
-    function _checkRatification(Offer memory offer, bytes memory ratification) internal returns (bool) {}
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
@@ -279,10 +370,14 @@ contract MorphoV2 is IMorphoV2 {
             return true;
         } else {
             uint256 maxDebt;
+            address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+                address currentCollateralToken = obligation.collaterals[i].token;
+                require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][obligation.collaterals[i].token]
-                    .mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(obligation.collaterals[i].lltv, 1e18);
+                maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(obligation.collaterals[i].lltv, 1e18);
+                previousCollateralToken = currentCollateralToken;
             }
 
             return debt <= maxDebt;

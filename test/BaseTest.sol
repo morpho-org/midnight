@@ -2,10 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import "../lib/forge-std/src/Test.sol";
+import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import "../src/MorphoV2.sol";
+import {MathLib} from "../src/libraries/MathLib.sol";
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
+import {MorphoV2} from "../src/MorphoV2.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
@@ -15,17 +17,19 @@ abstract contract BaseTest is Test {
     ERC20 internal collateralToken1;
     ERC20 internal collateralToken2;
     Oracle internal oracle;
-    uint256 internal borrowerSK;
+    uint256 internal borrowerSecretKey;
     address internal borrower;
-    uint256 internal lenderSK;
+    uint256 internal lenderSecretKey;
     address internal lender;
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public virtual {
         morphoV2 = new MorphoV2();
 
-        (borrower, borrowerSK) = makeAddrAndKey("borrower");
-        (lender, lenderSK) = makeAddrAndKey("lender");
+        morphoV2.setFeeSetter(address(this));
+
+        (borrower, borrowerSecretKey) = makeAddrAndKey("borrower");
+        (lender, lenderSecretKey) = makeAddrAndKey("lender");
 
         loanToken = new ERC20("loan", "loan");
         collateralToken1 = new ERC20("collat1", "collat1");
@@ -123,12 +127,23 @@ abstract contract BaseTest is Test {
             startPrice: 1 ether,
             expiryPrice: 1 ether,
             nonce: 0,
+            group: bytes32(uint256(0)),
             callbackAddress: address(0),
             callbackData: "",
             ratifier: address(0)
         });
 
-        morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
+        morphoV2.take(
+            0,
+            obligationUnits,
+            0,
+            0,
+            lender,
+            borrowOffer,
+            signProof([borrowOffer], borrowerSecretKey),
+            address(0),
+            hex""
+        );
     }
 
     function setupMaxObligationWithCollaterals(Obligation memory obligation, uint256 collateral0, uint256 collateral1)
@@ -160,12 +175,23 @@ abstract contract BaseTest is Test {
             expiry: block.timestamp + 200,
             startPrice: 1e18,
             expiryPrice: 1e18,
+            group: bytes32(uint256(0)),
             nonce: 0,
             callbackAddress: address(0),
             callbackData: "",
             ratifier: address(0)
         });
 
-        morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
+        morphoV2.take(
+            0,
+            obligationUnits,
+            0,
+            0,
+            lender,
+            borrowOffer,
+            signProof([borrowOffer], borrowerSecretKey),
+            address(0),
+            hex""
+        );
     }
 }
