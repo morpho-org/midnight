@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./BaseTest.sol";
+import {Seizure} from "../src/interfaces/IMorphoV2.sol";
 
 contract PostMaturityLiquidationTest is BaseTest {
     Obligation internal obligation;
