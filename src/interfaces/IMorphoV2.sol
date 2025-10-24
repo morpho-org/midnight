@@ -25,7 +25,8 @@ struct Offer {
     uint256 expiry;
     uint256 startPrice;
     uint256 expiryPrice;
-    uint256 nonce;
+    bytes32 group;
+    bytes32 nonce;
     address callbackAddress;
     bytes callbackData;
 }

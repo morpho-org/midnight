@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import "../src/libraries/SafeTransferLib.sol";
+import {Test} from "../lib/forge-std/src/Test.sol";
+import {IERC20, SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 
 /// @dev Token not returning any boolean.
 contract ERC20WithoutBoolean {

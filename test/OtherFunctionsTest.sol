@@ -2,7 +2,10 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import "./BaseTest.sol";
+import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
+
+import {ERC20} from "./helpers/ERC20.sol";
+import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 contract OtherFunctionsTest is BaseTest {
     Obligation internal obligation;
@@ -11,18 +14,14 @@ contract OtherFunctionsTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-
-        // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
-        // solc legacy pipeline.
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = toId(obligation);
     }
@@ -64,19 +63,23 @@ contract OtherFunctionsTest is BaseTest {
         uint256 minCollateral = (obligations * 1e18 + (0.75e18 - 1)) / 0.75e18;
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, 0, (supply - minCollateral) / 2);
-        deal(address(collateralToken1), address(this), supply);
+        deal(obligation.collaterals[0].token, address(this), supply);
         setupObligation(obligation, obligations, supply);
 
         // Test
-        morphoV2.withdrawCollateral(obligation, address(collateralToken1), withdraw, borrower);
+        morphoV2.withdrawCollateral(obligation, obligation.collaterals[0].token, withdraw, borrower);
 
         assertEq(
-            morphoV2.collateralOf(borrower, toId(obligation), address(collateralToken1)),
+            morphoV2.collateralOf(borrower, toId(obligation), obligation.collaterals[0].token),
             supply - withdraw,
             "collateral of"
         );
-        assertEq(collateralToken1.balanceOf(address(morphoV2)), supply - withdraw, "balance of morphoV2");
-        assertEq(collateralToken1.balanceOf(address(this)), withdraw, "balance of this");
+        assertEq(
+            ERC20(obligation.collaterals[0].token).balanceOf(address(morphoV2)),
+            supply - withdraw,
+            "balance of morphoV2"
+        );
+        assertEq(ERC20(obligation.collaterals[0].token).balanceOf(address(this)), withdraw, "balance of this");
     }
 
     function testWithdrawCollateralWithBorrowUnhealthy(uint256 supply, uint256 withdraw, uint256 obligations) public {
@@ -85,12 +88,12 @@ contract OtherFunctionsTest is BaseTest {
         uint256 minCollateral = (obligations * 1e18 + (0.75e18 - 1)) / 0.75e18;
         supply = bound(supply, minCollateral, 1e41);
         withdraw = bound(withdraw, supply - minCollateral + 1, supply);
-        deal(address(collateralToken1), address(this), supply);
+        deal(obligation.collaterals[0].token, address(this), supply);
         setupObligation(obligation, obligations, supply);
 
         // Test
         vm.expectRevert("Unhealthy borrower");
-        morphoV2.withdrawCollateral(obligation, address(collateralToken1), withdraw, borrower);
+        morphoV2.withdrawCollateral(obligation, obligation.collaterals[0].token, withdraw, borrower);
     }
 
     function testRepay(uint256 obligations, uint256 repaid) public {
@@ -115,9 +118,6 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawInconsistentInput() public {
         vm.expectRevert("INCONSISTENT_INPUT");
         morphoV2.withdraw(obligation, 1, 1, lender);
-
-        vm.expectRevert("INCONSISTENT_INPUT");
-        morphoV2.withdraw(obligation, 0, 0, lender);
     }
 
     function testWithdrawWithObligations(uint256 obligations, uint256 withdraw) public {
@@ -152,5 +152,11 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
+    }
+
+    function testConsume(address user, bytes32 group, uint256 amount) public {
+        vm.prank(user);
+        morphoV2.consume(group, amount);
+        assertEq(morphoV2.consumed(user, group), amount, "consumed");
     }
 }

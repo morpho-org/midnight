@@ -18,4 +18,4 @@ jobs:
       - name: Check formatting
         run: forge fmt --check
       - name: Run Forge tests
-        run: forge test
+        run: forge test --deny-warnings
