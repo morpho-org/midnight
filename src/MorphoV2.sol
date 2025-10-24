@@ -213,6 +213,7 @@ contract MorphoV2 is IMorphoV2 {
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
+        require(msg.sender == onBehalf || authorized[onBehalf][msg.sender], "withdraw not authorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
@@ -247,6 +248,7 @@ contract MorphoV2 is IMorphoV2 {
     function withdrawCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
+        require(msg.sender == onBehalf || authorized[onBehalf][msg.sender], "withdrawCollateral not authorized");
         collateralOf[onBehalf][_id(obligation)][collateral] -= assets;
 
         require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
