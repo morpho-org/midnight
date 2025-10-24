@@ -332,12 +332,9 @@ contract TakeTest is BaseTest {
         vm.assume(wrongRoot != root([lendOffer]));
         vm.expectRevert("invalid proof");
 
-        Signature memory sig;
-        (sig.v, sig.r, sig.s) = sign(wrongRoot, lenderSecretKey);
+        bytes memory ratificationData = abi.encode(wrongRoot, new bytes32[](0), messageSig(wrongRoot, lenderSecretKey));
 
-        morphoV2.take(
-            100, 0, 0, 0, borrower, lendOffer, abi.encode(wrongRoot, new bytes32[](0), sig), address(0), hex""
-        );
+        morphoV2.take(100, 0, 0, 0, borrower, lendOffer, ratificationData, address(0), hex"");
     }
 
     function testTakeNotRatified() public {
@@ -409,6 +406,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeByRatification(address maker, address sender, bytes32 data) public {
+        vm.assume(maker != sender);
         RatifyCallback ratifier = new RatifyCallback();
         lendOffer.maker = maker;
         lendOffer.ratifier = address(ratifier);
@@ -426,10 +424,10 @@ contract TakeTest is BaseTest {
         vm.assume(path.length >= 1);
         vm.expectRevert("invalid proof");
 
-        Signature memory sig;
-        (sig.v, sig.r, sig.s) = sign(root([lendOffer]), lenderSecretKey);
+        bytes32 _root = root([lendOffer]);
+        bytes memory ratificationData = abi.encode(_root, path, messageSig(_root, lenderSecretKey));
 
-        morphoV2.take(100, 0, 0, 0, borrower, lendOffer, abi.encode(root([lendOffer]), path, sig), address(0), hex"");
+        morphoV2.take(100, 0, 0, 0, borrower, lendOffer, ratificationData, address(0), hex"");
     }
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory path) public {
@@ -438,13 +436,11 @@ contract TakeTest is BaseTest {
         vm.assume(path.length >= 1);
         vm.assume(path[0] != keccak256(abi.encode(otherOffer)));
 
-        Signature memory sig;
-        (sig.v, sig.r, sig.s) = sign(root([lendOffer, otherOffer]), lenderSecretKey);
+        bytes32 _root = root([lendOffer, otherOffer]);
+        bytes memory ratificationData = abi.encode(_root, path, messageSig(_root, lenderSecretKey));
 
         vm.expectRevert("invalid proof");
-        morphoV2.take(
-            100, 0, 0, 0, borrower, lendOffer, abi.encode(root([lendOffer, otherOffer]), path, sig), address(0), hex""
-        );
+        morphoV2.take(100, 0, 0, 0, borrower, lendOffer, ratificationData, address(0), hex"");
     }
 
     function testTakeTwoLeaves(Offer memory otherOffer) public {

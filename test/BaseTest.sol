@@ -60,9 +60,7 @@ abstract contract BaseTest is Test {
 
     function signProof(Offer[1] memory offers, uint256 sk) internal pure returns (bytes memory) {
         bytes32 _root = root(offers);
-        Signature memory sig;
-        (sig.v, sig.r, sig.s) = sign(_root, sk);
-        return abi.encode(_root, new bytes32[](0), sig);
+        return abi.encode(_root, new bytes32[](0), messageSig(_root, sk));
     }
 
     // assumes the offer is the first one!
@@ -71,9 +69,7 @@ abstract contract BaseTest is Test {
         path[0] = keccak256(abi.encode(offers[1]));
 
         bytes32 _root = root(offers);
-        Signature memory sig;
-        (sig.v, sig.r, sig.s) = sign(_root, sk);
-        return abi.encode(_root, path, sig);
+        return abi.encode(_root, path, messageSig(_root, sk));
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
@@ -88,9 +84,9 @@ abstract contract BaseTest is Test {
         return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
     }
 
-    function sign(bytes32 _root, uint256 sk) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
+    function messageSig(bytes32 _root, uint256 sk) internal pure returns (Signature memory sig) {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
-        return vm.sign(sk, messageHash);
+        (sig.v, sig.r, sig.s) = vm.sign(sk, messageHash);
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {

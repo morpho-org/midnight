@@ -40,6 +40,21 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(collateralToken.balanceOf(address(morphoV2)), amount, "balance of morphoV2");
     }
 
+    function testWithdrawCollateralNotAuthorized(address sender, address user, uint256 amount) public {
+        vm.assume(sender != user);
+        ERC20 collateralToken = new ERC20("collat", "c");
+        deal(address(collateralToken), address(user), amount);
+
+        vm.startPrank(user);
+        collateralToken.approve(address(morphoV2), amount);
+        morphoV2.supplyCollateral(obligation, address(collateralToken), amount, user);
+        vm.stopPrank();
+
+        vm.prank(sender);
+        vm.expectRevert("withdrawCollateral not authorized");
+        morphoV2.withdrawCollateral(obligation, address(collateralToken), amount, user);
+    }
+
     function testWithdrawCollateralNoBorrow(address user, uint256 supply, uint256 withdraw) public {
         // Setup
         withdraw = bound(withdraw, 0, supply);
@@ -48,7 +63,11 @@ contract OtherFunctionsTest is BaseTest {
         collateralToken.approve(address(morphoV2), supply);
         morphoV2.supplyCollateral(obligation, address(collateralToken), supply, user);
 
-        // Test
+        vm.startPrank(user);
+        morphoV2.setAuthorized(address(this), true);
+        collateralToken.approve(address(morphoV2), withdraw);
+        vm.stopPrank();
+
         morphoV2.withdrawCollateral(obligation, address(collateralToken), withdraw, user);
 
         assertEq(
@@ -121,6 +140,19 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.withdraw(obligation, 1, 1, lender);
     }
 
+    function testWithdrawNotAuthorized(address sender, uint256 obligationUnits) public {
+        vm.assume(sender != lender);
+
+        // Setup
+        obligationUnits = bound(obligationUnits, 1, MAX_TEST_AMOUNT);
+        testRepay(obligationUnits, obligationUnits);
+
+        // Test
+        vm.prank(sender);
+        vm.expectRevert("withdraw not authorized");
+        morphoV2.withdraw(obligation, obligationUnits, 0, lender);
+    }
+
     function testWithdrawWithObligations(uint256 obligations, uint256 withdraw) public {
         // Setup
         obligations = bound(obligations, 1, MAX_TEST_AMOUNT);
@@ -129,13 +161,15 @@ contract OtherFunctionsTest is BaseTest {
 
         // Test
         vm.prank(lender);
+        morphoV2.setAuthorized(address(this), true);
+        vm.prank(address(this));
         morphoV2.withdraw(obligation, withdraw, 0, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), obligations - withdraw, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
         assertEq(morphoV2.totalShares(id), obligations - withdraw, "totalShares");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
-        assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
+        assertEq(loanToken.balanceOf(address(this)), withdraw, "balance of this");
     }
 
     function testWithdrawWithShares(uint256 obligations, uint256 shares) public {
@@ -147,12 +181,14 @@ contract OtherFunctionsTest is BaseTest {
         // Test
         // TODO: sharesPrice != 1
         vm.prank(lender);
+        morphoV2.setAuthorized(address(this), true);
+        vm.prank(address(this));
         morphoV2.withdraw(obligation, 0, shares, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), obligations - shares, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
-        assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
+        assertEq(loanToken.balanceOf(address(this)), shares, "balance of this");
     }
 
     function testSetRatified(address sender, address maker, bool newRatified, Offer memory offer) public {
