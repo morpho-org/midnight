@@ -161,21 +161,21 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.expectRevert("ratification not authorized");
         vm.prank(sender);
-        morphoV2.setRatified(offer, newRatified);
+        morphoV2.setRatified(maker, root(offer), newRatified);
 
         uint256 snap = vm.snapshotState();
 
         vm.prank(maker);
-        morphoV2.setRatified(offer, newRatified);
-        assertEq(morphoV2.ratified(offer), newRatified);
+        morphoV2.setRatified(maker, root(offer), newRatified);
+        assertEq(morphoV2.ratified(maker, root(offer)), newRatified);
 
         vm.revertToStateAndDelete(snap);
 
         vm.prank(maker);
         morphoV2.setAuthorized(sender, true);
         vm.prank(sender);
-        morphoV2.setRatified(offer, newRatified);
-        assertEq(morphoV2.ratified(offer), newRatified);
+        morphoV2.setRatified(maker, root(offer), newRatified);
+        assertEq(morphoV2.ratified(maker, root(offer)), newRatified);
     }
 
     function testSetAuthorized(address authorizer, address authorizee, bool newAuthorized) public {

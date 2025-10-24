@@ -60,8 +60,7 @@ contract LiquidationTest is BaseTest {
             nonce: 0,
             callbackAddress: address(0),
             callbackData: "",
-            ratifier: address(0),
-            ratifierData: ""
+            ratifier: address(0)
         });
 
         morphoV2.take(0, maxDebt, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");

@@ -56,11 +56,9 @@ abstract contract BaseTest is Test {
 
     function signProof(Offer[1] memory offers, uint256 sk) internal pure returns (bytes memory) {
         bytes32 _root = root(offers);
-        SignedProof memory signedProof;
-        signedProof.root = _root;
-        signedProof.path = new bytes32[](0);
-        (signedProof.v, signedProof.r, signedProof.s) = sign(_root, sk);
-        return abi.encode(signedProof);
+        Signature memory sig;
+        (sig.v, sig.r, sig.s) = sign(_root, sk);
+        return abi.encode(_root, new bytes32[](0), sig);
     }
 
     // assumes the offer is the first one!
@@ -69,11 +67,13 @@ abstract contract BaseTest is Test {
         path[0] = keccak256(abi.encode(offers[1]));
 
         bytes32 _root = root(offers);
-        SignedProof memory signedProof;
-        signedProof.root = _root;
-        signedProof.path = path;
-        (signedProof.v, signedProof.r, signedProof.s) = sign(_root, sk);
-        return abi.encode(signedProof);
+        Signature memory sig;
+        (sig.v, sig.r, sig.s) = sign(_root, sk);
+        return abi.encode(_root, path, sig);
+    }
+
+    function root(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -125,8 +125,7 @@ abstract contract BaseTest is Test {
             nonce: 0,
             callbackAddress: address(0),
             callbackData: "",
-            ratifier: address(0),
-            ratifierData: ""
+            ratifier: address(0)
         });
 
         morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");
@@ -164,8 +163,7 @@ abstract contract BaseTest is Test {
             nonce: 0,
             callbackAddress: address(0),
             callbackData: "",
-            ratifier: address(0),
-            ratifierData: ""
+            ratifier: address(0)
         });
 
         morphoV2.take(0, obligationUnits, lender, borrowOffer, signProof([borrowOffer], borrowerSK), address(0), hex"");

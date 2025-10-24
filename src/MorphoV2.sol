@@ -23,7 +23,7 @@ contract MorphoV2 is IMorphoV2 {
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
     mapping(address => mapping(address => bool)) public authorized;
     mapping(address => uint256) public authorizationNonce;
-    mapping(bytes => bool) public _ratified;
+    mapping(address => mapping(bytes32 => bool)) public ratified;
 
     /// @dev Multiple offers can have the same nonce. This allows to implement easy and efficient batch-cancelling and
     /// OCO (One-Cancels-the-Other) orders. Note that OCO orders work better if all offers have the same amount,
@@ -40,7 +40,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationUnits,
         address taker,
         Offer memory offer,
-        bytes memory ratification,
+        bytes memory ratificationData,
         address takerCallbackAddress,
         bytes memory takerCallbackData
     ) public {
@@ -51,15 +51,26 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
         require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
         require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
-        require(
-            msg.sender == offer.maker
-                || (
-                    offer.ratifier != address(0) && authorized[offer.maker][offer.ratifier]
-                        && ICallbacks(offer.ratifier).onRatify(offer, ratification)
-                ) || (ratification.length > 0 && _ratifyBySignedProof(offer, ratification))
-                || authorized[offer.maker][msg.sender] || _ratified[abi.encode(offer)],
-            "offer not ratified"
-        );
+
+        if (offer.ratifier != address(0)) {
+            require(
+                authorized[offer.maker][offer.ratifier] && ICallbacks(offer.ratifier).onRatify(offer, ratificationData),
+                "offer ratification failed"
+            );
+        } else if (ratificationData.length != 0) {
+            (bytes32 root, bytes32[] memory path, Signature memory sig) =
+                abi.decode(ratificationData, (bytes32, bytes32[], Signature));
+            require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), path), "invalid proof");
+            if (sig.v == 0) {
+                require(ratified[offer.maker][root], "offer not ratified");
+            } else {
+                address tentativeSigner = MathLib.signer(root, sig.v, sig.r, sig.s);
+                require(tentativeSigner != address(0) && tentativeSigner == offer.maker, "invalid signature");
+            }
+        } else {
+            require(authorized[offer.maker][msg.sender], "offer not authorized");
+        }
+
         (
             address buyer,
             address buyerCallbackAddress,
@@ -229,14 +240,9 @@ contract MorphoV2 is IMorphoV2 {
         return seizures;
     }
 
-    function ratified(Offer memory offer) external view returns (bool) {
-        return _ratified[abi.encode(offer)];
-    }
-
-    /// @dev No ratification by signature, check the signature in the caller.
-    function setRatified(Offer memory offer, bool newRatified) external {
-        require(msg.sender == offer.maker || authorized[offer.maker][msg.sender], "ratification not authorized");
-        _ratified[abi.encode(offer)] = newRatified;
+    function setRatified(address onBehalf, bytes32 root, bool newRatified) external {
+        require(msg.sender == onBehalf || authorized[onBehalf][msg.sender], "ratification not authorized");
+        ratified[onBehalf][root] = newRatified;
     }
 
     function setAuthorized(address authorizee, bool newAuthorized) external {
@@ -263,12 +269,8 @@ contract MorphoV2 is IMorphoV2 {
         return keccak256(abi.encode(obligation));
     }
 
-    function _ratifyBySignedProof(Offer memory offer, bytes memory ratification) internal pure returns (bool) {
-        SignedProof memory signedProof = abi.decode(ratification, (SignedProof));
-        address tentativeSigner = MathLib.signer(signedProof.root, signedProof.v, signedProof.r, signedProof.s);
-        return tentativeSigner != address(0) && tentativeSigner == offer.maker
-            && MathLib.isLeaf(signedProof.root, keccak256(abi.encode(offer)), signedProof.path);
-    }
+    /// @dev Check if an offer is ratified by a signature, by storage, or by an authorized contract.
+    function _checkRatification(Offer memory offer, bytes memory ratification) internal returns (bool) {}
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
