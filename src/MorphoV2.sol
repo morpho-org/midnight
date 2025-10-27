@@ -49,6 +49,19 @@ contract MorphoV2 is IMorphoV2 {
         owner = msg.sender;
     }
 
+    /// MULTICALL ///
+
+    function multicall(bytes[] calldata calls) external {
+        for (uint256 i = 0; i < calls.length; i++) {
+            (bool success, bytes memory returnData) = address(this).delegatecall(calls[i]);
+            if (!success) {
+                assembly ("memory-safe") {
+                    revert(add(returnData, 0x20), mload(returnData))
+                }
+            }
+        }
+    }
+
     /// ADMIN FUNCTIONS ///
 
     function setOwner(address newOwner) external {
@@ -63,8 +76,8 @@ contract MorphoV2 is IMorphoV2 {
 
     function setTradingFee(bytes32 id, uint128 slope, uint128 max) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(slope <= 1e18, "Slope too high");
-        require(max <= 1e18, "Max too high");
+        require(slope <= WAD, "Slope too high");
+        require(max <= WAD, "Max too high");
         tradingFee[id] = TradingFee({slope: slope, max: max});
     }
 
@@ -122,7 +135,7 @@ contract MorphoV2 is IMorphoV2 {
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
                 / (offer.expiry - offer.start)
             : offer.startPrice;
-        require(offerPrice <= 1e18, "price too high");
+        require(offerPrice <= WAD, "price too high");
 
         TradingFee memory _tradingFee = tradingFee[id];
         uint256 buyerPrice = offer.buy
@@ -140,21 +153,21 @@ contract MorphoV2 is IMorphoV2 {
             : offerPrice;
 
         if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(1e18, buyerPrice);
+            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
             sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(1e18, sellerPrice);
+            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
             buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else {
             obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, 1e18);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, 1e18);
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
 
         require(
@@ -281,8 +294,8 @@ contract MorphoV2 is IMorphoV2 {
             prices[i] = IOracle(obligation.collaterals[i].oracle).price();
             uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
             maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
-                .mulDivDown(obligation.collaterals[i].lltv, 1e18);
-            repayableDebt += collateralAmount.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR)
+                .mulDivDown(obligation.collaterals[i].lltv, WAD);
+            repayableDebt += collateralAmount.mulDivUp(WAD, LIQUIDATION_INCENTIVE_FACTOR)
                 .mulDivUp(prices[i], ORACLE_PRICE_SCALE);
         }
 
@@ -302,11 +315,11 @@ contract MorphoV2 is IMorphoV2 {
             require(UtilsLib.atMostOneNonZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
 
             if (seizure.seized > 0) {
-                seizure.repaid = seizure.seized.mulDivUp(1e18, LIQUIDATION_INCENTIVE_FACTOR)
+                seizure.repaid = seizure.seized.mulDivUp(WAD, LIQUIDATION_INCENTIVE_FACTOR)
                     .mulDivUp(prices[seizure.collateralIndex], ORACLE_PRICE_SCALE);
             } else {
                 seizure.seized = seizure.repaid.mulDivDown(ORACLE_PRICE_SCALE, prices[seizure.collateralIndex])
-                    .mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, 1e18);
+                    .mulDivDown(LIQUIDATION_INCENTIVE_FACTOR, WAD);
             }
 
             totalRepaid += seizure.repaid;
@@ -366,7 +379,7 @@ contract MorphoV2 is IMorphoV2 {
                 require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 price = IOracle(obligation.collaterals[i].oracle).price();
                 maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(obligation.collaterals[i].lltv, 1e18);
+                    .mulDivDown(obligation.collaterals[i].lltv, WAD);
                 previousCollateralToken = currentCollateralToken;
             }
 

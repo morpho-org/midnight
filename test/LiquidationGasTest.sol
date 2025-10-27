@@ -68,7 +68,7 @@ contract LiquidationTest is BaseTest {
             0,
             lender,
             borrowOffer,
-            sig(root([borrowOffer]), borrowerSecretKey),
+            sig([borrowOffer]),
             root([borrowOffer]),
             proof([borrowOffer]),
             address(0),
