@@ -192,7 +192,8 @@ contract LiquidationTest is BaseTest {
         seizures[0] = Seizure({collateralIndex: 0, repaid: 100, seized: 0});
         morphoV2.liquidate(obligation, seizures, borrower, "");
 
-        assertEq(morphoV2.debtOf(borrower, id), 0, "debt");
+        assertEq(morphoV2.debtOf(borrower, id), 100, "debt");
+        assertEq(morphoV2.preRepaidOf(borrower, id), 100, "pre repaid");
         assertEq(
             morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
             initialCollateral - 100 * MAX_LIF / 1e18,
@@ -214,7 +215,8 @@ contract LiquidationTest is BaseTest {
 
         uint256 lif = 1e18 + (MAX_LIF - 1e18) * delay / AUCTION_DURATION;
 
-        assertEq(morphoV2.debtOf(borrower, id), 0, "debt");
+        assertEq(morphoV2.debtOf(borrower, id), 100, "debt");
+        assertEq(morphoV2.preRepaidOf(borrower, id), 100, "pre repaid");
         assertEq(
             morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
             initialCollateral - 100 * lif / 1e18,
