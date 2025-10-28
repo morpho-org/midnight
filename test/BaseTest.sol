@@ -12,15 +12,17 @@ import {MorphoV2} from "../src/MorphoV2.sol";
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
 abstract contract BaseTest is Test {
+    mapping(address => uint256) internal privateKey;
+
     MorphoV2 internal morphoV2;
     ERC20 internal loanToken;
     ERC20 internal collateralToken1;
     ERC20 internal collateralToken2;
     Oracle internal oracle;
-    uint256 internal borrowerSecretKey;
     address internal borrower;
-    uint256 internal lenderSecretKey;
     address internal lender;
+    address internal otherBorrower;
+    address internal otherLender;
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public virtual {
@@ -28,8 +30,15 @@ abstract contract BaseTest is Test {
 
         morphoV2.setFeeSetter(address(this));
 
-        (borrower, borrowerSecretKey) = makeAddrAndKey("borrower");
-        (lender, lenderSecretKey) = makeAddrAndKey("lender");
+        uint256 _privateKey;
+        (borrower, _privateKey) = makeAddrAndKey("borrower");
+        privateKey[borrower] = _privateKey;
+        (lender, _privateKey) = makeAddrAndKey("lender");
+        privateKey[lender] = _privateKey;
+        (otherBorrower, _privateKey) = makeAddrAndKey("otherBorrower");
+        privateKey[otherBorrower] = _privateKey;
+        (otherLender, _privateKey) = makeAddrAndKey("otherLender");
+        privateKey[otherLender] = _privateKey;
 
         loanToken = new ERC20("loan", "loan");
         collateralToken1 = new ERC20("collat1", "collat1");
@@ -72,10 +81,19 @@ abstract contract BaseTest is Test {
         return res;
     }
 
-    function sig(bytes32 _root, uint256 sk) internal pure returns (Signature memory) {
+    function sig(Offer[1] memory offers) internal view returns (Signature memory) {
+        bytes32 _root = root(offers);
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
         Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(sk, messageHash);
+        (signature.v, signature.r, signature.s) = vm.sign(privateKey[offers[0].maker], messageHash);
+        return signature;
+    }
+
+    function sig(Offer[2] memory offers) internal view returns (Signature memory) {
+        bytes32 _root = root(offers);
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
+        Signature memory signature;
+        (signature.v, signature.r, signature.s) = vm.sign(privateKey[offers[0].maker], messageHash);
         return signature;
     }
 
@@ -103,19 +121,15 @@ abstract contract BaseTest is Test {
         deal(address(obligation.collaterals[0].token), address(this), collateral);
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
-        Offer memory borrowOffer = Offer({
-            obligation: obligation,
-            buy: false,
-            maker: borrower,
-            assets: obligationUnits,
-            start: block.timestamp,
-            expiry: block.timestamp,
-            startPrice: 1 ether,
-            expiryPrice: 1 ether,
-            nonce: 0,
-            callbackAddress: address(0),
-            callbackData: ""
-        });
+        Offer memory borrowOffer;
+        borrowOffer.obligation = obligation;
+        borrowOffer.buy = false;
+        borrowOffer.maker = borrower;
+        borrowOffer.assets = obligationUnits;
+        borrowOffer.start = block.timestamp;
+        borrowOffer.expiry = block.timestamp;
+        borrowOffer.startPrice = 1 ether;
+        borrowOffer.expiryPrice = 1 ether;
 
         morphoV2.take(
             0,
@@ -124,7 +138,7 @@ abstract contract BaseTest is Test {
             0,
             lender,
             borrowOffer,
-            sig(root([borrowOffer]), borrowerSecretKey),
+            sig([borrowOffer]),
             root([borrowOffer]),
             proof([borrowOffer]),
             address(0),
@@ -152,19 +166,15 @@ abstract contract BaseTest is Test {
 
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral0, borrower);
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[1].token), collateral1, borrower);
-        Offer memory borrowOffer = Offer({
-            buy: false,
-            maker: borrower,
-            assets: obligationUnits,
-            obligation: obligation,
-            start: block.timestamp,
-            expiry: block.timestamp + 200,
-            startPrice: 1e18,
-            expiryPrice: 1e18,
-            nonce: 0,
-            callbackAddress: address(0),
-            callbackData: ""
-        });
+        Offer memory borrowOffer;
+        borrowOffer.buy = false;
+        borrowOffer.maker = borrower;
+        borrowOffer.assets = obligationUnits;
+        borrowOffer.obligation = obligation;
+        borrowOffer.start = block.timestamp;
+        borrowOffer.expiry = block.timestamp + 200;
+        borrowOffer.startPrice = 1e18;
+        borrowOffer.expiryPrice = 1e18;
 
         morphoV2.take(
             0,
@@ -173,7 +183,7 @@ abstract contract BaseTest is Test {
             0,
             lender,
             borrowOffer,
-            sig(root([borrowOffer]), borrowerSecretKey),
+            sig([borrowOffer]),
             root([borrowOffer]),
             proof([borrowOffer]),
             address(0),

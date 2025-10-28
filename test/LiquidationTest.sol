@@ -2,11 +2,13 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {LIQUIDATION_INCENTIVE_FACTOR} from "../src/libraries/ConstantsLib.sol";
+import {MAX_LIF, AUCTION_DURATION} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 
 import {Oracle} from "./helpers/Oracle.sol";
 import {BaseTest} from "./BaseTest.sol";
+
+import "forge-std/console.sol";
 
 contract LiquidationTest is BaseTest {
     Obligation internal obligation;
@@ -20,27 +22,44 @@ contract LiquidationTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        Collateral[] memory collaterals = new Collateral[](2);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals[1] = Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)});
-        collaterals = sortCollaterals(collaterals);
-
-        // Populate collaterals one by one to avoid the unsupported memory-to-storage array assignment that breaks the
-        // solc legacy pipeline.
         obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            obligation.collaterals.push(collaterals[i]);
-        }
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = toId(obligation);
     }
 
-    function testLiquidateHealthy() public {
+    function testLiquidateHealthyPreMaturity() public {
         setupObligation(obligation, 100);
 
-        vm.expectRevert("position is healthy");
+        vm.expectRevert("position is not liquidatable");
+        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+    }
+
+    function testLiquidateUnhealthyPreMaturity() public {
+        setupObligation(obligation, 100);
+        oracle.setPrice(0);
+
+        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+    }
+
+    function testLiquidateHealthyPostMaturity() public {
+        setupObligation(obligation, 100);
+        obligation.maturity = block.timestamp - 1;
+
+        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+    }
+
+    function testLiquidateUnhealthyPostMaturity() public {
+        setupObligation(obligation, 100);
+        obligation.maturity = block.timestamp - 1;
+        oracle.setPrice(0);
+
         morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
     }
 
@@ -137,8 +156,8 @@ contract LiquidationTest is BaseTest {
         id = toId(obligation);
 
         setupMaxObligationWithCollaterals(obligation, 100, 100);
-        uint256 price = 1e36 * 1e18 / LIQUIDATION_INCENTIVE_FACTOR * 95 / 100;
-        uint256 price2 = 1e36 * 1e18 / LIQUIDATION_INCENTIVE_FACTOR;
+        uint256 price = 1e36 * 1e18 / MAX_LIF * 95 / 100;
+        uint256 price2 = 1e36 * 1e18 / MAX_LIF;
         oracle.setPrice(price);
         oracle2.setPrice(price2);
         deal(address(loanToken), address(this), 100e18);
@@ -157,5 +176,49 @@ contract LiquidationTest is BaseTest {
         recordedBorrower = borrower;
         recordedLiquidator = liquidator;
         recordedData = data;
+    }
+
+    // post maturity liquidation
+
+    function testLiquidatePostMaturityFullLIF(uint256 delay) public {
+        delay = bound(delay, 0, 100 weeks);
+
+        setupObligation(obligation, 100);
+        vm.warp(obligation.maturity + AUCTION_DURATION + delay);
+        deal(address(loanToken), address(this), 100);
+        uint256 initialCollateral = morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token);
+
+        Seizure[] memory seizures = new Seizure[](1);
+        seizures[0] = Seizure({collateralIndex: 0, repaid: 100, seized: 0});
+        morphoV2.liquidate(obligation, seizures, borrower, "");
+
+        assertEq(morphoV2.debtOf(borrower, id), 0, "debt");
+        assertEq(
+            morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
+            initialCollateral - 100 * MAX_LIF / 1e18,
+            "collateral"
+        );
+    }
+
+    function testLiquidatePostMaturityPartialLIF(uint256 delay) public {
+        delay = bound(delay, 1, AUCTION_DURATION);
+
+        setupObligation(obligation, 100);
+        vm.warp(obligation.maturity + delay);
+        deal(address(loanToken), address(this), 100);
+        uint256 initialCollateral = morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token);
+
+        Seizure[] memory seizures = new Seizure[](1);
+        seizures[0] = Seizure({collateralIndex: 0, repaid: 100, seized: 0});
+        morphoV2.liquidate(obligation, seizures, borrower, "");
+
+        uint256 lif = 1e18 + (MAX_LIF - 1e18) * delay / AUCTION_DURATION;
+
+        assertEq(morphoV2.debtOf(borrower, id), 0, "debt");
+        assertEq(
+            morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
+            initialCollateral - 100 * lif / 1e18,
+            "collateral"
+        );
     }
 }
