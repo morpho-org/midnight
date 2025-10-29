@@ -131,24 +131,24 @@ contract MorphoV2 is IMorphoV2 {
 
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
             (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
-                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits, false);
             sharesOf[buyer][id] += obligationShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
         } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
             (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
-                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits, false);
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
         } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
             (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
-                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits, false);
             debtOf[buyer][id] -= obligationUnits;
             debtOf[seller][id] += obligationUnits;
         } else {
             (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
-                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits, true);
             debtOf[buyer][id] -= obligationUnits;
             sharesOf[seller][id] -= obligationShares;
             totalShares[id] -= obligationShares;
@@ -200,7 +200,8 @@ contract MorphoV2 is IMorphoV2 {
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationShares,
-        uint256 obligationUnits
+        uint256 obligationUnits,
+        bool roundForMoreShares
     ) internal view returns (uint256, uint256, uint256, uint256) {
         bytes32 id = _id(offer.obligation);
         uint256 offerPrice = offer.expiry != offer.start
@@ -216,20 +217,20 @@ contract MorphoV2 is IMorphoV2 {
         if (buyerAssets > 0) {
             uint256 newObligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
             uint256 newSellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            uint256 newObligationShares = newObligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            uint256 newObligationShares = newObligationUnits.mulDiv(totalUnits[id] + 1, totalShares[id] + 1, roundForMoreShares);
             return (buyerAssets, newSellerAssets, newObligationShares, newObligationUnits);
         } else if (sellerAssets > 0) {
             uint256 newObligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
             uint256 newBuyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            uint256 newObligationShares = newObligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            uint256 newObligationShares = newObligationUnits.mulDiv(totalUnits[id] + 1, totalShares[id] + 1, roundForMoreShares);
             return (newBuyerAssets, sellerAssets, newObligationShares, newObligationUnits);
         } else if (obligationUnits > 0) {
             uint256 newBuyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
             uint256 newSellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            uint256 newObligationShares = obligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            uint256 newObligationShares = obligationUnits.mulDiv(totalUnits[id] + 1, totalShares[id] + 1, roundForMoreShares);
             return (newBuyerAssets, newSellerAssets, newObligationShares, obligationUnits);
         } else {
-            uint256 newObligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            uint256 newObligationUnits = obligationShares.mulDiv(totalUnits[id] + 1, totalShares[id] + 1, !roundForMoreShares);
             uint256 newBuyerAssets = newObligationUnits.mulDivDown(buyerPrice, WAD);
             uint256 newSellerAssets = newObligationUnits.mulDivDown(sellerPrice, WAD);
             return (newBuyerAssets, newSellerAssets, obligationShares, newObligationUnits);
