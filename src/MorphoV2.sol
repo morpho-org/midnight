@@ -129,55 +129,35 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = offer.expiry != offer.start
-            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
-            : offer.startPrice;
-        require(offerPrice <= WAD, "price too high");
-
-        uint256 _tradingFee = tradingFee[id];
-        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
-        uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
-
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-        }
-
-        require(
-            (consumed[offer.maker][offer.group] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
-        );
-
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
+            (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
             sharesOf[buyer][id] += obligationShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
         } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
+            (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
         } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
+            (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
             debtOf[buyer][id] -= obligationUnits;
             debtOf[seller][id] += obligationUnits;
         } else {
+            (buyerAssets, sellerAssets, obligationShares, obligationUnits) =
+                computeAssetsAndShares(offer, buyerAssets, sellerAssets, obligationShares, obligationUnits);
             debtOf[buyer][id] -= obligationUnits;
             sharesOf[seller][id] -= obligationShares;
             totalShares[id] -= obligationShares;
             totalUnits[id] -= obligationUnits;
         }
+
+        require(
+            (consumed[offer.maker][offer.group] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
+        );
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
@@ -213,6 +193,47 @@ contract MorphoV2 is IMorphoV2 {
         require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
+    }
+
+    function computeAssetsAndShares(
+        Offer memory offer,
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationShares,
+        uint256 obligationUnits
+    ) internal view returns (uint256, uint256, uint256, uint256) {
+        bytes32 id = _id(offer.obligation);
+        uint256 offerPrice = offer.expiry != offer.start
+            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
+                / (offer.expiry - offer.start)
+            : offer.startPrice;
+
+        require(offerPrice <= WAD, "price too high");
+        uint256 _tradingFee = tradingFee[id];
+        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
+        uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
+
+        if (buyerAssets > 0) {
+            uint256 newObligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+            uint256 newSellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            uint256 newObligationShares = newObligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            return (buyerAssets, newSellerAssets, newObligationShares, newObligationUnits);
+        } else if (sellerAssets > 0) {
+            uint256 newObligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+            uint256 newBuyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            uint256 newObligationShares = newObligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            return (newBuyerAssets, sellerAssets, newObligationShares, newObligationUnits);
+        } else if (obligationUnits > 0) {
+            uint256 newBuyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            uint256 newSellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            uint256 newObligationShares = obligationUnits.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            return (newBuyerAssets, newSellerAssets, newObligationShares, obligationUnits);
+        } else {
+            uint256 newObligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            uint256 newBuyerAssets = newObligationUnits.mulDivDown(buyerPrice, WAD);
+            uint256 newSellerAssets = newObligationUnits.mulDivDown(sellerPrice, WAD);
+            return (newBuyerAssets, newSellerAssets, obligationShares, newObligationUnits);
+        }
     }
 
     /// @dev Will revert if there is no withdrawable funds.
