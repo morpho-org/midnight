@@ -29,9 +29,9 @@ contract MorphoV2 is IMorphoV2 {
     /// obligationShares and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
-    /// @dev Offers should have this exact nonce to be valid.
-    /// @dev The nonce can be shuffled by the user to cancel everything easily/efficiently.
-    mapping(address user => bytes32) public nonce;
+    /// @dev Offers should have the current lot to be valid.
+    /// @dev The lot can be shuffled by the user to cancel everything easily/efficiently.
+    mapping(address user => bytes32) public lot;
 
     /// @dev Trading fee parameters for a given obligation id.
     mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
@@ -121,7 +121,7 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.nonce == nonce[offer.maker], "invalid nonce");
+        require(offer.lot == lot[offer.maker], "invalid lot");
         bytes32 id = _id(offer.obligation);
 
         (
@@ -370,8 +370,8 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev TODO: is it safe enough?
-    function shuffleNonce() external {
-        nonce[msg.sender] = keccak256(abi.encode(nonce[msg.sender], blockhash(block.number - 1)));
+    function shuffleLot() external {
+        lot[msg.sender] = keccak256(abi.encode(lot[msg.sender], blockhash(block.number - 1)));
     }
 
     function flashLoan(address token, uint256 amount, address callback, bytes calldata data) external {
