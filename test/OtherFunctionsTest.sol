@@ -103,7 +103,7 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, units);
-        _testRepay(units, withdraw, 0);
+        _testRepay(units, withdraw);
         vm.warp(obligation.maturity + 1);
 
         vm.prank(lender);
@@ -147,7 +147,7 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawWithShares(uint256 units, uint256 shares) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, units);
-        _testRepay(units, shares, 0);
+        _testRepay(units, shares);
 
         // TODO: sharesPrice != 1
         vm.warp(obligation.maturity + 1);
@@ -188,7 +188,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 maturity = originalTimestamp + termLength;
 
         obligation.maturity = maturity;
-        _testRepay(obligationUnits, repaid, 0);
+        _testRepay(obligationUnits, repaid);
         skip(skipped);
         vm.prank(borrower);
         morphoV2.withdraw(obligation, withdrawn, 0, borrower);
@@ -215,7 +215,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 maturity = originalTimestamp + termLength;
 
         obligation.maturity = maturity;
-        _testRepay(obligationUnits, repaid, 0);
+        _testRepay(obligationUnits, repaid);
 
         skip(skipped);
         vm.prank(borrower);
@@ -237,7 +237,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 maturity = originalTimestamp + termLength;
 
         obligation.maturity = maturity;
-        _testRepay(obligationUnits, repaid, 0);
+        _testRepay(obligationUnits, repaid);
 
         deal(address(loanToken), borrower, obligationUnits - repaid);
         vm.prank(borrower);
@@ -256,10 +256,10 @@ contract OtherFunctionsTest is BaseTest {
     function testRepay(uint256 obligationUnits, uint256 repaid) public {
         obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
         repaid = bound(repaid, 0, obligationUnits);
-        _testRepay(obligationUnits, repaid, 99);
+        _testRepay(obligationUnits, repaid);
     }
 
-    function _testRepay(uint256 obligationUnits, uint256 repaid, uint256 skipDuration) public {
+    function _testRepay(uint256 obligationUnits, uint256 repaid) public {
         id = toId(obligation);
 
         collateralize(obligation, borrower, obligationUnits);
