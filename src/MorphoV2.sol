@@ -262,7 +262,8 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = _id(obligation);
         preRepaidOf[onBehalf][id] -= assets;
         totalPreRepaid[id] -= assets;
-        require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        if (obligation.maturity < block.timestamp) require(debtOf[onBehalf][id] <= totalPreRepaid[id], "no debt");
+        else require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
     }
 
