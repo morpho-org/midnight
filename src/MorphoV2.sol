@@ -287,6 +287,7 @@ contract MorphoV2 is IMorphoV2 {
 
         withdrawable[id] += totalRepaid;
         coveredDebtOf[borrower][id] += totalRepaid;
+        require(coveredDebtOf[borrower][id] <= fullDebtOf[borrower][id], "repaid more than debt");
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
