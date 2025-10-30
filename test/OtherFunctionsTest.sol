@@ -93,26 +93,8 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.withdrawCollateral(obligation, collateralToken, withdraw, borrower);
     }
 
-    function testRepay(uint256 units, uint256 repaid) public {
-        // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
-        units = bound(units, 0, MAX_TEST_AMOUNT);
-        repaid = bound(repaid, 0, units);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        skip(99);
-        deal(address(loanToken), address(borrower), repaid);
-
-        vm.prank(borrower);
-        morphoV2.repay(obligation, repaid, borrower);
-
-        assertEq(morphoV2.debtOf(borrower, id), units);
-        assertEq(morphoV2.preRepaidOf(borrower, id), repaid);
-        assertEq(morphoV2.totalPreRepaid(id), repaid);
-        assertEq(loanToken.balanceOf(address(morphoV2)), repaid);
-        assertEq(loanToken.balanceOf(borrower), 0);
-    }
-
     function testWithdrawInconsistentInput(uint256 units, uint256 shares) public {
+        vm.warp(obligation.maturity + 1);
         vm.assume(units > 0 && shares > 0);
         vm.expectRevert("INCONSISTENT_INPUT");
         morphoV2.withdraw(obligation, units, shares, lender);
@@ -121,7 +103,8 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, units);
-        testRepay(units, withdraw);
+        _testRepay(units, withdraw);
+        vm.warp(obligation.maturity + 1);
 
         vm.prank(lender);
         morphoV2.withdraw(obligation, withdraw, 0, lender);
@@ -133,10 +116,39 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
     }
 
+    function testWithdrawObligationsBeforeMaturity(
+        uint256 obligationUnits,
+        uint256 withdraw,
+        uint256 maturity,
+        uint256 skipDuration
+    ) public {
+        obligationUnits = bound(obligationUnits, 1, MAX_TEST_AMOUNT);
+        withdraw = bound(withdraw, 0, obligationUnits);
+        maturity = bound(maturity, block.timestamp, block.timestamp + 365 days);
+        skipDuration = bound(skipDuration, 0, maturity - block.timestamp);
+        obligation.maturity = maturity;
+
+        collateralize(obligation, borrower, obligationUnits);
+        setupObligation(obligation, obligationUnits);
+
+        skip(skipDuration);
+
+        deal(address(loanToken), address(borrower), withdraw);
+
+        vm.prank(borrower);
+        morphoV2.repay(obligation, withdraw, borrower);
+
+        // Test
+        vm.prank(lender);
+        vm.expectRevert("maturity not reached");
+        morphoV2.withdraw(obligation, withdraw, 0, lender);
+    }
+
     function testWithdrawWithShares(uint256 units, uint256 shares) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, units);
-        testRepay(units, shares);
+        _testRepay(units, shares);
+        vm.warp(obligation.maturity + 1);
 
         // TODO: sharesPrice != 1
         vm.prank(lender);
@@ -146,6 +158,113 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.totalPreRepaid(id), 0, "totalPreRepaid");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
+    }
+
+    function testWithdrawRepaidUntilMaturity(
+        uint256 obligationUnits,
+        uint256 repaid,
+        uint256 withdrawn,
+        uint256 termLength,
+        uint256 skipped
+    ) public {
+        uint256 originalTimestamp = block.timestamp;
+        obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
+        repaid = bound(repaid, 0, obligationUnits * 3);
+        withdrawn = bound(withdrawn, 0, repaid);
+        termLength = bound(termLength, 1, 365 days);
+        skipped = bound(skipped, 0, termLength);
+        uint256 maturity = originalTimestamp + termLength;
+
+        obligation.maturity = maturity;
+        _testRepay(obligationUnits, repaid);
+        skip(skipped);
+        vm.prank(borrower);
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+
+        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "debt of");
+        assertEq(morphoV2.preRepaidOf(borrower, id), repaid - withdrawn, "pre repaid of");
+        assertEq(morphoV2.totalPreRepaid(id), repaid - withdrawn, "total pre repaid");
+        assertEq(loanToken.balanceOf(address(morphoV2)), repaid - withdrawn, "balance of morphoV2");
+        assertEq(loanToken.balanceOf(borrower), withdrawn, "balance of lender");
+    }
+
+    function testWithdrawExcessRepaidAnyTime(
+        uint256 obligationUnits,
+        uint256 repaid,
+        uint256 withdrawn,
+        uint256 termLength,
+        uint256 skipped
+    ) public {
+        uint256 originalTimestamp = block.timestamp;
+        obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
+        repaid = bound(repaid, obligationUnits, obligationUnits * 3);
+        withdrawn = bound(withdrawn, 0, repaid - obligationUnits);
+        termLength = bound(termLength, 1, 365 days);
+        skipped = bound(skipped, 0, termLength * 3);
+        uint256 maturity = originalTimestamp + termLength;
+
+        obligation.maturity = maturity;
+        _testRepay(obligationUnits, repaid);
+
+        skip(skipped);
+        vm.prank(borrower);
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "debt of");
+        assertEq(morphoV2.preRepaidOf(borrower, id), repaid - withdrawn, "pre repaid of");
+        assertEq(morphoV2.totalPreRepaid(id), repaid - withdrawn, "total pre repaid");
+        assertEq(loanToken.balanceOf(address(morphoV2)), repaid - withdrawn, "balance of morphoV2");
+        assertEq(loanToken.balanceOf(borrower), withdrawn, "balance of lender");
+    }
+
+    function testWithdrawCoverUnhealthy(uint256 obligationUnits, uint256 repaid, uint256 withdrawn, uint256 termLength)
+        public
+    {
+        uint256 originalTimestamp = block.timestamp;
+        obligationUnits = bound(obligationUnits, 1, MAX_TEST_AMOUNT);
+        repaid = bound(repaid, 1, obligationUnits);
+        withdrawn = bound(withdrawn, 1, repaid);
+        termLength = bound(termLength, 1, 365 days);
+        uint256 maturity = originalTimestamp + termLength;
+
+        obligation.maturity = maturity;
+        _testRepay(obligationUnits, repaid);
+
+        deal(address(loanToken), borrower, obligationUnits - repaid);
+        vm.prank(borrower);
+        morphoV2.repay(obligation, obligationUnits - repaid, borrower);
+        vm.prank(borrower);
+        morphoV2.withdrawCollateral(
+            obligation,
+            obligation.collaterals[0].token,
+            morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
+            borrower
+        );
+        vm.expectRevert("Unhealthy borrower");
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+    }
+
+    function testRepay(uint256 obligationUnits, uint256 repaid) public {
+        obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
+        repaid = bound(repaid, 0, obligationUnits);
+        _testRepay(obligationUnits, repaid);
+    }
+
+    function _testRepay(uint256 obligationUnits, uint256 repaid) public {
+        id = toId(obligation);
+
+        collateralize(obligation, borrower, obligationUnits);
+        setupObligation(obligation, obligationUnits);
+        deal(address(loanToken), address(borrower), repaid);
+
+        vm.prank(borrower);
+        morphoV2.repay(obligation, repaid, borrower);
+
+        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "debt of");
+        assertEq(morphoV2.debtOf(borrower, id), obligationUnits);
+        assertEq(morphoV2.preRepaidOf(borrower, id), repaid);
+        assertEq(morphoV2.totalPreRepaid(id), repaid, "total pre repaid");
+        assertEq(loanToken.balanceOf(address(morphoV2)), repaid, "balance of morphoV2");
+        assertEq(loanToken.balanceOf(borrower), 0, "balance of borrower");
     }
 
     function testConsume(address user, bytes32 group, uint256 amount) public {
