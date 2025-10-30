@@ -79,22 +79,18 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(tradingFee <= WAD, "Trading fee too high");
         require(interestCutLimit <= WAD, "Interest cut limit too high");
-        tradingFeeParams[id] = TradingFeeParams({
-            tradingFee: tradingFee,
-            interestCutLimit: interestCutLimit,
-            activated: activated
-        });
+        tradingFeeParams[id] =
+            TradingFeeParams({tradingFee: tradingFee, interestCutLimit: interestCutLimit, activated: activated});
     }
 
-    function setDefaultTradingFee(address loanToken, uint128 tradingFee, uint128 interestCutLimit, bool activated) external {
+    function setDefaultTradingFee(address loanToken, uint128 tradingFee, uint128 interestCutLimit, bool activated)
+        external
+    {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(tradingFee <= WAD, "Trading fee too high");
         require(interestCutLimit <= WAD, "Interest cut limit too high");
-        defaultTradingFeeParams[loanToken] = TradingFeeParams({
-            tradingFee: tradingFee,
-            interestCutLimit: interestCutLimit,
-            activated: activated
-        });
+        defaultTradingFeeParams[loanToken] =
+            TradingFeeParams({tradingFee: tradingFee, interestCutLimit: interestCutLimit, activated: activated});
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -160,9 +156,7 @@ contract MorphoV2 is IMorphoV2 {
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
         if (!_tradingFeeParams.activated) {
             TradingFeeParams memory _defaultTradingFeeParams = defaultTradingFeeParams[offer.obligation.loanToken];
-            if (_defaultTradingFeeParams.activated) {
-                _tradingFeeParams = _defaultTradingFeeParams;
-            }
+            if (_defaultTradingFeeParams.activated) _tradingFeeParams = _defaultTradingFeeParams;
         }
         uint256 buyerPrice = offer.buy
             ? offerPrice

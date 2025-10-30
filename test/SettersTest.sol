@@ -66,8 +66,7 @@ contract SettersTest is BaseTest {
         vm.assume(tradingFee <= 1e18);
         vm.assume(interestCutLimit <= 1e18);
         morphoV2.setDefaultTradingFee(loanToken, tradingFee, interestCutLimit, true);
-        (uint128 _tradingFee, uint128 _interestCutLimit, bool activated) =
-            morphoV2.defaultTradingFeeParams(loanToken);
+        (uint128 _tradingFee, uint128 _interestCutLimit, bool activated) = morphoV2.defaultTradingFeeParams(loanToken);
         assertEq(_tradingFee, tradingFee);
         assertEq(_interestCutLimit, interestCutLimit);
         assertTrue(activated);
