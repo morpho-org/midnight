@@ -276,7 +276,7 @@ contract MorphoV2 is IMorphoV2 {
 
         auctionable[user][id][start] -= obligationUnits;
 
-        sharesOf[user][id] -= shares;
+        sharesOf[msg.sender][id] -= shares;
         withdrawable[id] -= obligationUnits;
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
