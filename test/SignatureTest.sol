@@ -27,6 +27,6 @@ contract SignatureTest is Test, MorphoV2 {
         sk = boundPrivateKey(sk);
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(sk, messageHash);
-        assertEq(MathLib.signer(root, v, r, s), vm.addr(sk));
+        assertEq(MathLib.messageSigner(root, v, r, s), vm.addr(sk));
     }
 }

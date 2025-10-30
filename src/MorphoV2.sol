@@ -123,7 +123,7 @@ contract MorphoV2 is IMorphoV2 {
             if (sig.v == 0) {
                 require(ratified[offer.maker][root], "offer not ratified");
             } else {
-                address tentativeSigner = MathLib.signer(root, sig.v, sig.r, sig.s);
+                address tentativeSigner = MathLib.messageSigner(root, sig.v, sig.r, sig.s);
                 require(tentativeSigner != address(0) && tentativeSigner == offer.maker, "invalid signature");
             }
         } else {

@@ -30,7 +30,7 @@ library MathLib {
         return currentHash == root;
     }
 
-    function signer(bytes32 data, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
+    function messageSigner(bytes32 data, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", data));
         address tentativeSigner = ecrecover(messageHash, v, r, s);
         require(tentativeSigner != address(0), "invalid signature");
