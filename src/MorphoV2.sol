@@ -117,10 +117,7 @@ contract MorphoV2 is IMorphoV2 {
         require(block.timestamp >= offer.validFrom, "offer not started");
         require(block.timestamp <= offer.validUntil, "offer expired");
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
-        require(
-            offer.validFrom < offer.validUntil || offer.endPrice == offer.startPrice,
-            "inconsistent prices"
-        );
+        require(offer.validFrom < offer.validUntil || offer.endPrice == offer.startPrice, "inconsistent prices");
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
