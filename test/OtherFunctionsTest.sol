@@ -264,7 +264,6 @@ contract OtherFunctionsTest is BaseTest {
 
         collateralize(obligation, borrower, obligationUnits);
         setupObligation(obligation, obligationUnits);
-        skip(skipDuration);
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
