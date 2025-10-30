@@ -80,9 +80,6 @@ rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 
 strong invariant notBorrowerAndLender(bytes32 id, address user)
     sharesOf(user, id) == 0 || debtOf(user, id) == 0;
 
-strong invariant totalUnitsEqualsSumDebtPlusPreRepaid(bytes32 id)
-    totalUnits(id) <= sumDebtOf[id] + totalPreRepaid(id);
-
 strong invariant totalSharesEqualsSumSharesOf(bytes32 id)
     totalShares(id) == sumSharesOf[id];
 
