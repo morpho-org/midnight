@@ -21,12 +21,15 @@ struct Offer {
     bool buy;
     address maker;
     uint256 assets;
+    uint256 obligationUnits;
+    uint256 obligationShares;
     uint256 start;
     uint256 expiry;
     uint256 startPrice;
     uint256 expiryPrice;
-    uint256 nonce;
-    address callbackAddress;
+    bytes32 group;
+    bytes32 nonce;
+    address callback;
     bytes callbackData;
 }
 
