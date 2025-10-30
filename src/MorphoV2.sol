@@ -43,6 +43,8 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    mapping(address user => mapping(bytes32 id => mapping(uint256 start => uint256 units))) public auctionable;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -249,6 +251,7 @@ contract MorphoV2 is IMorphoV2 {
         external
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
+        require(block.timestamp > obligation.maturity, "maturity not reached");
         bytes32 id = _id(obligation);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
@@ -263,11 +266,31 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
 
+    function withdrawEarly(Obligation memory obligation, uint256 obligationUnits, address user, uint256 start)
+        external
+    {
+        bytes32 id = _id(obligation);
+
+        uint256 discount = block.timestamp > start + 6 hours ? WAD : (block.timestamp - start).mulDivDown(WAD, 6 hours);
+        uint256 shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
+
+        auctionable[user][id][start] -= obligationUnits;
+
+        sharesOf[user][id] -= shares;
+        withdrawable[id] -= obligationUnits;
+        totalShares[id] -= shares;
+        totalUnits[id] -= obligationUnits;
+
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits.mulDivDown(discount, WAD));
+        SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits.mulDivDown(WAD - discount, WAD));
+    }
+
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
         bytes32 id = _id(obligation);
 
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
+        auctionable[onBehalf][id][block.timestamp] += obligationUnits;
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
@@ -349,6 +372,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         withdrawable[id] += totalRepaid;
+        auctionable[borrower][id][block.timestamp] += totalRepaid;
         debtOf[borrower][id] -= totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {

@@ -118,6 +118,8 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
+        vm.warp(obligation.maturity + 1);
+
         units = bound(units, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
@@ -133,6 +135,8 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawWithShares(uint256 units, uint256 shares) public {
+        vm.warp(obligation.maturity + 1);
+
         units = bound(units, 1, MAX_TEST_AMOUNT);
         shares = bound(shares, 1, units);
         testRepay(units, shares);
