@@ -145,8 +145,8 @@ contract MorphoV2 is IMorphoV2 {
         uint256 sellerPrice;
         require(offerPrice <= WAD, "price too high");
         if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
+            sellerPrice = offerPrice;
+            buyerPrice = UtilsLib.max(
                 (buyerPrice - _tradingFeeParams.interestCutLimit)
                 .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
                 buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
