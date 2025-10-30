@@ -235,7 +235,7 @@ contract MorphoV2 is IMorphoV2 {
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
     {
-        require(obligation.maturity > block.timestamp, "maturity not reached");
+        require(block.timestamp > obligation.maturity, "maturity not reached");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
 
