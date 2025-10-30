@@ -62,11 +62,7 @@ contract SettersTest is BaseTest {
         morphoV2.setTradingFee(id, tradingFee, 0.1e18, true);
     }
 
-    function testSetDefaultTradingFeeSuccess(
-        address loanToken,
-        uint128 tradingFee,
-        uint128 interestCutLimit
-    ) public {
+    function testSetDefaultTradingFeeSuccess(address loanToken, uint128 tradingFee, uint128 interestCutLimit) public {
         vm.assume(tradingFee <= 1e18);
         vm.assume(interestCutLimit <= 1e18);
         morphoV2.setDefaultTradingFee(loanToken, tradingFee, interestCutLimit, true);
