@@ -23,10 +23,10 @@ struct Offer {
     uint256 assets;
     uint256 obligationUnits;
     uint256 obligationShares;
-    uint256 start;
-    uint256 expiry;
+    uint256 validFrom;
+    uint256 validUntil;
     uint256 startPrice;
-    uint256 expiryPrice;
+    uint256 endPrice;
     bytes32 group;
     bytes32 nonce;
     address callback;

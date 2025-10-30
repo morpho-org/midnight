@@ -44,33 +44,33 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.assets = type(uint256).max;
         lenderOffer.obligation = obligation;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.validUntil = block.timestamp + 200;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
 
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.obligation = obligation;
-        otherLenderOffer.expiry = block.timestamp + 200;
+        otherLenderOffer.validUntil = block.timestamp + 200;
         otherLenderOffer.startPrice = 1 ether;
-        otherLenderOffer.expiryPrice = 1 ether;
+        otherLenderOffer.endPrice = 1 ether;
 
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.assets = type(uint256).max;
         borrowerOffer.obligation = obligation;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.validUntil = block.timestamp + 200;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.obligation = obligation;
-        otherBorrowerOffer.expiry = block.timestamp + 200;
+        otherBorrowerOffer.validUntil = block.timestamp + 200;
         otherBorrowerOffer.startPrice = 1 ether;
-        otherBorrowerOffer.expiryPrice = 1 ether;
+        otherBorrowerOffer.endPrice = 1 ether;
 
         createBadDebt(obligation); // to create non trivial shares <=> units conversion.
 
@@ -86,7 +86,7 @@ contract TakeTest is BaseTest {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
         borrowerOffer.assets = buyerAssets;
         deal(address(loanToken), lender, buyerAssets);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
@@ -108,7 +108,7 @@ contract TakeTest is BaseTest {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
         lenderOffer.assets = buyerAssets;
         deal(address(loanToken), lender, buyerAssets);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
@@ -130,7 +130,7 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, 1, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
         uint256 expectedAssets = obligationUnits.mulDivDown(price, WAD);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         deal(address(loanToken), lender, expectedAssets);
@@ -152,7 +152,7 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, 1, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
         uint256 expectedAssets = obligationUnits.mulDivDown(price, WAD);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         deal(address(loanToken), lender, expectedAssets);
@@ -174,7 +174,7 @@ contract TakeTest is BaseTest {
         obligationShares = bound(obligationShares, 1, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
@@ -196,7 +196,7 @@ contract TakeTest is BaseTest {
         obligationShares = bound(obligationShares, 1, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
@@ -228,7 +228,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = buyerAssets;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, lender, otherLenderOffer);
 
@@ -254,7 +254,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, buyerAssets);
         lenderOffer.assets = buyerAssets;
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, otherLender, lenderOffer);
 
@@ -281,7 +281,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = buyerAssets + 1;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, lender, otherLenderOffer);
 
@@ -308,7 +308,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, buyerAssets);
         lenderOffer.assets = buyerAssets + 1;
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, otherLender, lenderOffer);
 
@@ -336,7 +336,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, lender, otherLenderOffer);
 
@@ -363,7 +363,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, buyerAssets + 1); // TODO fix
         lenderOffer.assets = type(uint256).max;
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, otherLender, lenderOffer);
 
@@ -402,7 +402,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, expectedUnits);
         borrowerOffer.assets = buyerAssets;
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, otherBorrower, borrowerOffer);
 
@@ -425,7 +425,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, expectedUnits);
         otherBorrowerOffer.assets = buyerAssets;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, borrower, otherBorrowerOffer);
 
@@ -448,7 +448,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, obligationUnits);
         borrowerOffer.assets = buyerAssets + 1;
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, otherBorrower, borrowerOffer);
 
@@ -471,7 +471,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, obligationUnits);
         otherBorrowerOffer.assets = buyerAssets + 1;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, borrower, otherBorrowerOffer);
 
@@ -495,7 +495,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, obligationShares);
         borrowerOffer.assets = buyerAssets + 1;
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, otherBorrower, borrowerOffer);
 
@@ -523,7 +523,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, obligationShares);
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, borrower, otherBorrowerOffer);
 
@@ -564,7 +564,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherLenderOffer.assets = buyerAssets;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, otherBorrower, otherLenderOffer);
 
@@ -591,7 +591,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherBorrowerOffer.assets = buyerAssets;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(buyerAssets, 0, 0, 0, otherLender, otherBorrowerOffer);
 
@@ -618,7 +618,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherLenderOffer.assets = buyerAssets + 1;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, otherBorrower, otherLenderOffer);
 
@@ -645,7 +645,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherBorrowerOffer.assets = buyerAssets + 1;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(0, 0, obligationUnits, 0, otherLender, otherBorrowerOffer);
 
@@ -673,7 +673,7 @@ contract TakeTest is BaseTest {
 
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.startPrice = price;
-        otherLenderOffer.expiryPrice = price;
+        otherLenderOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, otherBorrower, otherLenderOffer);
 
@@ -701,7 +701,7 @@ contract TakeTest is BaseTest {
 
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.startPrice = price;
-        otherBorrowerOffer.expiryPrice = price;
+        otherBorrowerOffer.endPrice = price;
 
         take(0, 0, 0, obligationShares, otherLender, otherBorrowerOffer);
 
@@ -732,7 +732,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         borrowerOffer.assets = offerAmount;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
         deal(address(loanToken), lender, offerAmount);
         collateralize(obligation, borrower, offerAmount);
 
@@ -756,7 +756,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         lenderOffer.assets = offerAmount;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
         deal(address(loanToken), lender, offerAmount);
         collateralize(obligation, borrower, offerAmount);
 
@@ -773,7 +773,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         borrowerOffer.assets = firstFill + secondFill;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -793,7 +793,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         lenderOffer.assets = firstFill + secondFill;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -818,10 +818,10 @@ contract TakeTest is BaseTest {
         vm.assume(price1 < price2);
         borrowerOffer.assets = units;
         borrowerOffer.startPrice = price1;
-        borrowerOffer.expiryPrice = price1;
+        borrowerOffer.endPrice = price1;
         lenderOffer.assets = units;
         lenderOffer.startPrice = price2;
-        lenderOffer.expiryPrice = price2;
+        lenderOffer.endPrice = price2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
         deal(address(loanToken), address(this), units.mulDivDown(price1, WAD));
@@ -849,10 +849,10 @@ contract TakeTest is BaseTest {
         vm.assume(price1 < price2);
         borrowerOffer.assets = units;
         borrowerOffer.startPrice = price1;
-        borrowerOffer.expiryPrice = price1;
+        borrowerOffer.endPrice = price1;
         lenderOffer.assets = units;
         lenderOffer.startPrice = price2;
-        lenderOffer.expiryPrice = price2;
+        lenderOffer.endPrice = price2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
         collateralize(obligation, borrower, units);
@@ -877,10 +877,10 @@ contract TakeTest is BaseTest {
     function testBuyPastMaturity(uint256 timestamp) public {
         timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
         vm.warp(timestamp);
-        borrowerOffer.expiry = timestamp;
+        borrowerOffer.validUntil = timestamp;
         borrowerOffer.assets = 100;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
@@ -890,10 +890,10 @@ contract TakeTest is BaseTest {
     function testSellPastMaturity(uint256 timestamp) public {
         timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
         vm.warp(timestamp);
-        lenderOffer.expiry = timestamp;
+        lenderOffer.validUntil = timestamp;
         lenderOffer.assets = 100;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
@@ -906,7 +906,7 @@ contract TakeTest is BaseTest {
         price = bound(price, 0.01 ether, 1 ether);
         borrowerOffer.assets = units;
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
@@ -920,7 +920,7 @@ contract TakeTest is BaseTest {
         price = bound(price, 0.01 ether, 1 ether);
         lenderOffer.assets = units;
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
@@ -930,10 +930,10 @@ contract TakeTest is BaseTest {
 
     function testTakeInconsistentPrices(uint256 startPrice, uint256 expiryPrice) public {
         vm.assume(startPrice != expiryPrice);
-        lenderOffer.start = block.timestamp;
-        lenderOffer.expiry = lenderOffer.start;
+        lenderOffer.validFrom = block.timestamp;
+        lenderOffer.validUntil = lenderOffer.validFrom;
         lenderOffer.startPrice = startPrice;
-        lenderOffer.expiryPrice = expiryPrice;
+        lenderOffer.endPrice = expiryPrice;
         vm.expectRevert("inconsistent prices");
         take(100, 0, 0, 0, borrower, lenderOffer);
         vm.expectRevert("inconsistent prices");
@@ -1045,7 +1045,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.callbackData = abi.encode(obligation.collaterals[0].token, collateral);
         borrowerOffer.assets = assets;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
         assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), 0);
@@ -1061,7 +1061,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = assets.mulDivUp(WAD, obligation.collaterals[0].lltv);
         lenderOffer.assets = assets;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
         address callback = address(new BorrowCallback());
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, callback, collateral);
@@ -1090,7 +1090,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = address(otherLender);
         lenderOffer.assets = assets;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
         deal(address(loanToken), lenderOffer.callback, assets);
         collateralize(obligation, borrower, assets);
 
@@ -1107,7 +1107,7 @@ contract TakeTest is BaseTest {
         address callback = address(new LendCallback());
         borrowerOffer.assets = assets;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, assets);
 

@@ -114,10 +114,13 @@ contract MorphoV2 is IMorphoV2 {
             UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
             "inconsistent offer input"
         );
-        require(block.timestamp >= offer.start, "offer not started");
-        require(block.timestamp <= offer.expiry, "offer expired");
+        require(block.timestamp >= offer.validFrom, "offer not started");
+        require(block.timestamp <= offer.validUntil, "offer expired");
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
-        require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
+        require(
+            offer.validFrom < offer.validUntil || offer.endPrice == offer.startPrice,
+            "inconsistent prices"
+        );
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
@@ -135,9 +138,9 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = offer.expiry != offer.start
-            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
+        uint256 offerPrice = offer.validUntil != offer.validFrom
+            ? offer.startPrice + (offer.endPrice - offer.startPrice) * (block.timestamp - offer.validFrom)
+                / (offer.validUntil - offer.validFrom)
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 

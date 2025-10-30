@@ -34,18 +34,18 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.assets = 100 ether;
-        lenderOffer.start = block.timestamp;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.validFrom = block.timestamp;
+        lenderOffer.validUntil = block.timestamp + 200;
         lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.endPrice = 1 ether;
 
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.assets = 100 ether;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.validUntil = block.timestamp + 200;
         borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.endPrice = 1 ether;
 
         deal(address(loanToken), address(this), 1000 ether);
         deal(address(loanToken), address(lender), 1000 ether);
@@ -66,7 +66,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + fee.mulDivDown(1e18, price) - fee);
         uint256 expectedUnits = expectedSellerAssets.mulDivDown(1e18, price);
@@ -84,7 +84,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         uint256 expectedUnits = buyerAssets.mulDivDown(1e18, price);
         uint256 expectedSellerAssets = (buyerAssets - fee.mulDivDown(expectedUnits, 1e18)).mulDivDown(1e18, 1e18 - fee);
@@ -102,7 +102,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         uint256 expectedUnits = sellerAssets.mulDivDown(1e18, price);
         uint256 expectedFee = (expectedUnits - sellerAssets) * fee / 1e18;
@@ -119,7 +119,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         uint256 expectedBuyerAssets =
             (sellerAssets.mulDivDown(1e18 - fee, 1e18)).mulDivDown(1e18, 1e18 - fee.mulDivDown(1e18, price));
@@ -137,7 +137,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         borrowerOffer.startPrice = price;
-        borrowerOffer.expiryPrice = price;
+        borrowerOffer.endPrice = price;
 
         uint256 expectedSellerAssets = obligationUnits * price / 1e18;
         uint256 expectedFee = (obligationUnits - expectedSellerAssets) * fee / 1e18;
@@ -154,7 +154,7 @@ contract TradingFeeTest is BaseTest {
         uint256 fee = 0.05e18;
 
         lenderOffer.startPrice = price;
-        lenderOffer.expiryPrice = price;
+        lenderOffer.endPrice = price;
 
         uint256 expectedBuyerAssets = obligationUnits * price / 1e18;
         uint256 expectedSellerAssets =
@@ -172,7 +172,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 buyerAssets = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
-        borrowerOffer.expiryPrice = 0.9 ether;
+        borrowerOffer.endPrice = 0.9 ether;
 
         uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
@@ -186,7 +186,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 buyerAssets = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
-        lenderOffer.expiryPrice = 0.9 ether;
+        lenderOffer.endPrice = 0.9 ether;
 
         uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
@@ -200,7 +200,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 sellerAssets = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
-        borrowerOffer.expiryPrice = 0.9 ether;
+        borrowerOffer.endPrice = 0.9 ether;
 
         uint256 expectedFee = sellerAssets / 1000;
 
@@ -213,7 +213,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 sellerAssets = 90 ether;
         lenderOffer.startPrice = 0.9 ether;
-        lenderOffer.expiryPrice = 0.9 ether;
+        lenderOffer.endPrice = 0.9 ether;
 
         uint256 expectedFee = sellerAssets / 1000;
 
@@ -226,7 +226,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 obligationUnits = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
-        borrowerOffer.expiryPrice = 0.9 ether;
+        borrowerOffer.endPrice = 0.9 ether;
 
         uint256 expectedSellerAssets = obligationUnits * 0.9 ether / 1e18;
         uint256 expectedFee = expectedSellerAssets / 1000;
@@ -240,7 +240,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 obligationUnits = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
-        lenderOffer.expiryPrice = 0.9 ether;
+        lenderOffer.endPrice = 0.9 ether;
 
         uint256 expectedBuyerAssets = obligationUnits * 0.9 ether / 1e18;
         uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
@@ -255,7 +255,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 obligationShares = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
-        borrowerOffer.expiryPrice = 0.9 ether;
+        borrowerOffer.endPrice = 0.9 ether;
 
         uint256 expectedSellerAssets = obligationShares * 0.9 ether / 1e18;
         uint256 expectedFee = expectedSellerAssets / 1000;
@@ -269,7 +269,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
         uint256 obligationShares = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
-        lenderOffer.expiryPrice = 0.9 ether;
+        lenderOffer.endPrice = 0.9 ether;
 
         uint256 expectedBuyerAssets = obligationShares * 0.9 ether / 1e18;
         uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
