@@ -12,8 +12,8 @@ contract TradingFeeTest is BaseTest {
 
     Obligation internal obligation;
     bytes32 internal id;
-    Offer internal lendOffer;
-    Offer internal borrowOffer;
+    Offer internal lenderOffer;
+    Offer internal borrowerOffer;
     address internal feeRecipient = makeAddr("feeRecipient");
 
     function setUp() public override {
@@ -23,29 +23,29 @@ contract TradingFeeTest is BaseTest {
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle)}));
+            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle)}));
+            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = keccak256(abi.encode(obligation));
 
-        lendOffer.obligation = obligation;
-        lendOffer.buy = true;
-        lendOffer.maker = lender;
-        lendOffer.assets = 100 ether;
-        lendOffer.start = block.timestamp;
-        lendOffer.expiry = block.timestamp + 200;
-        lendOffer.startPrice = 1 ether;
-        lendOffer.expiryPrice = 1 ether;
+        lenderOffer.obligation = obligation;
+        lenderOffer.buy = true;
+        lenderOffer.maker = lender;
+        lenderOffer.assets = 100 ether;
+        lenderOffer.start = block.timestamp;
+        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.startPrice = 1 ether;
+        lenderOffer.expiryPrice = 1 ether;
 
-        borrowOffer.obligation = obligation;
-        borrowOffer.buy = false;
-        borrowOffer.maker = borrower;
-        borrowOffer.assets = 100 ether;
-        borrowOffer.expiry = block.timestamp + 200;
-        borrowOffer.startPrice = 1 ether;
-        borrowOffer.expiryPrice = 1 ether;
+        borrowerOffer.obligation = obligation;
+        borrowerOffer.buy = false;
+        borrowerOffer.maker = borrower;
+        borrowerOffer.assets = 100 ether;
+        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.startPrice = 1 ether;
+        borrowerOffer.expiryPrice = 1 ether;
 
         deal(address(loanToken), address(this), 1000 ether);
         deal(address(loanToken), address(lender), 1000 ether);
@@ -69,8 +69,8 @@ contract TradingFeeTest is BaseTest {
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
 
-        borrowOffer.startPrice = price;
-        borrowOffer.expiryPrice = price;
+        borrowerOffer.startPrice = price;
+        borrowerOffer.expiryPrice = price;
 
         uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + fee.mulDivDown(1e18, price) - fee);
         uint256 expectedUnits = expectedSellerAssets.mulDivDown(1e18, price);
@@ -86,10 +86,10 @@ contract TradingFeeTest is BaseTest {
             0,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -109,8 +109,8 @@ contract TradingFeeTest is BaseTest {
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
 
-        borrowOffer.startPrice = price;
-        borrowOffer.expiryPrice = price;
+        borrowerOffer.startPrice = price;
+        borrowerOffer.expiryPrice = price;
 
         uint256 expectedUnits = sellerAssets.mulDivDown(1e18, price);
         uint256 expectedFee = (expectedUnits - sellerAssets) * fee / 1e18;
@@ -126,10 +126,10 @@ contract TradingFeeTest is BaseTest {
             0,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -144,8 +144,8 @@ contract TradingFeeTest is BaseTest {
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
 
-        borrowOffer.startPrice = price;
-        borrowOffer.expiryPrice = price;
+        borrowerOffer.startPrice = price;
+        borrowerOffer.expiryPrice = price;
 
         uint256 expectedSellerAssets = obligationUnits * price / 1e18;
         uint256 expectedFee = (obligationUnits - expectedSellerAssets) * fee / 1e18;
@@ -161,10 +161,10 @@ contract TradingFeeTest is BaseTest {
             obligationUnits,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -177,8 +177,8 @@ contract TradingFeeTest is BaseTest {
     function testZeroTradingFee() public {
         morphoV2.setTradingFee(id, 0);
         uint256 buyerAssets = 100 ether;
-        borrowOffer.startPrice = 0.9 ether;
-        borrowOffer.expiryPrice = 0.9 ether;
+        borrowerOffer.startPrice = 0.9 ether;
+        borrowerOffer.expiryPrice = 0.9 ether;
 
         uint256 feeRecipientBalanceBefore = loanToken.balanceOf(feeRecipient);
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
@@ -190,10 +190,10 @@ contract TradingFeeTest is BaseTest {
             0,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -205,8 +205,8 @@ contract TradingFeeTest is BaseTest {
 
     function testBuyerAssetsNoInterest() public {
         uint256 buyerAssets = 100 ether;
-        borrowOffer.startPrice = 1 ether;
-        borrowOffer.expiryPrice = 1 ether;
+        borrowerOffer.startPrice = 1 ether;
+        borrowerOffer.expiryPrice = 1 ether;
 
         uint256 feeRecipientBalanceBefore = loanToken.balanceOf(feeRecipient);
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
@@ -218,10 +218,10 @@ contract TradingFeeTest is BaseTest {
             0,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -233,8 +233,8 @@ contract TradingFeeTest is BaseTest {
 
     function testSellerAssetsNoInterest() public {
         uint256 sellerAssets = 100 ether;
-        borrowOffer.startPrice = 1 ether;
-        borrowOffer.expiryPrice = 1 ether;
+        borrowerOffer.startPrice = 1 ether;
+        borrowerOffer.expiryPrice = 1 ether;
 
         uint256 feeRecipientBalanceBefore = loanToken.balanceOf(feeRecipient);
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
@@ -246,10 +246,10 @@ contract TradingFeeTest is BaseTest {
             0,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );
@@ -261,8 +261,8 @@ contract TradingFeeTest is BaseTest {
 
     function testObligationUnitsNoInterest() public {
         uint256 obligationUnits = 100 ether;
-        borrowOffer.startPrice = 1 ether;
-        borrowOffer.expiryPrice = 1 ether;
+        borrowerOffer.startPrice = 1 ether;
+        borrowerOffer.expiryPrice = 1 ether;
 
         uint256 feeRecipientBalanceBefore = loanToken.balanceOf(feeRecipient);
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
@@ -274,10 +274,10 @@ contract TradingFeeTest is BaseTest {
             obligationUnits,
             0,
             lender,
-            borrowOffer,
-            sig([borrowOffer]),
-            root([borrowOffer]),
-            proof([borrowOffer]),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
             address(0),
             hex""
         );

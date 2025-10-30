@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, AUCTION_DURATION} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure} from "./interfaces/IMorphoV2.sol";
@@ -26,7 +26,8 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 => uint256) public totalShares;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same amount and the same loan asset.
+    /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
+    /// obligationShares and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
     /// @dev Offers should have this exact nonce to be valid.
@@ -91,7 +92,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    /// @dev Neither the taker nor the maker can pass from having obligation shares to having debt in one take.
+    /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
     function take(
         uint256 buyerAssets,
         uint256 sellerAssets,
@@ -108,6 +109,10 @@ contract MorphoV2 is IMorphoV2 {
         require(
             UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
             "inconsistent input"
+        );
+        require(
+            UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
+            "inconsistent offer input"
         );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
@@ -158,22 +163,33 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
 
-        require(
-            (consumed[offer.maker][offer.group] += (offer.buy ? buyerAssets : sellerAssets)) <= offer.assets, "consumed"
-        );
+        if (offer.assets > 0) {
+            require(
+                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= offer.assets,
+                "consumed"
+            );
+        } else if (offer.obligationUnits > 0) {
+            require((consumed[offer.maker][offer.group] += obligationUnits) <= offer.obligationUnits, "consumed");
+        } else {
+            require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
+        }
 
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
+            // Lender enters + borrower enters.
             sharesOf[buyer][id] += obligationShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
         } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
+            // Lender enters + lender exits.
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
         } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
+            // Borrower exits + borrower enters.
             debtOf[buyer][id] -= obligationUnits;
             debtOf[seller][id] += obligationUnits;
         } else {
+            // Borrower exits + lender exits.
             debtOf[buyer][id] -= obligationUnits;
             sharesOf[seller][id] -= obligationShares;
             totalShares[id] -= obligationShares;
@@ -270,7 +286,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev On each seizure at least one of `repaid` or `seized` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity is reached.
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
-    /// AUCTION_DURATION.
+    /// TIME_TO_MAX_LIF.
     /// @param obligation The obligation.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// obligation's collateral assets.
@@ -299,7 +315,7 @@ contract MorphoV2 is IMorphoV2 {
 
         uint256 lif = originalDebt > maxDebt
             ? MAX_LIF
-            : UtilsLib.min(MAX_LIF, WAD + (MAX_LIF - WAD) * (block.timestamp - obligation.maturity) / AUCTION_DURATION);
+            : UtilsLib.min(MAX_LIF, WAD + (MAX_LIF - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
 
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
@@ -328,6 +344,7 @@ contract MorphoV2 is IMorphoV2 {
 
         totalPreRepaid[id] += _repaid;
         preRepaidOf[borrower][id] += _repaid;
+        require(preRepaidOf[borrower][id] <= debtOf[borrower][id], "repaid more than debt");
 
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
