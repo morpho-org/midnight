@@ -35,6 +35,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Trading fee parameters for a given obligation id.
     mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
+    mapping(address loanToken => TradingFeeParams) public defaultTradingFeeParams;
     address public tradingFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
@@ -74,11 +75,31 @@ contract MorphoV2 is IMorphoV2 {
         feeSetter = newFeeSetter;
     }
 
-    function setTradingFee(bytes32 id, uint128 tradingFee, uint128 interestCutLimit) external {
+    function setTradingFee(bytes32 id, uint128 tradingFee, uint128 interestCutLimit, bool activated) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(tradingFee <= WAD, "Trading fee too high");
         require(interestCutLimit <= WAD, "Interest cut limit too high");
-        tradingFeeParams[id] = TradingFeeParams({tradingFee: tradingFee, interestCutLimit: interestCutLimit});
+        tradingFeeParams[id] = TradingFeeParams({
+            tradingFee: tradingFee,
+            interestCutLimit: interestCutLimit,
+            activated: activated
+        });
+    }
+
+    function setDefaultTradingFee(
+        address loanToken,
+        uint128 tradingFee,
+        uint128 interestCutLimit,
+        bool activated
+    ) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(tradingFee <= WAD, "Trading fee too high");
+        require(interestCutLimit <= WAD, "Interest cut limit too high");
+        defaultTradingFeeParams[loanToken] = TradingFeeParams({
+            tradingFee: tradingFee,
+            interestCutLimit: interestCutLimit,
+            activated: activated
+        });
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -142,6 +163,13 @@ contract MorphoV2 is IMorphoV2 {
         require(offerPrice <= WAD, "price too high");
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
+        if (!_tradingFeeParams.activated) {
+            TradingFeeParams memory _defaultTradingFeeParams =
+                defaultTradingFeeParams[offer.obligation.loanToken];
+            if (_defaultTradingFeeParams.activated) {
+                _tradingFeeParams = _defaultTradingFeeParams;
+            }
+        }
         uint256 buyerPrice = offer.buy
             ? offerPrice
             : UtilsLib.min(

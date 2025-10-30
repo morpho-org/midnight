@@ -59,8 +59,40 @@ contract TradingFeeTest is BaseTest {
 
     // Fee proportional to interest.
 
+    function testDefaultTradingFeeUsedWhenMarketUnset() public {
+        morphoV2.setDefaultTradingFee(address(loanToken), 0.001e18, 0.05e18, true);
+        uint256 buyerAssets = 100 ether;
+
+        borrowerOffer.startPrice = 0.9 ether;
+        borrowerOffer.expiryPrice = 0.9 ether;
+
+        uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedFee = expectedSellerAssets / 1000;
+
+        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+
+        assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
+    }
+
+    function testDefaultTradingFeeUsedWhenMarketDeactivated() public {
+        morphoV2.setDefaultTradingFee(address(loanToken), 0.001e18, 0.05e18, true);
+        morphoV2.setTradingFee(id, 0.5e18, 0.05e18, false);
+
+        uint256 buyerAssets = 100 ether;
+
+        borrowerOffer.startPrice = 0.9 ether;
+        borrowerOffer.expiryPrice = 0.9 ether;
+
+        uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedFee = expectedSellerAssets / 1000;
+
+        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+
+        assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
+    }
+
     function testBuyerAssetsLend() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 buyerAssets = 100 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -78,7 +110,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testBuyerAssetsBorrow() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 buyerAssets = 100 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -96,7 +128,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testSellerAssetsLend() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 sellerAssets = 90 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -113,7 +145,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testSellerAssetsBorrow() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 sellerAssets = 90 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -131,7 +163,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationUnitsLend() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 obligationUnits = 100 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -148,7 +180,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationUnitsBorrow() public {
-        morphoV2.setTradingFee(id, 1e18, 0.05e18);
+        morphoV2.setTradingFee(id, 1e18, 0.05e18, true);
         uint256 obligationUnits = 100 ether;
         uint256 price = 0.9 ether;
         uint256 fee = 0.05e18;
@@ -169,7 +201,7 @@ contract TradingFeeTest is BaseTest {
     // Fee proportional to amount traded.
 
     function testBuyerAssetsLendMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 buyerAssets = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
@@ -183,7 +215,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testBuyerAssetsBorrowMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 buyerAssets = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
@@ -197,7 +229,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testSellerAssetsLendMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 sellerAssets = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
@@ -210,7 +242,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testSellerAssetsBorrowMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 sellerAssets = 90 ether;
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
@@ -223,7 +255,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationUnitsLendMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 obligationUnits = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
@@ -237,7 +269,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationUnitsBorrowMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 obligationUnits = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
@@ -252,7 +284,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationSharesLendMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 obligationShares = 100 ether;
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
@@ -266,7 +298,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testObligationSharesBorrowMax() public {
-        morphoV2.setTradingFee(id, 0.001e18, 0.05e18);
+        morphoV2.setTradingFee(id, 0.001e18, 0.05e18, true);
         uint256 obligationShares = 100 ether;
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
