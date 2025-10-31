@@ -24,7 +24,7 @@ interface ICallbacks {
         bytes memory data
     ) external;
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external;
-    function onRatify(Offer memory offer, bytes memory ratification) external returns (bool);
+    function onRatify(Offer memory offer, address signer) external returns (bool);
 }
 
 interface IFlashLoanCallback {

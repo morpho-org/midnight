@@ -34,6 +34,11 @@ struct Offer {
     address ratifier;
 }
 
+struct Proof {
+    bytes32 root;
+    bytes32[] path;
+}
+
 struct Signature {
     uint8 v;
     bytes32 r;

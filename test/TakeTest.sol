@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Offer, Signature, Collateral, Seizure, Proof} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
@@ -959,32 +959,45 @@ contract TakeTest is BaseTest {
         vm.assume(invalidRoot != root([lenderOffer]));
         vm.expectRevert("invalid proof");
 
-        bytes memory ratificationData =
-            abi.encode(invalidRoot, new bytes32[](0), messageSig(invalidRoot, lenderOffer.maker));
+        Proof memory _proof = Proof({root: invalidRoot, path: new bytes32[](0)});
+        Signature memory _sig = sign([lenderOffer]);
 
-        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, ratificationData, address(0), hex"");
+        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, _proof, _sig, address(0), hex"");
     }
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("invalid signature");
         Signature memory sig = Signature({v: 1, r: 0, s: 0});
 
-        morphoV2.take(
-            100, 0, 0, 0, borrower, lenderOffer, abi.encode(root(lenderOffer), new bytes32[](0), sig), address(0), hex""
-        );
+        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, proof([lenderOffer]), sig, address(0), hex"");
     }
 
-    function testTakeByRatification(address maker, address sender, bytes32 data) public {
+    function testTakeByRatification(address maker, address sender, uint256 otherPrivateKey) public {
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
         vm.assume(maker != sender);
         RatifyCallback ratifier = new RatifyCallback();
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
 
+        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
+
         vm.prank(maker);
         morphoV2.setAuthorized(address(ratifier), true);
         vm.prank(sender);
-        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, bytes.concat(data), address(ratifier), hex"");
-        assertEq(bytes32(ratifier.recordedData()), data);
+        morphoV2.take(
+            0,
+            0,
+            0,
+            0,
+            sender,
+            lenderOffer,
+            proof([lenderOffer]),
+            sign([lenderOffer], vm.addr(otherPrivateKey)),
+            address(ratifier),
+            hex""
+        );
+        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
+        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
     }
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory path) public {
@@ -993,10 +1006,10 @@ contract TakeTest is BaseTest {
         vm.assume(path.length >= 1);
         vm.expectRevert("invalid proof");
 
-        bytes32 _root = root([lenderOffer]);
-        bytes memory ratificationData = abi.encode(_root, path, messageSig(_root, lenderOffer.maker));
+        Proof memory _proof = Proof({root: root([lenderOffer]), path: path});
+        Signature memory _sig = sign([lenderOffer]);
 
-        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, ratificationData, address(0), hex"");
+        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, _proof, _sig, address(0), hex"");
     }
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory path) public {
@@ -1005,11 +1018,11 @@ contract TakeTest is BaseTest {
         vm.assume(path.length >= 1);
         vm.assume(path[0] != keccak256(abi.encode(otherOffer)));
 
-        bytes32 _root = root([lenderOffer, otherOffer]);
-        bytes memory ratificationData = abi.encode(_root, path, messageSig(_root, lenderOffer.maker));
+        Proof memory _proof = Proof({root: root([lenderOffer, otherOffer]), path: path});
+        Signature memory _sig = sign([lenderOffer, otherOffer]);
 
         vm.expectRevert("invalid proof");
-        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, ratificationData, address(0), hex"");
+        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, _proof, _sig, address(0), hex"");
     }
 
     function testTakeTwoLeaves(uint256 assets, Offer memory otherOffer) public {
@@ -1018,7 +1031,18 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, assets.mulDivDown(WAD, lenderOffer.startPrice));
         lenderOffer.assets = assets;
 
-        morphoV2.take(assets, 0, 0, 0, borrower, lenderOffer, signProof([lenderOffer, otherOffer]), address(0), hex"");
+        morphoV2.take(
+            assets,
+            0,
+            0,
+            0,
+            borrower,
+            lenderOffer,
+            proof([lenderOffer, otherOffer]),
+            sign([lenderOffer, otherOffer]),
+            address(0),
+            hex""
+        );
     }
 
     function testTakeNotRatified() public {
@@ -1026,11 +1050,7 @@ contract TakeTest is BaseTest {
         morphoV2.setAuthorized(address(this), false);
         vm.expectRevert("offer not ratified");
 
-        Signature memory sig;
-
-        morphoV2.take(
-            100, 0, 0, 0, borrower, lenderOffer, abi.encode(root(lenderOffer), new bytes32[](0), sig), address(0), hex""
-        );
+        morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, proof([lenderOffer]), emptySig, address(0), hex"");
     }
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
@@ -1039,27 +1059,15 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = vm.addr(makerSecretKey);
         vm.assume(sender != vm.addr(makerSecretKey));
         vm.prank(sender);
-        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, signProof([lenderOffer]), address(0), hex"");
-    }
-
-    function testTakeOfferAuthorizedSender(address maker, address sender) public {
-        vm.assume(sender != maker);
-        lenderOffer.maker = maker;
-        vm.prank(maker);
-        morphoV2.setAuthorized(sender, true);
-        vm.prank(sender);
-        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, hex"", address(0), hex"");
+        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, proof([lenderOffer]), sign([lenderOffer]), address(0), hex"");
     }
 
     function testTakeOfferRatified(address maker, address sender) public {
         lenderOffer.maker = maker;
-        Signature memory sig;
         vm.prank(maker);
         morphoV2.setRatified(maker, root(lenderOffer), true);
         vm.prank(sender);
-        morphoV2.take(
-            0, 0, 0, 0, sender, lenderOffer, abi.encode(root(lenderOffer), new bytes32[](0), sig), address(0), hex""
-        );
+        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, proof([lenderOffer]), emptySig, address(0), hex"");
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
@@ -1071,15 +1079,26 @@ contract TakeTest is BaseTest {
 
         lenderOffer.maker = vm.addr(makerSecretKey);
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("invalid signer");
         vm.prank(sender);
         morphoV2.take(
-            100, 0, 0, 0, sender, lenderOffer, signProof([lenderOffer], vm.addr(otherSecretKey)), address(0), hex""
+            100,
+            0,
+            0,
+            0,
+            sender,
+            lenderOffer,
+            proof([lenderOffer]),
+            sign([lenderOffer], vm.addr(otherSecretKey)),
+            address(0),
+            hex""
         );
     }
 
-    function testTakeRatificationFailed(address maker, address sender) public {
+    function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
         vm.assume(maker != sender);
+        signerPrivateKey = boundPrivateKey(signerPrivateKey);
+        privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
         RatifyCallback ratifier = new RatifyCallback();
         ratifier.setReturnData(false);
         lenderOffer.maker = maker;
@@ -1089,7 +1108,18 @@ contract TakeTest is BaseTest {
         morphoV2.setAuthorized(address(ratifier), true);
         vm.expectRevert("offer ratification failed");
         vm.prank(sender);
-        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, hex"", address(ratifier), hex"");
+        morphoV2.take(
+            0,
+            0,
+            0,
+            0,
+            sender,
+            lenderOffer,
+            proof([lenderOffer]),
+            sign([lenderOffer], vm.addr(signerPrivateKey)),
+            address(ratifier),
+            hex""
+        );
     }
 
     function testOrderNotAuthorized(address taker, address sender) public {
@@ -1098,12 +1128,12 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert("order not authorized");
         vm.prank(sender);
-        morphoV2.take(100, 0, 0, 0, taker, lenderOffer, signProof([lenderOffer]), address(0), hex"");
+        morphoV2.take(100, 0, 0, 0, taker, lenderOffer, proof([lenderOffer]), sign([lenderOffer]), address(0), hex"");
     }
 
     function testOrderByTaker(address taker) public {
         vm.prank(taker);
-        morphoV2.take(0, 0, 0, 0, taker, lenderOffer, signProof([lenderOffer]), address(0), hex"");
+        morphoV2.take(0, 0, 0, 0, taker, lenderOffer, proof([lenderOffer]), sign([lenderOffer]), address(0), hex"");
     }
 
     function testOrderByAuthorized(address taker, address sender) public {
@@ -1111,7 +1141,7 @@ contract TakeTest is BaseTest {
         vm.prank(taker);
         morphoV2.setAuthorized(sender, true);
         vm.prank(sender);
-        morphoV2.take(0, 0, 0, 0, taker, lenderOffer, signProof([lenderOffer]), address(0), hex"");
+        morphoV2.take(0, 0, 0, 0, taker, lenderOffer, proof([lenderOffer]), sign([lenderOffer]), address(0), hex"");
     }
 
     // test callbacks.
@@ -1151,7 +1181,8 @@ contract TakeTest is BaseTest {
             0,
             borrower,
             lenderOffer,
-            signProof([lenderOffer]),
+            proof([lenderOffer]),
+            sign([lenderOffer]),
             callback,
             abi.encode(obligation.collaterals[0].token, collateral)
         );
@@ -1194,7 +1225,8 @@ contract TakeTest is BaseTest {
             0,
             otherLender,
             borrowerOffer,
-            signProof([borrowerOffer]),
+            proof([borrowerOffer]),
+            sign([borrowerOffer]),
             callback,
             abi.encode(address(loanToken), assets)
         );
@@ -1231,7 +1263,7 @@ contract BorrowCallback is ICallbacks {
     ) external {}
 
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
-    function onRatify(Offer memory offer, bytes memory ratification) external returns (bool) {}
+    function onRatify(Offer memory offer, address signer) external returns (bool) {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1260,12 +1292,13 @@ contract LendCallback is ICallbacks {
         bytes memory data
     ) external {}
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
-    function onRatify(Offer memory offer, bytes memory ratification) external returns (bool) {}
+    function onRatify(Offer memory offer, address signer) external returns (bool) {}
 }
 
 contract RatifyCallback is ICallbacks {
-    bytes public recordedData;
-    bool public returnData = true;
+    address public recordedSigner;
+    Offer internal _recordedOffer;
+    bool public returnBool = true;
 
     function onBuy(
         Obligation memory obligation,
@@ -1287,12 +1320,17 @@ contract RatifyCallback is ICallbacks {
     ) external {}
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 
-    function onRatify(Offer memory, bytes memory ratificationData) external returns (bool) {
-        recordedData = ratificationData;
-        return returnData;
+    function recordedOffer() public view returns (Offer memory) {
+        return _recordedOffer;
     }
 
-    function setReturnData(bool _returnData) external {
-        returnData = _returnData;
+    function onRatify(Offer memory offer, address signer) external returns (bool) {
+        _recordedOffer = offer;
+        recordedSigner = signer;
+        return returnBool;
+    }
+
+    function setReturnData(bool _returnBool) external {
+        returnBool = _returnBool;
     }
 }

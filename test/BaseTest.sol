@@ -7,7 +7,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Offer, Signature, Collateral, Seizure, Proof} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
@@ -28,6 +28,9 @@ abstract contract BaseTest is Test {
     address internal otherBorrower;
     address internal otherLender;
     address internal liquidator = makeAddr("liquidator");
+
+    Signature internal emptySig;
+    Proof internal emptyProof;
 
     function setUp() public virtual {
         morphoV2 = new MorphoV2();
@@ -101,7 +104,8 @@ abstract contract BaseTest is Test {
             obligationShares,
             taker,
             offer,
-            signProof([offer]),
+            proof([offer]),
+            sign([offer]),
             address(0),
             hex""
         );
@@ -169,26 +173,27 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(obligation));
     }
 
-    function signProof(Offer[1] memory offers, address signer) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        return abi.encode(_root, new bytes32[](0), messageSig(_root, signer));
+    function sign(Offer[1] memory offers) internal view returns (Signature memory) {
+        return messageSig(root(offers), offers[0].maker);
     }
 
-    function signProof(Offer[1] memory offers) internal view returns (bytes memory) {
-        return signProof(offers, offers[0].maker);
+    function sign(Offer[1] memory offers, address signer) internal view returns (Signature memory) {
+        return messageSig(root(offers), signer);
+    }
+
+    function proof(Offer[1] memory offers) internal pure returns (Proof memory) {
+        return Proof({root: root(offers), path: new bytes32[](0)});
+    }
+
+    function sign(Offer[2] memory offers) internal view returns (Signature memory) {
+        return messageSig(root(offers), offers[0].maker);
     }
 
     // assumes the offer is the first one!
-    function signProof(Offer[2] memory offers, address signer) internal view returns (bytes memory) {
-        bytes32[] memory path = new bytes32[](1);
-        path[0] = keccak256(abi.encode(offers[1]));
-
-        bytes32 _root = root(offers);
-        return abi.encode(_root, path, messageSig(_root, signer));
-    }
-
-    function signProof(Offer[2] memory offers) internal view returns (bytes memory) {
-        return signProof(offers, offers[0].maker);
+    function proof(Offer[2] memory offers) internal pure returns (Proof memory) {
+        Proof memory _proof = Proof({root: root(offers), path: new bytes32[](1)});
+        _proof.path[0] = keccak256(abi.encode(offers[1]));
+        return _proof;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
@@ -234,7 +239,18 @@ abstract contract BaseTest is Test {
         borrowerOffer.startPrice = 1 ether;
         borrowerOffer.expiryPrice = 1 ether;
 
-        morphoV2.take(0, 0, obligationUnits, 0, lender, borrowerOffer, signProof([borrowerOffer]), address(0), hex"");
+        morphoV2.take(
+            0,
+            0,
+            obligationUnits,
+            0,
+            lender,
+            borrowerOffer,
+            proof([borrowerOffer]),
+            sign([borrowerOffer]),
+            address(0),
+            hex""
+        );
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

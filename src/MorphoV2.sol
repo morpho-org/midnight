@@ -21,7 +21,8 @@ import {
     Signature,
     Seizure,
     Authorization,
-    TradingFeeParams
+    TradingFeeParams,
+    Proof
 } from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 
@@ -118,7 +119,8 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationShares,
         address taker,
         Offer memory offer,
-        bytes memory ratificationData,
+        Proof memory proof,
+        Signature memory sig,
         address takerCallback,
         bytes memory takerCallbackData
     ) public returns (uint256, uint256, uint256, uint256) {
@@ -137,24 +139,22 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(offer.nonce == nonce[offer.maker], "invalid nonce");
         require(msg.sender == taker || authorized[taker][msg.sender], "order not authorized");
+        require(MathLib.isLeaf(proof.root, keccak256(abi.encode(offer)), proof.path), "invalid proof");
 
-        if (offer.ratifier != address(0)) {
-            require(
-                authorized[offer.maker][offer.ratifier] && ICallbacks(offer.ratifier).onRatify(offer, ratificationData),
-                "offer ratification failed"
-            );
-        } else if (ratificationData.length != 0) {
-            (bytes32 root, bytes32[] memory path, Signature memory sig) =
-                abi.decode(ratificationData, (bytes32, bytes32[], Signature));
-            require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), path), "invalid proof");
-            if (sig.v == 0) {
-                require(ratified[offer.maker][root], "offer not ratified");
+        if (sig.v != 0) {
+            address tentativeSigner = MathLib.messageSigner(proof.root, sig.v, sig.r, sig.s);
+            require(tentativeSigner != address(0), "invalid signature");
+            if (offer.ratifier != address(0)) {
+                require(
+                    authorized[offer.maker][offer.ratifier]
+                        && ICallbacks(offer.ratifier).onRatify(offer, tentativeSigner),
+                    "offer ratification failed"
+                );
             } else {
-                address tentativeSigner = MathLib.messageSigner(root, sig.v, sig.r, sig.s);
-                require(tentativeSigner != address(0) && tentativeSigner == offer.maker, "invalid signature");
+                require(tentativeSigner == offer.maker, "invalid signer");
             }
         } else {
-            require(authorized[offer.maker][msg.sender], "offer not authorized");
+            require(ratified[offer.maker][proof.root], "offer not ratified");
         }
         bytes32 id = _id(offer.obligation);
 
