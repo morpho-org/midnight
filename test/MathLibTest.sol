@@ -66,7 +66,10 @@ contract MathLibTest is Test {
     }
 
     function testIsLeaf4Leaves(bytes32 x, bytes32 y, bytes32 z, bytes32 w) public pure {
-        vm.assume(x < y && y < z && z < w);
+        x = bytes32(bound(uint256(x), 0, type(uint256).max - 3));
+        y = bytes32(bound(uint256(y), uint256(x), type(uint256).max - 2));
+        z = bytes32(bound(uint256(z), uint256(y), type(uint256).max - 1));
+        w = bytes32(bound(uint256(w), uint256(z), type(uint256).max));
         bytes32 leftNode = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
         bytes32 rightNode = keccak256(z < w ? abi.encode(z, w) : abi.encode(w, z));
         bytes32 root =
