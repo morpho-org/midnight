@@ -43,7 +43,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
-    mapping(address user => mapping(bytes32 id => mapping(uint256 start => uint256 units))) public auctionable;
+    mapping(address user => mapping(bytes32 id => mapping(uint256 start => uint256))) public auctionable;
 
     /// CONSTRUCTOR ///
 
