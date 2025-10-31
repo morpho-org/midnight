@@ -4,13 +4,12 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
-import {ORACLE_PRICE_SCALE, WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
-import {Oracle} from "./helpers/Oracle.sol";
 
 contract TakeTest is BaseTest {
     using MathLib for uint256;

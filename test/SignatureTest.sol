@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Signature} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 

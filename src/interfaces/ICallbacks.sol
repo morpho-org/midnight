@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.28;
 
-import {Seizure, Obligation, Offer, Signature} from "./IMorphoV2.sol";
+import {Seizure, Obligation, Offer} from "./IMorphoV2.sol";
 
 interface ICallbacks {
     function onBuy(

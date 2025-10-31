@@ -223,19 +223,19 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSetAuthorizedWithSigDeadlineOutdated(
-        uint256 authorizerPK,
+        uint256 authorizerPrivateKey,
         uint256 elapsed,
         address authorizee,
         bool isAuthorized,
-        uint256 otherPK,
+        uint256 otherPrivateKey,
         uint256 wrongNonce
     ) public {
-        authorizerPK = boundPrivateKey(authorizerPK);
-        otherPK = boundPrivateKey(otherPK);
+        authorizerPrivateKey = boundPrivateKey(authorizerPrivateKey);
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
         wrongNonce = bound(wrongNonce, 1, type(uint256).max);
-        vm.assume(otherPK != authorizerPK);
+        vm.assume(otherPrivateKey != authorizerPrivateKey);
         elapsed = bound(elapsed, 0, 365 days);
-        address authorizer = vm.addr(authorizerPK);
+        address authorizer = vm.addr(authorizerPrivateKey);
 
         Authorization memory authorization = Authorization({
             authorizer: authorizer,
@@ -246,7 +246,7 @@ contract OtherFunctionsTest is BaseTest {
         });
 
         Signature memory sig;
-        (sig.v, sig.r, sig.s) = vm.sign(authorizerPK, _authorizationDigest(authorization));
+        (sig.v, sig.r, sig.s) = vm.sign(authorizerPrivateKey, _authorizationDigest(authorization));
 
         skip(elapsed);
 
@@ -259,7 +259,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.expectRevert("invalid signature");
         morphoV2.setAuthorizedWithSig(authorization, sig);
 
-        (sig.v, sig.r, sig.s) = vm.sign(otherPK, _authorizationDigest(authorization));
+        (sig.v, sig.r, sig.s) = vm.sign(otherPrivateKey, _authorizationDigest(authorization));
 
         vm.expectRevert("invalid signature");
         morphoV2.setAuthorizedWithSig(authorization, sig);
@@ -269,7 +269,7 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.setAuthorizedWithSig(authorization, sig);
 
         authorization.nonce = 0;
-        (sig.v, sig.r, sig.s) = vm.sign(authorizerPK, _authorizationDigest(authorization));
+        (sig.v, sig.r, sig.s) = vm.sign(authorizerPrivateKey, _authorizationDigest(authorization));
         morphoV2.setAuthorizedWithSig(authorization, sig);
         assertEq(morphoV2.authorized(authorizer, authorizee), isAuthorized);
         assertEq(morphoV2.authorizationNonce(authorizer), 1);
