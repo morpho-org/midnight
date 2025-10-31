@@ -158,20 +158,23 @@ contract MorphoV2 is IMorphoV2 {
             TradingFeeParams memory _defaultTradingFeeParams = defaultTradingFeeParams[offer.obligation.loanToken];
             if (_defaultTradingFeeParams.activated) _tradingFeeParams = _defaultTradingFeeParams;
         }
-        uint256 buyerPrice = offer.buy
-            ? offerPrice
-            : UtilsLib.min(
-                offerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                offerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
-        uint256 sellerPrice = offer.buy
-            ? UtilsLib.max(
-                (offerPrice - _tradingFeeParams.interestCutLimit)
+        uint256 buyerPrice;
+        uint256 sellerPrice;
+        if (offer.buy) {
+            buyerPrice = offerPrice;
+            sellerPrice = UtilsLib.max(
+                (buyerPrice - _tradingFeeParams.interestCutLimit)
                 .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                offerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            )
-            : offerPrice;
+                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
+            );
+        } else {
+            sellerPrice = offerPrice;
+            buyerPrice = UtilsLib.min(
+                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
+                    + _tradingFeeParams.interestCutLimit,
+                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
+            );
+        }
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
