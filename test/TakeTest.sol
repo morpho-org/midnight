@@ -1107,6 +1107,7 @@ contract TakeTest is BaseTest {
     }
 
     function testOrderByAuthorized(address taker, address sender) public {
+        vm.assume(taker != sender);
         vm.prank(taker);
         morphoV2.setAuthorized(sender, true);
         vm.prank(sender);
