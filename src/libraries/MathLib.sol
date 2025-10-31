@@ -14,11 +14,7 @@ library MathLib {
     }
 
     function mulDiv(uint256 x, uint256 y, uint256 d, bool roundUp) internal pure returns (uint256) {
-        if (roundUp) {
-            return mulDivUp(x, y, d);
-        } else {
-            return mulDivDown(x, y, d);
-        }
+        return roundUp ? mulDivUp(x, y, d) : mulDivDown(x, y, d);
     }
 
     /// @dev Returns max(0, x - y).
