@@ -61,9 +61,7 @@ contract LiquidationTest is BaseTest {
         borrowOffer.startPrice = 1e18;
         borrowOffer.expiryPrice = 1e18;
 
-        morphoV2.take(
-            0, 0, maxDebt, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(0, 0, maxDebt, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         // Setup liquidation
         for (uint256 i = 0; i < numCollaterals; i++) {

@@ -80,9 +80,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(lender), lenderBalanceBefore - buyerAssets, "lender balance");
         assertApproxEqAbs(morphoV2.sharesOf(lender, id), expectedUnits, 100, "units");
@@ -110,9 +108,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            0, sellerAssets, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(0, sellerAssets, 0, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore + expectedFee, "fee recipient balance");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + sellerAssets, "borrower balance");
@@ -135,17 +131,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            0,
-            0,
-            obligationUnits,
-            0,
-            lender,
-            borrowOffer,
-            signProof([borrowOffer], borrowerSecretKey),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, obligationUnits, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore + expectedFee, "fee recipient balance");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + expectedSellerAssets, "borrower balance");
@@ -162,9 +148,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore, "no fee collected");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + buyerAssets, "borrower gets full amount");
@@ -180,9 +164,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(buyerAssets, 0, 0, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore, "no fee collected");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + buyerAssets, "borrower gets full amount");
@@ -198,9 +180,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            0, sellerAssets, 0, 0, lender, borrowOffer, signProof([borrowOffer], borrowerSecretKey), address(0), hex""
-        );
+        morphoV2.take(0, sellerAssets, 0, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore, "no fee collected");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + sellerAssets, "borrower gets full amount");
@@ -216,17 +196,7 @@ contract TradingFeeTest is BaseTest {
         uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
         uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
 
-        morphoV2.take(
-            0,
-            0,
-            obligationUnits,
-            0,
-            lender,
-            borrowOffer,
-            signProof([borrowOffer], borrowerSecretKey),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, obligationUnits, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
 
         assertEq(loanToken.balanceOf(feeRecipient), feeRecipientBalanceBefore, "no fee collected");
         assertEq(loanToken.balanceOf(borrower), borrowerBalanceBefore + obligationUnits, "borrower gets full amount");

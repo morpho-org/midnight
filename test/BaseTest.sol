@@ -12,15 +12,17 @@ import {MorphoV2} from "../src/MorphoV2.sol";
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
 abstract contract BaseTest is Test {
+    mapping(address => uint256) internal privateKey;
+
     MorphoV2 internal morphoV2;
     ERC20 internal loanToken;
     ERC20 internal collateralToken1;
     ERC20 internal collateralToken2;
     Oracle internal oracle;
-    uint256 internal borrowerSecretKey;
     address internal borrower;
-    uint256 internal lenderSecretKey;
     address internal lender;
+    address internal otherBorrower;
+    address internal otherLender;
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public virtual {
@@ -28,8 +30,15 @@ abstract contract BaseTest is Test {
 
         morphoV2.setFeeSetter(address(this));
 
-        (borrower, borrowerSecretKey) = makeAddrAndKey("borrower");
-        (lender, lenderSecretKey) = makeAddrAndKey("lender");
+        uint256 _privateKey;
+        (borrower, _privateKey) = makeAddrAndKey("borrower");
+        privateKey[borrower] = _privateKey;
+        (lender, _privateKey) = makeAddrAndKey("lender");
+        privateKey[lender] = _privateKey;
+        (otherBorrower, _privateKey) = makeAddrAndKey("otherBorrower");
+        privateKey[otherBorrower] = _privateKey;
+        (otherLender, _privateKey) = makeAddrAndKey("otherLender");
+        privateKey[otherLender] = _privateKey;
 
         loanToken = new ERC20("loan", "loan");
         collateralToken1 = new ERC20("collat1", "collat1");
@@ -58,18 +67,26 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(obligation));
     }
 
-    function signProof(Offer[1] memory offers, uint256 sk) internal pure returns (bytes memory) {
+    function signProof(Offer[1] memory offers, address signer) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(_root, new bytes32[](0), messageSig(_root, sk));
+        return abi.encode(_root, new bytes32[](0), messageSig(_root, signer));
+    }
+
+    function signProof(Offer[1] memory offers) internal view returns (bytes memory) {
+        return signProof(offers, offers[0].maker);
     }
 
     // assumes the offer is the first one!
-    function signProof(Offer[2] memory offers, uint256 sk) internal pure returns (bytes memory) {
+    function signProof(Offer[2] memory offers, address signer) internal view returns (bytes memory) {
         bytes32[] memory path = new bytes32[](1);
         path[0] = keccak256(abi.encode(offers[1]));
 
         bytes32 _root = root(offers);
-        return abi.encode(_root, path, messageSig(_root, sk));
+        return abi.encode(_root, path, messageSig(_root, signer));
+    }
+
+    function signProof(Offer[2] memory offers) internal view returns (bytes memory) {
+        return signProof(offers, offers[0].maker);
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
@@ -84,9 +101,9 @@ abstract contract BaseTest is Test {
         return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
     }
 
-    function messageSig(bytes32 _root, uint256 sk) internal pure returns (Signature memory sig) {
+    function messageSig(bytes32 _root, address signer) internal view returns (Signature memory sig) {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
-        (sig.v, sig.r, sig.s) = vm.sign(sk, messageHash);
+        (sig.v, sig.r, sig.s) = vm.sign(privateKey[signer], messageHash);
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
@@ -124,17 +141,7 @@ abstract contract BaseTest is Test {
         borrowOffer.startPrice = 1 ether;
         borrowOffer.expiryPrice = 1 ether;
 
-        morphoV2.take(
-            0,
-            0,
-            obligationUnits,
-            0,
-            lender,
-            borrowOffer,
-            signProof([borrowOffer], borrowerSecretKey),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, obligationUnits, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
     }
 
     function setupMaxObligationWithCollaterals(Obligation memory obligation, uint256 collateral0, uint256 collateral1)
@@ -168,16 +175,6 @@ abstract contract BaseTest is Test {
         borrowOffer.startPrice = 1e18;
         borrowOffer.expiryPrice = 1e18;
 
-        morphoV2.take(
-            0,
-            0,
-            obligationUnits,
-            0,
-            lender,
-            borrowOffer,
-            signProof([borrowOffer], borrowerSecretKey),
-            address(0),
-            hex""
-        );
+        morphoV2.take(0, 0, obligationUnits, 0, lender, borrowOffer, signProof([borrowOffer]), address(0), hex"");
     }
 }
