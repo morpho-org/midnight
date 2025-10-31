@@ -31,13 +31,13 @@ hook Sstore debtOf[KEY address owner][KEY bytes32 id] uint256 newDebt (uint256 o
     sumDebtOf[id] = sumDebtOf[id] - oldDebt + newDebt;
 }
 
-rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takercallback, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallback, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takercallback, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallback, takerCallbackData);
 
     assert buyerAssets == 0 || buyerAssetsOutput == buyerAssets;
     assert sellerAssets == 0 || sellerAssetsOutput == sellerAssets;
@@ -47,12 +47,12 @@ rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets
 
 rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
-    
+
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
-    
+
     buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallbackAddress, takerCallbackData);
 
     assert offer.assets == 0 || consumed(offer.maker, offer.group) == consumedBefore + (offer.buy ? buyerAssetsOutput : sellerAssetsOutput);
@@ -62,12 +62,12 @@ rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint2
 
 rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
-    
+
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
-    
+
     buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallbackAddress, takerCallbackData);
 
     assert offer.assets == 0 || (offer.buy ? buyerAssetsOutput : sellerAssetsOutput) <= offer.assets - consumedBefore;

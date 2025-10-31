@@ -119,7 +119,7 @@ contract MorphoV2 is IMorphoV2 {
         address taker,
         Offer memory offer,
         bytes memory ratificationData,
-        address takercallback,
+        address takerCallback,
         bytes memory takerCallbackData
     ) public returns (uint256, uint256, uint256, uint256) {
         require(
@@ -166,8 +166,8 @@ contract MorphoV2 is IMorphoV2 {
             address sellerCallback,
             bytes memory sellerCallbackData
         ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takercallback, takerCallbackData)
-            : (taker, takercallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
+            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
         uint256 offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
