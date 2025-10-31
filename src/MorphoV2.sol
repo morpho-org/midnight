@@ -281,8 +281,9 @@ contract MorphoV2 is IMorphoV2 {
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits.mulDivDown(discount, WAD));
-        SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits.mulDivDown(WAD - discount, WAD));
+        uint256 forBidder = obligationUnits.mulDivDown(discount, WAD);
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
+        SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits - forBidder);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
