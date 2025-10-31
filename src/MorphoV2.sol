@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF, LIQUIDATION_CURSOR} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
@@ -310,21 +310,22 @@ contract MorphoV2 is IMorphoV2 {
         uint256 maxDebt;
         bytes32 id = _id(obligation);
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
+        uint256[] memory lifs = new uint256[](obligation.collaterals.length);
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             prices[i] = IOracle(obligation.collaterals[i].oracle).price();
+
+            uint256 lltv = obligation.collaterals[i].lltv;
+            uint256 curLif =
+                UtilsLib.min(MAX_LIF, WAD.mulDivDown(WAD, WAD - LIQUIDATION_CURSOR.mulDivDown(WAD - lltv, WAD)));
+            lifs[i] = curLif;
             uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
-            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
-                .mulDivDown(obligation.collaterals[i].lltv, WAD);
-            repayableDebt += collateralAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
+            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
+            repayableDebt += collateralAmount.mulDivUp(WAD, curLif).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
         }
 
         uint256 originalDebt = debtOf[borrower][id];
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
-
-        uint256 lif = originalDebt > maxDebt
-            ? MAX_LIF
-            : UtilsLib.min(MAX_LIF, WAD + (MAX_LIF - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
 
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
@@ -335,6 +336,11 @@ contract MorphoV2 is IMorphoV2 {
         uint256 totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
+            uint256 curLif = lifs[i];
+            uint256 lif = originalDebt > maxDebt
+                ? curLif
+                : UtilsLib.min(curLif, WAD + (curLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
+
             Seizure memory seizure = seizures[i];
             require(UtilsLib.atMostOneNonZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
 
