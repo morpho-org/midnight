@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 
 contract SettersTest is BaseTest {
     function testInitialOwner() public view {
@@ -34,8 +35,8 @@ contract SettersTest is BaseTest {
     }
 
     function testSetTradingFeeSuccess(bytes32 id, uint128 tradingFee, uint128 interestCutLimit) public {
-        vm.assume(tradingFee <= 1e18);
-        vm.assume(interestCutLimit <= 1e18);
+        vm.assume(tradingFee <= WAD);
+        vm.assume(interestCutLimit <= WAD);
         morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
         (uint128 _tradingFee, uint128 _interestCutLimit) = morphoV2.tradingFeeParams(id);
         assertEq(_tradingFee, tradingFee);
@@ -50,13 +51,13 @@ contract SettersTest is BaseTest {
     }
 
     function testSetInterestCutLimitTooHigh(bytes32 id, uint128 interestCutLimit) public {
-        vm.assume(interestCutLimit > 1e18);
+        vm.assume(interestCutLimit > WAD);
         vm.expectRevert("Interest cut limit too high");
         morphoV2.setTradingFee(id, 0.1e18, interestCutLimit);
     }
 
     function testSetTradingFeeTooHigh(bytes32 id, uint128 tradingFee) public {
-        vm.assume(tradingFee > 1e18);
+        vm.assume(tradingFee > WAD);
         vm.expectRevert("Trading fee too high");
         morphoV2.setTradingFee(id, tradingFee, 0.1e18);
     }

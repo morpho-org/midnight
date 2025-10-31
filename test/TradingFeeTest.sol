@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
@@ -68,9 +69,9 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = price;
         borrowerOffer.expiryPrice = price;
 
-        uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + fee.mulDivDown(1e18, price) - fee);
-        uint256 expectedUnits = expectedSellerAssets.mulDivDown(1e18, price);
-        uint256 expectedFee = (expectedUnits - expectedSellerAssets) * fee / 1e18;
+        uint256 expectedSellerAssets = buyerAssets.mulDivDown(WAD, WAD + fee.mulDivDown(WAD, price) - fee);
+        uint256 expectedUnits = expectedSellerAssets.mulDivDown(WAD, price);
+        uint256 expectedFee = (expectedUnits - expectedSellerAssets) * fee / WAD;
 
         take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
 
@@ -86,8 +87,8 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.startPrice = price;
         lenderOffer.expiryPrice = price;
 
-        uint256 expectedUnits = buyerAssets.mulDivDown(1e18, price);
-        uint256 expectedSellerAssets = (buyerAssets - fee.mulDivDown(expectedUnits, 1e18)).mulDivDown(1e18, 1e18 - fee);
+        uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
+        uint256 expectedSellerAssets = (buyerAssets - fee.mulDivDown(expectedUnits, WAD)).mulDivDown(WAD, WAD - fee);
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         take(buyerAssets, 0, 0, 0, borrower, lenderOffer);
@@ -104,8 +105,8 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = price;
         borrowerOffer.expiryPrice = price;
 
-        uint256 expectedUnits = sellerAssets.mulDivDown(1e18, price);
-        uint256 expectedFee = (expectedUnits - sellerAssets) * fee / 1e18;
+        uint256 expectedUnits = sellerAssets.mulDivDown(WAD, price);
+        uint256 expectedFee = (expectedUnits - sellerAssets) * fee / WAD;
 
         take(0, sellerAssets, 0, 0, lender, borrowerOffer);
 
@@ -122,7 +123,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.expiryPrice = price;
 
         uint256 expectedBuyerAssets =
-            (sellerAssets.mulDivDown(1e18 - fee, 1e18)).mulDivDown(1e18, 1e18 - fee.mulDivDown(1e18, price));
+            (sellerAssets.mulDivDown(WAD - fee, WAD)).mulDivDown(WAD, WAD - fee.mulDivDown(WAD, price));
         uint256 expectedFee = expectedBuyerAssets - sellerAssets;
 
         take(0, sellerAssets, 0, 0, borrower, lenderOffer);
@@ -139,8 +140,8 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = price;
         borrowerOffer.expiryPrice = price;
 
-        uint256 expectedSellerAssets = obligationUnits * price / 1e18;
-        uint256 expectedFee = (obligationUnits - expectedSellerAssets) * fee / 1e18;
+        uint256 expectedSellerAssets = obligationUnits * price / WAD;
+        uint256 expectedFee = (obligationUnits - expectedSellerAssets) * fee / WAD;
 
         take(0, 0, obligationUnits, 0, lender, borrowerOffer);
 
@@ -156,9 +157,9 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.startPrice = price;
         lenderOffer.expiryPrice = price;
 
-        uint256 expectedBuyerAssets = obligationUnits * price / 1e18;
+        uint256 expectedBuyerAssets = obligationUnits * price / WAD;
         uint256 expectedSellerAssets =
-            (expectedBuyerAssets - fee.mulDivDown(obligationUnits, 1e18)).mulDivDown(1e18, 1e18 - fee);
+            (expectedBuyerAssets - fee.mulDivDown(obligationUnits, WAD)).mulDivDown(WAD, WAD - fee);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         take(0, 0, obligationUnits, 0, borrower, lenderOffer);
@@ -174,7 +175,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedSellerAssets = buyerAssets.mulDivDown(WAD, WAD + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
@@ -188,7 +189,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedSellerAssets = buyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedSellerAssets = buyerAssets.mulDivDown(WAD, WAD + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(buyerAssets, 0, 0, 0, borrower, lenderOffer);
@@ -228,7 +229,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedSellerAssets = obligationUnits * 0.9 ether / 1e18;
+        uint256 expectedSellerAssets = obligationUnits * 0.9 ether / WAD;
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(0, 0, obligationUnits, 0, lender, borrowerOffer);
@@ -242,8 +243,8 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedBuyerAssets = obligationUnits * 0.9 ether / 1e18;
-        uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedBuyerAssets = obligationUnits * 0.9 ether / WAD;
+        uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(WAD, WAD + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(0, 0, obligationUnits, 0, borrower, lenderOffer);
@@ -257,7 +258,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.startPrice = 0.9 ether;
         borrowerOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedSellerAssets = obligationShares * 0.9 ether / 1e18;
+        uint256 expectedSellerAssets = obligationShares * 0.9 ether / WAD;
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(0, 0, 0, obligationShares, lender, borrowerOffer);
@@ -271,8 +272,8 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.startPrice = 0.9 ether;
         lenderOffer.expiryPrice = 0.9 ether;
 
-        uint256 expectedBuyerAssets = obligationShares * 0.9 ether / 1e18;
-        uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(1e18, 1e18 + 0.001e18);
+        uint256 expectedBuyerAssets = obligationShares * 0.9 ether / WAD;
+        uint256 expectedSellerAssets = expectedBuyerAssets.mulDivDown(WAD, WAD + 0.001e18);
         uint256 expectedFee = expectedSellerAssets / 1000;
 
         take(0, 0, 0, obligationShares, borrower, lenderOffer);
