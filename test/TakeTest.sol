@@ -175,7 +175,7 @@ contract TakeTest is BaseTest {
         price = bound(price, 0.01 ether, 1 ether);
         borrowerOffer.startPrice = price;
         borrowerOffer.expiryPrice = price;
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, obligationShares);
@@ -197,7 +197,7 @@ contract TakeTest is BaseTest {
         price = bound(price, 0.01 ether, 1 ether);
         lenderOffer.startPrice = price;
         lenderOffer.expiryPrice = price;
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, obligationShares);
@@ -326,7 +326,7 @@ contract TakeTest is BaseTest {
     function testBuyObligationSharesInput2(uint256 obligationShares, uint256 price, uint256 otherLenderUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
@@ -354,7 +354,7 @@ contract TakeTest is BaseTest {
     function testSellObligationSharesInput2(uint256 obligationShares, uint256 price, uint256 otherLenderUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
@@ -487,7 +487,7 @@ contract TakeTest is BaseTest {
     function testBuyObligationSharesInput3(uint256 obligationShares, uint256 price, uint256 otherBorrowerDebt) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
@@ -515,7 +515,7 @@ contract TakeTest is BaseTest {
     function testSellObligationSharesInput3(uint256 obligationShares, uint256 price, uint256 otherBorrowerDebt) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
@@ -558,8 +558,8 @@ contract TakeTest is BaseTest {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
-        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
-        existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
+        uint256 expectedShares = expectedUnits.mulDivUp(initialShares + 1, initialUnits + 1);
+        existingUnits = bound(existingUnits, expectedShares, max(expectedShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherLenderOffer.assets = buyerAssets;
@@ -585,8 +585,8 @@ contract TakeTest is BaseTest {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
-        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
-        existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
+        uint256 expectedShares = expectedUnits.mulDivUp(initialShares + 1, initialUnits + 1);
+        existingUnits = bound(existingUnits, expectedShares, max(expectedShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherBorrowerOffer.assets = buyerAssets;
@@ -612,8 +612,8 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
-        uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
-        existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
+        uint256 expectedShares = obligationUnits.mulDivUp(initialShares + 1, initialUnits + 1);
+        existingUnits = bound(existingUnits, expectedShares, max(expectedShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherLenderOffer.assets = buyerAssets + 1;
@@ -639,8 +639,8 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
         price = bound(price, 0.01 ether, 1 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
-        uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
-        existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
+        uint256 expectedShares = obligationUnits.mulDivUp(initialShares + 1, initialUnits + 1);
+        existingUnits = bound(existingUnits, expectedShares, max(expectedShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
         otherBorrowerOffer.assets = buyerAssets + 1;
