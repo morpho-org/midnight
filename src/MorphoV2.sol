@@ -306,18 +306,9 @@ contract MorphoV2 is IMorphoV2 {
         external
         returns (Seizure[] memory)
     {
-        uint256 repayableDebt;
-        uint256 maxDebt;
         bytes32 id = _id(obligation);
-        uint256[] memory prices = new uint256[](obligation.collaterals.length);
 
-        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-            prices[i] = IOracle(obligation.collaterals[i].oracle).price();
-            uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
-            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
-                .mulDivDown(obligation.collaterals[i].lltv, WAD);
-            repayableDebt += collateralAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
-        }
+        (uint256[] memory prices, uint256 maxDebt, uint256 repayableDebt) = _healthData(obligation, id, borrower);
 
         uint256 originalDebt = debtOf[borrower][id];
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
@@ -398,24 +389,36 @@ contract MorphoV2 is IMorphoV2 {
         return tentativeSigner;
     }
 
+    function _healthData(Obligation memory obligation, bytes32 id, address borrower)
+        internal
+        view
+        returns (uint256[] memory prices, uint256 maxDebt, uint256 repayableDebt)
+    {
+        prices = new uint256[](obligation.collaterals.length);
+        address previousCollateralToken;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            address currentCollateralToken = obligation.collaterals[i].token;
+            require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
+            prices[i] = IOracle(obligation.collaterals[i].oracle).price();
+            uint256 collateralAmount = collateralOf[borrower][id][currentCollateralToken];
+
+            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
+                .mulDivDown(obligation.collaterals[i].lltv, WAD);
+            repayableDebt += collateralAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
+
+            previousCollateralToken = currentCollateralToken;
+        }
+    }
+
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
         uint256 debt = debtOf[borrower][id];
         if (debt == 0) {
             return true;
         } else {
-            uint256 maxDebt;
-            address previousCollateralToken;
-            for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-                address currentCollateralToken = obligation.collaterals[i].token;
-                require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
-                uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(obligation.collaterals[i].lltv, WAD);
-                previousCollateralToken = currentCollateralToken;
-            }
-
+            (, uint256 maxDebt, ) = _healthData(obligation, id, borrower);
             return debt <= maxDebt;
         }
     }
+
 }
