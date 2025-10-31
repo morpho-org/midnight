@@ -21,6 +21,8 @@ struct Offer {
     bool buy;
     address maker;
     uint256 assets;
+    uint256 obligationUnits;
+    uint256 obligationShares;
     uint256 start;
     uint256 expiry;
     uint256 startPrice;
@@ -44,6 +46,11 @@ struct Seizure {
     uint256 repaid;
     // Amount of collateral to seize.
     uint256 seized;
+}
+
+struct TradingFeeParams {
+    uint128 tradingFee;
+    uint128 interestCutLimit;
 }
 
 interface IMorphoV2 {}
