@@ -954,13 +954,14 @@ contract TakeTest is BaseTest {
 
     // test tree / signatures.
 
-     function testTakeInvalidRoot(bytes32 wrongRoot) public {
+    function testTakeInvalidRoot(bytes32 invalidRoot) public {
         vm.prank(lenderOffer.maker);
         morphoV2.setAuthorized(address(this), false);
-        vm.assume(wrongRoot != root([lenderOffer]));
+        vm.assume(invalidRoot != root([lenderOffer]));
         vm.expectRevert("invalid proof");
 
-         bytes memory ratificationData = abi.encode(wrongRoot, new bytes32[](0), messageSig(wrongRoot, lenderOffer.maker));
+        bytes memory ratificationData =
+            abi.encode(invalidRoot, new bytes32[](0), messageSig(invalidRoot, lenderOffer.maker));
 
         morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, ratificationData, address(0), hex"");
     }
