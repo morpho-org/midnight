@@ -972,7 +972,32 @@ contract TakeTest is BaseTest {
         morphoV2.take(100, 0, 0, 0, borrower, lenderOffer, proof([lenderOffer]), sig, address(0), hex"");
     }
 
-    function testTakeByRatification(address maker, address sender, uint256 otherPrivateKey) public {
+    function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender) public {
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
+        RatifyCallback ratifier = new RatifyCallback();
+        lenderOffer.maker = address(ratifier);
+        lenderOffer.ratifier = address(ratifier);
+
+        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
+
+        vm.prank(sender);
+        morphoV2.take(
+            0,
+            0,
+            0,
+            0,
+            sender,
+            lenderOffer,
+            proof([lenderOffer]),
+            sign([lenderOffer], vm.addr(otherPrivateKey)),
+            address(ratifier),
+            hex""
+        );
+        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
+        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
+    }
+
+    function testTakeByRatificationDifferentFromMaker(address maker, address sender, uint256 otherPrivateKey) public {
         otherPrivateKey = boundPrivateKey(otherPrivateKey);
         vm.assume(maker != sender);
         RatifyCallback ratifier = new RatifyCallback();

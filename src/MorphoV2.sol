@@ -146,7 +146,7 @@ contract MorphoV2 is IMorphoV2 {
             require(tentativeSigner != address(0), "invalid signature");
             if (offer.ratifier != address(0)) {
                 require(
-                    authorized[offer.maker][offer.ratifier]
+                    (offer.maker == offer.ratifier || authorized[offer.maker][offer.ratifier])
                         && ICallbacks(offer.ratifier).onRatify(offer, tentativeSigner),
                     "offer ratification failed"
                 );
