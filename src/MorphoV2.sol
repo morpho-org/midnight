@@ -338,7 +338,7 @@ contract MorphoV2 is IMorphoV2 {
         for (uint256 i = 0; i < seizures.length; i++) {
             Seizure memory seizure = seizures[i];
 
-            uint256 maxLif = maxLifs[i];
+            uint256 maxLif = maxLifs[seizure.collateralIndex];
             uint256 lif = originalDebt > maxDebt
                 ? maxLif
                 : UtilsLib.min(maxLif, WAD + (maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
