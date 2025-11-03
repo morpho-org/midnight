@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF, LIQUIDATION_CURSOR} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_MAX_LIF, TIME_TO_MAX_LIF, LIQUIDATION_CURSOR} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
@@ -294,7 +294,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev On each seizure at least one of `repaid` or `seized` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity is reached.
-    /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
+    /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity +
     /// TIME_TO_MAX_LIF.
     /// @param obligation The obligation.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
@@ -310,18 +310,18 @@ contract MorphoV2 is IMorphoV2 {
         uint256 maxDebt;
         bytes32 id = _id(obligation);
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
-        uint256[] memory lifs = new uint256[](obligation.collaterals.length);
+        uint256[] memory maxLifs = new uint256[](obligation.collaterals.length);
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             prices[i] = IOracle(obligation.collaterals[i].oracle).price();
 
             uint256 lltv = obligation.collaterals[i].lltv;
-            uint256 curLif =
-                UtilsLib.min(MAX_LIF, WAD.mulDivDown(WAD, WAD - LIQUIDATION_CURSOR.mulDivDown(WAD - lltv, WAD)));
-            lifs[i] = curLif;
+            uint256 maxLif =
+                UtilsLib.min(MAX_MAX_LIF, WAD.mulDivDown(WAD, WAD - LIQUIDATION_CURSOR.mulDivDown(WAD - lltv, WAD)));
+            maxLifs[i] = maxLif;
             uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
             maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-            repayableDebt += collateralAmount.mulDivUp(WAD, curLif).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
+            repayableDebt += collateralAmount.mulDivUp(WAD, maxLif).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
         }
 
         uint256 originalDebt = debtOf[borrower][id];
@@ -336,12 +336,13 @@ contract MorphoV2 is IMorphoV2 {
         uint256 totalRepaid;
 
         for (uint256 i = 0; i < seizures.length; i++) {
-            uint256 curLif = lifs[i];
-            uint256 lif = originalDebt > maxDebt
-                ? curLif
-                : UtilsLib.min(curLif, WAD + (curLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
-
             Seizure memory seizure = seizures[i];
+
+            uint256 maxLif = maxLifs[i];
+            uint256 lif = originalDebt > maxDebt
+                ? maxLif
+                : UtilsLib.min(maxLif, WAD + (maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF);
+
             require(UtilsLib.atMostOneNonZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
 
             if (seizure.seized > 0) {
