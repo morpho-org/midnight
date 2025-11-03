@@ -1001,6 +1001,7 @@ contract TakeTest is BaseTest {
         otherPrivateKey = boundPrivateKey(otherPrivateKey);
         vm.assume(maker != sender);
         RatifyCallback ratifier = new RatifyCallback();
+        vm.assume(maker != address(ratifier));
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
 
