@@ -140,7 +140,8 @@ contract MorphoV2 is IMorphoV2 {
 
         if (offer.ratifier != address(0)) {
             require(
-                authorized[offer.maker][offer.ratifier] && ICallbacks(offer.ratifier).onRatify(offer, ratificationData),
+                (offer.maker == offer.ratifier || authorized[offer.maker][offer.ratifier])
+                    && ICallbacks(offer.ratifier).onRatify(offer, ratificationData),
                 "offer ratification failed"
             );
         } else if (ratificationData.length != 0) {

@@ -974,9 +974,23 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeByRatification(address maker, address sender, bytes32 data) public {
+    function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender, bytes32 data) public {
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
+        RatifyCallback ratifier = new RatifyCallback();
+        lenderOffer.maker = address(ratifier);
+        lenderOffer.ratifier = address(ratifier);
+
+        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
+
+        vm.prank(sender);
+        morphoV2.take(0, 0, 0, 0, sender, lenderOffer, bytes.concat(data), address(ratifier), hex"");
+        assertEq(bytes32(ratifier.recordedData()), data);
+    }
+
+    function testTakeByRatificationDifferentFromMaker(address maker, address sender, bytes32 data) public {
         vm.assume(maker != sender);
         RatifyCallback ratifier = new RatifyCallback();
+        vm.assume(maker != address(ratifier));
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
 
