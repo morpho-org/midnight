@@ -112,7 +112,8 @@ rule unauthorizedTakeFails(env e, uint256 buyerAssets, uint256 sellerAssets, uin
 }
 
 rule unauthorizedOnRatifyFails(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Proof proof, MorphoV2.Signature signature, address takerCallbackAddress, bytes takerCallbackData) {
-    require offer.ratifier != 0;
+    require signature.v != 0, "no ratification callback without a signature";
+    require offer.ratifier != 0, "no ratification callback without a ratifier";
     take@withrevert(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, proof, signature, takerCallbackAddress, takerCallbackData);
     assert !lastReverted => offer.maker == offer.ratifier || authorized(offer.maker, offer.ratifier);
 }
