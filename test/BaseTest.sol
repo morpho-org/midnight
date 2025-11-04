@@ -96,8 +96,8 @@ abstract contract BaseTest is Test {
         uint256 obligationShares,
         address taker,
         Offer memory offer
-    ) internal {
-        morphoV2.take(
+    ) internal returns (uint256, uint256, uint256, uint256) {
+        return morphoV2.take(
             buyerAssets,
             sellerAssets,
             obligationUnits,
