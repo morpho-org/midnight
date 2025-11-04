@@ -153,9 +153,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.consumed(user, group), amount, "consumed");
     }
 
-    function testShuffleNonce(address user) public {
+    function testShuffleSession(address user) public {
         vm.prank(user);
-        morphoV2.shuffleNonce();
-        assertEq(morphoV2.nonce(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "nonce");
+        morphoV2.shuffleSession();
+        assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 }

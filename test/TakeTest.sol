@@ -944,11 +944,11 @@ contract TakeTest is BaseTest {
         take(0, 0, 0, 100, borrower, lenderOffer);
     }
 
-    function testNonce() public {
+    function testSession() public {
         vm.prank(lender);
-        morphoV2.shuffleNonce();
+        morphoV2.shuffleSession();
 
-        vm.expectRevert("invalid nonce");
+        vm.expectRevert("invalid session");
         take(100, 0, 0, 0, borrower, lenderOffer);
     }
 
