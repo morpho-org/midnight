@@ -19,6 +19,8 @@ contract MorphoV2 is IMorphoV2 {
 
     mapping(address => mapping(bytes32 => uint256)) public sharesOf;
     mapping(address => mapping(bytes32 => uint256)) public debtOf;
+    mapping(address => mapping(bytes32 => uint256)) public averageEntryRate;
+    mapping(bytes32 => uint256) public lastUpdate;
     mapping(bytes32 => uint256) public withdrawable;
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
@@ -36,6 +38,8 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Trading fee parameters for a given obligation id.
     mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
     address public tradingFeeRecipient;
+    mapping(bytes32 id => uint256 interestFee) public interestFee;
+    address public interestFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -386,6 +390,15 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// INTERNAL ///
+
+    function _accrueInterestFees(Obligation memory obligation) internal {
+        bytes32 id = _id(obligation);
+        uint256 elapsed = block.timestamp - lastUpdate[id];
+        uint256 sharesToMint = (totalShares[id] * elapsed).mulDivDown(interestFee[id], WAD);
+        totalShares[id] += sharesToMint;
+        sharesOf[interestFeeRecipient][id] += sharesToMint;
+        lastUpdate[id] = block.timestamp;
+    }
 
     function _id(Obligation memory obligation) internal pure returns (bytes32) {
         return keccak256(abi.encode(obligation));
