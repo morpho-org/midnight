@@ -49,8 +49,8 @@ struct Seizure {
 }
 
 struct TradingFeeParams {
-    uint128 tradingFee;
-    uint128 interestCutLimit;
+    uint64 tradingFee;
+    uint64 interestCutLimit;
     bool activated;
 }
 
