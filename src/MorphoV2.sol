@@ -157,26 +157,36 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        if (!_tradingFeeParams.activated) {
-            TradingFeeParams memory _defaultTradingFeeParams = defaultTradingFeeParams[offer.obligation.loanToken];
-            if (_defaultTradingFeeParams.activated) _tradingFeeParams = _defaultTradingFeeParams;
+        uint256 interestCutLimit;
+        uint256 tradingFee;
+        TradingFeeParams memory params = tradingFeeParams[id];
+        if (params.activated) {
+            interestCutLimit = params.interestCutLimit;
+            tradingFee = params.tradingFee;
+        } else {
+            TradingFeeParams memory defaultParams = defaultTradingFeeParams[offer.obligation.loanToken];
+            if (defaultParams.activated) {
+                interestCutLimit = defaultParams.interestCutLimit;
+                tradingFee = defaultParams.tradingFee;
+            } else {
+                interestCutLimit = 0;
+                tradingFee = 0;
+            }
         }
+
         uint256 buyerPrice;
         uint256 sellerPrice;
         if (offer.buy) {
             buyerPrice = offerPrice;
             sellerPrice = UtilsLib.max(
-                (buyerPrice - _tradingFeeParams.interestCutLimit)
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
+                (buyerPrice - interestCutLimit).mulDivDown(WAD, WAD - interestCutLimit),
+                buyerPrice.mulDivDown(WAD, WAD + tradingFee)
             );
         } else {
             sellerPrice = offerPrice;
             buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
+                sellerPrice.mulDivDown(WAD - interestCutLimit, WAD) + interestCutLimit,
+                sellerPrice.mulDivDown(WAD + tradingFee, WAD)
             );
         }
 
