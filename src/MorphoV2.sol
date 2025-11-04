@@ -14,6 +14,7 @@ import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
     using MathLib for uint256;
+    using MathLib for uint64;
 
     /// STORAGE ///
 
@@ -74,11 +75,13 @@ contract MorphoV2 is IMorphoV2 {
         feeSetter = newFeeSetter;
     }
 
-    function setTradingFee(bytes32 id, uint128 tradingFee, uint128 interestCutLimit) external {
+    function setTradingFee(bytes32 id, uint64 sellTradingFee, uint64 sellInterestCutLimit, uint64 buyTradingFee, uint64 buyInterestCutLimit) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(tradingFee <= WAD, "Trading fee too high");
-        require(interestCutLimit <= WAD, "Interest cut limit too high");
-        tradingFeeParams[id] = TradingFeeParams({tradingFee: tradingFee, interestCutLimit: interestCutLimit});
+        require(sellTradingFee <= WAD, "Sell trading fee too high");
+        require(sellInterestCutLimit <= WAD, "Sell interest cut limit too high");
+        require(buyTradingFee <= WAD, "Buy trading fee too high");
+        require(buyInterestCutLimit <= WAD, "Buy interest cut limit too high");
+        tradingFeeParams[id] = TradingFeeParams({sellTradingFee: sellTradingFee, sellInterestCutLimit: sellInterestCutLimit, buyTradingFee: buyTradingFee, buyInterestCutLimit: buyInterestCutLimit});
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -146,18 +149,12 @@ contract MorphoV2 is IMorphoV2 {
         uint256 sellerPrice;
         if (offer.buy) {
             buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice - _tradingFeeParams.interestCutLimit)
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            );
+            uint256 effectiveTradingFee = UtilsLib.min(_tradingFeeParams.sellTradingFee, _tradingFeeParams.sellInterestCutLimit.mulDivDown(WAD - buyerPrice, buyerPrice));
+            sellerPrice = buyerPrice.mulDivDown(WAD, WAD + effectiveTradingFee);
         } else {
             sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
+            uint256 effectiveTradingFee = UtilsLib.min(_tradingFeeParams.buyTradingFee, _tradingFeeParams.buyInterestCutLimit.mulDivDown(WAD - sellerPrice, sellerPrice));
+            buyerPrice = sellerPrice.mulDivDown(WAD + effectiveTradingFee, WAD);
         }
 
         if (buyerAssets > 0) {
