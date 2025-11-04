@@ -286,6 +286,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
+        returns (uint256, uint256)
     {
         require(msg.sender == onBehalf || authorized[onBehalf][msg.sender], "withdraw not authorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
@@ -301,6 +302,8 @@ contract MorphoV2 is IMorphoV2 {
         totalUnits[id] -= obligationUnits;
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+
+        return (obligationUnits, shares);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
