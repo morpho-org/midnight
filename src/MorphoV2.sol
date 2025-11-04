@@ -75,13 +75,24 @@ contract MorphoV2 is IMorphoV2 {
         feeSetter = newFeeSetter;
     }
 
-    function setTradingFee(bytes32 id, uint64 sellTradingFee, uint64 sellInterestCutLimit, uint64 buyTradingFee, uint64 buyInterestCutLimit) external {
+    function setTradingFee(
+        bytes32 id,
+        uint256 buyTradingFee,
+        uint256 buyInterestCutLimit,
+        uint256 sellTradingFee,
+        uint256 sellInterestCutLimit
+    ) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(sellTradingFee <= WAD, "Sell trading fee too high");
-        require(sellInterestCutLimit <= WAD, "Sell interest cut limit too high");
-        require(buyTradingFee <= WAD, "Buy trading fee too high");
-        require(buyInterestCutLimit <= WAD, "Buy interest cut limit too high");
-        tradingFeeParams[id] = TradingFeeParams({sellTradingFee: sellTradingFee, sellInterestCutLimit: sellInterestCutLimit, buyTradingFee: buyTradingFee, buyInterestCutLimit: buyInterestCutLimit});
+        require(buyTradingFee <= type(uint64).max, "Buy trading fee too high");
+        require(buyInterestCutLimit < WAD, "Buy interest cut limit too high");
+        require(sellTradingFee <= type(uint64).max, "Sell trading fee too high");
+        require(sellInterestCutLimit < WAD, "Sell interest cut limit too high");
+        tradingFeeParams[id] = TradingFeeParams({
+            buyTradingFee: uint64(buyTradingFee),
+            buyInterestCutLimit: uint64(buyInterestCutLimit),
+            sellTradingFee: uint64(sellTradingFee),
+            sellInterestCutLimit: uint64(sellInterestCutLimit)
+        });
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -149,11 +160,17 @@ contract MorphoV2 is IMorphoV2 {
         uint256 sellerPrice;
         if (offer.buy) {
             buyerPrice = offerPrice;
-            uint256 effectiveTradingFee = UtilsLib.min(_tradingFeeParams.sellTradingFee, _tradingFeeParams.sellInterestCutLimit.mulDivDown(WAD - buyerPrice, buyerPrice));
+            uint256 effectiveTradingFee = UtilsLib.min(
+                _tradingFeeParams.sellTradingFee,
+                _tradingFeeParams.sellInterestCutLimit.mulDivDown(WAD - buyerPrice, buyerPrice)
+            );
             sellerPrice = buyerPrice.mulDivDown(WAD, WAD + effectiveTradingFee);
         } else {
             sellerPrice = offerPrice;
-            uint256 effectiveTradingFee = UtilsLib.min(_tradingFeeParams.buyTradingFee, _tradingFeeParams.buyInterestCutLimit.mulDivDown(WAD - sellerPrice, sellerPrice));
+            uint256 effectiveTradingFee = UtilsLib.min(
+                _tradingFeeParams.buyTradingFee,
+                _tradingFeeParams.buyInterestCutLimit.mulDivDown(WAD - sellerPrice, sellerPrice)
+            );
             buyerPrice = sellerPrice.mulDivDown(WAD + effectiveTradingFee, WAD);
         }
 
