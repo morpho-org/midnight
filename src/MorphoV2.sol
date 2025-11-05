@@ -44,6 +44,7 @@ contract MorphoV2 is IMorphoV2 {
     address public feeSetter;
 
     mapping(address user => mapping(bytes32 id => mapping(uint256 start => uint256))) public auctionable;
+    mapping(address user => mapping(bytes32 id => uint256)) public auctionSlope;
 
     /// CONSTRUCTOR ///
 
@@ -282,8 +283,7 @@ contract MorphoV2 is IMorphoV2 {
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
 
-        uint256 fractionForBidder =
-            block.timestamp > start + 6 hours ? WAD : (block.timestamp - start).mulDivDown(WAD, 6 hours);
+        uint256 fractionForBidder = UtilsLib.max((block.timestamp - start).mulDivDown(auctionSlope[user][id], WAD), WAD);
         uint256 forBidder = obligationUnits.mulDivDown(fractionForBidder, WAD);
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
         SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits - forBidder);
@@ -400,6 +400,10 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev TODO: is it safe enough?
     function shuffleNonce() external {
         nonce[msg.sender] = keccak256(abi.encode(nonce[msg.sender], blockhash(block.number - 1)));
+    }
+
+    function setAuctionSlope(bytes32 id, uint256 slope) external {
+        auctionSlope[msg.sender][id] = slope;
     }
 
     function flashLoan(address token, uint256 amount, address callback, bytes calldata data) external {
