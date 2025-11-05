@@ -29,9 +29,9 @@ contract MorphoV2 is IMorphoV2 {
     /// obligationShares and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
-    /// @dev Offers should have this exact nonce to be valid.
-    /// @dev The nonce can be shuffled by the user to cancel everything easily/efficiently.
-    mapping(address user => bytes32) public nonce;
+    /// @dev Offers should have the current session to be valid.
+    /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
+    mapping(address user => bytes32) public session;
 
     /// @dev Trading fee parameters for a given obligation id.
     mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
@@ -74,11 +74,13 @@ contract MorphoV2 is IMorphoV2 {
         feeSetter = newFeeSetter;
     }
 
-    function setTradingFee(bytes32 id, uint128 tradingFee, uint128 interestCutLimit) external {
+    function setTradingFee(bytes32 id, uint256 tradingFee, uint256 interestCutLimit) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(tradingFee <= WAD, "Trading fee too high");
-        require(interestCutLimit <= WAD, "Interest cut limit too high");
-        tradingFeeParams[id] = TradingFeeParams({tradingFee: tradingFee, interestCutLimit: interestCutLimit});
+        require(tradingFee <= type(uint128).max, "Trading fee too high");
+        require(interestCutLimit < WAD, "Interest cut limit too high");
+        // Safe cast because values are below type(uint128).max.
+        tradingFeeParams[id] =
+            TradingFeeParams({tradingFee: uint128(tradingFee), interestCutLimit: uint128(interestCutLimit)});
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -121,7 +123,7 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.nonce == nonce[offer.maker], "invalid nonce");
+        require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = _id(offer.obligation);
 
         (
@@ -147,7 +149,7 @@ contract MorphoV2 is IMorphoV2 {
         if (offer.buy) {
             buyerPrice = offerPrice;
             sellerPrice = UtilsLib.max(
-                (buyerPrice - _tradingFeeParams.interestCutLimit)
+                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
                 .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
                 buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
             );
@@ -250,6 +252,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
+        returns (uint256, uint256)
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = _id(obligation);
@@ -264,6 +267,8 @@ contract MorphoV2 is IMorphoV2 {
         totalUnits[id] -= obligationUnits;
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+
+        return (obligationUnits, shares);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
@@ -364,8 +369,8 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev TODO: is it safe enough?
-    function shuffleNonce() external {
-        nonce[msg.sender] = keccak256(abi.encode(nonce[msg.sender], blockhash(block.number - 1)));
+    function shuffleSession() external {
+        session[msg.sender] = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
     }
 
     function flashLoan(address token, uint256 amount, address callback, bytes calldata data) external {
