@@ -107,19 +107,29 @@ contract EventsTest is BaseTest {
         vm.setSeed(seed);
         setupState();
 
-        uint256 initialShares = morphoV2.sharesOf(lender, id);
-        uint256 sharesToWithdraw = vm.randomUint(0, initialShares);
+        uint256 sharesOfBefore = morphoV2.sharesOf(lender, id);
+        uint256 totalUnitsBefore = morphoV2.totalUnits(id);
+        uint256 totalSharesBefore = morphoV2.totalShares(id);
+        uint256 withdrawableBefore = morphoV2.withdrawable(id);
 
         vm.recordLogs();
-        morphoV2.withdraw(obligation, 0, sharesToWithdraw, lender);
-        (, bytes memory data) = findFirstEvent(address(morphoV2), EventsLib.Withdraw.selector);
+        bool withdrawShares = vm.randomBool();
+        if (withdrawShares) {
+            uint256 withdrawnShares = vm.randomUint(0, sharesOfBefore);
+            morphoV2.withdraw(obligation, 0, withdrawnShares, lender);
+        } else {
+            uint256 unitsOf = sharesOfBefore.mulDivDown(morphoV2.totalUnits(id) + 1, morphoV2.totalShares(id) + 1);
+            uint256 withdrawnUnits = vm.randomUint(0, unitsOf);
+            morphoV2.withdraw(obligation, withdrawnUnits, 0, lender);
+        }
 
+        (, bytes memory data) = findFirstEvent(address(morphoV2), EventsLib.Withdraw.selector);
         WithdrawEventData memory eventData = abi.decode(data, (WithdrawEventData));
 
-        uint256 finalShares = morphoV2.sharesOf(lender, id);
-        assertEq(finalShares, initialShares - eventData.shares, "state can be reconstructed from event");
-        assertTrue(eventData.obligationUnits > 0, "event obligation units should be positive");
-        assertEq(eventData.shares, sharesToWithdraw, "event shares should match withdrawn amount");
+        assertEq(morphoV2.sharesOf(lender, id), sharesOfBefore - eventData.shares, "shares");
+        assertEq(morphoV2.withdrawable(id), withdrawableBefore - eventData.obligationUnits, "withdrawable");
+        assertEq(morphoV2.totalUnits(id), totalUnitsBefore - eventData.obligationUnits, "total units");
+        assertEq(morphoV2.totalShares(id), totalSharesBefore - eventData.shares, "total shares");
     }
 
     /* INTERNAL FUNCTIONS */
