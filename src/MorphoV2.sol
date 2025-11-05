@@ -313,10 +313,10 @@ contract MorphoV2 is IMorphoV2 {
     {
         bytes32 id = _id(obligation);
 
-        (uint256[] memory prices, uint256 maxDebt, uint256 repayableDebt) = _healthData(obligation, id, borrower);
+        (uint256 maxDebt, uint256 repayableDebt, uint256[] memory prices) = _healthData(obligation, id, borrower);
 
         uint256 originalDebt = debtOf[borrower][id];
-        require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+        require(originalDebt > maxDebt ||block.timestamp > obligation.maturity, "position is not liquidatable");
 
         uint256 lif = originalDebt > maxDebt
             ? MAX_LIF
@@ -394,12 +394,15 @@ contract MorphoV2 is IMorphoV2 {
         return tentativeSigner;
     }
 
+    /// @dev Returns the maximum debt, the repayable debt and the prices of the collaterals.
     function _healthData(Obligation memory obligation, bytes32 id, address borrower)
         internal
         view
-        returns (uint256[] memory prices, uint256 maxDebt, uint256 repayableDebt)
+        returns (uint256, uint256, uint256[] memory)
     {
-        prices = new uint256[](obligation.collaterals.length);
+        uint256[] memory prices = new uint256[](obligation.collaterals.length);
+        uint256 maxDebt;
+        uint256 repayableDebt;
         address previousCollateralToken;
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             address currentCollateralToken = obligation.collaterals[i].token;
@@ -413,17 +416,12 @@ contract MorphoV2 is IMorphoV2 {
 
             previousCollateralToken = currentCollateralToken;
         }
+        return (maxDebt, repayableDebt, prices);
     }
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
-        uint256 debt = debtOf[borrower][id];
-        if (debt == 0) {
-            return true;
-        } else {
-            (, uint256 maxDebt, ) = _healthData(obligation, id, borrower);
-            return debt <= maxDebt;
-        }
+        (uint256 maxDebt,,) = _healthData(obligation, id, borrower);
+        return debtOf[borrower][id] <= maxDebt;
     }
-
 }
