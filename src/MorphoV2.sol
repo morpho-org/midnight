@@ -316,7 +316,7 @@ contract MorphoV2 is IMorphoV2 {
         (uint256 maxDebt, uint256 repayableDebt, uint256[] memory prices) = _healthData(obligation, id, borrower);
 
         uint256 originalDebt = debtOf[borrower][id];
-        require(originalDebt > maxDebt ||block.timestamp > obligation.maturity, "position is not liquidatable");
+        require(originalDebt > maxDebt || block.timestamp > obligation.maturity, "position is not liquidatable");
 
         uint256 lif = originalDebt > maxDebt
             ? MAX_LIF
@@ -419,9 +419,15 @@ contract MorphoV2 is IMorphoV2 {
         return (maxDebt, repayableDebt, prices);
     }
 
+    /// @dev Returns true if the borrower is healthy.
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
         bytes32 id = _id(obligation);
-        (uint256 maxDebt,,) = _healthData(obligation, id, borrower);
-        return debtOf[borrower][id] <= maxDebt;
+        uint256 _debtOf = debtOf[borrower][id];
+        if (_debtOf == 0) {
+            return true;
+        } else {
+            (uint256 maxDebt,,) = _healthData(obligation, id, borrower);
+            return _debtOf <= maxDebt;
+        }
     }
 }
