@@ -260,7 +260,7 @@ contract MorphoV2 is IMorphoV2 {
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
 
-        sharesOf[onBehalf][id] -= shares;
+        sharesOf[onBehalf][id] += shares;
         withdrawable[id] -= obligationUnits;
 
         totalShares[id] -= shares;
