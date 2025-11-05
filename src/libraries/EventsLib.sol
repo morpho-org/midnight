@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Seizure, Offer} from "../interfaces/IMorphoV2.sol";
+import {Obligation, Seizure, Offer, TakeCase} from "../interfaces/IMorphoV2.sol";
 
 library EventsLib {
     event Constructor(address indexed owner);
@@ -21,12 +21,7 @@ library EventsLib {
         uint256 obligationShares,
         address indexed taker,
         Offer offer,
-        uint256 obligationTotalUnits,
-        uint256 obligationTotalShares,
-        uint256 buyerShares,
-        uint256 buyerDebt,
-        uint256 sellerShares,
-        uint256 sellerDebt
+        TakeCase takeCase
     );
     event Withdraw(
         address indexed caller,

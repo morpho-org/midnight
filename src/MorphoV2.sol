@@ -7,7 +7,7 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
+import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams, TakeCase} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
@@ -197,43 +197,36 @@ contract MorphoV2 is IMorphoV2 {
             require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
         }
 
+        TakeCase takeCase;
+
         if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
             // Lender enters + borrower enters.
             sharesOf[buyer][id] += obligationShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
+            takeCase = TakeCase.LenderEnterBorrowerEnter;
         } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
             // Lender enters + lender exits.
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
+            takeCase = TakeCase.LenderEnterLenderExit;
         } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
             // Borrower exits + borrower enters.
             debtOf[buyer][id] -= obligationUnits;
             debtOf[seller][id] += obligationUnits;
+            takeCase = TakeCase.BorrowerExitBorrowerEnter;
         } else {
             // Borrower exits + lender exits.
             debtOf[buyer][id] -= obligationUnits;
             sharesOf[seller][id] -= obligationShares;
             totalShares[id] -= obligationShares;
             totalUnits[id] -= obligationUnits;
+            takeCase = TakeCase.BorrowerExitLenderExit;
         }
 
         emit EventsLib.Take(
-            msg.sender,
-            id,
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
-            taker,
-            offer,
-            totalUnits[id],
-            totalShares[id],
-            sharesOf[buyer][id],
-            debtOf[buyer][id],
-            sharesOf[seller][id],
-            debtOf[seller][id]
+            msg.sender, id, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, takeCase
         );
 
         if (buyerCallback != address(0)) {

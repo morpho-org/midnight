@@ -53,4 +53,11 @@ struct TradingFeeParams {
     uint128 interestCutLimit;
 }
 
+enum TakeCase {
+    LenderEnterBorrowerEnter,
+    LenderEnterLenderExit,
+    BorrowerExitBorrowerEnter,
+    BorrowerExitLenderExit
+}
+
 interface IMorphoV2 {}
