@@ -269,19 +269,22 @@ contract MorphoV2 is IMorphoV2 {
     function withdrawEarly(Obligation memory obligation, uint256 obligationUnits, address user, uint256 start)
         external
     {
+        require(block.timestamp <= obligation.maturity, "maturity not reached");
         bytes32 id = _id(obligation);
 
-        uint256 discount = block.timestamp > start + 6 hours ? WAD : (block.timestamp - start).mulDivDown(WAD, 6 hours);
         uint256 shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
 
         auctionable[user][id][start] -= obligationUnits;
 
         sharesOf[msg.sender][id] -= shares;
         withdrawable[id] -= obligationUnits;
+
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
 
-        uint256 forBidder = obligationUnits.mulDivDown(discount, WAD);
+        uint256 fractionForBidder =
+            block.timestamp > start + 6 hours ? WAD : (block.timestamp - start).mulDivDown(WAD, 6 hours);
+        uint256 forBidder = obligationUnits.mulDivDown(fractionForBidder, WAD);
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
         SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits - forBidder);
     }
