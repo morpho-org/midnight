@@ -197,26 +197,21 @@ contract MorphoV2 is IMorphoV2 {
             require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
         }
 
-        if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
-            // Lender enters + borrower enters.
-            sharesOf[buyer][id] += obligationShares;
-            debtOf[seller][id] += obligationUnits;
-            totalShares[id] += obligationShares;
-            totalUnits[id] += obligationUnits;
-        } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
-            // Lender enters + lender exits.
-            sharesOf[buyer][id] += obligationShares;
-            sharesOf[seller][id] -= obligationShares;
-        } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
-            // Borrower exits + borrower enters.
-            debtOf[buyer][id] -= obligationUnits;
-            debtOf[seller][id] += obligationUnits;
-        } else {
-            // Borrower exits + lender exits.
-            debtOf[buyer][id] -= obligationUnits;
-            sharesOf[seller][id] -= obligationShares;
-            totalShares[id] -= obligationShares;
-            totalUnits[id] -= obligationUnits;
+        (uint256 buyerSharesIncrease, uint256 buyerDebtDecrease) =
+            debtOf[buyer][id] == 0 ? (obligationShares, uint256(0)) : (0, obligationUnits);
+        (uint256 sellerSharesDecrease, uint256 sellerDebtIncrease) =
+            sharesOf[seller][id] == 0 ? (uint256(0), obligationUnits) : (obligationShares, 0);
+
+        if (buyerSharesIncrease > 0) sharesOf[buyer][id] += buyerSharesIncrease;
+        if (buyerDebtDecrease > 0) debtOf[buyer][id] -= buyerDebtDecrease;
+        if (sellerSharesDecrease > 0) sharesOf[seller][id] -= sellerSharesDecrease;
+        if (sellerDebtIncrease > 0) debtOf[seller][id] += sellerDebtIncrease;
+
+        if (buyerSharesIncrease != sellerSharesDecrease) {
+            totalShares[id] = totalShares[id] + buyerSharesIncrease - sellerSharesDecrease;
+        }
+        if (buyerDebtDecrease != sellerDebtIncrease) {
+            totalUnits[id] = totalUnits[id] + sellerDebtIncrease - buyerDebtDecrease;
         }
 
         emit EventsLib.Take(
@@ -228,12 +223,10 @@ contract MorphoV2 is IMorphoV2 {
             obligationShares,
             taker,
             offer,
-            totalUnits[id],
-            totalShares[id],
-            sharesOf[buyer][id],
-            debtOf[buyer][id],
-            sharesOf[seller][id],
-            debtOf[seller][id]
+            buyerSharesIncrease,
+            buyerDebtDecrease,
+            sellerSharesDecrease,
+            sellerDebtIncrease
         );
 
         if (buyerCallback != address(0)) {
