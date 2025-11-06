@@ -31,16 +31,22 @@ library EventsLib {
     event Withdraw(
         address indexed caller,
         bytes32 indexed obligationId,
+        Obligation obligation,
         uint256 obligationUnits,
         uint256 shares,
         address indexed onBehalf
     );
     event Repay(
-        address indexed caller, bytes32 indexed obligationId, uint256 obligationUnits, address indexed onBehalf
+        address indexed caller,
+        bytes32 indexed obligationId,
+        Obligation obligation,
+        uint256 obligationUnits,
+        address indexed onBehalf
     );
     event SupplyCollateral(
         address caller,
         bytes32 indexed obligationId,
+        Obligation obligation,
         address indexed collateral,
         uint256 assets,
         address indexed onBehalf
@@ -49,6 +55,7 @@ library EventsLib {
     event WithdrawCollateral(
         address caller,
         bytes32 indexed obligationId,
+        Obligation obligation,
         address indexed collateral,
         uint256 assets,
         address indexed onBehalf
@@ -57,6 +64,7 @@ library EventsLib {
     event Liquidate(
         address indexed caller,
         bytes32 indexed obligationId,
+        Obligation obligation,
         Seizure[] seizures,
         address indexed borrower,
         uint256 totalRepaid,
