@@ -307,7 +307,7 @@ contract MorphoV2 is IMorphoV2 {
         else require(_isHealthy(obligation, repayer), "Unhealthy borrower");
 
         uint256 fractionForBidder =
-            UtilsLib.max((block.timestamp - start).mulDivDown(auctionSlope[repayer][id], WAD), WAD);
+            UtilsLib.min((block.timestamp - start).mulDivDown(auctionSlope[repayer][id], WAD), WAD);
         uint256 forBidder = assets.mulDivDown(fractionForBidder, WAD);
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
         SafeTransferLib.safeTransfer(obligation.loanToken, repayer, assets - forBidder);
