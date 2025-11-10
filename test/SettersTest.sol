@@ -52,21 +52,18 @@ contract SettersTest is BaseTest {
     function testSetTradingFeeOnlyFeeSetter(address rdm, Obligation memory obligation) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        bytes32 id = toId(obligation);
         vm.expectRevert("Only feeSetter");
         morphoV2.setTradingFee(obligation, 0.1e18, 0.1e18);
     }
 
     function testSetInterestCutLimitTooHigh(Obligation memory obligation, uint256 interestCutLimit) public {
         vm.assume(interestCutLimit >= WAD);
-        bytes32 id = toId(obligation);
         vm.expectRevert("Interest cut limit too high");
         morphoV2.setTradingFee(obligation, 0.1e18, interestCutLimit);
     }
 
     function testSetTradingFeeTooHigh(Obligation memory obligation, uint256 tradingFee) public {
         vm.assume(tradingFee > type(uint128).max);
-        bytes32 id = toId(obligation);
         vm.expectRevert("Trading fee too high");
         morphoV2.setTradingFee(obligation, tradingFee, 0.1e18);
     }
