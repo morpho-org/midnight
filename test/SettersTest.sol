@@ -44,7 +44,7 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(obligation);
 
         morphoV2.setTradingFee(obligation, tradingFee, interestCutLimit);
-        (uint128 _tradingFee, uint128 _interestCutLimit) = morphoV2.tradingFeeParams(id);
+        (uint128 _tradingFee, uint128 _interestCutLimit,) = morphoV2.tradingFeeParams(id);
         assertEq(_tradingFee, tradingFee);
         assertEq(_interestCutLimit, interestCutLimit);
     }

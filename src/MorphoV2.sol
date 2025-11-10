@@ -83,16 +83,19 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(tradingFee <= type(uint128).max, "Trading fee too high");
         require(interestCutLimit < WAD, "Interest cut limit too high");
-
         bytes32 id = _id(obligation);
-        if (!obligationCreated[id]) {
+
+        TradingFeeParams memory params = tradingFeeParams[id];
+        if (!params.created) {
             emit EventsLib.CreateObligation(id, obligation);
-            obligationCreated[id] = true;
+            params.created = true;
         }
 
+        params.tradingFee = uint128(tradingFee);
+        params.interestCutLimit = uint64(interestCutLimit);
+
         // Safe cast because values are below type(uint128).max.
-        tradingFeeParams[id] =
-            TradingFeeParams({tradingFee: uint128(tradingFee), interestCutLimit: uint128(interestCutLimit)});
+        tradingFeeParams[id] = params;
         emit EventsLib.SetTradingFee(id, tradingFee, interestCutLimit);
     }
 
@@ -140,9 +143,12 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = _id(offer.obligation);
 
-        if (!obligationCreated[id]) {
+        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
+
+        if (!_tradingFeeParams.created) {
             emit EventsLib.CreateObligation(id, offer.obligation);
-            obligationCreated[id] = true;
+            _tradingFeeParams.created = true;
+            tradingFeeParams[id] = _tradingFeeParams;
         }
 
         (
@@ -162,7 +168,6 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
         uint256 buyerPrice;
         uint256 sellerPrice;
         if (offer.buy) {
@@ -320,9 +325,11 @@ contract MorphoV2 is IMorphoV2 {
     {
         bytes32 id = _id(obligation);
 
-        if (!obligationCreated[id]) {
+        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
+        if (!_tradingFeeParams.created) {
             emit EventsLib.CreateObligation(id, obligation);
-            obligationCreated[id] = true;
+            _tradingFeeParams.created = true;
+            tradingFeeParams[id] = _tradingFeeParams;
         }
 
         collateralOf[onBehalf][id][collateral] += assets;
