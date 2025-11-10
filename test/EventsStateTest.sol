@@ -18,12 +18,8 @@ struct TakeEventData {
     uint256 obligationUnits;
     uint256 obligationShares;
     Offer offer;
-    uint256 obligationTotalUnits;
-    uint256 obligationTotalShares;
-    uint256 buyerShares;
-    uint256 buyerDebt;
-    uint256 sellerShares;
-    uint256 sellerDebt;
+    bool buyerIsLender;
+    bool sellerIsBorrower;
 }
 
 contract EventsStateTest is BaseTest {
@@ -76,6 +72,13 @@ contract EventsStateTest is BaseTest {
         uint256 obligationShares = vm.randomUint(0, 1e18);
 
         uint256 consumedBefore = vm.randomUint(0, 1e18);
+        uint256 totalSharesBefore = morphoV2.totalShares(id);
+        uint256 totalUnitsBefore = morphoV2.totalUnits(id);
+        uint256 buyerSharesBefore = morphoV2.sharesOf(buyer, id);
+        uint256 buyerDebtBefore = morphoV2.debtOf(buyer, id);
+        uint256 sellerSharesBefore = morphoV2.sharesOf(seller, id);
+        uint256 sellerDebtBefore = morphoV2.debtOf(seller, id);
+
         writeConsumed(offer.maker, offer.group, consumedBefore);
 
         vm.recordLogs();
@@ -83,13 +86,20 @@ contract EventsStateTest is BaseTest {
         (, bytes memory data) = findFirstEvent(address(morphoV2), EventsLib.Take.selector);
         (TakeEventData memory eventData) = abi.decode(bytes.concat(abi.encode(0x20), data), (TakeEventData));
 
-        assertEq(eventData.obligationTotalShares, morphoV2.totalShares(id), "total shares");
-        assertEq(eventData.obligationTotalUnits, morphoV2.totalUnits(id), "total units");
-        assertEq(eventData.buyerShares, morphoV2.sharesOf(buyer, id), "buyer shares");
-        assertEq(eventData.sellerShares, morphoV2.sharesOf(seller, id), "seller shares");
-        assertEq(morphoV2.debtOf(buyer, id), eventData.buyerDebt, "buyer debt");
-        assertEq(morphoV2.debtOf(seller, id), eventData.sellerDebt, "seller debt");
-        assertEq(eventData.obligationShares, obligationShares, "obligation shares");
+        (uint256 buyerSharesIncrease, uint256 buyerDebtDecrease) =
+            eventData.buyerIsLender ? (eventData.obligationShares, uint256(0)) : (0, eventData.obligationUnits);
+        (uint256 sellerSharesDecrease, uint256 sellerDebtIncrease) =
+            eventData.sellerIsBorrower ? (uint256(0), eventData.obligationUnits) : (eventData.obligationShares, 0);
+
+        assertEq(
+            morphoV2.totalShares(id), totalSharesBefore + buyerSharesIncrease - sellerSharesDecrease, "total shares"
+        );
+        assertEq(morphoV2.totalUnits(id), totalUnitsBefore + sellerDebtIncrease - buyerDebtDecrease, "total units");
+        assertEq(morphoV2.sharesOf(buyer, id), buyerSharesBefore + buyerSharesIncrease, "buyer shares");
+        assertEq(morphoV2.sharesOf(seller, id), sellerSharesBefore - sellerSharesDecrease, "seller shares");
+        assertEq(morphoV2.debtOf(buyer, id), buyerDebtBefore - buyerDebtDecrease, "buyer debt");
+        assertEq(morphoV2.debtOf(seller, id), sellerDebtBefore + sellerDebtIncrease, "seller debt");
+        assertEq(obligationShares, obligationShares, "obligation shares");
 
         uint256 expectedConsumed;
 
