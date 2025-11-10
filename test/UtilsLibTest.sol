@@ -19,4 +19,8 @@ contract UtilsLibTest is Test {
     function testMin(uint256 a, uint256 b) public pure {
         assertEq(UtilsLib.min(a, b), a < b ? a : b);
     }
+
+    function testMax(uint256 a, uint256 b) public pure {
+        assertEq(UtilsLib.max(a, b), a > b ? a : b);
+    }
 }

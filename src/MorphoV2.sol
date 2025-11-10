@@ -7,7 +7,7 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMorphoV2, Obligation, Offer, Signature, Seizure} from "./interfaces/IMorphoV2.sol";
+import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 
 /// OBLIGATIONS
@@ -30,12 +30,12 @@ contract MorphoV2 is IMorphoV2 {
     /// obligationShares and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
-    /// @dev Offers should have this exact nonce to be valid.
-    /// @dev The nonce can be shuffled by the user to cancel everything easily/efficiently.
-    mapping(address user => bytes32) public nonce;
+    /// @dev Offers should have the current session to be valid.
+    /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
+    mapping(address user => bytes32) public session;
 
-    /// @dev Cut on interest at each trade for a given obligation id.
-    mapping(bytes32 id => uint256) public tradingFee;
+    /// @dev Trading fee parameters for a given obligation id.
+    mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
     address public tradingFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
@@ -75,10 +75,13 @@ contract MorphoV2 is IMorphoV2 {
         feeSetter = newFeeSetter;
     }
 
-    function setTradingFee(bytes32 id, uint256 fee) external {
+    function setTradingFee(bytes32 id, uint256 tradingFee, uint256 interestCutLimit) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(fee <= WAD, "Fee too high");
-        tradingFee[id] = fee;
+        require(tradingFee <= type(uint128).max, "Trading fee too high");
+        require(interestCutLimit < WAD, "Interest cut limit too high");
+        // Safe cast because values are below type(uint128).max.
+        tradingFeeParams[id] =
+            TradingFeeParams({tradingFee: uint128(tradingFee), interestCutLimit: uint128(interestCutLimit)});
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -121,7 +124,7 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.nonce == nonce[offer.maker], "invalid nonce");
+        require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = _id(offer.obligation);
 
         (
@@ -141,9 +144,24 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 
-        uint256 _tradingFee = tradingFee[id];
-        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice.mulDivDown(WAD - _tradingFee, WAD) + _tradingFee;
-        uint256 sellerPrice = offer.buy ? (offerPrice - _tradingFee).mulDivDown(WAD, WAD - _tradingFee) : offerPrice;
+        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
+        uint256 buyerPrice;
+        uint256 sellerPrice;
+        if (offer.buy) {
+            buyerPrice = offerPrice;
+            sellerPrice = UtilsLib.max(
+                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
+                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
+                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
+            );
+        } else {
+            sellerPrice = offerPrice;
+            buyerPrice = UtilsLib.min(
+                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
+                    + _tradingFeeParams.interestCutLimit,
+                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
+            );
+        }
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
@@ -234,6 +252,7 @@ contract MorphoV2 is IMorphoV2 {
 
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
+        returns (uint256, uint256)
     {
         require(block.timestamp > obligation.maturity, "maturity not reached");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
@@ -249,6 +268,8 @@ contract MorphoV2 is IMorphoV2 {
         totalUnits[id] -= obligationUnits;
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+
+        return (obligationUnits, shares);
     }
 
     function repay(Obligation memory obligation, uint256 assets, address onBehalf) external {
@@ -366,8 +387,8 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev TODO: is it safe enough?
-    function shuffleNonce() external {
-        nonce[msg.sender] = keccak256(abi.encode(nonce[msg.sender], blockhash(block.number - 1)));
+    function shuffleSession() external {
+        session[msg.sender] = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
     }
 
     function flashLoan(address token, uint256 amount, address callback, bytes calldata data) external {

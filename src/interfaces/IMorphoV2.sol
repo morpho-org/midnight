@@ -28,7 +28,7 @@ struct Offer {
     uint256 startPrice;
     uint256 expiryPrice;
     bytes32 group;
-    bytes32 nonce;
+    bytes32 session;
     address callback;
     bytes callbackData;
 }
@@ -46,6 +46,11 @@ struct Seizure {
     uint256 repaid;
     // Amount of collateral to seize.
     uint256 seized;
+}
+
+struct TradingFeeParams {
+    uint128 tradingFee;
+    uint128 interestCutLimit;
 }
 
 interface IMorphoV2 {}

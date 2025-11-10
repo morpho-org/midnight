@@ -107,13 +107,15 @@ contract OtherFunctionsTest is BaseTest {
         vm.warp(obligation.maturity + 1);
 
         vm.prank(lender);
-        morphoV2.withdraw(obligation, withdraw, 0, lender);
+        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, withdraw, 0, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - withdraw, "obligationSharesOf");
         assertEq(morphoV2.totalPreRepaid(id), 0, "totalPreRepaid");
         assertEq(morphoV2.totalShares(id), units - withdraw, "totalShares");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
+        assertEq(returnedObligationUnits, withdraw, "returned obligation units");
+        assertEq(returnedShares, withdraw, "returned shares");
     }
 
     function testWithdrawObligationsBeforeMaturity(
@@ -152,12 +154,14 @@ contract OtherFunctionsTest is BaseTest {
 
         // TODO: sharesPrice != 1
         vm.prank(lender);
-        morphoV2.withdraw(obligation, 0, shares, lender);
+        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, 0, shares, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - shares, "obligationSharesOf");
         assertEq(morphoV2.totalPreRepaid(id), 0, "totalPreRepaid");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
+        assertEq(returnedObligationUnits, shares, "returned obligation units");
+        assertEq(returnedShares, shares, "returned shares");
     }
 
     function testWithdrawRepaidUntilMaturity(
@@ -273,9 +277,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.consumed(user, group), amount, "consumed");
     }
 
-    function testShuffleNonce(address user) public {
+    function testShuffleSession(address user) public {
         vm.prank(user);
-        morphoV2.shuffleNonce();
-        assertEq(morphoV2.nonce(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "nonce");
+        morphoV2.shuffleSession();
+        assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 }

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 
 contract SettersTest is BaseTest {
     function testInitialOwner() public view {
@@ -33,23 +34,32 @@ contract SettersTest is BaseTest {
         morphoV2.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
-    function testSetTradingFeeSuccess(bytes32 id, uint256 fee) public {
-        vm.assume(fee <= 1e18);
-        morphoV2.setTradingFee(id, fee);
-        assertEq(morphoV2.tradingFee(id), fee);
+    function testSetTradingFeeSuccess(bytes32 id, uint128 tradingFee, uint128 interestCutLimit) public {
+        vm.assume(tradingFee <= WAD);
+        vm.assume(interestCutLimit < WAD);
+        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        (uint128 _tradingFee, uint128 _interestCutLimit) = morphoV2.tradingFeeParams(id);
+        assertEq(_tradingFee, tradingFee);
+        assertEq(_interestCutLimit, interestCutLimit);
     }
 
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("Only feeSetter");
-        morphoV2.setTradingFee(id, 0.1e18);
+        morphoV2.setTradingFee(id, 0.1e18, 0.1e18);
     }
 
-    function testSetTradingFeeTooHigh(bytes32 id, uint256 fee) public {
-        vm.assume(fee > 1e18);
-        vm.expectRevert("Fee too high");
-        morphoV2.setTradingFee(id, fee);
+    function testSetInterestCutLimitTooHigh(bytes32 id, uint256 interestCutLimit) public {
+        vm.assume(interestCutLimit >= WAD);
+        vm.expectRevert("Interest cut limit too high");
+        morphoV2.setTradingFee(id, 0.1e18, interestCutLimit);
+    }
+
+    function testSetTradingFeeTooHigh(bytes32 id, uint256 tradingFee) public {
+        vm.assume(tradingFee > type(uint128).max);
+        vm.expectRevert("Trading fee too high");
+        morphoV2.setTradingFee(id, tradingFee, 0.1e18);
     }
 
     function testSetTradingFeeRecipientSuccess(address recipient) public {
