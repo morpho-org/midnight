@@ -24,7 +24,6 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 => uint256) public totalUnits;
     mapping(bytes32 => uint256) public totalShares;
     mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
-    mapping(bytes32 => bool) public obligationCreated;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
@@ -83,19 +82,14 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(tradingFee <= type(uint128).max, "Trading fee too high");
         require(interestCutLimit < WAD, "Interest cut limit too high");
-        bytes32 id = _id(obligation);
 
-        TradingFeeParams memory params = tradingFeeParams[id];
-        if (!params.created) {
-            emit EventsLib.CreateObligation(id, obligation);
-            params.created = true;
-        }
+        bytes32 id = _createObligation(obligation);
 
-        params.tradingFee = uint128(tradingFee);
-        params.interestCutLimit = uint64(interestCutLimit);
+        // Safe cast because tradingFee is below type(uint128).max.
+        tradingFeeParams[id].tradingFee = uint128(tradingFee);
+        // Safe cast because interestCutLimit is below WAD.
+        tradingFeeParams[id].interestCutLimit = uint64(interestCutLimit);
 
-        // Safe cast because values are below type(uint128).max.
-        tradingFeeParams[id] = params;
         emit EventsLib.SetTradingFee(id, tradingFee, interestCutLimit);
     }
 
@@ -141,15 +135,7 @@ contract MorphoV2 is IMorphoV2 {
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes32 id = _id(offer.obligation);
-
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-
-        if (!_tradingFeeParams.created) {
-            emit EventsLib.CreateObligation(id, offer.obligation);
-            _tradingFeeParams.created = true;
-            tradingFeeParams[id] = _tradingFeeParams;
-        }
+        bytes32 id = _createObligation(offer.obligation);
 
         (
             address buyer,
@@ -168,6 +154,7 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 
+        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
         uint256 buyerPrice;
         uint256 sellerPrice;
         if (offer.buy) {
@@ -323,14 +310,7 @@ contract MorphoV2 is IMorphoV2 {
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
-        bytes32 id = _id(obligation);
-
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        if (!_tradingFeeParams.created) {
-            emit EventsLib.CreateObligation(id, obligation);
-            _tradingFeeParams.created = true;
-            tradingFeeParams[id] = _tradingFeeParams;
-        }
+        bytes32 id = _createObligation(obligation);
 
         collateralOf[onBehalf][id][collateral] += assets;
 
@@ -466,6 +446,15 @@ contract MorphoV2 is IMorphoV2 {
         address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    function _createObligation(Obligation memory obligation) internal returns (bytes32) {
+        bytes32 id = _id(obligation);
+        if (!tradingFeeParams[id].created) {
+            emit EventsLib.CreateObligation(id, obligation);
+            tradingFeeParams[id].created = true;
+        }
+        return id;
     }
 
     function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
