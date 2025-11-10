@@ -44,6 +44,9 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    mapping(address user => mapping(bytes32 id => mapping(uint256 start => uint256))) public auctionable;
+    mapping(address user => mapping(bytes32 id => uint256)) public auctionSlope;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -276,16 +279,38 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = _id(obligation);
         preRepaidOf[onBehalf][id] += assets;
         totalPreRepaid[id] += assets;
+        auctionable[onBehalf][id][block.timestamp] += assets;
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), assets);
     }
 
-    function withdrawRepaid(Obligation memory obligation, uint256 assets, address onBehalf) external {
+    function withdrawRepaid(
+        Obligation memory obligation,
+        uint256 assets,
+        address bidder,
+        address repayer,
+        uint256 start
+    ) external {
         bytes32 id = _id(obligation);
-        preRepaidOf[onBehalf][id] -= assets;
         totalPreRepaid[id] -= assets;
-        if (obligation.maturity < block.timestamp) require(debtOf[onBehalf][id] <= totalPreRepaid[id], "no debt");
-        else require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
-        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, assets);
+        auctionable[repayer][id][start] -= assets;
+        preRepaidOf[repayer][id] -= assets;
+
+        if (bidder != repayer) {
+            debtOf[repayer][id] -= assets;
+            uint256 shares = assets.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
+            sharesOf[bidder][id] -= shares;
+            totalShares[id] -= shares;
+            totalUnits[id] -= assets;
+        }
+
+        if (obligation.maturity < block.timestamp) require(debtOf[repayer][id] <= preRepaidOf[repayer][id], "no debt");
+        else require(_isHealthy(obligation, repayer), "Unhealthy borrower");
+
+        uint256 fractionForBidder =
+            UtilsLib.max((block.timestamp - start).mulDivDown(auctionSlope[repayer][id], WAD), WAD);
+        uint256 forBidder = assets.mulDivDown(fractionForBidder, WAD);
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
+        SafeTransferLib.safeTransfer(obligation.loanToken, repayer, assets - forBidder);
     }
 
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
@@ -365,6 +390,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         totalPreRepaid[id] += _repaid;
+        auctionable[borrower][id][block.timestamp] += _repaid;
         preRepaidOf[borrower][id] += _repaid;
         require(preRepaidOf[borrower][id] <= debtOf[borrower][id], "repaid more than debt");
 
@@ -389,6 +415,10 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev TODO: is it safe enough?
     function shuffleSession() external {
         session[msg.sender] = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
+    }
+
+    function setAuctionSlope(bytes32 id, uint256 slope) external {
+        auctionSlope[msg.sender][id] = slope;
     }
 
     function flashLoan(address token, uint256 amount, address callback, bytes calldata data) external {

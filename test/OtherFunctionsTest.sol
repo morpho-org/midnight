@@ -183,7 +183,7 @@ contract OtherFunctionsTest is BaseTest {
         _testRepay(obligationUnits, repaid);
         skip(skipped);
         vm.prank(borrower);
-        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower, borrower, originalTimestamp);
 
         assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "debt of");
         assertEq(morphoV2.preRepaidOf(borrower, id), repaid - withdrawn, "pre repaid of");
@@ -212,7 +212,7 @@ contract OtherFunctionsTest is BaseTest {
 
         skip(skipped);
         vm.prank(borrower);
-        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower, borrower, originalTimestamp);
         assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "debt of");
         assertEq(morphoV2.preRepaidOf(borrower, id), repaid - withdrawn, "pre repaid of");
         assertEq(morphoV2.totalPreRepaid(id), repaid - withdrawn, "total pre repaid");
@@ -244,7 +244,7 @@ contract OtherFunctionsTest is BaseTest {
             borrower
         );
         vm.expectRevert("Unhealthy borrower");
-        morphoV2.withdrawRepaid(obligation, withdrawn, borrower);
+        morphoV2.withdrawRepaid(obligation, withdrawn, borrower, borrower, block.timestamp);
     }
 
     function testRepay(uint256 obligationUnits, uint256 repaid) public {
