@@ -273,15 +273,18 @@ contract MorphoV2 is IMorphoV2 {
         require(block.timestamp <= obligation.maturity, "maturity not reached");
         bytes32 id = _id(obligation);
 
-        uint256 shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
+        if (sharesOf[msg.sender][id] > 0) {
+            uint256 shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
+            sharesOf[msg.sender][id] -= shares;
+            withdrawable[id] -= obligationUnits;
+            totalShares[id] -= shares;
+            totalUnits[id] -= obligationUnits;
+        } else {
+            debtOf[msg.sender][id] += obligationUnits;
+            require(_isHealthy(obligation, msg.sender), "Unhealthy borrower");
+        }
 
         auctionable[user][id][start] -= obligationUnits;
-
-        sharesOf[msg.sender][id] -= shares;
-        withdrawable[id] -= obligationUnits;
-
-        totalShares[id] -= shares;
-        totalUnits[id] -= obligationUnits;
 
         uint256 fractionForBidder = UtilsLib.max((block.timestamp - start).mulDivDown(auctionSlope[user][id], WAD), WAD);
         uint256 forBidder = obligationUnits.mulDivDown(fractionForBidder, WAD);
