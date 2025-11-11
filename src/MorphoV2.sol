@@ -286,7 +286,7 @@ contract MorphoV2 is IMorphoV2 {
 
         auctionable[user][id][start] -= obligationUnits;
 
-        uint256 fractionForBidder = UtilsLib.max((block.timestamp - start).mulDivDown(auctionSlope[user][id], WAD), WAD);
+        uint256 fractionForBidder = UtilsLib.min((block.timestamp - start).mulDivDown(auctionSlope[user][id], WAD), WAD);
         uint256 forBidder = obligationUnits.mulDivDown(fractionForBidder, WAD);
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
         SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits - forBidder);
