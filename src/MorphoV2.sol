@@ -267,29 +267,34 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
     }
 
-    function withdrawEarly(Obligation memory obligation, uint256 obligationUnits, address user, uint256 start)
-        external
-    {
+    function withdrawEarly(
+        Obligation memory obligation,
+        uint256 obligationUnits,
+        address auctioner,
+        uint256 start,
+        address onBehalf
+    ) external {
         require(block.timestamp <= obligation.maturity, "maturity not reached");
         bytes32 id = _id(obligation);
 
-        if (sharesOf[msg.sender][id] > 0) {
+        if (sharesOf[onBehalf][id] > 0) {
             uint256 shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
-            sharesOf[msg.sender][id] -= shares;
+            sharesOf[onBehalf][id] -= shares;
             withdrawable[id] -= obligationUnits;
             totalShares[id] -= shares;
             totalUnits[id] -= obligationUnits;
         } else {
-            debtOf[msg.sender][id] += obligationUnits;
-            require(_isHealthy(obligation, msg.sender), "Unhealthy borrower");
+            debtOf[onBehalf][id] += obligationUnits;
+            require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
         }
 
-        auctionable[user][id][start] -= obligationUnits;
+        auctionable[auctioner][id][start] -= obligationUnits;
 
-        uint256 fractionForBidder = UtilsLib.min((block.timestamp - start).mulDivDown(auctionSlope[user][id], WAD), WAD);
+        uint256 fractionForBidder =
+            UtilsLib.min((block.timestamp - start).mulDivDown(auctionSlope[auctioner][id], WAD), WAD);
         uint256 forBidder = obligationUnits.mulDivDown(fractionForBidder, WAD);
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, forBidder);
-        SafeTransferLib.safeTransfer(obligation.loanToken, user, obligationUnits - forBidder);
+        SafeTransferLib.safeTransfer(obligation.loanToken, auctioner, obligationUnits - forBidder);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
