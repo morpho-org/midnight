@@ -30,6 +30,7 @@ contract TakeTest is BaseTest {
         super.setUp();
 
         obligation.chainId = block.chainid;
+        obligation.morphoV2 = address(morphoV2);
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
