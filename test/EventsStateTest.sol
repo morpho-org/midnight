@@ -17,7 +17,6 @@ struct TakeEventData {
     uint256 sellerAssets;
     uint256 obligationUnits;
     uint256 obligationShares;
-    Offer offer;
     bool buyerIsLender;
     bool sellerIsBorrower;
 }
@@ -84,7 +83,7 @@ contract EventsStateTest is BaseTest {
         vm.recordLogs();
         take(0, 0, 0, obligationShares, offer.buy ? seller : buyer, offer);
         (, bytes memory data) = findFirstEvent(address(morphoV2), EventsLib.Take.selector);
-        (TakeEventData memory eventData) = abi.decode(bytes.concat(abi.encode(0x20), data), (TakeEventData));
+        (TakeEventData memory eventData) = abi.decode(data, (TakeEventData));
 
         (uint256 buyerSharesIncrease, uint256 buyerDebtDecrease) =
             eventData.buyerIsLender ? (eventData.obligationShares, uint256(0)) : (0, eventData.obligationUnits);
