@@ -1314,6 +1314,14 @@ contract TakeTest is BaseTest {
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
+
+    function testInvalidMorphoV2Contract(address rdm) public {
+        vm.assume(rdm != address(morphoV2));
+        borrowerOffer.obligation.morphoV2 = rdm;
+
+        vm.expectRevert("morphoV2 mismatch");
+        take(1, 0, 0, 0, lender, borrowerOffer);
+    }
 }
 
 contract BorrowCallback is ICallbacks {
