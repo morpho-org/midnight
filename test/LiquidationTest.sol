@@ -104,13 +104,22 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), repaid);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        Seizure[] memory actualSeizures = morphoV2.liquidate(obligation, seizures, borrower, "");
+
+        assertEq(actualSeizures.length, 1, "seizures length");
+        assertEq(actualSeizures[0].collateralIndex, 0, "collateral index");
+        assertEq(actualSeizures[0].repaid, repaid, "repaid units");
+        assertEq(
+            actualSeizures[0].seized,
+            repaid.mulDivDown(ORACLE_PRICE_SCALE, 1e36 - 1).mulDivDown(MAX_LIF, WAD),
+            "seized assets"
+        );
 
         assertEq(morphoV2.debtOf(borrower, id), units);
         assertEq(morphoV2.preRepaidOf(borrower, id), repaid);
         assertEq(
             morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
-            initialCollateral - repaid.mulDivDown(ORACLE_PRICE_SCALE, 1e36 - 1).mulDivDown(MAX_LIF, WAD)
+            initialCollateral - actualSeizures[0].seized
         );
         assertEq(loanToken.balanceOf(address(this)), 0);
     }
@@ -126,14 +135,23 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), repaid);
         seizures.push(Seizure({collateralIndex: 0, repaid: 0, seized: seized}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        Seizure[] memory actualSeizures = morphoV2.liquidate(obligation, seizures, borrower, "");
+
+        assertEq(actualSeizures.length, 1, "seizures length");
+        assertEq(actualSeizures[0].collateralIndex, 0, "collateral index");
+        assertEq(
+            actualSeizures[0].repaid,
+            seized.mulDivUp(WAD, MAX_LIF).mulDivUp(1e36 - 1, ORACLE_PRICE_SCALE),
+            "repaid units"
+        );
+        assertEq(actualSeizures[0].seized, seized, "seized assets");
 
         assertEq(loanToken.balanceOf(address(this)), 0, "loan token balance");
         assertEq(morphoV2.debtOf(borrower, id), units, "debt");
-        assertEq(morphoV2.preRepaidOf(borrower, id), repaid, "pre repaid");
+        assertEq(morphoV2.preRepaidOf(borrower, id), actualSeizures[0].repaid, "pre repaid");
         assertEq(
             morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token),
-            initialCollateral - seized,
+            initialCollateral - actualSeizures[0].seized,
             "collateral"
         );
     }

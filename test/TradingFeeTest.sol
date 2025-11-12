@@ -8,8 +8,6 @@ import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract TradingFeeTest is BaseTest {
     using MathLib for uint256;
 
