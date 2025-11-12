@@ -20,7 +20,6 @@ library EventsLib {
         uint256 obligationUnits,
         uint256 obligationShares,
         address indexed taker,
-        Offer offer,
         bool buyerIsLender,
         bool sellerIsBorrower
     );

@@ -7,7 +7,15 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
+import {
+    IMorphoV2,
+    Obligation,
+    Offer,
+    Signature,
+    Collateral,
+    Seizure,
+    TradingFeeParams
+} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
@@ -130,7 +138,7 @@ contract MorphoV2 is IMorphoV2 {
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes32 id = _id(offer.obligation);
+        bytes32 id = toId(offer.obligation);
 
         (
             address buyer,
@@ -229,7 +237,6 @@ contract MorphoV2 is IMorphoV2 {
             obligationUnits,
             obligationShares,
             taker,
-            offer,
             buyerIsLender,
             sellerIsBorrower
         );
@@ -265,7 +272,7 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
+        require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -276,7 +283,7 @@ contract MorphoV2 is IMorphoV2 {
         returns (uint256, uint256)
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
@@ -295,7 +302,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
@@ -308,7 +315,7 @@ contract MorphoV2 is IMorphoV2 {
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] += assets;
 
@@ -320,11 +327,11 @@ contract MorphoV2 is IMorphoV2 {
     function withdrawCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] -= assets;
 
-        require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf);
 
@@ -347,15 +354,16 @@ contract MorphoV2 is IMorphoV2 {
     {
         uint256 repayableDebt;
         uint256 maxDebt;
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-            prices[i] = IOracle(obligation.collaterals[i].oracle).price();
-            uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
-            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
-                .mulDivDown(obligation.collaterals[i].lltv, WAD);
-            repayableDebt += collateralAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
+            Collateral memory _collateral = obligation.collaterals[i];
+            uint256 price = IOracle(_collateral.oracle).price();
+            prices[i] = price;
+            uint256 _collateralOf = collateralOf[borrower][id][_collateral.token];
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            repayableDebt += _collateralOf.mulDivUp(WAD, MAX_LIF).mulDivUp(price, ORACLE_PRICE_SCALE);
         }
 
         uint256 originalDebt = debtOf[borrower][id];
@@ -433,21 +441,14 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    /// INTERNAL ///
+    /// VIEW ///
 
-    function _id(Obligation memory obligation) internal pure returns (bytes32) {
+    function toId(Obligation memory obligation) public pure returns (bytes32) {
         return keccak256(abi.encode(obligation));
     }
 
-    function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
-        address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
-    }
-
-    function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
-        bytes32 id = _id(obligation);
+    function isHealthy(Obligation memory obligation, address borrower) public view returns (bool) {
+        bytes32 id = toId(obligation);
         uint256 debt = debtOf[borrower][id];
         if (debt == 0) {
             return true;
@@ -455,15 +456,22 @@ contract MorphoV2 is IMorphoV2 {
             uint256 maxDebt;
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-                address currentCollateralToken = obligation.collaterals[i].token;
-                require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
-                uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(obligation.collaterals[i].lltv, WAD);
-                previousCollateralToken = currentCollateralToken;
+                Collateral memory _collateral = obligation.collaterals[i];
+                address collateralToken = _collateral.token;
+                require(collateralToken > previousCollateralToken, "collaterals not sorted");
+                maxDebt += collateralOf[borrower][id][collateralToken]
+                    .mulDivDown(IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE)
+                    .mulDivDown(_collateral.lltv, WAD);
+                previousCollateralToken = collateralToken;
             }
-
             return debt <= maxDebt;
         }
+    }
+
+    function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
+        address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
+        require(tentativeSigner != address(0), "invalid signature");
+        return tentativeSigner;
     }
 }
