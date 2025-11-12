@@ -371,7 +371,7 @@ contract LiquidationTest is BaseTest {
 
         morphoV2.liquidate(obligation, seizures, borrower, "");
 
-        uint256 lif = 1e18 + (MAX_LIF - WAD) * delay / TIME_TO_MAX_LIF;
+        uint256 lif = WAD + (MAX_LIF - WAD) * delay / TIME_TO_MAX_LIF;
 
         assertEq(morphoV2.debtOf(borrower, id), units - repaid, "debt");
         assertEq(
