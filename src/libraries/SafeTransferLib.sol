@@ -9,7 +9,11 @@ library SafeTransferLib {
         require(token.code.length > 0, "no code");
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transfer, (to, value)));
-        require(success, "transfer reverted");
+        if (!success) {
+            assembly {
+                revert(add(returndata, 0x20), mload(returndata))
+            }
+        }
         require(returndata.length == 0 || abi.decode(returndata, (bool)), "transfer returned false");
     }
 
@@ -17,7 +21,11 @@ library SafeTransferLib {
         require(token.code.length > 0, "no code");
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transferFrom, (from, to, value)));
-        require(success, "transferFrom reverted");
+        if (!success) {
+            assembly {
+                revert(add(returndata, 0x20), mload(returndata))
+            }
+        }
         require(returndata.length == 0 || abi.decode(returndata, (bool)), "transferFrom returned false");
     }
 }
