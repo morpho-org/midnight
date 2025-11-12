@@ -123,13 +123,15 @@ contract OtherFunctionsTest is BaseTest {
         testRepay(units, withdraw);
 
         vm.prank(lender);
-        morphoV2.withdraw(obligation, withdraw, 0, lender);
+        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, withdraw, 0, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - withdraw, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
         assertEq(morphoV2.totalShares(id), units - withdraw, "totalShares");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
+        assertEq(returnedObligationUnits, withdraw, "returned obligation units");
+        assertEq(returnedShares, withdraw, "returned shares");
     }
 
     function testWithdrawWithShares(uint256 units, uint256 shares) public {
@@ -139,12 +141,14 @@ contract OtherFunctionsTest is BaseTest {
 
         // TODO: sharesPrice != 1
         vm.prank(lender);
-        morphoV2.withdraw(obligation, 0, shares, lender);
+        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, 0, shares, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - shares, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
         assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
+        assertEq(returnedObligationUnits, shares, "returned obligation units");
+        assertEq(returnedShares, shares, "returned shares");
     }
 
     function testConsume(address user, bytes32 group, uint256 amount) public {

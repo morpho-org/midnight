@@ -16,6 +16,7 @@ jobs:
         conf:
           - Hasher
           - MorphoV2
+          - SharePrice
 
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +29,6 @@ jobs:
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc-0.8.28
       - name: Verify ${{ matrix.conf }}
-        run: certoraRun certora/${{ matrix.conf }}.conf
+        run: certoraRun certora/confs/${{ matrix.conf }}.conf
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}
