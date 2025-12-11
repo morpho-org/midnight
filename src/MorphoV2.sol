@@ -471,7 +471,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares
-    ) internal returns (uint256, uint256, uint256, uint256) {
+    ) internal view returns (uint256, uint256, uint256, uint256) {
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
             sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
