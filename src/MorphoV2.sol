@@ -489,6 +489,6 @@ contract MorphoV2 is IMorphoV2 {
             buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
+        return (buyerAssets, obligationUnits, obligationShares, sellerAssets);
     }
-    return (buyerAssets, obligationUnits, obligationShares, sellerAssets);
 }
