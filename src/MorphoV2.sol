@@ -33,6 +33,7 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 obligationId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 obligationId => mapping(address collateralToken => uint256))) public
         collateralOf;
+    mapping(uint256 minBorrowAmount => bool authorized) public authorizedMinBorrowAmount;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
@@ -103,6 +104,12 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetTradingFeeRecipient(recipient);
     }
 
+    function setAuthorizedMinBorrowAmount(uint256 minBorrowAmount, bool authorized) external {
+        require(msg.sender == owner, "Only owner");
+        authorizedMinBorrowAmount[minBorrowAmount] = authorized;
+        emit EventsLib.SetAuthorizedMinBorrowAmount(minBorrowAmount, authorized);
+    }
+
     /// ENTRY-POINTS ///
 
     /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
@@ -139,6 +146,7 @@ contract MorphoV2 is IMorphoV2 {
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
+        require(authorizedMinBorrowAmount[offer.obligation.minBorrowAmount], "min borrow amount not authorized");
         bytes32 id = toId(offer.obligation);
 
         (
@@ -274,7 +282,10 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
-
+        require(
+            debtOf[seller][id] == 0 || debtOf[seller][id] >= offer.obligation.minBorrowAmount,
+            "min borrow amount not met"
+        );
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
@@ -310,6 +321,9 @@ contract MorphoV2 is IMorphoV2 {
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
+        require(
+            debtOf[onBehalf][id] == 0 || debtOf[onBehalf][id] >= obligation.minBorrowAmount, "min borrow amount not met"
+        );
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
 
@@ -415,6 +429,9 @@ contract MorphoV2 is IMorphoV2 {
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
 
+        require(
+            debtOf[borrower][id] == 0 || debtOf[borrower][id] >= obligation.minBorrowAmount, "min borrow amount not met"
+        );
         return seizures;
     }
 
