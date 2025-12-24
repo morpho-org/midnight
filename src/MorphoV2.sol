@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF, TIME_TO_BATCH_LIQUIDATION} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -33,6 +33,7 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 obligationId => uint256) public totalShares;
     mapping(address user => mapping(bytes32 obligationId => mapping(address collateralToken => uint256))) public
         collateralOf;
+    mapping(bytes32 obligationId => mapping(address collateralToken => uint256)) public totalCollateralOf;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
@@ -319,6 +320,7 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] += assets;
+        totalCollateralOf[id][collateral] += assets;
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateral, assets, onBehalf);
 
@@ -331,6 +333,7 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] -= assets;
+        totalCollateralOf[id][collateral] -= assets;
 
         require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
 
@@ -397,6 +400,7 @@ contract MorphoV2 is IMorphoV2 {
             totalRepaid += seizure.repaid;
             address collateralToken = obligation.collaterals[seizure.collateralIndex].token;
             collateralOf[borrower][id][collateralToken] -= seizure.seized;
+            totalCollateralOf[id][collateralToken] -= seizure.seized;
         }
 
         withdrawable[id] += totalRepaid;
@@ -412,6 +416,61 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         if (data.length > 0) ICallbacks(msg.sender).onLiquidate(seizures, borrower, msg.sender, data);
+
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
+
+        return seizures;
+    }
+
+    /// @dev On each seizure at least one of `repaid` or `seized` should be equal to zero.
+    /// @dev Obligation can be batch-liquidated if the time since maturity is greater than TIME_TO_BATCH_LIQUIDATION.
+    /// @param obligation The obligation.
+    /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
+    /// obligation's collateral assets.
+    /// @param data Arbitrary data to pass to the callback. Pass empty data if not needed.
+    /// @return A collection of the actual amounts of debt repaid or asset seized with the collateral index.
+    function batchLiquidate(Obligation memory obligation, Seizure[] memory seizures, bytes calldata data)
+        external
+        returns (Seizure[] memory)
+    {
+        bytes32 id = toId(obligation);
+
+        require(block.timestamp > obligation.maturity + TIME_TO_BATCH_LIQUIDATION, "obligation is not batch liquidatable");
+
+        uint256 lif = MAX_LIF;
+        uint256 totalRepaid;
+
+        for (uint256 i = 0; i < seizures.length; i++) {
+            Seizure memory seizure = seizures[i];
+            require(UtilsLib.atMostOneNonZero(seizure.repaid, seizure.seized), "INCONSISTENT_INPUT");
+
+            uint256 price = IOracle(obligation.collaterals[seizure.collateralIndex].oracle).price();
+
+            if (seizure.seized > 0) {
+                seizure.repaid =
+                    seizure.seized.mulDivUp(WAD, lif).mulDivUp(price, ORACLE_PRICE_SCALE);
+            } else {
+                seizure.seized =
+                    seizure.repaid.mulDivDown(ORACLE_PRICE_SCALE, price).mulDivDown(lif, WAD);
+            }
+
+            totalRepaid += seizure.repaid;
+            address collateralToken = obligation.collaterals[seizure.collateralIndex].token;
+            totalCollateralOf[id][collateralToken] -= seizure.seized;
+        }
+
+        withdrawable[id] += totalRepaid;
+
+        emit EventsLib.BatchLiquidate(msg.sender, id, seizures, totalRepaid);
+
+        for (uint256 i = 0; i < seizures.length; i++) {
+            Seizure memory seizure = seizures[i];
+            SafeTransferLib.safeTransfer(
+                obligation.collaterals[seizure.collateralIndex].token, msg.sender, seizure.seized
+            );
+        }
+
+        if (data.length > 0) ICallbacks(msg.sender).onBatchLiquidate(seizures, msg.sender, data);
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
 

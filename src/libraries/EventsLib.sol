@@ -58,6 +58,13 @@ library EventsLib {
         uint256 badDebt
     );
 
+    event BatchLiquidate(
+        address indexed caller,
+        bytes32 indexed obligationId,
+        Seizure[] seizures,
+        uint256 totalRepaid
+    );
+
     event Consume(address indexed user, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed user, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);
