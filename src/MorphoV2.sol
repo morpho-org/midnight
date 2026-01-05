@@ -19,6 +19,14 @@ import {
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
+/// @dev Used internally to avoid stack too deep.
+struct Callbacks {
+    address buyerCallback;
+    bytes buyerCallbackData;
+    address sellerCallback;
+    bytes sellerCallbackData;
+}
+
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
@@ -142,16 +150,19 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = toId(offer.obligation);
 
+        Callbacks memory callbacks;
+        address buyer;
+        address seller;
         (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData
+            buyer,
+            callbacks.buyerCallback,
+            callbacks.buyerCallbackData,
+            seller,
+            callbacks.sellerCallback,
+            callbacks.sellerCallbackData
         ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+                ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
+                : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
         uint256 offerTick = offer.expiry != offer.start
             ? offer.startTick + (offer.expiryTick - offer.startTick) * (block.timestamp - offer.start)
@@ -178,8 +189,23 @@ contract MorphoV2 is IMorphoV2 {
             );
         }
 
-        (buyerAssets, obligationUnits, obligationShares, sellerAssets) =
-            calculateAssets(id, buyerPrice, sellerPrice, buyerAssets, sellerAssets, obligationUnits, obligationShares);
+        if (buyerAssets > 0) {
+            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (sellerAssets > 0) {
+            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (obligationUnits > 0) {
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else {
+            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        }
 
         if (offer.assets > 0) {
             require(
@@ -228,8 +254,8 @@ contract MorphoV2 is IMorphoV2 {
             sellerIsBorrower
         );
 
-        if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback)
+        if (callbacks.buyerCallback != address(0)) {
+            ICallbacks(callbacks.buyerCallback)
                 .onBuy(
                     offer.obligation,
                     buyer,
@@ -237,7 +263,7 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    buyerCallbackData
+                    callbacks.buyerCallbackData
                 );
         }
 
@@ -246,8 +272,8 @@ contract MorphoV2 is IMorphoV2 {
         );
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
 
-        if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback)
+        if (callbacks.sellerCallback != address(0)) {
+            ICallbacks(callbacks.sellerCallback)
                 .onSell(
                     offer.obligation,
                     seller,
@@ -255,7 +281,7 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    sellerCallbackData
+                    callbacks.sellerCallbackData
                 );
         }
 
@@ -471,35 +497,5 @@ contract MorphoV2 is IMorphoV2 {
         address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
-    }
-
-    // Separated to avoid stack too deep error
-    function calculateAssets(
-        bytes32 id,
-        uint256 buyerPrice,
-        uint256 sellerPrice,
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares
-    ) internal returns (uint256, uint256, uint256, uint256) {
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-        }
-        return (buyerAssets, obligationUnits, obligationShares, sellerAssets);
     }
 }
