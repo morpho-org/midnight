@@ -159,8 +159,8 @@ contract MorphoV2 is IMorphoV2 {
             callbacks.sellerCallback,
             callbacks.sellerCallbackData
         ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+                ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
+                : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
         uint256 offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
