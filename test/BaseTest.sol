@@ -9,8 +9,9 @@ import {MathLib} from "../src/libraries/MathLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
+import {MIN_TICK} from "../src/libraries/TickLib.sol";
 
-uint256 constant MAX_TEST_AMOUNT = 1e36;
+uint256 constant MAX_TEST_AMOUNT = 1e28;
 
 abstract contract BaseTest is Test {
     using MathLib for uint256;
@@ -110,8 +111,8 @@ abstract contract BaseTest is Test {
         lenderOffer.assets = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.startTick = type(uint256).max;
-        lenderOffer.expiryTick = type(uint256).max;
+        lenderOffer.startTick = MIN_TICK;
+        lenderOffer.expiryTick = MIN_TICK;
 
         collateralize(obligation, otherBorrower, units);
         take(0, 0, units, 0, otherBorrower, lenderOffer);
@@ -131,8 +132,8 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.startTick = type(uint256).max;
-        badBorrowerOffer.expiryTick = type(uint256).max;
+        badBorrowerOffer.startTick = MIN_TICK;
+        badBorrowerOffer.expiryTick = MIN_TICK;
 
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
@@ -219,8 +220,8 @@ abstract contract BaseTest is Test {
         borrowerOffer.assets = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
-        borrowerOffer.startTick = type(uint256).max;
-        borrowerOffer.expiryTick = type(uint256).max;
+        borrowerOffer.startTick = MIN_TICK;
+        borrowerOffer.expiryTick = MIN_TICK;
 
         morphoV2.take(
             0,
