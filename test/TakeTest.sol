@@ -10,6 +10,7 @@ import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
+import {console} from "forge-std/console.sol";
 
 contract TakeTest is BaseTest {
     using MathLib for uint256;
@@ -1312,6 +1313,23 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets)
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+    }
+
+    function testMinCollateral(uint256 assets, uint256 minCollateral) public {
+        assets = bound(assets, 0, maxAssets);
+        vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) > 0);
+
+        minCollateral =
+            bound(minCollateral, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, type(uint256).max);
+        borrowerOffer.obligation.minCollateral = minCollateral;
+        collateralize(borrowerOffer.obligation, borrower, assets);
+        deal(address(loanToken), lender, assets);
+
+        console.log("minCollateral", minCollateral);
+        console.log("collateral quoted in loan token", assets.mulDivUp(WAD, obligation.collaterals[0].lltv));
+
+        vm.expectRevert("Seller has insufficient collateral");
+        take(assets, 0, 0, 0, lender, borrowerOffer);
     }
 }
 
