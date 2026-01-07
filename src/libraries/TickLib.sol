@@ -14,7 +14,7 @@ int256 constant X96_INT = 1 << 96;
 int256 constant LN_1_025_DELTA_X96 = 1956350323211722979786136201;
 // ln(2)x96
 int256 constant LN2_X96 = 54916777467707473351141471128;
-// (1/log2(1.025))x64
+// (1/log2(1.025))x96
 int256 constant INV_LOG2_1_025_X96 = 2224016485364590939422807110544;
 
 library TickLib {
@@ -56,60 +56,60 @@ library TickLib {
             mpow = roi << (127 - msb);
         }
 
-        int256 log2roiX96 = (int256(msb) - 96) << 96;
+        int256 log2roiX10 = (int256(msb) - 96) << 10;
 
         assembly ("memory-safe") {
             mpow := shr(127, mul(mpow, mpow))
             let highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(95, highbit))
+            log2roiX10 := or(log2roiX10, shl(9, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(94, highbit))
+            log2roiX10 := or(log2roiX10, shl(8, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(93, highbit))
+            log2roiX10 := or(log2roiX10, shl(7, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(92, highbit))
+            log2roiX10 := or(log2roiX10, shl(6, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(91, highbit))
+            log2roiX10 := or(log2roiX10, shl(5, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(90, highbit))
+            log2roiX10 := or(log2roiX10, shl(4, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(89, highbit))
+            log2roiX10 := or(log2roiX10, shl(3, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(88, highbit))
+            log2roiX10 := or(log2roiX10, shl(2, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(87, highbit))
+            log2roiX10 := or(log2roiX10, shl(1, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX96 := or(log2roiX96, shl(86, highbit))
+            log2roiX10 := or(log2roiX10, highbit)
         }
 
-        return (log2roiX96 * INV_LOG2_1_025_X96 + (1 << 191)) >> 192;
+        return (log2roiX10 * INV_LOG2_1_025_X96 + (1 << 105)) >> 106;
     }
 
     function expX96(uint256 x) private pure returns (uint256) {
