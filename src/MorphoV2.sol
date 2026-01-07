@@ -254,6 +254,7 @@ contract MorphoV2 is IMorphoV2 {
                     buyerCallbackData
                 );
         }
+        require(hasMinCollateral(offer.obligation, buyer), "Buyer has insufficient collateral");
 
         SafeTransferLib.safeTransferFrom(
             offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
@@ -275,7 +276,6 @@ contract MorphoV2 is IMorphoV2 {
 
         require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
         require(hasMinCollateral(offer.obligation, seller), "Seller has insufficient collateral");
-        require(hasMinCollateral(offer.obligation, buyer), "Buyer has insufficient collateral");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
