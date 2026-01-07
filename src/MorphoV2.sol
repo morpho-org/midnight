@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF, DELTA, P_0} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
+import {TickLib, MIN_TICK, MAX_TICK} from "./libraries/TickLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -134,8 +135,10 @@ contract MorphoV2 is IMorphoV2 {
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
         require(offer.start < offer.expiry || offer.expiryTick == offer.startTick, "inconsistent prices");
-        require(offer.startTick < 10_000 || offer.startTick == type(uint256).max, "start tick too high");
-        require(offer.expiryTick < 10_000 || offer.expiryTick == type(uint256).max, "expiry tick too high");
+        require(
+            MAX_TICK >= offer.startTick && offer.startTick >= offer.expiryTick && offer.expiryTick >= MIN_TICK,
+            "incorrect ticks"
+        );
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
@@ -153,11 +156,18 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerTick = offer.expiry != offer.start
-            ? offer.startTick + (offer.expiryTick - offer.startTick) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
-            : offer.startTick;
-        uint256 offerPrice = tickToPrice(offerTick);
+        uint256 offerPrice;
+        if (offer.startTick != offer.expiryTick && offer.expiry != offer.start) {
+            uint256 startRoi = TickLib.tickToRoi(offer.startTick);
+            uint256 expiryRoi = TickLib.tickToRoi(offer.expiryTick);
+            offerPrice = TickLib.tickToPrice(
+                TickLib.roiToTick(
+                    startRoi - (startRoi - expiryRoi) * (block.timestamp - offer.start) / (offer.expiry - offer.start)
+                )
+            );
+        } else {
+            offerPrice = TickLib.tickToPrice(offer.startTick);
+        }
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
         uint256 buyerPrice;
@@ -445,13 +455,8 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW ///
 
-    function tickToPrice(uint256 tick) public pure returns (uint256) {
-        if (tick == type(uint256).max) {
-            return WAD;
-        } else {
-            return
-                WAD.mulDivDown(WAD, WAD + (WAD.mulDivDown(WAD - P_0, P_0)).mulDivDown(MathLib.wExp(DELTA * tick), WAD));
-        }
+    function tickToPrice(int256 tick) public pure returns (uint256) {
+        return TickLib.tickToPrice(tick);
     }
 
     function toId(Obligation memory obligation) public pure returns (bytes32) {
@@ -478,6 +483,8 @@ contract MorphoV2 is IMorphoV2 {
             return debt <= maxDebt;
         }
     }
+
+    /// INTERNAL ///
 
     function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));

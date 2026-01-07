@@ -167,21 +167,4 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.shuffleSession();
         assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
-
-    function testTickToPrice() public view {
-        uint256 P_0 = 0.9999999e18;
-        assertEq(morphoV2.tickToPrice(0), P_0, "tick 0");
-
-        uint256 previousReturn = _return(P_0);
-        for (uint256 i = 1; i <= 1000; i++) {
-            assertApproxEqRel(
-                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(WAD + DELTA, WAD), 0.05e18, "tick i"
-            );
-            previousReturn = _return(morphoV2.tickToPrice(i));
-        }
-    }
-
-    function _return(uint256 price) internal pure returns (uint256) {
-        return (WAD - price).mulDivDown(WAD, price);
-    }
 }
