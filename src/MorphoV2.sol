@@ -274,6 +274,8 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
+        require(hasMinCollateral(offer.obligation, seller), "Seller has insufficient collateral");
+        require(hasMinCollateral(offer.obligation, buyer), "Buyer has insufficient collateral");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -320,6 +322,14 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[onBehalf][id][collateral] += assets;
 
+        uint256 collateralIndex = 0;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            if (obligation.collaterals[i].token == collateral) {
+                collateralIndex = i;
+                break;
+            }
+        }
+
         emit EventsLib.SupplyCollateral(msg.sender, id, collateral, assets, onBehalf);
 
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
@@ -331,6 +341,14 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] -= assets;
+
+        uint256 collateralIndex = 0;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            if (obligation.collaterals[i].token == collateral) {
+                collateralIndex = i;
+                break;
+            }
+        }
 
         require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
 
@@ -467,6 +485,19 @@ contract MorphoV2 is IMorphoV2 {
             }
             return debt <= maxDebt;
         }
+    }
+
+    function hasMinCollateral(Obligation memory obligation, address borrower) public view returns (bool) {
+        bytes32 id = toId(obligation);
+        uint256 totalCollateral = 0;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            Collateral memory _collateral = obligation.collaterals[i];
+            totalCollateral += collateralOf[borrower][id][_collateral.token].mulDivDown(
+                IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE
+            );
+        }
+        uint256 debt = debtOf[borrower][id];
+        return (debt == 0) || (totalCollateral >= obligation.minCollateral);
     }
 
     function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
