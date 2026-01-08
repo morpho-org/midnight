@@ -1319,6 +1319,7 @@ contract TakeTest is BaseTest {
         assets = bound(assets, 0, maxAssets.mulDivDown(obligation.collaterals[0].lltv, WAD));
         vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) > 0);
 
+        vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) < maxAssets);
         minCollateral = bound(minCollateral, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, maxAssets);
         borrowerOffer.obligation.minCollateral = minCollateral;
         collateralize(borrowerOffer.obligation, borrower, assets);
