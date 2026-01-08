@@ -351,6 +351,7 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        require(hasMinCollateral(obligation, onBehalf), "User has insufficient collateral");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf);
 
@@ -489,6 +490,10 @@ contract MorphoV2 is IMorphoV2 {
 
     function hasMinCollateral(Obligation memory obligation, address borrower) public view returns (bool) {
         bytes32 id = toId(obligation);
+        if (debtOf[borrower][id] == 0) {
+            return true;
+        }
+
         uint256 totalCollateral = 0;
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             Collateral memory _collateral = obligation.collaterals[i];
@@ -496,8 +501,7 @@ contract MorphoV2 is IMorphoV2 {
                 IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE
             );
         }
-        uint256 debt = debtOf[borrower][id];
-        return (debt == 0) || (totalCollateral >= obligation.minCollateral);
+        return totalCollateral >= obligation.minCollateral;
     }
 
     function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
