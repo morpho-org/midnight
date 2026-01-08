@@ -31,6 +31,7 @@ struct Offer {
     bytes32 session;
     address callback;
     bytes callbackData;
+    address matching;
 }
 
 struct Signature {

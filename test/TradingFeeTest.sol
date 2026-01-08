@@ -7,7 +7,7 @@ import {MathLib} from "../src/libraries/MathLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MIN_TICK, MAX_TICK} from "../src/MorphoV2.sol";
 
 contract TradingFeeTest is BaseTest {
     using MathLib for uint256;

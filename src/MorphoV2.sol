@@ -18,15 +18,8 @@ import {
 } from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
-import {TickLib, MIN_TICK, MAX_TICK} from "./libraries/TickLib.sol";
-
-/// @dev Used internally to avoid stack too deep.
-struct Callbacks {
-    address buyerCallback;
-    bytes buyerCallbackData;
-    address sellerCallback;
-    bytes sellerCallbackData;
-}
+import {IMatching} from "./interfaces/IMatching.sol";
+import {MIN_TICK, MAX_TICK} from "./Matching.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -61,10 +54,14 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    /// @dev Matching contract for tick/price conversions.
+    IMatching public matching;
+
     /// CONSTRUCTOR ///
 
-    constructor() {
+    constructor(address _matching) {
         owner = msg.sender;
+        matching = IMatching(_matching);
         emit EventsLib.Constructor(owner);
     }
 
@@ -153,32 +150,18 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = toId(offer.obligation);
 
-        Callbacks memory callbacks;
-        address buyer;
-        address seller;
         (
-            buyer,
-            callbacks.buyerCallback,
-            callbacks.buyerCallbackData,
-            seller,
-            callbacks.sellerCallback,
-            callbacks.sellerCallbackData
+            address buyer,
+            address buyerCallback,
+            bytes memory buyerCallbackData,
+            address seller,
+            address sellerCallback,
+            bytes memory sellerCallbackData
         ) = offer.buy
-                ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-                : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
+            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice;
-        if (offer.startTick != offer.expiryTick && offer.expiry != offer.start) {
-            uint256 startRoi = TickLib.tickToRoi(offer.startTick);
-            uint256 expiryRoi = TickLib.tickToRoi(offer.expiryTick);
-            offerPrice = TickLib.tickToPrice(
-                TickLib.roiToTick(
-                    startRoi - (startRoi - expiryRoi) * (block.timestamp - offer.start) / (offer.expiry - offer.start)
-                )
-            );
-        } else {
-            offerPrice = TickLib.tickToPrice(offer.startTick);
-        }
+        uint256 offerPrice = matching.getPrice(offer);
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
         uint256 buyerPrice;
@@ -264,8 +247,8 @@ contract MorphoV2 is IMorphoV2 {
             sellerIsBorrower
         );
 
-        if (callbacks.buyerCallback != address(0)) {
-            ICallbacks(callbacks.buyerCallback)
+        if (buyerCallback != address(0)) {
+            ICallbacks(buyerCallback)
                 .onBuy(
                     offer.obligation,
                     buyer,
@@ -273,7 +256,7 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    callbacks.buyerCallbackData
+                    buyerCallbackData
                 );
         }
 
@@ -282,8 +265,8 @@ contract MorphoV2 is IMorphoV2 {
         );
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
 
-        if (callbacks.sellerCallback != address(0)) {
-            ICallbacks(callbacks.sellerCallback)
+        if (sellerCallback != address(0)) {
+            ICallbacks(sellerCallback)
                 .onSell(
                     offer.obligation,
                     seller,
@@ -291,7 +274,7 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    callbacks.sellerCallbackData
+                    sellerCallbackData
                 );
         }
 
@@ -466,8 +449,8 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW ///
 
-    function tickToPrice(int256 tick) public pure returns (uint256) {
-        return TickLib.tickToPrice(tick);
+    function tickToPrice(int256 tick) public view returns (uint256) {
+        return matching.tickToPrice(tick);
     }
 
     function toId(Obligation memory obligation) public pure returns (bytes32) {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Signature} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
+import {Matching} from "../src/Matching.sol";
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 
@@ -16,7 +17,7 @@ function toEthSignedMessageHash(bytes32 messageHash) pure returns (bytes32 diges
     }
 }
 
-contract SignatureTest is Test, MorphoV2 {
+contract SignatureTest is Test, MorphoV2(address(new Matching())) {
     function testFormat(bytes32 root) public pure {
         bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
         assertEq(toEthSignedMessageHash(root), messageHash);

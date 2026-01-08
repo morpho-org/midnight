@@ -8,8 +8,8 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
-import {MorphoV2} from "../src/MorphoV2.sol";
-import {MIN_TICK} from "../src/libraries/TickLib.sol";
+import {MorphoV2, MIN_TICK, MAX_TICK} from "../src/MorphoV2.sol";
+import {Matching} from "../src/Matching.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e28;
 
@@ -31,7 +31,8 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public virtual {
-        morphoV2 = new MorphoV2();
+        Matching matching = new Matching();
+        morphoV2 = new MorphoV2(address(matching));
 
         morphoV2.setFeeSetter(address(this));
 
@@ -73,7 +74,7 @@ abstract contract BaseTest is Test {
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
         uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
-        collateralToken1.approve(address(morphoV2), collateral);
+        // note: collateral tokens are already approved in setup() with type(uint256).max
         morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, _borrower);
     }
 
