@@ -85,19 +85,35 @@ abstract contract BaseTest is Test {
         address taker,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
-        return morphoV2.take(
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
-            taker,
-            offer,
-            sig([offer]),
-            root([offer]),
-            proof([offer]),
-            address(0),
-            hex""
-        );
+        if (offer.buy) {
+            return morphoV2.sell(
+                buyerAssets,
+                sellerAssets,
+                obligationUnits,
+                obligationShares,
+                taker,
+                offer,
+                sig([offer]),
+                root([offer]),
+                proof([offer]),
+                address(0),
+                hex""
+            );
+        } else {
+            return morphoV2.buy(
+                buyerAssets,
+                sellerAssets,
+                obligationUnits,
+                obligationShares,
+                taker,
+                offer,
+                sig([offer]),
+                root([offer]),
+                proof([offer]),
+                address(0),
+                hex""
+            );
+        }
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -222,7 +238,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.startPrice = 1 ether;
         borrowerOffer.expiryPrice = 1 ether;
 
-        morphoV2.take(
+        morphoV2.buy(
             0,
             0,
             obligationUnits,

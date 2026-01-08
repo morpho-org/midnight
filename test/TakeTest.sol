@@ -1142,7 +1142,7 @@ contract TakeTest is BaseTest {
 
     function testTakeWrongRoot() public {
         vm.expectRevert("invalid signature");
-        morphoV2.take(
+        morphoV2.sell(
             100,
             0,
             0,
@@ -1159,7 +1159,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("invalid signature");
-        morphoV2.take(
+        morphoV2.sell(
             100,
             0,
             0,
@@ -1177,7 +1177,7 @@ contract TakeTest is BaseTest {
     function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
         vm.expectRevert("invalid proof");
-        morphoV2.take(
+        morphoV2.sell(
             100, 0, 0, 0, borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof, address(0), hex""
         );
     }
@@ -1186,7 +1186,7 @@ contract TakeTest is BaseTest {
         vm.assume(proof.length >= 1);
         vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
-        morphoV2.take(
+        morphoV2.sell(
             100,
             0,
             0,
@@ -1207,7 +1207,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, assets.mulDivDown(WAD, lenderOffer.startPrice));
         lenderOffer.assets = assets;
 
-        morphoV2.take(
+        morphoV2.sell(
             assets,
             0,
             0,
@@ -1252,7 +1252,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, callback, collateral);
 
-        morphoV2.take(
+        morphoV2.sell(
             assets,
             0,
             0,
@@ -1297,7 +1297,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, assets);
 
-        morphoV2.take(
+        morphoV2.buy(
             assets,
             0,
             0,

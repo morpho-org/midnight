@@ -105,6 +105,72 @@ contract MorphoV2 is IMorphoV2 {
 
     /// ENTRY-POINTS ///
 
+    function buy(
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address buyer,
+        Offer memory offer,
+        Signature memory sig,
+        bytes32 root,
+        bytes32[] memory proof,
+        address takerCallback,
+        bytes memory takerCallbackData
+    ) external returns (uint256, uint256, uint256, uint256) {
+        require(!offer.buy, "offer must be a buy offer");
+        require(_signer(root, sig) == offer.maker, "invalid signature");
+        require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(offer.session == session[offer.maker], "invalid session");
+
+        return take(
+            buyerAssets,
+            sellerAssets,
+            obligationUnits,
+            obligationShares,
+            buyer,
+            offer.maker,
+            offer,
+            takerCallback,
+            takerCallbackData,
+            offer.callback,
+            offer.callbackData
+        );
+    }
+
+    function sell(
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address seller,
+        Offer memory offer,
+        Signature memory sig,
+        bytes32 root,
+        bytes32[] memory proof,
+        address takerCallback,
+        bytes memory takerCallbackData
+    ) external returns (uint256, uint256, uint256, uint256) {
+        require(offer.buy, "offer must be a sell offer");
+        require(_signer(root, sig) == offer.maker, "invalid signature");
+        require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(offer.session == session[offer.maker], "invalid session");
+
+        return take(
+            buyerAssets,
+            sellerAssets,
+            obligationUnits,
+            obligationShares,
+            offer.maker,
+            seller,
+            offer,
+            offer.callback,
+            offer.callbackData,
+            takerCallback,
+            takerCallbackData
+        );
+    }
+
     /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
@@ -115,14 +181,14 @@ contract MorphoV2 is IMorphoV2 {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
-        address taker,
+        address buyer,
+        address seller,
         Offer memory offer,
-        Signature memory sig,
-        bytes32 root,
-        bytes32[] memory proof,
-        address takerCallback,
-        bytes memory takerCallbackData
-    ) public returns (uint256, uint256, uint256, uint256) {
+        address buyerCallback,
+        bytes memory buyerCallbackData,
+        address sellerCallback,
+        bytes memory sellerCallbackData
+    ) internal returns (uint256, uint256, uint256, uint256) {
         require(
             UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
             "inconsistent input"
@@ -135,22 +201,8 @@ contract MorphoV2 is IMorphoV2 {
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.obligation.chainId == block.chainid, "chain id mismatch");
         require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
-        require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(_signer(root, sig) == offer.maker, "invalid signature");
-        require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.session == session[offer.maker], "invalid session");
+        require(buyer != seller, "buyer and seller cannot be the same");
         bytes32 id = toId(offer.obligation);
-
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData
-        ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
         uint256 offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
@@ -237,7 +289,8 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets,
             obligationUnits,
             obligationShares,
-            taker,
+            buyer,
+            seller,
             buyerIsLender,
             sellerIsBorrower
         );

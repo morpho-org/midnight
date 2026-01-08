@@ -13,13 +13,14 @@ library EventsLib {
     event SetTradingFeeRecipient(address indexed recipient);
 
     event Take(
-        address indexed caller,
+        address caller,
         bytes32 indexed obligationId,
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
-        address indexed taker,
+        address indexed buyer,
+        address indexed seller,
         bool buyerIsLender,
         bool sellerIsBorrower
     );
