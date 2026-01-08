@@ -1315,21 +1315,38 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
 
-    function testMinCollateral(uint256 assets, uint256 minCollateral) public {
-        assets = bound(assets, 0, maxAssets);
+    function testMinCollateralSeller(uint256 assets, uint256 minCollateral) public {
+        assets = bound(assets, 0, maxAssets.mulDivDown(obligation.collaterals[0].lltv, WAD));
         vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) > 0);
 
-        minCollateral =
-            bound(minCollateral, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, type(uint256).max);
+        minCollateral = bound(minCollateral, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, maxAssets);
         borrowerOffer.obligation.minCollateral = minCollateral;
         collateralize(borrowerOffer.obligation, borrower, assets);
         deal(address(loanToken), lender, assets);
 
-        console.log("minCollateral", minCollateral);
-        console.log("collateral quoted in loan token", assets.mulDivUp(WAD, obligation.collaterals[0].lltv));
-
         vm.expectRevert("Seller has insufficient collateral");
         take(assets, 0, 0, 0, lender, borrowerOffer);
+    }
+
+    function testMinCollateralWithdrawCollateral(uint256 assets) public {
+        assets = bound(assets, 1, maxAssets);
+
+        uint256 minCollateral = assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 2; // health threshold
+        borrowerOffer.obligation.minCollateral = minCollateral;
+        obligation.minCollateral = minCollateral;
+
+        collateralize(borrowerOffer.obligation, borrower, 2 * assets + 1);
+        deal(address(loanToken), lender, assets);
+        bytes32 newId = toId(borrowerOffer.obligation);
+
+        take(assets, 0, 0, 0, lender, borrowerOffer);
+
+        uint256 removedCollateral = morphoV2.collateralOf(
+                borrower, newId, borrowerOffer.obligation.collaterals[0].token
+            ) - assets.mulDivUp(WAD, obligation.collaterals[0].lltv) - 1;
+
+        vm.expectRevert("User has insufficient collateral");
+        morphoV2.withdrawCollateral(obligation, obligation.collaterals[0].token, removedCollateral, borrower);
     }
 }
 
