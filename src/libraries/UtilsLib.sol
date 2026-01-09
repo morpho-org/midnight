@@ -31,9 +31,12 @@ library UtilsLib {
         }
     }
 
-    function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    /// @dev Returns x clamped between min and max.
+    /// @dev Doesn't behave well if min > max.
+    function bound(uint256 x, uint256 min, uint256 max) internal pure returns (uint256 z) {
         assembly {
-            z := xor(x, mul(xor(x, y), gt(y, x)))
+            z := xor(x, mul(xor(x, max), lt(max, x)))
+            z := xor(z, mul(xor(z, min), gt(min, z)))
         }
     }
 

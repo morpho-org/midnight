@@ -160,12 +160,10 @@ contract MorphoV2 is IMorphoV2 {
         require(offerPrice <= WAD, "price too high");
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 tradingFee = UtilsLib.max(
-            UtilsLib.min(
-                _tradingFeeParams.maxTradingFee,
-                _tradingFeeParams.slope * UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp)
-            ),
-            _tradingFeeParams.minTradingFee
+        uint256 tradingFee = UtilsLib.bound(
+            _tradingFeeParams.slope * UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp),
+            _tradingFeeParams.minTradingFee,
+            _tradingFeeParams.maxTradingFee
         );
 
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
