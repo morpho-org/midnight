@@ -68,7 +68,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee = bound(tradingFee, 0, 0.5 ether);
         uint256 interestCutLimit = WAD - 1;
         sellerPrice = bound(sellerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -88,7 +88,7 @@ contract TradingFeeTest is BaseTest {
         uint256 interestCutLimit = WAD - 1;
         buyerPrice =
             bound(buyerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD + tradingFee, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -109,7 +109,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee = bound(tradingFee, 0, 0.5 ether);
         uint256 interestCutLimit = WAD - 1;
         sellerPrice = bound(sellerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -129,7 +129,7 @@ contract TradingFeeTest is BaseTest {
         uint256 interestCutLimit = WAD - 1;
         buyerPrice =
             bound(buyerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD + tradingFee, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -150,7 +150,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee = bound(tradingFee, 0, 0.5 ether);
         uint256 interestCutLimit = WAD - 1;
         sellerPrice = bound(sellerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -173,7 +173,7 @@ contract TradingFeeTest is BaseTest {
         uint256 interestCutLimit = WAD - 1;
         buyerPrice =
             bound(buyerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD + tradingFee, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -195,7 +195,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee = bound(tradingFee, 0, 0.5 ether);
         uint256 interestCutLimit = WAD - 1;
         sellerPrice = bound(sellerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -218,7 +218,7 @@ contract TradingFeeTest is BaseTest {
         uint256 interestCutLimit = WAD - 1;
         buyerPrice =
             bound(buyerPrice, 0.5e18, interestCutLimit.mulDivDown(WAD + tradingFee, tradingFee + interestCutLimit));
-        morphoV2.setTradingFee(id, tradingFee, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, tradingFee, 0.01 ether);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -249,9 +249,9 @@ contract TradingFeeTest is BaseTest {
         public
     {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.5 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         sellerPrice = bound(sellerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 1000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -271,10 +271,10 @@ contract TradingFeeTest is BaseTest {
         public
     {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.1 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         buyerPrice = bound(buyerPrice, interestCutLimit, WAD);
         buyerPrice = bound(buyerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 100_000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -292,9 +292,9 @@ contract TradingFeeTest is BaseTest {
         public
     {
         sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.1 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         sellerPrice = bound(sellerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 100_000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -313,10 +313,10 @@ contract TradingFeeTest is BaseTest {
         public
     {
         sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.1 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         buyerPrice = bound(buyerPrice, interestCutLimit, WAD);
         buyerPrice = bound(buyerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 1000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -337,9 +337,9 @@ contract TradingFeeTest is BaseTest {
         uint256 obligationUnits
     ) public {
         obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.1 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         sellerPrice = bound(sellerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 1000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
 
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
@@ -364,7 +364,7 @@ contract TradingFeeTest is BaseTest {
         interestCutLimit = bound(interestCutLimit, 0, 0.3 ether);
         buyerPrice = bound(buyerPrice, interestCutLimit, WAD);
         buyerPrice = bound(buyerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 100_000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 0, 0);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 
@@ -385,9 +385,9 @@ contract TradingFeeTest is BaseTest {
         uint256 obligationShares
     ) public {
         obligationShares = bound(obligationShares, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.1 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         sellerPrice = bound(sellerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 1000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;
 
@@ -411,10 +411,10 @@ contract TradingFeeTest is BaseTest {
         uint256 obligationShares
     ) public {
         obligationShares = bound(obligationShares, 0, MAX_TEST_AMOUNT);
-        interestCutLimit = bound(interestCutLimit, 0, 0.3 ether);
+        interestCutLimit = bound(interestCutLimit, 0, 6341958396); // 20% apr
         buyerPrice = bound(buyerPrice, interestCutLimit, WAD);
         buyerPrice = bound(buyerPrice, 0.5e18, WAD);
-        morphoV2.setTradingFee(id, 100_000 ether, interestCutLimit);
+        morphoV2.setTradingFee(id, 0, 1 ether, interestCutLimit);
         lenderOffer.startPrice = buyerPrice;
         lenderOffer.expiryPrice = buyerPrice;
 

@@ -87,14 +87,15 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
-    function setTradingFee(bytes32 id, uint256 tradingFee, uint256 interestCutLimit) external {
+    function setTradingFee(bytes32 id, uint256 minTradingFee, uint256 maxTradingFee, uint256 slope) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(tradingFee <= type(uint128).max, "Trading fee too high");
-        require(interestCutLimit < WAD, "Interest cut limit too high");
-        // forge-lint: disable-next-item(unsafe-typecast) Safe cast because values are below type(uint128).max.
-        tradingFeeParams[id] =
-            TradingFeeParams({tradingFee: uint128(tradingFee), interestCutLimit: uint128(interestCutLimit)});
-        emit EventsLib.SetTradingFee(id, tradingFee, interestCutLimit);
+        require(minTradingFee <= type(uint64).max, "Min trading fee too high");
+        require(maxTradingFee <= type(uint64).max, "Max trading fee too high");
+        require(slope <= type(uint64).max, "Slope too high");
+        tradingFeeParams[id] = TradingFeeParams({
+            minTradingFee: uint64(minTradingFee), maxTradingFee: uint64(maxTradingFee), slope: uint64(slope)
+        });
+        emit EventsLib.SetTradingFee(id, uint64(minTradingFee), uint64(maxTradingFee), uint64(slope));
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -159,23 +160,16 @@ contract MorphoV2 is IMorphoV2 {
         require(offerPrice <= WAD, "price too high");
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 buyerPrice;
-        uint256 sellerPrice;
-        if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            );
-        } else {
-            sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
-        }
+        uint256 tradingFee = UtilsLib.max(
+            UtilsLib.min(
+                _tradingFeeParams.maxTradingFee,
+                _tradingFeeParams.slope * UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp)
+            ),
+            _tradingFeeParams.minTradingFee
+        );
+
+        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
+        uint256 sellerPrice = buyerPrice - tradingFee;
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
