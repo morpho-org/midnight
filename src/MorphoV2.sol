@@ -154,8 +154,6 @@ contract MorphoV2 is IMorphoV2 {
             obligationShares: obligationShares
         });
 
-        bytes32 id = toId(offer.obligation);
-
         (
             address buyer,
             address buyerCallback,
@@ -173,6 +171,7 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         require(offerPrice <= WAD, "price too high");
 
+        bytes32 id = toId(offer.obligation);
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
 
         {
