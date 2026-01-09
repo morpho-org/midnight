@@ -105,6 +105,13 @@ contract MorphoV2 is IMorphoV2 {
 
     /// ENTRY-POINTS ///
 
+    struct Assets {
+        uint256 buyerAssets;
+        uint256 sellerAssets;
+        uint256 obligationUnits;
+        uint256 obligationShares;
+    }
+
     /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
@@ -139,6 +146,14 @@ contract MorphoV2 is IMorphoV2 {
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
+
+        Assets memory assets = Assets({
+            buyerAssets: buyerAssets,
+            sellerAssets: sellerAssets,
+            obligationUnits: obligationUnits,
+            obligationShares: obligationShares
+        });
+
         bytes32 id = toId(offer.obligation);
 
         (
@@ -159,84 +174,90 @@ contract MorphoV2 is IMorphoV2 {
         require(offerPrice <= WAD, "price too high");
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 buyerPrice;
-        uint256 sellerPrice;
-        if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            );
-        } else {
-            sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
-        }
 
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        {
+            uint256 buyerPrice;
+            uint256 sellerPrice;
+            if (offer.buy) {
+                buyerPrice = offerPrice;
+                sellerPrice = UtilsLib.max(
+                    (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
+                    .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
+                    buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
+                );
+            } else {
+                sellerPrice = offerPrice;
+                buyerPrice = UtilsLib.min(
+                    sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
+                        + _tradingFeeParams.interestCutLimit,
+                    sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
+                );
+            }
+
+            if (buyerAssets > 0) {
+                assets.obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+                assets.sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+                assets.obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            } else if (sellerAssets > 0) {
+                assets.obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+                assets.buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+                assets.obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            } else if (obligationUnits > 0) {
+                assets.buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                assets.sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+                assets.obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            } else {
+                assets.obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+                assets.buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                assets.sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            }
         }
 
         if (offer.assets > 0) {
             require(
-                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= offer.assets,
+                (consumed[offer.maker][offer.group] += offer.buy ? assets.buyerAssets : assets.sellerAssets)
+                    <= offer.assets,
                 "consumed"
             );
         } else if (offer.obligationUnits > 0) {
-            require((consumed[offer.maker][offer.group] += obligationUnits) <= offer.obligationUnits, "consumed");
+            require((consumed[offer.maker][offer.group] += assets.obligationUnits) <= offer.obligationUnits, "consumed");
         } else {
-            require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
+            require(
+                (consumed[offer.maker][offer.group] += assets.obligationShares) <= offer.obligationShares, "consumed"
+            );
         }
 
         bool buyerIsLender = (debtOf[buyer][id] == 0);
         bool sellerIsBorrower = (sharesOf[seller][id] == 0);
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
-            sharesOf[buyer][id] += obligationShares;
-            debtOf[seller][id] += obligationUnits;
-            totalShares[id] += obligationShares;
-            totalUnits[id] += obligationUnits;
+            sharesOf[buyer][id] += assets.obligationShares;
+            debtOf[seller][id] += assets.obligationUnits;
+            totalShares[id] += assets.obligationShares;
+            totalUnits[id] += assets.obligationUnits;
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
-            sharesOf[buyer][id] += obligationShares;
-            sharesOf[seller][id] -= obligationShares;
+            sharesOf[buyer][id] += assets.obligationShares;
+            sharesOf[seller][id] -= assets.obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
-            debtOf[buyer][id] -= obligationUnits;
-            debtOf[seller][id] += obligationUnits;
+            debtOf[buyer][id] -= assets.obligationUnits;
+            debtOf[seller][id] += assets.obligationUnits;
         } else {
             // Borrower exits + lender exits.
-            debtOf[buyer][id] -= obligationUnits;
-            sharesOf[seller][id] -= obligationShares;
-            totalShares[id] -= obligationShares;
-            totalUnits[id] -= obligationUnits;
+            debtOf[buyer][id] -= assets.obligationUnits;
+            sharesOf[seller][id] -= assets.obligationShares;
+            totalShares[id] -= assets.obligationShares;
+            totalUnits[id] -= assets.obligationUnits;
         }
 
         emit EventsLib.Take(
             msg.sender,
             id,
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
+            assets.buyerAssets,
+            assets.sellerAssets,
+            assets.obligationUnits,
+            assets.obligationShares,
             taker,
             buyerIsLender,
             sellerIsBorrower
@@ -248,34 +269,34 @@ contract MorphoV2 is IMorphoV2 {
                     offer.obligation,
                     buyer,
                     buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
+                    assets.sellerAssets,
+                    assets.obligationUnits,
+                    assets.obligationShares,
                     buyerCallbackData
                 );
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken, buyer, tradingFeeRecipient, assets.buyerAssets - assets.sellerAssets
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, assets.sellerAssets);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
                 .onSell(
                     offer.obligation,
                     seller,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
+                    assets.buyerAssets,
+                    assets.sellerAssets,
+                    assets.obligationUnits,
+                    assets.obligationShares,
                     sellerCallbackData
                 );
         }
 
         require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
 
-        return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
+        return (assets.buyerAssets, assets.sellerAssets, assets.obligationUnits, assets.obligationShares);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
