@@ -22,7 +22,7 @@ contract OtherFunctionsTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.minCollateral = 1;
+        obligation.minCollateralValue = 1;
 
         id = toId(obligation);
     }

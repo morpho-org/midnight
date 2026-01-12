@@ -37,7 +37,7 @@ contract TakeTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.minCollateral = 1;
+        obligation.minCollateralValue = 1;
 
         id = keccak256(abi.encode(obligation));
 
@@ -1315,13 +1315,14 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
 
-    function testMinCollateralSeller(uint256 assets, uint256 minCollateral) public {
+    function testMinCollateralSeller(uint256 assets, uint256 minCollateralValue) public {
         assets = bound(assets, 0, maxAssets.mulDivDown(obligation.collaterals[0].lltv, WAD));
         vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) > 0);
 
         vm.assume(assets.mulDivUp(WAD, obligation.collaterals[0].lltv) < maxAssets);
-        minCollateral = bound(minCollateral, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, maxAssets);
-        borrowerOffer.obligation.minCollateral = minCollateral;
+        minCollateralValue =
+            bound(minCollateralValue, assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 1, maxAssets);
+        borrowerOffer.obligation.minCollateralValue = minCollateralValue;
         collateralize(borrowerOffer.obligation, borrower, assets);
         deal(address(loanToken), lender, assets);
 
@@ -1332,9 +1333,9 @@ contract TakeTest is BaseTest {
     function testMinCollateralWithdrawCollateral(uint256 assets) public {
         assets = bound(assets, 1, maxAssets);
 
-        uint256 minCollateral = assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 2; // health threshold
-        borrowerOffer.obligation.minCollateral = minCollateral;
-        obligation.minCollateral = minCollateral;
+        uint256 minCollateralValue = assets.mulDivUp(WAD, obligation.collaterals[0].lltv) + 2; // health threshold
+        borrowerOffer.obligation.minCollateralValue = minCollateralValue;
+        obligation.minCollateralValue = minCollateralValue;
 
         collateralize(borrowerOffer.obligation, borrower, 2 * assets + 1);
         deal(address(loanToken), lender, assets);

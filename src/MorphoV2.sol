@@ -485,7 +485,7 @@ contract MorphoV2 is IMorphoV2 {
                 IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE
             );
         }
-        return totalCollateral >= obligation.minCollateral;
+        return totalCollateral >= obligation.minCollateralValue;
     }
 
     function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
