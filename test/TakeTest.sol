@@ -10,7 +10,6 @@ import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
-import {console} from "forge-std/console.sol";
 
 contract TakeTest is BaseTest {
     using MathLib for uint256;
