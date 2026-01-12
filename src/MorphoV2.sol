@@ -254,7 +254,6 @@ contract MorphoV2 is IMorphoV2 {
                     buyerCallbackData
                 );
         }
-        require(hasMinCollateral(offer.obligation, buyer), "Buyer has insufficient collateral");
 
         SafeTransferLib.safeTransferFrom(
             offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
