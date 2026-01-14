@@ -143,6 +143,7 @@ contract MorphoV2 is IMorphoV2 {
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = toId(offer.obligation);
+        _accrueInterestFees(id);
 
         (
             address buyer,
@@ -288,6 +289,7 @@ contract MorphoV2 is IMorphoV2 {
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = toId(obligation);
+        _accrueInterestFees(id);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
@@ -445,15 +447,14 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    function _accrueInterestFees(Obligation memory obligation) internal {
-        bytes32 id = toId(obligation);
+    function _accrueInterestFees(bytes32 id) internal {
         uint256 elapsed = block.timestamp - lastUpdate[id];
         uint256 sharesToMint = (totalShares[id] * elapsed).mulDivDown(interestFee[id], WAD);
         totalShares[id] += sharesToMint;
         sharesOf[interestFeeRecipient][id] += sharesToMint;
         lastUpdate[id] = block.timestamp;
     }
-    
+
     /// VIEW ///
 
     function toId(Obligation memory obligation) public pure returns (bytes32) {
