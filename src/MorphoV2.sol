@@ -58,6 +58,10 @@ contract MorphoV2 is IMorphoV2 {
         return ttm == 0 ? 0 : ttm < 1 days ? 1 : ttm < 7 days ? 2 : ttm < 30 days ? 3 : ttm < 90 days ? 4 : 5;
     }
 
+    function obligationTradingFeeFromIndex(bytes32 id, uint256 index) public view returns (uint256) {
+        return uint256(uint32(_obligationTradingFee[id] >> (index * 32))) * 1e9;
+    }
+
     function obligationTradingFee(bytes32 id, uint256 ttm) public view returns (uint256) {
         return uint256(uint32(_obligationTradingFee[id] >> (tradingFeeIndex(ttm) * 32))) * 1e9;
     }
