@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.28;
+pragma solidity 0.8.31;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
@@ -49,28 +49,6 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Address that can set trading fees.
     address public feeSetter;
-
-    /// GETTERS ///
-
-    function obligationTradingFee(bytes32 id, uint256 ttm) external view returns (uint256) {
-        return _computeTradingFee(obligationFeesStorage[id], ttm);
-    }
-
-    function defaultTradingFee(address loanToken, uint256 ttm) external view returns (uint256) {
-        return _computeTradingFee(defaultFeesStorage[loanToken], ttm);
-    }
-
-    /// @dev Computes F(t) = min(max, min + (max - min) * t / duration)
-    /// @dev Linear ramp from min to max over duration, then capped at max.
-    /// @dev Returns 0 if fee is not activated.
-    function _computeTradingFee(TradingFee memory fee, uint256 ttm) internal pure returns (uint256) {
-        if (!fee.activated) return 0;
-        if (fee.duration == 0) return fee.min;
-        return
-            UtilsLib.min(
-                fee.max, uint256(fee.min) + (uint256(fee.max) - uint256(fee.min)) * ttm / uint256(fee.duration)
-            );
-    }
 
     /// CONSTRUCTOR ///
 
@@ -182,12 +160,9 @@ contract MorphoV2 is IMorphoV2 {
                 / (offer.expiry - offer.start)
             : offer.startPrice;
         uint256 ttm = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        TradingFee memory oblFee = obligationFeesStorage[id];
-        uint256 tradingFee = oblFee.activated
-            ? _computeTradingFee(oblFee, ttm)
-            : _computeTradingFee(defaultFeesStorage[offer.obligation.loanToken], ttm);
-        uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + tradingFee;
+        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, ttm);
+        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");
 
         if (buyerAssets > 0) {
@@ -480,6 +455,22 @@ contract MorphoV2 is IMorphoV2 {
             }
             return debt <= maxDebt;
         }
+    }
+
+    /// @dev Returns the trading fee for a given obligation and time to maturity.
+    /// @dev Uses obligation-specific fee if activated, otherwise falls back to default fee for the loan token.
+    /// @dev Computes F(t) = min(max, min + (max - min) * t / duration)
+    /// @dev Linear ramp from min to max over duration, then capped at max.
+    /// @dev Returns 0 if fee is not activated, min if duration is 0.
+    function tradingFee(bytes32 id, address loanToken, uint256 ttm) public view returns (uint256) {
+        TradingFee memory fee = obligationFeesStorage[id];
+        if (!fee.activated) fee = defaultFeesStorage[loanToken];
+        if (!fee.activated) return 0;
+        if (fee.duration == 0) return fee.min;
+        return
+            UtilsLib.min(
+                fee.max, uint256(fee.min) + (uint256(fee.max) - uint256(fee.min)) * ttm / uint256(fee.duration)
+            );
     }
 
     function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
