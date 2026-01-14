@@ -46,6 +46,9 @@ contract MorphoV2 is IMorphoV2 {
 
     address public tradingFeeRecipient;
 
+    /// @dev Global issuance fee
+    uint256 public issuanceFee;
+
     /// @dev Contract owner for administrative functions.
     address public owner;
 
@@ -124,6 +127,13 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == owner, "Only owner");
         tradingFeeRecipient = recipient;
         emit EventsLib.SetTradingFeeRecipient(recipient);
+    }
+
+    function setIssuanceFee(uint256 newIssuanceFee) external {
+        require(msg.sender == owner, "Only owner");
+        require(newIssuanceFee <= WAD, "Issuance fee too high");
+        issuanceFee = newIssuanceFee;
+        emit EventsLib.SetIssuanceFee(newIssuanceFee);
     }
 
     /// ENTRY-POINTS ///
@@ -220,7 +230,9 @@ contract MorphoV2 is IMorphoV2 {
         bool sellerIsBorrower = (sharesOf[seller][id] == 0);
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
-            sharesOf[buyer][id] += obligationShares;
+            uint256 issuanceFeeShares = obligationShares.mulDivDown(issuanceFee, WAD);
+            sharesOf[buyer][id] += obligationShares - issuanceFeeShares;
+            sharesOf[tradingFeeRecipient][id] += issuanceFeeShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;

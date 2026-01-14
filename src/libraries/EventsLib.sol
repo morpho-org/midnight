@@ -12,6 +12,7 @@ library EventsLib {
     event SetObligationTradingFee(bytes32 indexed obligationId, uint256 index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 index, uint256 newTradingFee);
     event SetTradingFeeRecipient(address indexed recipient);
+    event SetIssuanceFee(uint256 indexed issuanceFee);
 
     event Take(
         address indexed caller,
