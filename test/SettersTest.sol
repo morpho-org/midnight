@@ -113,6 +113,31 @@ contract SettersTest is BaseTest {
         assertEq(morphoV2.defaultTradingFee(randomToken, 90 days), 0, "unset default fee should be 0");
     }
 
+    function testDeactivatedFeeReturnsZero() public {
+        bytes32 id = keccak256("test");
+        address token = makeAddr("token");
+
+        // Set fees with activated=true first
+        morphoV2.setObligationTradingFee(id, true, 0.01e18, 7 days, 0.05e18);
+        morphoV2.setDefaultTradingFee(token, true, 0.01e18, 7 days, 0.05e18);
+
+        // Verify fees are non-zero when activated
+        assertGt(morphoV2.obligationTradingFee(id, 1 days), 0, "activated obligation fee should be > 0");
+        assertGt(morphoV2.defaultTradingFee(token, 1 days), 0, "activated default fee should be > 0");
+
+        // Deactivate fees
+        morphoV2.setObligationTradingFee(id, false, 0.01e18, 7 days, 0.05e18);
+        morphoV2.setDefaultTradingFee(token, false, 0.01e18, 7 days, 0.05e18);
+
+        // Verify fees are zero when deactivated
+        assertEq(morphoV2.obligationTradingFee(id, 0), 0, "deactivated obligation fee should be 0");
+        assertEq(morphoV2.obligationTradingFee(id, 1 days), 0, "deactivated obligation fee should be 0");
+        assertEq(morphoV2.obligationTradingFee(id, 7 days), 0, "deactivated obligation fee should be 0");
+        assertEq(morphoV2.defaultTradingFee(token, 0), 0, "deactivated default fee should be 0");
+        assertEq(morphoV2.defaultTradingFee(token, 1 days), 0, "deactivated default fee should be 0");
+        assertEq(morphoV2.defaultTradingFee(token, 7 days), 0, "deactivated default fee should be 0");
+    }
+
     function testSetDefaultTradingFeeSuccess(address loanToken, uint64 min, uint64 duration, uint64 max) public {
         vm.assume(max <= WAD);
         vm.assume(min <= max);

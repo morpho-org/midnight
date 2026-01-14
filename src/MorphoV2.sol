@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.31;
+pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
@@ -62,14 +62,14 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Computes F(t) = min(max, min + (max - min) * t / duration)
     /// @dev Linear ramp from min to max over duration, then capped at max.
+    /// @dev Returns 0 if fee is not activated.
     function _computeTradingFee(TradingFee memory fee, uint256 ttm) internal pure returns (uint256) {
-        if (fee.duration == 0) {
-            return fee.min;
-        } else {
-            return UtilsLib.min(
+        if (!fee.activated) return 0;
+        if (fee.duration == 0) return fee.min;
+        return
+            UtilsLib.min(
                 fee.max, uint256(fee.min) + (uint256(fee.max) - uint256(fee.min)) * ttm / uint256(fee.duration)
             );
-        }
     }
 
     /// CONSTRUCTOR ///
