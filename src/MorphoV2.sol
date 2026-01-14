@@ -418,7 +418,7 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), totalRepaid);
 
         if (block.timestamp <= obligation.maturity) {
-            require(!isHealthy(obligation, borrower) || badDebt > 0, "Recovery close factor");
+            require(!isHealthy(obligation, borrower) || originalDebt >= repayableDebt, "Recovery close factor");
         }
         return seizures;
     }
