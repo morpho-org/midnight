@@ -50,24 +50,6 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
-    /// GETTERS ///
-
-    function obligationTradingFee(bytes32 id, uint256 ttm) external view returns (uint256) {
-        TradingFee memory fee = obligationFeesStorage[id];
-        return _computeTradingFee(fee, ttm);
-    }
-
-    function defaultTradingFee(address loanToken, uint256 ttm) external view returns (uint256) {
-        TradingFee memory fee = defaultFeesStorage[loanToken];
-        return _computeTradingFee(fee, ttm);
-    }
-
-    /// @dev Computes F(t) = (max - min) * (t / (t + halfLife)) + min
-    function _computeTradingFee(TradingFee memory fee, uint256 ttm) internal pure returns (uint256) {
-        if (fee.halfLife == 0) return fee.min;
-        return (uint256(fee.max) - uint256(fee.min)) * ttm / (ttm + uint256(fee.halfLife)) + uint256(fee.min);
-    }
-
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -178,12 +160,9 @@ contract MorphoV2 is IMorphoV2 {
                 / (offer.expiry - offer.start)
             : offer.startPrice;
         uint256 ttm = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        TradingFee memory _obligationFeeStorage = obligationFeesStorage[id];
-        uint256 tradingFee = _obligationFeeStorage.activated
-            ? _computeTradingFee(_obligationFeeStorage, ttm)
-            : _computeTradingFee(defaultFeesStorage[offer.obligation.loanToken], ttm);
-        uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + tradingFee;
+        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, ttm);
+        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");
 
         if (buyerAssets > 0) {
@@ -483,5 +462,33 @@ contract MorphoV2 is IMorphoV2 {
         address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    /// @dev Returns the trading fee for a given obligation and time to maturity.
+    /// @dev Uses obligation-specific fee if activated, otherwise falls back to default fee for the loan token.
+    /// @dev Computes F(t) = (max - min) * (t / (t + halfLife)) + min
+    /// @dev Returns 0 if fee is not activated, min if halfLife is 0.
+    function tradingFee(bytes32 id, address loanToken, uint256 ttm) public view returns (uint256) {
+        TradingFee memory _oFeeStorage = obligationFeesStorage[id];
+        if (_oFeeStorage.activated) {
+            if (_oFeeStorage.halfLife == 0) return _oFeeStorage.min;
+            else return feeFormula(_oFeeStorage.min, _oFeeStorage.max, _oFeeStorage.halfLife, ttm);
+        } else {
+            TradingFee memory _dFeeStorage = defaultFeesStorage[loanToken];
+            if (_dFeeStorage.activated) {
+                if (_dFeeStorage.halfLife == 0) return _dFeeStorage.min;
+                else return feeFormula(_dFeeStorage.min, _dFeeStorage.max, _dFeeStorage.halfLife, ttm);
+            } else {
+                return 0;
+            }
+        }
+    }
+
+    function feeFormula(uint256 min, uint256 max, uint256 halfLife, uint256 ttm) internal pure returns (uint256) {
+        if (halfLife == 0) {
+            return min;
+        } else {
+            return (max - min) * ttm / (ttm + halfLife) + min;
+        }
     }
 }
