@@ -183,8 +183,9 @@ contract MorphoV2 is IMorphoV2 {
             : offer.startPrice;
         uint256 ttm = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         TradingFee memory oblFee = obligationFeesStorage[id];
-        uint256 tradingFee =
-            oblFee.activated ? _computeTradingFee(oblFee, ttm) : defaultTradingFee(offer.obligation.loanToken, ttm);
+        uint256 tradingFee = oblFee.activated
+            ? _computeTradingFee(oblFee, ttm)
+            : _computeTradingFee(defaultFeesStorage[offer.obligation.loanToken], ttm);
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");
