@@ -7,7 +7,7 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./interfaces/IMorphoV2.sol";
+import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure, TradingFee} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
@@ -36,13 +36,11 @@ contract MorphoV2 is IMorphoV2 {
     mapping(address user => bytes32) public session;
 
     /// @dev Obligation trading fees for a given obligation id.
-    /// @dev The slot contains the 6 trading fees packed (each takes 32 bits).
-    mapping(bytes32 obligationId => uint256) internal _obligationTradingFee;
+    mapping(bytes32 obligationId => TradingFee) public obligationFeesStorage;
 
     /// @dev Default trading fees per loan token.
-    /// @dev The slot contains the 6 trading fees packed (each takes 32 bits).
-    /// @dev Used when obligation fee is not set (slot is empty).
-    mapping(address loanToken => uint256) internal _defaultTradingFee;
+    /// @dev Used when obligation fee is not set.
+    mapping(address loanToken => TradingFee) public defaultFeesStorage;
 
     address public tradingFeeRecipient;
 
@@ -54,16 +52,26 @@ contract MorphoV2 is IMorphoV2 {
 
     /// GETTERS ///
 
-    function tradingFeeIndex(uint256 ttm) public pure returns (uint256) {
-        return ttm == 0 ? 0 : UtilsLib.min(8, UtilsLib.log2(ttm / 1 days) + 1);
-    }
-
     function obligationTradingFee(bytes32 id, uint256 ttm) public view returns (uint256) {
-        return uint256(uint24(_obligationTradingFee[id] >> (tradingFeeIndex(ttm) * 24))) * 1e12;
+        TradingFee memory fee = obligationFeesStorage[id];
+        return _computeTradingFee(fee, ttm);
     }
 
     function defaultTradingFee(address loanToken, uint256 ttm) public view returns (uint256) {
-        return uint256(uint24(_defaultTradingFee[loanToken] >> (tradingFeeIndex(ttm) * 24))) * 1e12;
+        TradingFee memory fee = defaultFeesStorage[loanToken];
+        return _computeTradingFee(fee, ttm);
+    }
+
+    /// @dev Computes F(t) = min(max, min + (max - min) * t / duration)
+    /// @dev Linear ramp from min to max over duration, then capped at max.
+    function _computeTradingFee(TradingFee memory fee, uint256 ttm) internal pure returns (uint256) {
+        if (fee.duration == 0) {
+            return fee.min;
+        } else {
+            return UtilsLib.min(
+                fee.max, uint256(fee.min) + (uint256(fee.max) - uint256(fee.min)) * ttm / uint256(fee.duration)
+            );
+        }
     }
 
     /// CONSTRUCTOR ///
@@ -100,24 +108,20 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
-    function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
+    function setObligationTradingFee(bytes32 id, bool activated, uint64 min, uint64 duration, uint64 max) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(newTradingFee <= WAD, "Trading fee too high");
-        require(index <= 8, "Invalid index");
-        require(newTradingFee % 1e12 == 0, "fee should be a multiple of 1e12");
-        _obligationTradingFee[id] =
-            _obligationTradingFee[id] & ~(0xFFFFFF << (index * 24)) | (newTradingFee / 1e12 << (index * 24));
-        emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
+        require(max <= WAD, "Trading fee too high");
+        require(min <= max, "min > max");
+        obligationFeesStorage[id] = TradingFee({activated: activated, min: min, duration: duration, max: max});
+        emit EventsLib.SetObligationTradingFee(id, activated, min, duration, max);
     }
 
-    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
+    function setDefaultTradingFee(address loanToken, bool activated, uint64 min, uint64 duration, uint64 max) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(newTradingFee <= WAD, "Trading fee too high");
-        require(index <= 8, "Invalid index");
-        require(newTradingFee % 1e12 == 0, "fee should be a multiple of 1e12");
-        _defaultTradingFee[loanToken] =
-            _defaultTradingFee[loanToken] & ~(0xFFFFFF << (index * 24)) | (newTradingFee / 1e12 << (index * 24));
-        emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
+        require(max <= WAD, "Trading fee too high");
+        require(min <= max, "min > max");
+        defaultFeesStorage[loanToken] = TradingFee({activated: activated, min: min, duration: duration, max: max});
+        emit EventsLib.SetDefaultTradingFee(loanToken, activated, min, duration, max);
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -180,9 +184,9 @@ contract MorphoV2 is IMorphoV2 {
                 / (offer.expiry - offer.start)
             : offer.startPrice;
         uint256 ttm = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 tradingFee = _obligationTradingFee[id] != 0
-            ? obligationTradingFee(id, ttm)
-            : defaultTradingFee(offer.obligation.loanToken, ttm);
+        TradingFee memory oblFee = obligationFeesStorage[id];
+        uint256 tradingFee =
+            oblFee.activated ? _computeTradingFee(oblFee, ttm) : defaultTradingFee(offer.obligation.loanToken, ttm);
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");

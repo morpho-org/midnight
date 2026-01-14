@@ -24,22 +24,23 @@ library UtilsLib {
         }
     }
 
-    /// @dev Returns min(a, b).
+    /// @dev Returns min(x, y).
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
             z := xor(x, mul(xor(x, y), lt(y, x)))
         }
     }
 
-    function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    /// @dev Returns max(x, y).
+    function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
-            z := mul(gt(x, y), sub(x, y))
+            z := xor(x, mul(xor(x, y), gt(y, x)))
         }
     }
 
-    function log2(uint256 x) internal pure returns (uint256 z) {
+    function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
-            z := sub(256, clz(x))
+            z := mul(gt(x, y), sub(x, y))
         }
     }
 }
