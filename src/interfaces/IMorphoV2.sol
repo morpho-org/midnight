@@ -48,4 +48,11 @@ struct Seizure {
     uint256 seized;
 }
 
+struct TradingFee {
+    bool activated;
+    uint64 min;
+    uint64 halfLife;
+    uint64 max;
+}
+
 interface IMorphoV2 {}
