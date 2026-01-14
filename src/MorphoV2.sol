@@ -52,14 +52,12 @@ contract MorphoV2 is IMorphoV2 {
 
     /// GETTERS ///
 
-    function obligationTradingFee(bytes32 id, uint256 ttm) public view returns (uint256) {
-        TradingFee memory fee = obligationFeesStorage[id];
-        return _computeTradingFee(fee, ttm);
+    function obligationTradingFee(bytes32 id, uint256 ttm) external view returns (uint256) {
+        return _computeTradingFee(obligationFeesStorage[id], ttm);
     }
 
-    function defaultTradingFee(address loanToken, uint256 ttm) public view returns (uint256) {
-        TradingFee memory fee = defaultFeesStorage[loanToken];
-        return _computeTradingFee(fee, ttm);
+    function defaultTradingFee(address loanToken, uint256 ttm) external view returns (uint256) {
+        return _computeTradingFee(defaultFeesStorage[loanToken], ttm);
     }
 
     /// @dev Computes F(t) = min(max, min + (max - min) * t / duration)
