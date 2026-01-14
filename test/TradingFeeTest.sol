@@ -55,12 +55,12 @@ contract TradingFeeTest is BaseTest {
 
     /// @dev Helper to set a constant trading fee (min=max=fee)
     function setConstantObligationFee(bytes32 _id, uint64 fee) internal {
-        morphoV2.setObligationTradingFee(_id, fee, 0, fee);
+        morphoV2.setObligationTradingFee(_id, true, fee, 0, fee);
     }
 
     /// @dev Helper to set a constant default trading fee (min=max=fee)
     function setConstantDefaultFee(address loanToken_, uint64 fee) internal {
-        morphoV2.setDefaultTradingFee(loanToken_, fee, 0, fee);
+        morphoV2.setDefaultTradingFee(loanToken_, true, fee, 0, fee);
     }
 
     function testBuyBuyerAssets(uint256 buyerAssets, uint256 sellerPrice, uint256 tradingFee) public {
@@ -245,7 +245,7 @@ contract TradingFeeTest is BaseTest {
         uint64 minFee = 0.01 ether;
         uint64 maxFee = 0.05 ether;
         uint64 halfLife = 7 days;
-        morphoV2.setObligationTradingFee(id, minFee, halfLife, maxFee);
+        morphoV2.setObligationTradingFee(id, true, minFee, halfLife, maxFee);
 
         borrowerOffer.startPrice = sellerPrice;
         borrowerOffer.expiryPrice = sellerPrice;

@@ -52,12 +52,12 @@ contract MorphoV2 is IMorphoV2 {
 
     /// GETTERS ///
 
-    function obligationTradingFee(bytes32 id, uint256 ttm) public view returns (uint256) {
+    function obligationTradingFee(bytes32 id, uint256 ttm) external view returns (uint256) {
         TradingFee memory fee = obligationFeesStorage[id];
         return _computeTradingFee(fee, ttm);
     }
 
-    function defaultTradingFee(address loanToken, uint256 ttm) public view returns (uint256) {
+    function defaultTradingFee(address loanToken, uint256 ttm) external view returns (uint256) {
         TradingFee memory fee = defaultFeesStorage[loanToken];
         return _computeTradingFee(fee, ttm);
     }
@@ -102,20 +102,20 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
-    function setObligationTradingFee(bytes32 id, uint64 min, uint64 halfLife, uint64 max) external {
+    function setObligationTradingFee(bytes32 id, bool activated, uint64 min, uint64 halfLife, uint64 max) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(max <= WAD, "Trading fee too high");
         require(min <= max, "min > max");
-        obligationFeesStorage[id] = TradingFee({activated: true, min: min, halfLife: halfLife, max: max});
-        emit EventsLib.SetObligationTradingFee(id, min, halfLife, max);
+        obligationFeesStorage[id] = TradingFee({activated: activated, min: min, halfLife: halfLife, max: max});
+        emit EventsLib.SetObligationTradingFee(id, activated, min, halfLife, max);
     }
 
-    function setDefaultTradingFee(address loanToken, uint64 min, uint64 halfLife, uint64 max) external {
+    function setDefaultTradingFee(address loanToken, bool activated, uint64 min, uint64 halfLife, uint64 max) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(max <= WAD, "Trading fee too high");
         require(min <= max, "min > max");
-        defaultFeesStorage[loanToken] = TradingFee({activated: true, min: min, halfLife: halfLife, max: max});
-        emit EventsLib.SetDefaultTradingFee(loanToken, min, halfLife, max);
+        defaultFeesStorage[loanToken] = TradingFee({activated: activated, min: min, halfLife: halfLife, max: max});
+        emit EventsLib.SetDefaultTradingFee(loanToken, activated, min, halfLife, max);
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -178,9 +178,10 @@ contract MorphoV2 is IMorphoV2 {
                 / (offer.expiry - offer.start)
             : offer.startPrice;
         uint256 ttm = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        TradingFee memory oblFee = obligationFeesStorage[id];
-        uint256 tradingFee =
-            oblFee.activated ? _computeTradingFee(oblFee, ttm) : defaultTradingFee(offer.obligation.loanToken, ttm);
+        TradingFee memory _obligationFeeStorage = obligationFeesStorage[id];
+        uint256 tradingFee = _obligationFeeStorage.activated
+            ? _computeTradingFee(_obligationFeeStorage, ttm)
+            : _computeTradingFee(defaultFeesStorage[offer.obligation.loanToken], ttm);
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");

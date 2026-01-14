@@ -35,14 +35,17 @@ contract SettersTest is BaseTest {
         morphoV2.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
-    function testSetObligationTradingFeeSuccess(bytes32 id, uint64 min, uint64 halfLife, uint64 max) public {
+    function testSetObligationTradingFeeSuccess(bytes32 id, bool activated, uint64 min, uint64 halfLife, uint64 max)
+        public
+    {
         vm.assume(max <= WAD);
         vm.assume(min <= max);
 
-        morphoV2.setObligationTradingFee(id, min, halfLife, max);
+        morphoV2.setObligationTradingFee(id, activated, min, halfLife, max);
 
-        (bool activated, uint64 storedMin, uint64 storedHalfLife, uint64 storedMax) = morphoV2.obligationFeesStorage(id);
-        assertTrue(activated, "activated stored correctly");
+        (bool storedActivated, uint64 storedMin, uint64 storedHalfLife, uint64 storedMax) =
+            morphoV2.obligationFeesStorage(id);
+        assertEq(storedActivated, activated, "activated stored correctly");
         assertEq(storedMin, min, "min stored correctly");
         assertEq(storedHalfLife, halfLife, "halfLife stored correctly");
         assertEq(storedMax, max, "max stored correctly");
@@ -53,7 +56,7 @@ contract SettersTest is BaseTest {
         uint64 halfLife = 7 days;
         uint64 max = 0.05e18;
 
-        morphoV2.setObligationTradingFee(id, min, halfLife, max);
+        morphoV2.setObligationTradingFee(id, true, min, halfLife, max);
 
         // At t=0, fee should be min
         assertEq(morphoV2.obligationTradingFee(id, 0), min, "fee at t=0 should be min");
@@ -71,20 +74,20 @@ contract SettersTest is BaseTest {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("Only feeSetter");
-        morphoV2.setObligationTradingFee(id, 0, 0, 0);
+        morphoV2.setObligationTradingFee(id, true, 0, 0, 0);
     }
 
     function testSetObligationTradingFeeTooHigh(bytes32 id, uint64 max) public {
         vm.assume(max > WAD);
         vm.expectRevert("Trading fee too high");
-        morphoV2.setObligationTradingFee(id, 0, 1 days, max);
+        morphoV2.setObligationTradingFee(id, true, 0, 1 days, max);
     }
 
     function testSetObligationTradingFeeMinGreaterThanMax(bytes32 id, uint64 min, uint64 max) public {
         vm.assume(min <= WAD);
         vm.assume(max < min);
         vm.expectRevert("min > max");
-        morphoV2.setObligationTradingFee(id, min, 1 days, max);
+        morphoV2.setObligationTradingFee(id, true, min, 1 days, max);
     }
 
     function testSetTradingFeeRecipientSuccess(address recipient) public {
@@ -110,15 +113,17 @@ contract SettersTest is BaseTest {
         assertEq(morphoV2.defaultTradingFee(randomToken, 90 days), 0, "unset default fee should be 0");
     }
 
-    function testSetDefaultTradingFeeSuccess(address loanToken, uint64 min, uint64 halfLife, uint64 max) public {
+    function testSetDefaultTradingFeeSuccess(address loanToken, bool activated, uint64 min, uint64 halfLife, uint64 max)
+        public
+    {
         vm.assume(max <= WAD);
         vm.assume(min <= max);
 
-        morphoV2.setDefaultTradingFee(loanToken, min, halfLife, max);
+        morphoV2.setDefaultTradingFee(loanToken, activated, min, halfLife, max);
 
-        (bool activated, uint64 storedMin, uint64 storedHalfLife, uint64 storedMax) =
+        (bool storedActivated, uint64 storedMin, uint64 storedHalfLife, uint64 storedMax) =
             morphoV2.defaultFeesStorage(loanToken);
-        assertTrue(activated, "activated stored correctly");
+        assertEq(storedActivated, activated, "activated stored correctly");
         assertEq(storedMin, min, "min stored correctly");
         assertEq(storedHalfLife, halfLife, "halfLife stored correctly");
         assertEq(storedMax, max, "max stored correctly");
@@ -129,7 +134,7 @@ contract SettersTest is BaseTest {
         uint64 halfLife = 14 days;
         uint64 max = 0.02e18;
 
-        morphoV2.setDefaultTradingFee(loanToken, min, halfLife, max);
+        morphoV2.setDefaultTradingFee(loanToken, true, min, halfLife, max);
 
         // At t=0, fee should be min
         assertEq(morphoV2.defaultTradingFee(loanToken, 0), min, "fee at t=0 should be min");
@@ -147,20 +152,20 @@ contract SettersTest is BaseTest {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("Only feeSetter");
-        morphoV2.setDefaultTradingFee(loanToken, 0, 0, 0);
+        morphoV2.setDefaultTradingFee(loanToken, true, 0, 0, 0);
     }
 
     function testSetDefaultTradingFeeTooHigh(address loanToken, uint64 max) public {
         vm.assume(max > WAD);
         vm.expectRevert("Trading fee too high");
-        morphoV2.setDefaultTradingFee(loanToken, 0, 1 days, max);
+        morphoV2.setDefaultTradingFee(loanToken, true, 0, 1 days, max);
     }
 
     function testSetDefaultTradingFeeMinGreaterThanMax(address loanToken, uint64 min, uint64 max) public {
         vm.assume(min <= WAD);
         vm.assume(max < min);
         vm.expectRevert("min > max");
-        morphoV2.setDefaultTradingFee(loanToken, min, 1 days, max);
+        morphoV2.setDefaultTradingFee(loanToken, true, min, 1 days, max);
     }
 
     function testTradingFeeFormulaWithZeroHalfLife(bytes32 id) public {
@@ -168,7 +173,7 @@ contract SettersTest is BaseTest {
         uint64 max = 0.05e18;
 
         // With halfLife=0, fee should always return min
-        morphoV2.setObligationTradingFee(id, min, 0, max);
+        morphoV2.setObligationTradingFee(id, true, min, 0, max);
 
         assertEq(morphoV2.obligationTradingFee(id, 0), min, "fee at t=0 with halfLife=0");
         assertEq(morphoV2.obligationTradingFee(id, 1 days), min, "fee at t=1day with halfLife=0");
@@ -180,7 +185,7 @@ contract SettersTest is BaseTest {
         uint64 halfLife = 7 days;
         uint64 max = 0.05e18;
 
-        morphoV2.setObligationTradingFee(id, min, halfLife, max);
+        morphoV2.setObligationTradingFee(id, true, min, halfLife, max);
 
         uint256 prevFee = morphoV2.obligationTradingFee(id, 0);
         uint256[] memory times = new uint256[](10);
