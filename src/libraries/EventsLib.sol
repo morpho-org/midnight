@@ -11,6 +11,8 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetTradingFee(bytes32 indexed obligationId, uint256 tradingFee, uint256 interestCutLimit);
     event SetTradingFeeRecipient(address indexed recipient);
+    event SetInterestFee(bytes32 indexed obligationId, uint256 interestFee);
+    event SetInterestFeeRecipient(address indexed recipient);
 
     event Take(
         address indexed caller,

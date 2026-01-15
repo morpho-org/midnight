@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, MAX_INTEREST_FEE} from "../src/libraries/ConstantsLib.sol";
 
 contract SettersTest is BaseTest {
     function testInitialOwner() public view {
@@ -72,5 +72,20 @@ contract SettersTest is BaseTest {
         vm.prank(rdm);
         vm.expectRevert("Only owner");
         morphoV2.setTradingFeeRecipient(makeAddr("newRecipient"));
+    }
+
+    function testSetInterestFeeOnlyFeeSetter(address notFeeSetter, bytes32 id) public {
+        vm.assume(notFeeSetter != address(this));
+
+        vm.prank(notFeeSetter);
+        vm.expectRevert("Only feeSetter");
+        morphoV2.setInterestFee(id, 0.01e18);
+    }
+
+    function testInterestFeeMaximum(uint256 interestFee, bytes32 id) public {
+        interestFee = bound(interestFee, MAX_INTEREST_FEE + 1, MAX_INTEREST_FEE * 100);
+
+        vm.expectRevert("Interest fee too high");
+        morphoV2.setInterestFee(id, interestFee);
     }
 }

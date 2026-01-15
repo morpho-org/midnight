@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF, MAX_INTEREST_FEE} from "./libraries/ConstantsLib.sol";
 import {MathLib} from "./libraries/MathLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -104,6 +104,19 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == owner, "Only owner");
         tradingFeeRecipient = recipient;
         emit EventsLib.SetTradingFeeRecipient(recipient);
+    }
+
+    function setInterestFee(bytes32 id, uint256 fee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(fee <= MAX_INTEREST_FEE, "Interest fee too high");
+        interestFee[id] = fee;
+        emit EventsLib.SetInterestFee(id, fee);
+    }
+
+    function setInterestFeeRecipient(address recipient) external {
+        require(msg.sender == owner, "Only owner");
+        interestFeeRecipient = recipient;
+        emit EventsLib.SetInterestFeeRecipient(recipient);
     }
 
     /// ENTRY-POINTS ///
