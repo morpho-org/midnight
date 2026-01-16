@@ -103,6 +103,12 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetTradingFeeRecipient(recipient);
     }
 
+    struct Prices {
+        uint256 buyerPrice;
+        uint256 sellerPrice;
+        uint256 offerPrice;
+    }
+
     /// ENTRY-POINTS ///
 
     /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
@@ -139,60 +145,49 @@ contract MorphoV2 is IMorphoV2 {
         require(_signer(root, sig) == offer.maker, "invalid signature");
         require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes32 id = toId(offer.obligation);
 
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData
-        ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
-
-        uint256 offerPrice = offer.expiry != offer.start
+        Prices memory prices;
+        prices.offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
                 / (offer.expiry - offer.start)
             : offer.startPrice;
-        require(offerPrice <= WAD, "price too high");
+        require(prices.offerPrice <= WAD, "price too high");
+
+        bytes32 id = toId(offer.obligation);
 
         TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 buyerPrice;
-        uint256 sellerPrice;
         if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
+            prices.buyerPrice = prices.offerPrice;
+            prices.sellerPrice = UtilsLib.max(
+                (prices.buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
                 .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
+                prices.buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
             );
         } else {
-            sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
+            prices.sellerPrice = prices.offerPrice;
+            prices.buyerPrice = UtilsLib.min(
+                prices.sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
                     + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
+                prices.sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
             );
         }
 
         if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            obligationUnits = buyerAssets.mulDivDown(WAD, prices.buyerPrice);
+            sellerAssets = buyerAssets.mulDivDown(prices.sellerPrice, prices.buyerPrice);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            obligationUnits = sellerAssets.mulDivDown(WAD, prices.sellerPrice);
+            buyerAssets = sellerAssets.mulDivDown(prices.buyerPrice, prices.sellerPrice);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            buyerAssets = obligationUnits.mulDivDown(prices.buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(prices.sellerPrice, WAD);
             obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
         } else {
             obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            buyerAssets = obligationUnits.mulDivDown(prices.buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(prices.sellerPrice, WAD);
         }
 
         if (offer.assets > 0) {
@@ -205,6 +200,8 @@ contract MorphoV2 is IMorphoV2 {
         } else {
             require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
         }
+
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         bool buyerIsLender = (debtOf[buyer][id] == 0);
         bool sellerIsBorrower = (sharesOf[seller][id] == 0);
@@ -241,6 +238,15 @@ contract MorphoV2 is IMorphoV2 {
             buyerIsLender,
             sellerIsBorrower
         );
+
+        (
+            address buyerCallback,
+            bytes memory buyerCallbackData,
+            address sellerCallback,
+            bytes memory sellerCallbackData
+        ) = offer.buy
+            ? (offer.callback, offer.callbackData, takerCallback, takerCallbackData)
+            : (takerCallback, takerCallbackData, offer.callback, offer.callbackData);
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
