@@ -36,18 +36,16 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
 
-    /// @dev Obligation trading fees for a given obligation id.
-    /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
-    /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
-    mapping(bytes32 obligationId => uint256) internal _obligationTradingFeeStorage;
+    /// @dev Obligation fees storage.
+    mapping(bytes32 obligationId => uint256) public obligationFeesStorage;
 
-    /// @dev Default trading fees per loan token. Used when obligation fee is not activated.
-    /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
-    /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
-    mapping(address loanToken => uint256) internal _defaultTradingFeeStorage;
+    /// @dev Default fees storage (per loan token). Used when obligation fee is not activated.
+    mapping(address loanToken => uint256) public defaultFeesStorage;
 
+    /// @dev Trading fee recipient.
     address public tradingFeeRecipient;
-    mapping(bytes32 id => uint256 interestFee) public interestFee;
+
+    /// @dev Interest fee recipient.
     address public interestFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
@@ -94,13 +92,13 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newTradingFee <= WAD, "Trading fee too high");
         require(index <= 5, "Invalid index");
-        _obligationTradingFeeStorage[id] = FeeLib.setFee(_obligationTradingFeeStorage[id], index, newTradingFee);
+        obligationFeesStorage[id] = FeeLib.setTradingFee(obligationFeesStorage[id], index, newTradingFee);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
     function setObligationTradingFeeActivated(bytes32 id, bool activated) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        _obligationTradingFeeStorage[id] = FeeLib.setActivated(_obligationTradingFeeStorage[id], activated);
+        obligationFeesStorage[id] = FeeLib.setTradingFeeActivated(obligationFeesStorage[id], activated);
         emit EventsLib.SetObligationTradingFeeActivated(id, activated);
     }
 
@@ -108,13 +106,13 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newTradingFee <= WAD, "Trading fee too high");
         require(index <= 5, "Invalid index");
-        _defaultTradingFeeStorage[loanToken] = FeeLib.setFee(_defaultTradingFeeStorage[loanToken], index, newTradingFee);
+        defaultFeesStorage[loanToken] = FeeLib.setTradingFee(defaultFeesStorage[loanToken], index, newTradingFee);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
     function setDefaultTradingFeeActivated(address loanToken, bool activated) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        _defaultTradingFeeStorage[loanToken] = FeeLib.setActivated(_defaultTradingFeeStorage[loanToken], activated);
+        defaultFeesStorage[loanToken] = FeeLib.setTradingFeeActivated(defaultFeesStorage[loanToken], activated);
         emit EventsLib.SetDefaultTradingFeeActivated(loanToken, activated);
     }
 
@@ -127,7 +125,7 @@ contract MorphoV2 is IMorphoV2 {
     function setInterestFee(bytes32 id, uint256 fee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(fee <= MAX_INTEREST_FEE, "Interest fee too high");
-        interestFee[id] = fee;
+        obligationFeesStorage[id] = FeeLib.setInterestFee(obligationFeesStorage[id], fee);
         emit EventsLib.SetInterestFee(id, fee);
     }
 
@@ -465,7 +463,8 @@ contract MorphoV2 is IMorphoV2 {
 
     function _accrueInterestFees(bytes32 id) internal {
         uint256 elapsed = block.timestamp - lastUpdate[id];
-        uint256 sharesToMint = (totalShares[id] * elapsed).mulDivDown(interestFee[id], WAD);
+        uint256 interestFee = FeeLib.getInterestFee(obligationFeesStorage[id]);
+        uint256 sharesToMint = (totalShares[id] * elapsed).mulDivDown(interestFee, WAD);
         totalShares[id] += sharesToMint;
         sharesOf[interestFeeRecipient][id] += sharesToMint;
         lastUpdate[id] = block.timestamp;
@@ -508,13 +507,13 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Return the trading fee using piecewise linear interpolation between breakpoints.
     /// @dev Returns 0 if neither obligation nor default fee is activated.
     function tradingFee(bytes32 id, address loanToken, uint256 timeToMaturity) public view returns (uint256) {
-        uint256 feeStorage = _obligationTradingFeeStorage[id];
-        if (!FeeLib.getActivated(feeStorage)) {
-            feeStorage = _defaultTradingFeeStorage[loanToken];
-            if (!FeeLib.getActivated(feeStorage)) return 0;
+        uint256 feeStorage = obligationFeesStorage[id];
+        if (!FeeLib.getTradingFeeActivated(feeStorage)) {
+            feeStorage = defaultFeesStorage[loanToken];
+            if (!FeeLib.getTradingFeeActivated(feeStorage)) return 0;
         }
 
-        if (timeToMaturity >= 180 days) return FeeLib.getFee(feeStorage, 5);
+        if (timeToMaturity >= 180 days) return FeeLib.getTradingFee(feeStorage, 5);
 
         // forgefmt: disable-start
         (uint256 index, uint256 start, uint256 end) =
@@ -525,8 +524,8 @@ contract MorphoV2 is IMorphoV2 {
             (4, 90 days, 180 days);
         // forgefmt: disable-end
 
-        uint256 feeLower = FeeLib.getFee(feeStorage, index);
-        uint256 feeUpper = FeeLib.getFee(feeStorage, index + 1);
+        uint256 feeLower = FeeLib.getTradingFee(feeStorage, index);
+        uint256 feeUpper = FeeLib.getTradingFee(feeStorage, index + 1);
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
