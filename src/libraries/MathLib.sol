@@ -15,7 +15,7 @@ library MathLib {
 
     /// @dev Returns max(0, x - y).
     function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        assembly {
+        assembly ("memory-safe") {
             z := mul(gt(x, y), sub(x, y))
         }
     }

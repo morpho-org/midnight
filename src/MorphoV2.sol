@@ -152,47 +152,59 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = offer.expiry != offer.start
-            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
-            : offer.startPrice;
-        require(offerPrice <= WAD, "price too high");
+        {
+            uint256 offerPrice = offer.expiry != offer.start
+                ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
+                    / (offer.expiry - offer.start)
+                : offer.startPrice;
+            require(offerPrice <= WAD, "price too high");
 
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 buyerPrice;
-        uint256 sellerPrice;
-        if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            );
-        } else {
-            sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
-        }
-
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            if (offer.buy) {
+                uint256 buyerPrice = offerPrice;
+                uint256 sellerPrice = UtilsLib.max(
+                    (buyerPrice.zeroFloorSub(tradingFeeParams[id].interestCutLimit))
+                    .mulDivDown(WAD, WAD - tradingFeeParams[id].interestCutLimit),
+                    buyerPrice.mulDivDown(WAD, WAD + tradingFeeParams[id].tradingFee)
+                );
+                if (buyerAssets > 0) {
+                    obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+                    sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+                } else if (sellerAssets > 0) {
+                    obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+                    buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+                } else if (obligationUnits > 0) {
+                    buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                    sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+                } else {
+                    obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+                    buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                    sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+                }
+            } else {
+                uint256 sellerPrice = offerPrice;
+                uint256 buyerPrice = UtilsLib.min(
+                    sellerPrice.mulDivDown(WAD - tradingFeeParams[id].interestCutLimit, WAD)
+                        + tradingFeeParams[id].interestCutLimit,
+                    sellerPrice.mulDivDown(WAD + tradingFeeParams[id].tradingFee, WAD)
+                );
+                if (buyerAssets > 0) {
+                    obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+                    sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+                } else if (sellerAssets > 0) {
+                    obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+                    buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+                } else if (obligationUnits > 0) {
+                    buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                    sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+                } else {
+                    obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+                    buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+                    sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+                }
+            }
+            if (obligationShares == 0) {
+                obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+            }
         }
 
         if (offer.assets > 0) {
