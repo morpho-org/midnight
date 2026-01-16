@@ -18,14 +18,13 @@ contract MorphoV2 is IMorphoV2 {
 
     /// STORAGE ///
 
-    mapping(address user => mapping(bytes32 obligationId => uint256)) public sharesOf;
-    mapping(address user => mapping(bytes32 obligationId => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public lastUpdate;
-    mapping(bytes32 obligationId => uint256) public withdrawable;
-    mapping(bytes32 obligationId => uint256) public totalUnits;
-    mapping(bytes32 obligationId => uint256) public totalShares;
-    mapping(address user => mapping(bytes32 obligationId => mapping(address collateralToken => uint256))) public
-        collateralOf;
+    mapping(address user => mapping(bytes32 id => uint256)) public sharesOf;
+    mapping(address user => mapping(bytes32 id => uint256)) public debtOf;
+    mapping(bytes32 id => uint256) public lastUpdate;
+    mapping(bytes32 id => uint256) public withdrawable;
+    mapping(bytes32 id => uint256) public totalUnits;
+    mapping(bytes32 id => uint256) public totalShares;
+    mapping(address user => mapping(bytes32 id => mapping(address collateralToken => uint256))) public collateralOf;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
@@ -37,7 +36,7 @@ contract MorphoV2 is IMorphoV2 {
     mapping(address user => bytes32) public session;
 
     /// @dev Obligation fees storage.
-    mapping(bytes32 obligationId => uint256) public obligationFeesStorage;
+    mapping(bytes32 id => uint256) public obligationFeesStorage;
 
     /// @dev Default fees storage (per loan token). Used when obligation fee is not activated.
     mapping(address loanToken => uint256) public defaultFeesStorage;
@@ -172,7 +171,7 @@ contract MorphoV2 is IMorphoV2 {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = toId(offer.obligation);
-        _accrueInterestFees(id);
+        accrueInterestFees(id);
 
         (
             address buyer,
@@ -303,7 +302,7 @@ contract MorphoV2 is IMorphoV2 {
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = toId(obligation);
-        _accrueInterestFees(id);
+        accrueInterestFees(id);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
@@ -461,7 +460,8 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    function _accrueInterestFees(bytes32 id) internal {
+    function accrueInterestFees(bytes32 id) internal {
+        if (debtOf[interestFeeRecipient][id] != 0) return;
         uint256 elapsed = block.timestamp - lastUpdate[id];
         uint256 interestFee = FeeLib.getInterestFee(obligationFeesStorage[id]);
         uint256 sharesToMint = (totalShares[id] * elapsed).mulDivDown(interestFee, WAD);
