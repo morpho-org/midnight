@@ -1,8 +1,9 @@
 [profile.default]
 via_ir = true
+evm_version = "osaka"
 
 [profile.default.fmt]
 wrap_comments = true
 
 [lint]
-exclude_lints = ["asm-keccak256"]
+exclude_lints = ["asm-keccak256", "incorrect-shift"]

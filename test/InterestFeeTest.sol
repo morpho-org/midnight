@@ -3,13 +3,13 @@
 pragma solidity ^0.8.0;
 
 import {WAD, MAX_INTEREST_FEE} from "../src/libraries/ConstantsLib.sol";
-import {MathLib} from "../src/libraries/MathLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 contract InterestFeeTest is BaseTest {
-    using MathLib for uint256;
+    using UtilsLib for uint256;
 
     Obligation internal obligation;
     bytes32 internal id;

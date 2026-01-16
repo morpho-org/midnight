@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {MathLib} from "../src/libraries/MathLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
@@ -13,7 +13,7 @@ import {MorphoV2} from "../src/MorphoV2.sol";
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
 abstract contract BaseTest is Test {
-    using MathLib for uint256;
+    using UtilsLib for uint256;
 
     mapping(address => uint256) internal privateKey;
 
@@ -166,7 +166,7 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
+        return keccak256(UtilsLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
