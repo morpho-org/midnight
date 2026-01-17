@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity >=0.5.0;
 
 struct Obligation {
     uint256 chainId;
@@ -46,11 +46,6 @@ struct Seizure {
     uint256 repaid;
     // Amount of collateral to seize.
     uint256 seized;
-}
-
-struct TradingFeeParams {
-    uint128 tradingFee;
-    uint128 interestCutLimit;
 }
 
 interface IMorphoV2 {}

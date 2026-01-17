@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 
 import {MAX_LIF, WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
-import {MathLib} from "../src/libraries/MathLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 
 contract LiquidationTest is BaseTest {
-    using MathLib for uint256;
+    using UtilsLib for uint256;
 
     Obligation internal obligation;
     bytes32 internal id;
