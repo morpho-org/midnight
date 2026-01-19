@@ -20,17 +20,21 @@ int256 constant INV_LOG2_1_025_X96 = 2224016485364590939422807110544;
 library TickLib {
     /// @dev Tick range is not checked.
     function tickToPrice(int256 tick) internal pure returns (uint256) {
-        uint256 roiWad = WAD * tickToRoi(tick) / X96;
-        return WAD * WAD / (WAD + roiWad);
+        unchecked {
+            uint256 roiWad = WAD * tickToRoi(tick) / X96;
+            return WAD * WAD / (WAD + roiWad);
+        }
     }
 
     /// @dev Tick range is not checked.
     function tickToRoi(int256 tick) internal pure returns (uint256) {
-        int256 exp = LN_1_025_DELTA_X96 * tick;
-        if (tick >= 0) {
-            return expX96(uint256(exp));
-        } else {
-            return (X96 * X96) / expX96(uint256(-exp));
+        unchecked {
+            int256 exp = LN_1_025_DELTA_X96 * tick;
+            if (tick >= 0) {
+                return expX96(uint256(exp));
+            } else {
+                return (X96 * X96) / expX96(uint256(-exp));
+            }
         }
     }
 
