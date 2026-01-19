@@ -95,7 +95,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testRepay(uint256 units, uint256 repaid) public {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
-        units = bound(units, 1, MAX_TEST_AMOUNT);
+        units = bound(units, 0, MAX_TEST_AMOUNT);
         repaid = bound(repaid, 0, units);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);

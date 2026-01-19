@@ -347,13 +347,16 @@ contract MorphoV2 is IMorphoV2 {
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external returns (uint256) {
         bytes32 id = toId(obligation);
 
-        require(debtOf[onBehalf][id] > 0, "no debt to repay");
+        uint256 debt = debtOf[onBehalf][id];
+        uint256 clearedRevenue;
 
-        // revenue <= debt so fee will always be zero
-        uint256 clearedRevenue = revenueOf[onBehalf][id].mulDivDown(obligationUnits, debtOf[onBehalf][id]);
+        if (debt > 0) {
+            // revenue <= debt so fee will always be zero
+            clearedRevenue = revenueOf[onBehalf][id].mulDivDown(obligationUnits, debt);
+            revenueOf[onBehalf][id] -= clearedRevenue;
+        }
 
-        revenueOf[onBehalf][id] -= clearedRevenue;
-        debtOf[onBehalf][id] -= obligationUnits;
+        debtOf[onBehalf][id] = debt - obligationUnits;
         withdrawable[id] += obligationUnits;
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, clearedRevenue, onBehalf);
