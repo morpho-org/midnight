@@ -13,7 +13,9 @@ library EventsLib {
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
     event SetObligationTradingFeeActivated(bytes32 indexed obligationId, bool activated);
     event SetDefaultTradingFeeActivated(address indexed loanToken, bool activated);
-    event SetTradingFeeRecipient(address indexed recipient);
+    event SetFeeRecipient(address indexed recipient);
+    event SetObligationInterestFee(bytes32 indexed obligationId, uint256 newInterestFee);
+    event SetDefaultInterestFee(address indexed loanToken, uint256 newInterestFee);
 
     event Take(
         address indexed caller,
@@ -23,8 +25,8 @@ library EventsLib {
         uint256 obligationUnits,
         uint256 obligationShares,
         address indexed taker,
-        bool buyerIsLender,
-        bool sellerIsBorrower
+        uint256 sellerInterestFee,
+        uint256 buyerInterestFee
     );
     event Withdraw(
         address indexed caller,
@@ -34,7 +36,11 @@ library EventsLib {
         address indexed onBehalf
     );
     event Repay(
-        address indexed caller, bytes32 indexed obligationId, uint256 obligationUnits, address indexed onBehalf
+        address indexed caller,
+        bytes32 indexed obligationId,
+        uint256 obligationUnits,
+        uint256 clearedRevenue,
+        address indexed onBehalf
     );
     event SupplyCollateral(
         address caller,

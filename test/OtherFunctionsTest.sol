@@ -95,7 +95,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testRepay(uint256 units, uint256 repaid) public {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
-        units = bound(units, 0, MAX_TEST_AMOUNT);
+        units = bound(units, 1, MAX_TEST_AMOUNT);
         repaid = bound(repaid, 0, units);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -123,7 +123,7 @@ contract OtherFunctionsTest is BaseTest {
         testRepay(units, withdraw);
 
         vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, withdraw, 0, lender);
+        (uint256 returnedObligationUnits,, uint256 returnedShares) = morphoV2.withdraw(obligation, withdraw, 0, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - withdraw, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
@@ -141,7 +141,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // TODO: sharesPrice != 1
         vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) = morphoV2.withdraw(obligation, 0, shares, lender);
+        (uint256 returnedObligationUnits,, uint256 returnedShares) = morphoV2.withdraw(obligation, 0, shares, lender);
 
         assertEq(morphoV2.sharesOf(lender, id), units - shares, "obligationSharesOf");
         assertEq(morphoV2.withdrawable(id), 0, "withdrawable");

@@ -11,6 +11,13 @@ import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./in
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
+struct Callbacks {
+    address buyerCallback;
+    bytes buyerCallbackData;
+    address sellerCallback;
+    bytes sellerCallbackData;
+}
+
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
@@ -40,12 +47,22 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
     mapping(bytes32 obligationId => uint256) internal _obligationTradingFeeStorage;
 
+    /// @dev Obligation interest fees for a given obligation id.
+    mapping(bytes32 obligationId => uint256) public _obligationInterestFee;
+
     /// @dev Default trading fees per loan token. Used when obligation fee is not activated.
     /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
     /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
     mapping(address loanToken => uint256) internal _defaultTradingFeeStorage;
 
-    address public tradingFeeRecipient;
+    /// @dev Default interest fees per loan token.
+    mapping(address loanToken => uint256) public _defaultInterestFee;
+
+    address public feeRecipient;
+
+    /// @dev Track not yet repaid cost for lenders and not yet repaid revenue for borrowers.
+    mapping(address => mapping(bytes32 => uint256)) public costOf;
+    mapping(address => mapping(bytes32 => uint256)) public revenueOf;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -117,8 +134,22 @@ contract MorphoV2 is IMorphoV2 {
 
     function setTradingFeeRecipient(address recipient) external {
         require(msg.sender == owner, "Only owner");
-        tradingFeeRecipient = recipient;
-        emit EventsLib.SetTradingFeeRecipient(recipient);
+        feeRecipient = recipient;
+        emit EventsLib.SetFeeRecipient(recipient);
+    }
+
+    function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(newInterestFee <= WAD, "Interest fee too high");
+        _obligationInterestFee[id] = newInterestFee;
+        emit EventsLib.SetObligationInterestFee(id, newInterestFee);
+    }
+
+    function setDefaultInterestFee(address loanToken, uint256 newInterestFee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(newInterestFee <= WAD, "Interest fee too high");
+        _defaultInterestFee[loanToken] = newInterestFee;
+        emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
     }
 
     /// ENTRY-POINTS ///
@@ -128,6 +159,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
+    /// @dev Offer price and input asset amounts are not inclusive of any interest fee.
     function take(
         uint256 buyerAssets,
         uint256 sellerAssets,
@@ -159,44 +191,22 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = toId(offer.obligation);
 
+        Callbacks memory callbacks;
+        address buyer;
+        address seller;
         (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData
+            buyer,
+            callbacks.buyerCallback,
+            callbacks.buyerCallbackData,
+            seller,
+            callbacks.sellerCallback,
+            callbacks.sellerCallbackData
         ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+                ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
+                : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = offer.expiry != offer.start
-            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
-            : offer.startPrice;
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
-        require(buyerPrice <= WAD, "cannot trade at price above one");
-
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-        }
+        (buyerAssets, sellerAssets, obligationUnits, obligationShares) =
+            computeTakeAmounts(id, offer, buyerAssets, sellerAssets, obligationUnits, obligationShares);
 
         if (offer.assets > 0) {
             require(
@@ -209,26 +219,43 @@ contract MorphoV2 is IMorphoV2 {
             require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
         }
 
-        bool buyerIsLender = (debtOf[buyer][id] == 0);
-        bool sellerIsBorrower = (sharesOf[seller][id] == 0);
-        if (buyerIsLender && sellerIsBorrower) {
-            // Lender enters + borrower enters.
+        bool buyerIsLender = (debtOf[buyer][id] == 0); // iff revenue of buyer == 0
+        bool sellerIsBorrower = (sharesOf[seller][id] == 0); // iff cost of seller == 0
+        uint256 buyerInterestFee;
+        uint256 sellerInterestFee;
+
+        if (buyerIsLender) {
+            // Lender enters
+            costOf[buyer][id] += buyerAssets;
             sharesOf[buyer][id] += obligationShares;
-            debtOf[seller][id] += obligationUnits;
-            totalShares[id] += obligationShares;
-            totalUnits[id] += obligationUnits;
-        } else if (buyerIsLender && !sellerIsBorrower) {
-            // Lender enters + lender exits.
-            sharesOf[buyer][id] += obligationShares;
-            sharesOf[seller][id] -= obligationShares;
-        } else if (!buyerIsLender && sellerIsBorrower) {
-            // Borrower exits + borrower enters.
+        } else {
+            // Borrower exits
+            uint256 clearedRevenue = revenueOf[buyer][id].mulDivDown(obligationUnits, debtOf[buyer][id]);
+            revenueOf[buyer][id] -= clearedRevenue;
             debtOf[buyer][id] -= obligationUnits;
+            buyerInterestFee = clearedRevenue.zeroFloorSub(buyerAssets)
+                .mulDivDown(getInterestFee(id, offer.obligation.loanToken), WAD);
+        }
+
+        if (sellerIsBorrower) {
+            // Borrower enters
+            revenueOf[seller][id] += sellerAssets;
             debtOf[seller][id] += obligationUnits;
         } else {
-            // Borrower exits + lender exits.
-            debtOf[buyer][id] -= obligationUnits;
+            // Lender exits
+            uint256 clearedCost = costOf[seller][id].mulDivDown(obligationShares, sharesOf[seller][id]);
+            costOf[seller][id] -= clearedCost;
             sharesOf[seller][id] -= obligationShares;
+            sellerInterestFee =
+                sellerAssets.zeroFloorSub(clearedCost).mulDivDown(getInterestFee(id, offer.obligation.loanToken), WAD);
+        }
+
+        if (buyerIsLender && sellerIsBorrower) {
+            // Borrower enters + lender enters.
+            totalShares[id] += obligationShares;
+            totalUnits[id] += obligationUnits;
+        } else if (!buyerIsLender && !sellerIsBorrower) {
+            // Borrower exits + lender exits.
             totalShares[id] -= obligationShares;
             totalUnits[id] -= obligationUnits;
         }
@@ -241,12 +268,12 @@ contract MorphoV2 is IMorphoV2 {
             obligationUnits,
             obligationShares,
             taker,
-            buyerIsLender,
-            sellerIsBorrower
+            sellerInterestFee,
+            buyerInterestFee
         );
 
-        if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback)
+        if (callbacks.buyerCallback != address(0)) {
+            ICallbacks(callbacks.buyerCallback)
                 .onBuy(
                     offer.obligation,
                     buyer,
@@ -254,17 +281,22 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    buyerCallbackData
+                    sellerInterestFee,
+                    buyerInterestFee,
+                    callbacks.buyerCallbackData
                 );
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken,
+            buyer,
+            feeRecipient,
+            buyerAssets - sellerAssets + buyerInterestFee + sellerInterestFee
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets - sellerInterestFee);
 
-        if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback)
+        if (callbacks.sellerCallback != address(0)) {
+            ICallbacks(callbacks.sellerCallback)
                 .onSell(
                     offer.obligation,
                     seller,
@@ -272,7 +304,9 @@ contract MorphoV2 is IMorphoV2 {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
-                    sellerCallbackData
+                    sellerInterestFee,
+                    buyerInterestFee,
+                    callbacks.sellerCallbackData
                 );
         }
 
@@ -284,7 +318,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
-        returns (uint256, uint256)
+        returns (uint256, uint256, uint256)
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = toId(obligation);
@@ -292,28 +326,41 @@ contract MorphoV2 is IMorphoV2 {
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
 
+        uint256 clearedCost = costOf[onBehalf][id].mulDivDown(shares, sharesOf[onBehalf][id]);
+        uint256 interestFee =
+            obligationUnits.zeroFloorSub(clearedCost).mulDivDown(getInterestFee(id, obligation.loanToken), WAD);
+
+        costOf[onBehalf][id] -= clearedCost;
         sharesOf[onBehalf][id] -= shares;
         withdrawable[id] -= obligationUnits;
-
         totalShares[id] -= shares;
         totalUnits[id] -= obligationUnits;
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits - interestFee);
+        SafeTransferLib.safeTransfer(obligation.loanToken, feeRecipient, interestFee);
 
-        return (obligationUnits, shares);
+        return (obligationUnits, obligationUnits - interestFee, shares);
     }
 
-    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
+    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external returns (uint256) {
         bytes32 id = toId(obligation);
 
+        require(debtOf[onBehalf][id] > 0, "no debt to repay");
+
+        // revenue <= debt so fee will always be zero
+        uint256 clearedRevenue = revenueOf[onBehalf][id].mulDivDown(obligationUnits, debtOf[onBehalf][id]);
+
+        revenueOf[onBehalf][id] -= clearedRevenue;
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
 
-        emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
+        emit EventsLib.Repay(msg.sender, id, obligationUnits, clearedRevenue, onBehalf);
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
+
+        return obligationUnits;
     }
 
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
@@ -405,6 +452,11 @@ contract MorphoV2 is IMorphoV2 {
         withdrawable[id] += totalRepaid;
         debtOf[borrower][id] -= totalRepaid;
 
+        if (originalDebt > 0) {
+            uint256 clearedRevenue = revenueOf[borrower][id].mulDivDown(badDebt + totalRepaid, originalDebt);
+            revenueOf[borrower][id] -= clearedRevenue;
+        }
+
         emit EventsLib.Liquidate(msg.sender, id, seizures, borrower, totalRepaid, badDebt);
 
         for (uint256 i = 0; i < seizures.length; i++) {
@@ -447,6 +499,10 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW ///
 
+    function getInterestFee(bytes32 id, address loanToken) public view returns (uint256) {
+        return _obligationInterestFee[id] != 0 ? _obligationInterestFee[id] : _defaultInterestFee[loanToken];
+    }
+
     function toId(Obligation memory obligation) public pure returns (bytes32) {
         return keccak256(abi.encode(obligation));
     }
@@ -477,6 +533,45 @@ contract MorphoV2 is IMorphoV2 {
         address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    function computeTakeAmounts(
+        bytes32 id,
+        Offer memory offer,
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares
+    ) internal view returns (uint256, uint256, uint256, uint256) {
+        uint256 offerPrice = offer.expiry != offer.start
+            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
+                / (offer.expiry - offer.start)
+            : offer.startPrice;
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
+        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _tradingFee;
+        require(buyerPrice <= WAD, "cannot trade at price above one");
+
+        if (buyerAssets > 0) {
+            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
+            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (sellerAssets > 0) {
+            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
+            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else if (obligationUnits > 0) {
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
+        } else {
+            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
+            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        }
+
+        return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
     /// @dev Return the trading fee using piecewise linear interpolation between breakpoints.
