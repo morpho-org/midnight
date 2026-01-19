@@ -293,7 +293,7 @@ contract MorphoV2 is IMorphoV2 {
             feeRecipient,
             buyerAssets - sellerAssets + buyerInterestFee + sellerInterestFee
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets - sellerInterestFee);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
 
         if (callbacks.sellerCallback != address(0)) {
             ICallbacks(callbacks.sellerCallback)
