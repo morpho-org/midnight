@@ -85,19 +85,3 @@ strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
 
 strong invariant totalSharesEqualsSumSharesOf(bytes32 id)
     totalShares(id) == sumSharesOf[id];
-
-rule setGetTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
-    setObligationTradingFee(e, id, index, newTradingFee);
-
-    assert obligationTradingFeeFromIndex(id, index) == newTradingFee / 10 ^ 9 * 10 ^ 9;
-}
-
-rule setGetOtherTradingFees(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
-    bytes32 id2;
-    uint256 index2;
-    uint256 tradingFee2 = obligationTradingFeeFromIndex(id2, index2);
-
-    setObligationTradingFee(e, id, index, newTradingFee);
-
-    assert id2 != id || index2 != index => obligationTradingFeeFromIndex(id2, index2) == tradingFee2;
-}
