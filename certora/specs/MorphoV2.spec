@@ -10,8 +10,6 @@ methods {
     function sharesOf(address owner, bytes32 id) external returns (uint256) envfree;
     function debtOf(address owner, bytes32 id) external returns (uint256) envfree;
 
-    function obligationTradingFeeFromIndex(bytes32 id, uint256 index) external returns (uint256) envfree;
-
     function _.price() external => NONDET;
 }
 
