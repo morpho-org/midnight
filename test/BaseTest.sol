@@ -5,15 +5,15 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {MathLib} from "../src/libraries/MathLib.sol";
-import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
 abstract contract BaseTest is Test {
-    using MathLib for uint256;
+    using UtilsLib for uint256;
 
     mapping(address => uint256) internal privateKey;
 
@@ -110,8 +110,7 @@ abstract contract BaseTest is Test {
         lenderOffer.assets = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.price = 1 ether;
 
         collateralize(obligation, otherBorrower, units);
         take(0, 0, units, 0, otherBorrower, lenderOffer);
@@ -131,8 +130,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.startPrice = 1 ether;
-        badBorrowerOffer.expiryPrice = 1 ether;
+        badBorrowerOffer.price = 1 ether;
 
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
@@ -157,8 +155,8 @@ abstract contract BaseTest is Test {
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Obligation memory obligation) internal pure returns (bytes32) {
-        return keccak256(abi.encode(obligation));
+    function toId(Obligation memory obligation) internal view returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(morphoV2), obligation));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -166,7 +164,7 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return keccak256(MathLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
+        return keccak256(UtilsLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -180,20 +178,26 @@ abstract contract BaseTest is Test {
         return res;
     }
 
+    function domainSeparator() internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
+    }
+
+    function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
+        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+        Signature memory signature;
+        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, messageHash);
+        return signature;
+    }
+
     function sig(Offer[1] memory offers) internal view returns (Signature memory) {
         bytes32 _root = root(offers);
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
-        Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(privateKey[offers[0].maker], messageHash);
-        return signature;
+        return sig(_root, privateKey[offers[0].maker]);
     }
 
     function sig(Offer[2] memory offers) internal view returns (Signature memory) {
         bytes32 _root = root(offers);
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", _root));
-        Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(privateKey[offers[0].maker], messageHash);
-        return signature;
+        return sig(_root, privateKey[offers[0].maker]);
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
@@ -219,8 +223,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.assets = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
-        borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.price = 1 ether;
 
         morphoV2.take(
             0,
