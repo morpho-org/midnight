@@ -20,7 +20,6 @@ contract InterestFeeTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        obligation.chainId = block.chainid;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 365 days;
         obligation.collaterals
@@ -29,7 +28,7 @@ contract InterestFeeTest is BaseTest {
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
-        id = keccak256(abi.encode(obligation));
+        id = toId(obligation);
 
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
@@ -37,16 +36,14 @@ contract InterestFeeTest is BaseTest {
         lenderOffer.assets = type(uint256).max;
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 365 days;
-        lenderOffer.startPrice = 1 ether;
-        lenderOffer.expiryPrice = 1 ether;
+        lenderOffer.price = 1 ether;
 
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.assets = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 365 days;
-        borrowerOffer.startPrice = 1 ether;
-        borrowerOffer.expiryPrice = 1 ether;
+        borrowerOffer.price = 1 ether;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 100);
 
