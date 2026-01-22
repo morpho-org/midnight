@@ -1,29 +1,37 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.28;
+pragma solidity 0.8.31;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, MAX_LIF, TIME_TO_MAX_LIF} from "./libraries/ConstantsLib.sol";
-import {MathLib} from "./libraries/MathLib.sol";
+import {FeeLib} from "./libraries/FeeLib.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    MAX_LIF,
+    TIME_TO_MAX_LIF,
+    EIP712_DOMAIN_TYPEHASH,
+    ROOT_TYPEHASH
+} from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMorphoV2, Obligation, Offer, Signature, Seizure, TradingFeeParams} from "./interfaces/IMorphoV2.sol";
+import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
-    using MathLib for uint256;
+    using UtilsLib for uint256;
 
     /// STORAGE ///
 
-    mapping(address => mapping(bytes32 => uint256)) public sharesOf;
-    mapping(address => mapping(bytes32 => uint256)) public debtOf;
-    mapping(bytes32 => uint256) public withdrawable;
-    mapping(bytes32 => uint256) public totalUnits;
-    mapping(bytes32 => uint256) public totalShares;
-    mapping(address => mapping(bytes32 => mapping(address => uint256))) public collateralOf;
+    mapping(address user => mapping(bytes32 obligationId => uint256)) public sharesOf;
+    mapping(address user => mapping(bytes32 obligationId => uint256)) public debtOf;
+    mapping(bytes32 obligationId => uint256) public withdrawable;
+    mapping(bytes32 obligationId => uint256) public totalUnits;
+    mapping(bytes32 obligationId => uint256) public totalShares;
+    mapping(address user => mapping(bytes32 obligationId => mapping(address collateralToken => uint256))) public
+        collateralOf;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
@@ -34,8 +42,16 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
 
-    /// @dev Trading fee parameters for a given obligation id.
-    mapping(bytes32 id => TradingFeeParams) public tradingFeeParams;
+    /// @dev Obligation trading fees for a given obligation id.
+    /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
+    /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
+    mapping(bytes32 obligationId => uint256) internal _obligationTradingFeeStorage;
+
+    /// @dev Default trading fees per loan token. Used when obligation fee is not activated.
+    /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
+    /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
+    mapping(address loanToken => uint256) internal _defaultTradingFeeStorage;
+
     address public tradingFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
@@ -78,14 +94,32 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
-    function setTradingFee(bytes32 id, uint256 tradingFee, uint256 interestCutLimit) external {
+    function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(tradingFee <= type(uint128).max, "Trading fee too high");
-        require(interestCutLimit < WAD, "Interest cut limit too high");
-        // Safe cast because values are below type(uint128).max.
-        tradingFeeParams[id] =
-            TradingFeeParams({tradingFee: uint128(tradingFee), interestCutLimit: uint128(interestCutLimit)});
-        emit EventsLib.SetTradingFee(id, tradingFee, interestCutLimit);
+        require(newTradingFee <= WAD, "Trading fee too high");
+        require(index <= 5, "Invalid index");
+        _obligationTradingFeeStorage[id] = FeeLib.setFee(_obligationTradingFeeStorage[id], index, newTradingFee);
+        emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
+    }
+
+    function setObligationTradingFeeActivated(bytes32 id, bool activated) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        _obligationTradingFeeStorage[id] = FeeLib.setActivated(_obligationTradingFeeStorage[id], activated);
+        emit EventsLib.SetObligationTradingFeeActivated(id, activated);
+    }
+
+    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(newTradingFee <= WAD, "Trading fee too high");
+        require(index <= 5, "Invalid index");
+        _defaultTradingFeeStorage[loanToken] = FeeLib.setFee(_defaultTradingFeeStorage[loanToken], index, newTradingFee);
+        emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
+    }
+
+    function setDefaultTradingFeeActivated(address loanToken, bool activated) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        _defaultTradingFeeStorage[loanToken] = FeeLib.setActivated(_defaultTradingFeeStorage[loanToken], activated);
+        emit EventsLib.SetDefaultTradingFeeActivated(loanToken, activated);
     }
 
     function setTradingFeeRecipient(address recipient) external {
@@ -124,13 +158,11 @@ contract MorphoV2 is IMorphoV2 {
         );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
-        require(offer.obligation.chainId == block.chainid, "chain id mismatch");
-        require(offer.start < offer.expiry || offer.expiryPrice == offer.startPrice, "inconsistent prices");
         require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(_signer(root, sig) == offer.maker, "invalid signature");
-        require(MathLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(signer(root, sig) == offer.maker, "invalid signature");
+        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes32 id = _id(offer.obligation);
+        bytes32 id = toId(offer.obligation);
 
         (
             address buyer,
@@ -143,30 +175,11 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = offer.expiry != offer.start
-            ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
-                / (offer.expiry - offer.start)
-            : offer.startPrice;
-        require(offerPrice <= WAD, "price too high");
-
-        TradingFeeParams memory _tradingFeeParams = tradingFeeParams[id];
-        uint256 buyerPrice;
-        uint256 sellerPrice;
-        if (offer.buy) {
-            buyerPrice = offerPrice;
-            sellerPrice = UtilsLib.max(
-                (buyerPrice.zeroFloorSub(_tradingFeeParams.interestCutLimit))
-                .mulDivDown(WAD, WAD - _tradingFeeParams.interestCutLimit),
-                buyerPrice.mulDivDown(WAD, WAD + _tradingFeeParams.tradingFee)
-            );
-        } else {
-            sellerPrice = offerPrice;
-            buyerPrice = UtilsLib.min(
-                sellerPrice.mulDivDown(WAD - _tradingFeeParams.interestCutLimit, WAD)
-                    + _tradingFeeParams.interestCutLimit,
-                sellerPrice.mulDivDown(WAD + _tradingFeeParams.tradingFee, WAD)
-            );
-        }
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
+        uint256 sellerPrice = offer.buy ? offer.price - _tradingFee : offer.price;
+        uint256 buyerPrice = sellerPrice + _tradingFee;
+        require(buyerPrice <= WAD, "cannot trade at price above one");
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
@@ -197,17 +210,19 @@ contract MorphoV2 is IMorphoV2 {
             require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
         }
 
-        if (debtOf[buyer][id] == 0 && sharesOf[seller][id] == 0) {
+        bool buyerIsLender = (debtOf[buyer][id] == 0);
+        bool sellerIsBorrower = (sharesOf[seller][id] == 0);
+        if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[buyer][id] += obligationShares;
             debtOf[seller][id] += obligationUnits;
             totalShares[id] += obligationShares;
             totalUnits[id] += obligationUnits;
-        } else if (debtOf[buyer][id] == 0 && sharesOf[seller][id] > 0) {
+        } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
             sharesOf[buyer][id] += obligationShares;
             sharesOf[seller][id] -= obligationShares;
-        } else if (debtOf[buyer][id] > 0 && sharesOf[seller][id] == 0) {
+        } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
             debtOf[buyer][id] -= obligationUnits;
             debtOf[seller][id] += obligationUnits;
@@ -227,13 +242,8 @@ contract MorphoV2 is IMorphoV2 {
             obligationUnits,
             obligationShares,
             taker,
-            offer,
-            totalUnits[id],
-            totalShares[id],
-            sharesOf[buyer][id],
-            debtOf[buyer][id],
-            sharesOf[seller][id],
-            debtOf[seller][id]
+            buyerIsLender,
+            sellerIsBorrower
         );
 
         if (buyerCallback != address(0)) {
@@ -267,7 +277,7 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        require(_isHealthy(offer.obligation, seller), "Seller is unhealthy");
+        require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -275,9 +285,10 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Will revert if there is no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
         external
+        returns (uint256, uint256)
     {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         if (obligationUnits > 0) shares = obligationUnits.mulDivUp(totalShares[id] + 1, totalUnits[id] + 1);
         else obligationUnits = shares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
@@ -291,10 +302,12 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.Withdraw(msg.sender, id, obligation, obligationUnits, shares, onBehalf);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+
+        return (obligationUnits, shares);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         debtOf[onBehalf][id] -= obligationUnits;
         withdrawable[id] += obligationUnits;
@@ -307,7 +320,7 @@ contract MorphoV2 is IMorphoV2 {
     function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] += assets;
 
@@ -319,11 +332,11 @@ contract MorphoV2 is IMorphoV2 {
     function withdrawCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
 
         collateralOf[onBehalf][id][collateral] -= assets;
 
-        require(_isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, obligation, collateral, assets, onBehalf);
 
@@ -346,15 +359,16 @@ contract MorphoV2 is IMorphoV2 {
     {
         uint256 repayableDebt;
         uint256 maxDebt;
-        bytes32 id = _id(obligation);
+        bytes32 id = toId(obligation);
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
 
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-            prices[i] = IOracle(obligation.collaterals[i].oracle).price();
-            uint256 collateralAmount = collateralOf[borrower][id][obligation.collaterals[i].token];
-            maxDebt += collateralAmount.mulDivDown(prices[i], ORACLE_PRICE_SCALE)
-                .mulDivDown(obligation.collaterals[i].lltv, WAD);
-            repayableDebt += collateralAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(prices[i], ORACLE_PRICE_SCALE);
+            Collateral memory _collateral = obligation.collaterals[i];
+            uint256 price = IOracle(_collateral.oracle).price();
+            prices[i] = price;
+            uint256 _collateralOf = collateralOf[borrower][id][_collateral.token];
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            repayableDebt += _collateralOf.mulDivUp(WAD, MAX_LIF).mulDivUp(price, ORACLE_PRICE_SCALE);
         }
 
         uint256 originalDebt = debtOf[borrower][id];
@@ -432,21 +446,14 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    /// INTERNAL ///
+    /// VIEW FUNCTIONS ///
 
-    function _id(Obligation memory obligation) internal pure returns (bytes32) {
-        return keccak256(abi.encode(obligation));
+    function toId(Obligation memory obligation) public view returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), obligation));
     }
 
-    function _signer(bytes32 root, Signature memory signature) internal pure returns (address) {
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x45thereum Signed Message:\n32", root));
-        address tentativeSigner = ecrecover(messageHash, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
-    }
-
-    function _isHealthy(Obligation memory obligation, address borrower) internal view returns (bool) {
-        bytes32 id = _id(obligation);
+    function isHealthy(Obligation memory obligation, address borrower) public view returns (bool) {
+        bytes32 id = toId(obligation);
         uint256 debt = debtOf[borrower][id];
         if (debt == 0) {
             return true;
@@ -454,15 +461,53 @@ contract MorphoV2 is IMorphoV2 {
             uint256 maxDebt;
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-                address currentCollateralToken = obligation.collaterals[i].token;
-                require(currentCollateralToken > previousCollateralToken, "collaterals not sorted");
-                uint256 price = IOracle(obligation.collaterals[i].oracle).price();
-                maxDebt += collateralOf[borrower][id][currentCollateralToken].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(obligation.collaterals[i].lltv, WAD);
-                previousCollateralToken = currentCollateralToken;
+                Collateral memory _collateral = obligation.collaterals[i];
+                address collateralToken = _collateral.token;
+                require(collateralToken > previousCollateralToken, "collaterals not sorted");
+                maxDebt += collateralOf[borrower][id][collateralToken]
+                    .mulDivDown(IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE)
+                    .mulDivDown(_collateral.lltv, WAD);
+                previousCollateralToken = collateralToken;
             }
-
             return debt <= maxDebt;
         }
+    }
+
+    function domainSeparator() internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+    }
+
+    function signer(bytes32 root, Signature memory signature) internal view returns (address) {
+        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+        address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(tentativeSigner != address(0), "invalid signature");
+        return tentativeSigner;
+    }
+
+    /// @dev Return the trading fee using piecewise linear interpolation between breakpoints.
+    /// @dev Returns 0 if neither obligation nor default fee is activated.
+    function tradingFee(bytes32 id, address loanToken, uint256 timeToMaturity) public view returns (uint256) {
+        uint256 feeStorage = _obligationTradingFeeStorage[id];
+        if (!FeeLib.getActivated(feeStorage)) {
+            feeStorage = _defaultTradingFeeStorage[loanToken];
+            if (!FeeLib.getActivated(feeStorage)) return 0;
+        }
+
+        if (timeToMaturity >= 180 days) return FeeLib.getFee(feeStorage, 5);
+
+        // forgefmt: disable-start
+        (uint256 index, uint256 start, uint256 end) =
+            timeToMaturity < 1 days ? (0, 0 days, 1 days) :
+            timeToMaturity < 7 days ? (1, 1 days, 7 days) :
+            timeToMaturity < 30 days ? (2, 7 days, 30 days) :
+            timeToMaturity < 90 days ? (3, 30 days, 90 days) :
+            (4, 90 days, 180 days);
+        // forgefmt: disable-end
+
+        uint256 feeLower = FeeLib.getFee(feeStorage, index);
+        uint256 feeUpper = FeeLib.getFee(feeStorage, index + 1);
+
+        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
 }
