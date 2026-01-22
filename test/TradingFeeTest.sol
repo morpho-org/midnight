@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
@@ -48,9 +49,9 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFeeRecipient(feeRecipient);
     }
 
-    function testBuyBuyerAssets(uint256 buyerAssets, uint256 sellerTick, uint256 tradingFee) public {
+    function testBuyBuyerAssets(uint256 buyerAssets, int256 sellerTick, uint256 tradingFee) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, WAD - sellerPrice) / 1e12 * 1e12;
@@ -68,9 +69,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSellBuyerAssets(uint256 tradingFee, uint256 buyerTick, uint256 buyerAssets) public {
+    function testSellBuyerAssets(uint256 tradingFee, int256 buyerTick, uint256 buyerAssets) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        buyerTick = bound(buyerTick, 0, 1176);
+        buyerTick = bound(buyerTick, MIN_TICK, MAX_TICK);
         uint256 buyerPrice = morphoV2.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, buyerPrice) / 1e12 * 1e12;
@@ -90,9 +91,9 @@ contract TradingFeeTest is BaseTest {
         );
     }
 
-    function testBuySellerAssets(uint256 tradingFee, uint256 sellerTick, uint256 sellerAssets) public {
+    function testBuySellerAssets(uint256 tradingFee, int256 sellerTick, uint256 sellerAssets) public {
         sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, WAD - sellerPrice) / 1e12 * 1e12;
@@ -110,9 +111,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSellSellerAssets(uint256 tradingFee, uint256 buyerTick, uint256 sellerAssets) public {
+    function testSellSellerAssets(uint256 tradingFee, int256 buyerTick, uint256 sellerAssets) public {
         sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
-        buyerTick = bound(buyerTick, 0, 1176);
+        buyerTick = bound(buyerTick, MIN_TICK, MAX_TICK);
         uint256 buyerPrice = morphoV2.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, 0.05 ether) / 1e12 * 1e12;
@@ -130,9 +131,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testBuyObligationUnits(uint256 tradingFee, uint256 sellerTick, uint256 obligationUnits) public {
+    function testBuyObligationUnits(uint256 tradingFee, int256 sellerTick, uint256 obligationUnits) public {
         obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.01e18);
         tradingFee = bound(tradingFee, 0, WAD - sellerPrice) / 1e12 * 1e12;
@@ -151,9 +152,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSellObligationUnits(uint256 tradingFee, uint256 buyerTick, uint256 obligationUnits) public {
+    function testSellObligationUnits(uint256 tradingFee, int256 buyerTick, uint256 obligationUnits) public {
         obligationUnits = bound(obligationUnits, 0, MAX_TEST_AMOUNT);
-        buyerTick = bound(buyerTick, 0, 1176);
+        buyerTick = bound(buyerTick, MIN_TICK, MAX_TICK);
         uint256 buyerPrice = morphoV2.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, 0.5 ether) / 1e12 * 1e12;
@@ -172,9 +173,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testBuyObligationShares(uint256 tradingFee, uint256 sellerTick, uint256 obligationShares) public {
+    function testBuyObligationShares(uint256 tradingFee, int256 sellerTick, uint256 obligationShares) public {
         obligationShares = bound(obligationShares, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, WAD - sellerPrice) / 1e12 * 1e12;
@@ -193,9 +194,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSellObligationShares(uint256 tradingFee, uint256 buyerTick, uint256 obligationShares) public {
+    function testSellObligationShares(uint256 tradingFee, int256 buyerTick, uint256 obligationShares) public {
         obligationShares = bound(obligationShares, 0, MAX_TEST_AMOUNT);
-        buyerTick = bound(buyerTick, 0, 1176);
+        buyerTick = bound(buyerTick, MIN_TICK, MAX_TICK);
         uint256 buyerPrice = morphoV2.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, 0.05 ether) / 1e12 * 1e12;
@@ -214,9 +215,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testDefaultFee(uint256 buyerAssets, uint256 sellerTick, uint256 tradingFee) public {
+    function testDefaultFee(uint256 buyerAssets, int256 sellerTick, uint256 tradingFee) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, WAD - sellerPrice) / 1e12 * 1e12;
@@ -234,9 +235,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSevenDayTtmFee(uint256 buyerAssets, uint256 sellerTick, uint256 fee1Day, uint256 fee7Days) public {
+    function testSevenDayTtmFee(uint256 buyerAssets, int256 sellerTick, uint256 fee1Day, uint256 fee7Days) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         fee1Day = bound(fee1Day, 0, (WAD - sellerPrice) / 2) / 1e12 * 1e12;
@@ -268,7 +269,7 @@ contract TradingFeeTest is BaseTest {
 
     function testBuyerPriceTooHighFees() public {
         uint256 tradingFee = 0.6 ether;
-        uint256 sellerTick = 588;
+        int256 sellerTick = 0;
 
         morphoV2.setObligationTradingFeeActivated(id, true);
         morphoV2.setObligationTradingFee(id, 1, tradingFee);
@@ -280,9 +281,9 @@ contract TradingFeeTest is BaseTest {
         take(MAX_TEST_AMOUNT, 0, 0, 0, lender, borrowerOffer);
     }
 
-    function testPostMaturityFee(uint256 buyerAssets, uint256 sellerTick, uint256 fee0Day, uint256 maturity) public {
+    function testPostMaturityFee(uint256 buyerAssets, int256 sellerTick, uint256 fee0Day, uint256 maturity) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         fee0Day = bound(fee0Day, 0, (WAD - sellerPrice) / 2) / 1e12 * 1e12;
@@ -308,9 +309,9 @@ contract TradingFeeTest is BaseTest {
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testEarlyFee(uint256 buyerAssets, uint256 sellerTick, uint256 fee180Days, uint256 maturity) public {
+    function testEarlyFee(uint256 buyerAssets, int256 sellerTick, uint256 fee180Days, uint256 maturity) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, 1176);
+        sellerTick = bound(sellerTick, MIN_TICK, MAX_TICK);
         uint256 sellerPrice = morphoV2.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= 0.5e18);
         fee180Days = bound(fee180Days, 0, (WAD - sellerPrice) / 2) / 1e12 * 1e12;

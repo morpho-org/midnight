@@ -18,6 +18,7 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
+import {TickLib, MIN_TICK, MAX_TICK} from "./libraries/TickLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -159,7 +160,7 @@ contract MorphoV2 is IMorphoV2 {
         );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
-        require(offer.tick <= 1176, "start tick too high");
+        require(MIN_TICK <= offer.tick && offer.tick <= MAX_TICK, "tick out of range");
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
@@ -177,7 +178,7 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        uint256 offerPrice = tickToPrice(offer.tick);
+        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
@@ -451,9 +452,8 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW FUNCTIONS ///
 
-    function tickToPrice(uint256 tick) public pure returns (uint256) {
-        // forge-lint: disable-next-line(unsafe-typecast) tick is always less than 1176
-        return (WAD.mulDivUp(WAD, WAD + UtilsLib.wExp(DELTA * (588 - int256(tick))))).mulDivUp(1, 1e12) * 1e12;
+    function tickToPrice(int256 tick) public pure returns (uint256) {
+        return TickLib.tickToPrice(tick);
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {

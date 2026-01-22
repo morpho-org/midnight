@@ -10,6 +10,7 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {console} from "../lib/forge-std/src/console.sol";
 import {WAD, DELTA} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
@@ -168,16 +169,10 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
-    function testTickToPriceMinMax() public view {
-        assertEq(morphoV2.tickToPrice(0), 0.000001e18, "tick 0");
-        assertEq(morphoV2.tickToPrice(1140), 0.999999e18, "tick max - 1");
-        assertEq(morphoV2.tickToPrice(1141), WAD, "tick max");
-    }
-
     function testReturnJumps() public view {
-        uint256 price = morphoV2.tickToPrice(205);
+        uint256 price = morphoV2.tickToPrice(-200);
         uint256 previousReturn = _return(price);
-        for (uint256 i = 205; i <= 400; i++) {
+        for (int256 i = -200; i <= 0; i++) {
             assertApproxEqRel(
                 _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(WAD + uint256(DELTA), WAD), 0.1e18, "tick i"
             );
@@ -190,7 +185,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testTickToPriceRange() public view {
-        for (uint256 i = 0; i <= 1176; i++) {
+        for (int256 i = MIN_TICK; i <= MAX_TICK; i++) {
             console.log(morphoV2.tickToPrice(i));
         }
     }
