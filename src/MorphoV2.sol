@@ -28,7 +28,7 @@ struct Amounts {
 }
 
 struct FeeContext {
-    uint256 feeRate;
+    uint256 feeRatio;
     uint256 totalShares;
     uint256 totalUnits;
     uint256 sellerCost;
@@ -597,7 +597,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 buyerPrice = sellerPrice + _tradingFee;
         // interest fees cannot bring price > 1 since they are fees on the profit
         require(buyerPrice <= WAD, "cannot trade at price above one");
-        uint256 feeRate = getInterestFee(id, loanToken);
+        uint256 feeRatio = getInterestFee(id, loanToken);
         uint256 _totalShares = totalShares[id];
         uint256 _totalUnits = totalUnits[id];
         uint256 _sellerCost = costOf[seller][id];
@@ -612,18 +612,18 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
-                    amounts.sellerObligationUnits = amounts.sellerAssets * (WAD + sellerPrice * feeRate / WAD)
-                        / sellerPrice * sxtu / (sxtu + _sellerCost * _totalShares * feeRate / WAD);
+                if (sellerProfits && feeRatio > 0) {
+                    amounts.sellerObligationUnits = amounts.sellerAssets * (WAD + sellerPrice * feeRatio / WAD)
+                        / sellerPrice * sxtu / (sxtu + _sellerCost * _totalShares * feeRatio / WAD);
                 } else {
                     amounts.sellerObligationUnits = grossSellerUnits;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
-                    amounts.buyerObligationUnits = amounts.sellerAssets * (WAD + buyerPrice * feeRate / WAD)
-                        / sellerPrice * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                if (buyerProfits && feeRatio > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerAssets * (WAD + buyerPrice * feeRatio / WAD)
+                        / sellerPrice * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRatio / WAD);
                 } else {
                     amounts.buyerObligationUnits = grossSellerUnits;
                 }
@@ -637,18 +637,18 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
+                if (sellerProfits && feeRatio > 0) {
                     amounts.sellerAssets = amounts.sellerObligationUnits
-                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                        * (sellerPrice + _sellerCost * _totalShares * feeRatio / sxtu) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.sellerAssets = grossSellerAssets;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
-                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRate / WAD)
-                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                if (buyerProfits && feeRatio > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRatio / WAD)
+                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRatio / WAD);
                 } else {
                     amounts.buyerObligationUnits = amounts.sellerObligationUnits;
                 }
@@ -663,18 +663,18 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
+                if (sellerProfits && feeRatio > 0) {
                     amounts.sellerAssets = amounts.sellerObligationUnits
-                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                        * (sellerPrice + _sellerCost * _totalShares * feeRatio / sxtu) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.sellerAssets = grossSellerAssets;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
-                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRate / WAD)
-                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                if (buyerProfits && feeRatio > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRatio / WAD)
+                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRatio / WAD);
                 } else {
                     amounts.buyerObligationUnits = amounts.sellerObligationUnits;
                 }
@@ -690,19 +690,19 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
+                if (sellerProfits && feeRatio > 0) {
                     amounts.sellerAssets = amounts.buyerAssets
-                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / buyerPrice * WAD
-                        / (WAD + feeRate);
+                        * (sellerPrice + _sellerCost * _totalShares * feeRatio / sxtu) / buyerPrice * WAD
+                        / (WAD + feeRatio);
                 } else {
                     amounts.sellerAssets = grossSellerAssets;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
-                    amounts.buyerObligationUnits = amounts.buyerAssets * (WAD + buyerPrice * feeRate / WAD) / buyerPrice
-                        * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                if (buyerProfits && feeRatio > 0) {
+                    amounts.buyerObligationUnits = amounts.buyerAssets * (WAD + buyerPrice * feeRatio / WAD)
+                        / buyerPrice * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRatio / WAD);
                 } else {
                     amounts.buyerObligationUnits = grossBuyerUnits;
                 }
@@ -717,18 +717,18 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
+                if (sellerProfits && feeRatio > 0) {
                     amounts.sellerAssets = amounts.buyerObligationUnits
-                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                        * (sellerPrice + _sellerCost * _totalShares * feeRatio / sxtu) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.sellerAssets = grossSellerAssets;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
+                if (buyerProfits && feeRatio > 0) {
                     amounts.buyerAssets = amounts.buyerObligationUnits
-                        * (buyerPrice + _buyerRevenue * feeRate / _buyerDebt) / WAD * WAD / (WAD + feeRate);
+                        * (buyerPrice + _buyerRevenue * feeRatio / _buyerDebt) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.buyerAssets = grossBuyerAssets;
                 }
@@ -744,18 +744,18 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 sxtu = _sellerShares * _totalUnits;
                 bool sellerProfits = sxtu > 0
                     && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
-                if (sellerProfits && feeRate > 0) {
+                if (sellerProfits && feeRatio > 0) {
                     amounts.sellerAssets = amounts.buyerObligationUnits
-                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                        * (sellerPrice + _sellerCost * _totalShares * feeRatio / sxtu) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.sellerAssets = grossSellerAssets;
                 }
             }
             {
                 bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
-                if (buyerProfits && feeRate > 0) {
+                if (buyerProfits && feeRatio > 0) {
                     amounts.buyerAssets = amounts.buyerObligationUnits
-                        * (buyerPrice + _buyerRevenue * feeRate / _buyerDebt) / WAD * WAD / (WAD + feeRate);
+                        * (buyerPrice + _buyerRevenue * feeRatio / _buyerDebt) / WAD * WAD / (WAD + feeRatio);
                 } else {
                     amounts.buyerAssets = grossBuyerAssets;
                 }
