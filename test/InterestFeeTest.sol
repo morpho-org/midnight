@@ -5,7 +5,7 @@ import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {MorphoV2, Amounts} from "../src/MorphoV2.sol";
+import {Amounts} from "../src/MorphoV2.sol";
 
 contract InterestFeeTest is BaseTest {
     using UtilsLib for uint256;
@@ -217,11 +217,7 @@ contract InterestFeeTest is BaseTest {
         Amounts memory amounts;
         amounts.sellerAssets = 100e18;
 
-        Amounts memory result =
-            morphoV2.take(amounts, lender, offer, sig([offer]), root([offer]), proof([offer]), address(0), hex"");
-
-        // assertEq(result.sellerInterestFeeUnits, 0, "no fee when no profit");
-        // assertEq(result.sellerInterestFeeAssets, 0, "no fee when no profit");
+        morphoV2.take(amounts, lender, offer, sig([offer]), root([offer]), proof([offer]), address(0), hex"");
     }
 
     // ============ BUYER (BORROWER) INTEREST FEE TESTS ============
@@ -292,7 +288,6 @@ contract InterestFeeTest is BaseTest {
         // Buyer should receive fewer units than gross due to fee
         uint256 grossUnits = sellerAssets.mulDivDown(WAD, ENTRY_PRICE);
         assertLt(result.buyerObligationUnits, grossUnits, "buyer should receive fewer units for fee");
-        // assertEq(result.buyerInterestFeeUnits, grossUnits - result.buyerObligationUnits, "fee units mismatch");
     }
 
     /// @dev Case C: Fixed buyerAssets - buyer pays fee in units (receives less)
@@ -327,7 +322,6 @@ contract InterestFeeTest is BaseTest {
         // Buyer should receive fewer units than gross due to fee
         uint256 grossUnits = buyerAssets.mulDivDown(WAD, ENTRY_PRICE);
         assertLt(result.buyerObligationUnits, grossUnits, "buyer should receive fewer units for fee");
-        // assertEq(result.buyerInterestFeeUnits, grossUnits - result.buyerObligationUnits, "fee units mismatch");
     }
 
     /// @dev Case D: Fixed buyerUnits - buyer pays fee in assets (pays more)
@@ -362,7 +356,6 @@ contract InterestFeeTest is BaseTest {
         // Buyer should pay more assets than gross due to fee
         uint256 grossAssets = buyerUnits.mulDivDown(ENTRY_PRICE, WAD);
         assertGt(result.buyerAssets, grossAssets, "buyer should pay more assets for fee");
-        // assertEq(result.buyerInterestFeeAssets, result.buyerAssets - grossAssets, "fee assets mismatch");
     }
 
     /// @dev No fee when buyer has no profit (exit price >= entry price)
@@ -382,7 +375,7 @@ contract InterestFeeTest is BaseTest {
         Amounts memory amounts;
         amounts.buyerAssets = 100e18;
 
-        Amounts memory result = morphoV2.take(
+        morphoV2.take(
             amounts,
             borrower,
             lenderSellOffer,
@@ -392,9 +385,6 @@ contract InterestFeeTest is BaseTest {
             address(0),
             hex""
         );
-
-        // assertEq(result.buyerInterestFeeUnits, 0, "no fee when no profit");
-        // assertEq(result.buyerInterestFeeAssets, 0, "no fee when no profit");
     }
 
     // ============ NO FEE WHEN NO PROFIT ============
@@ -417,7 +407,7 @@ contract InterestFeeTest is BaseTest {
         Amounts memory amounts;
         amounts.buyerAssets = 100e18;
 
-        Amounts memory result = morphoV2.take(
+        morphoV2.take(
             amounts,
             lender,
             borrowerOffer,
@@ -427,11 +417,5 @@ contract InterestFeeTest is BaseTest {
             address(0),
             hex""
         );
-
-        // No fees for new positions
-        // assertEq(result.sellerInterestFeeUnits, 0, "no seller fee for new position");
-        // assertEq(result.sellerInterestFeeAssets, 0, "no seller fee for new position");
-        // assertEq(result.buyerInterestFeeUnits, 0, "no buyer fee for new position");
-        // assertEq(result.buyerInterestFeeAssets, 0, "no buyer fee for new position");
     }
 }
