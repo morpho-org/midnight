@@ -8,7 +8,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 import {console} from "../lib/forge-std/src/console.sol";
-import {WAD, DELTA} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
 
@@ -170,18 +170,17 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testReturnJumps() public view {
-        uint256 price = morphoV2.tickToPrice(-200);
-        uint256 previousReturn = _return(price);
-        for (int256 i = -200; i <= 0; i++) {
+        uint256 previousReturn = _return(morphoV2.tickToPrice(-200));
+        for (int256 i = -199; i <= 200; i++) {
             assertApproxEqRel(
-                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(WAD + uint256(DELTA), WAD), 0.1e18, "tick i"
+                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(1025, 1000), 0.01e18, "tick i"
             );
             previousReturn = _return(morphoV2.tickToPrice(i));
         }
     }
 
     function _return(uint256 price) internal pure returns (uint256) {
-        return (WAD - price).mulDivDown(WAD, price);
+        return WAD.mulDivDown(WAD, price) - WAD;
     }
 
     function testTickToPriceRange() public view {
