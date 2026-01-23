@@ -36,6 +36,7 @@ library TickLib {
                 uint256 expWad = wExp(uint256(-x));
                 price = expWad * WAD / (WAD + expWad);
             }
+            // forge-lint: disable-next-item(divide-before-multiply) loss is the point
             return ((price + PRICE_PRECISION / 2) / PRICE_PRECISION) * PRICE_PRECISION;
         }
     }
