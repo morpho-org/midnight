@@ -18,6 +18,27 @@ struct Callbacks {
     bytes sellerCallbackData;
 }
 
+struct Amounts {
+    uint256 buyerAssets;
+    uint256 sellerAssets;
+    uint256 buyerObligationUnits;
+    uint256 buyerObligationShares;
+    uint256 sellerObligationUnits;
+    uint256 sellerObligationShares;
+}
+
+struct FeeContext {
+    uint256 feeRate;
+    uint256 totalShares;
+    uint256 totalUnits;
+    uint256 sellerCost;
+    uint256 sellerShares;
+    uint256 buyerRevenue;
+    uint256 buyerDebt;
+    uint256 sellerPrice;
+    uint256 buyerPrice;
+}
+
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
@@ -154,17 +175,15 @@ contract MorphoV2 is IMorphoV2 {
 
     /// ENTRY-POINTS ///
 
-    /// @dev Returns buyerAssets, sellerAssets, obligationUnits, obligationShares.
+    /// @dev Returns Amounts with all computed values.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
-    /// @dev Offer price and input asset amounts are not inclusive of any interest fee.
+    /// @dev The offer price is inclusive of the trading fee but not of the interest fee.
+    /// @dev Input amounts are inclusive of both interest and trading fees.
     function take(
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
+        Amounts memory amounts,
         address taker,
         Offer memory offer,
         Signature memory sig,
@@ -172,9 +191,16 @@ contract MorphoV2 is IMorphoV2 {
         bytes32[] memory proof,
         address takerCallback,
         bytes memory takerCallbackData
-    ) public returns (uint256, uint256, uint256, uint256) {
+    ) public returns (Amounts memory) {
         require(
-            UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
+            UtilsLib.atMostOneNonZero(
+                amounts.buyerAssets,
+                amounts.sellerAssets,
+                amounts.buyerObligationUnits,
+                amounts.buyerObligationShares,
+                amounts.sellerObligationUnits,
+                amounts.sellerObligationShares
+            ),
             "inconsistent input"
         );
         require(
@@ -205,71 +231,90 @@ contract MorphoV2 is IMorphoV2 {
                 ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
                 : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
-        (buyerAssets, sellerAssets, obligationUnits, obligationShares) =
-            computeTakeAmounts(id, offer, buyerAssets, sellerAssets, obligationUnits, obligationShares);
-
-        if (offer.assets > 0) {
-            require(
-                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= offer.assets,
-                "consumed"
-            );
-        } else if (offer.obligationUnits > 0) {
-            require((consumed[offer.maker][offer.group] += obligationUnits) <= offer.obligationUnits, "consumed");
-        } else {
-            require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
-        }
+        computeAmounts(id, offer, amounts, buyer, seller, offer.obligation.loanToken);
 
         bool buyerIsLender = (debtOf[buyer][id] == 0); // iff revenue of buyer == 0
         bool sellerIsBorrower = (sharesOf[seller][id] == 0); // iff cost of seller == 0
-        uint256 buyerInterestFee;
-        uint256 sellerInterestFee;
 
         if (buyerIsLender) {
             // Lender enters
-            costOf[buyer][id] += buyerAssets;
-            sharesOf[buyer][id] += obligationShares;
+            costOf[buyer][id] += amounts.buyerAssets;
+            sharesOf[buyer][id] += amounts.buyerObligationShares;
         } else {
             // Borrower exits
-            uint256 clearedRevenue = revenueOf[buyer][id].mulDivDown(obligationUnits, debtOf[buyer][id]);
+            uint256 clearedRevenue = revenueOf[buyer][id].mulDivDown(amounts.buyerObligationUnits, debtOf[buyer][id]);
             revenueOf[buyer][id] -= clearedRevenue;
-            debtOf[buyer][id] -= obligationUnits;
-            buyerInterestFee = clearedRevenue.zeroFloorSub(buyerAssets)
-                .mulDivDown(getInterestFee(id, offer.obligation.loanToken), WAD);
+            debtOf[buyer][id] -= amounts.buyerObligationUnits;
         }
 
         if (sellerIsBorrower) {
             // Borrower enters
-            revenueOf[seller][id] += sellerAssets;
-            debtOf[seller][id] += obligationUnits;
+            revenueOf[seller][id] += amounts.sellerAssets;
+            debtOf[seller][id] += amounts.sellerObligationUnits;
         } else {
             // Lender exits
-            uint256 clearedCost = costOf[seller][id].mulDivDown(obligationShares, sharesOf[seller][id]);
+            uint256 clearedCost = costOf[seller][id].mulDivDown(amounts.sellerObligationShares, sharesOf[seller][id]);
             costOf[seller][id] -= clearedCost;
-            sharesOf[seller][id] -= obligationShares;
-            sellerInterestFee =
-                sellerAssets.zeroFloorSub(clearedCost).mulDivDown(getInterestFee(id, offer.obligation.loanToken), WAD);
+            sharesOf[seller][id] -= amounts.sellerObligationShares;
         }
 
         if (buyerIsLender && sellerIsBorrower) {
-            // Borrower enters + lender enters.
-            totalShares[id] += obligationShares;
-            totalUnits[id] += obligationUnits;
+            // Borrower enters + lender enters
+            totalShares[id] += amounts.sellerObligationShares;
+            totalUnits[id] += amounts.sellerObligationUnits;
         } else if (!buyerIsLender && !sellerIsBorrower) {
-            // Borrower exits + lender exits.
-            totalShares[id] -= obligationShares;
-            totalUnits[id] -= obligationUnits;
+            // Borrower exits + lender exits
+            totalShares[id] -= amounts.sellerObligationShares;
+            totalUnits[id] -= amounts.buyerObligationUnits;
+        } else if (!buyerIsLender && sellerIsBorrower) {
+            // Borrower exits + lender enters
+            totalUnits[id] += (amounts.sellerObligationUnits - amounts.buyerObligationUnits);
+        } else if (buyerIsLender && !sellerIsBorrower) {
+            // Lender enters + borrower exits
+            totalShares[id] -= (amounts.sellerObligationShares - amounts.buyerObligationShares);
+        }
+
+        if (offer.assets > 0) {
+            require(
+                (consumed[offer.maker][offer.group] += offer.buy ? amounts.buyerAssets : amounts.sellerAssets)
+                    <= offer.assets,
+                "consumed"
+            );
+        } else if (offer.obligationUnits > 0) {
+            require(
+                (consumed[offer.maker][offer.group] += offer.buy
+                            ? amounts.buyerObligationUnits
+                            : amounts.sellerObligationUnits) <= offer.obligationUnits,
+                "consumed"
+            );
+        } else {
+            require(
+                (consumed[offer.maker][offer.group] += offer.buy
+                            ? amounts.buyerObligationShares
+                            : amounts.sellerObligationShares) <= offer.obligationShares,
+                "consumed"
+            );
+        }
+
+        uint256 feeUnits = amounts.sellerObligationUnits - amounts.buyerObligationUnits;
+        uint256 feeAssets = amounts.buyerAssets - amounts.sellerAssets;
+        uint256 totalFee = feeUnits + feeAssets;
+        if (totalFee > 0) {
+            uint256 feeShares = totalFee.mulDivDown(totalShares[id], totalUnits[id]);
+            sharesOf[feeRecipient][id] += feeShares;
+            totalShares[id] += feeShares;
+            totalUnits[id] += feeAssets;
+            withdrawable[id] += feeAssets;
         }
 
         emit EventsLib.Take(
             msg.sender,
             id,
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
-            taker,
-            sellerInterestFee,
-            buyerInterestFee
+            amounts.buyerAssets,
+            amounts.sellerAssets,
+            amounts.buyerObligationUnits,
+            amounts.sellerObligationUnits,
+            taker
         );
 
         if (callbacks.buyerCallback != address(0)) {
@@ -277,42 +322,36 @@ contract MorphoV2 is IMorphoV2 {
                 .onBuy(
                     offer.obligation,
                     buyer,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    sellerInterestFee,
-                    buyerInterestFee,
+                    amounts.buyerAssets,
+                    amounts.sellerAssets,
+                    amounts.buyerObligationUnits,
+                    amounts.sellerObligationUnits,
                     callbacks.buyerCallbackData
                 );
         }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken,
-            buyer,
-            feeRecipient,
-            buyerAssets - sellerAssets + buyerInterestFee + sellerInterestFee
-        );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, amounts.sellerAssets);
+
+        if (feeAssets > 0) {
+            SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, address(this), feeAssets);
+        }
 
         if (callbacks.sellerCallback != address(0)) {
             ICallbacks(callbacks.sellerCallback)
                 .onSell(
                     offer.obligation,
                     seller,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    sellerInterestFee,
-                    buyerInterestFee,
+                    amounts.buyerAssets,
+                    amounts.sellerAssets,
+                    amounts.buyerObligationUnits,
+                    amounts.sellerObligationUnits,
                     callbacks.sellerCallbackData
                 );
         }
 
         require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
 
-        return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
+        return amounts;
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -538,43 +577,192 @@ contract MorphoV2 is IMorphoV2 {
         return tentativeSigner;
     }
 
-    function computeTakeAmounts(
+    function computeAmounts(
         bytes32 id,
         Offer memory offer,
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares
-    ) internal view returns (uint256, uint256, uint256, uint256) {
+        Amounts memory amounts,
+        address buyer,
+        address seller,
+        address loanToken
+    ) internal view {
         uint256 offerPrice = offer.expiry != offer.start
             ? offer.startPrice + (offer.expiryPrice - offer.startPrice) * (block.timestamp - offer.start)
                 / (offer.expiry - offer.start)
             : offer.startPrice;
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+
+        uint256 timeToMaturity =
+            offer.obligation.maturity > block.timestamp ? offer.obligation.maturity - block.timestamp : 0;
         uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
+        // interest fees cannot bring price > 1 since they are fees on the profit
         require(buyerPrice <= WAD, "cannot trade at price above one");
+        uint256 feeRate = getInterestFee(id, loanToken);
+        uint256 _totalShares = totalShares[id];
+        uint256 _totalUnits = totalUnits[id];
+        uint256 _sellerCost = costOf[seller][id];
+        uint256 _sellerShares = sharesOf[seller][id];
+        uint256 _buyerRevenue = revenueOf[buyer][id];
+        uint256 _buyerDebt = debtOf[buyer][id];
 
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDivDown(totalShares[id] + 1, totalUnits[id] + 1);
-        } else {
-            obligationUnits = obligationShares.mulDivDown(totalUnits[id] + 1, totalShares[id] + 1);
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        if (amounts.sellerAssets > 0) {
+            uint256 grossSellerUnits = amounts.sellerAssets.mulDivDown(WAD, sellerPrice);
+
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerObligationUnits = amounts.sellerAssets * (WAD + sellerPrice * feeRate / WAD)
+                        / sellerPrice * sxtu / (sxtu + _sellerCost * _totalShares * feeRate / WAD);
+                } else {
+                    amounts.sellerObligationUnits = grossSellerUnits;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerAssets * (WAD + buyerPrice * feeRate / WAD)
+                        / sellerPrice * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                } else {
+                    amounts.buyerObligationUnits = grossSellerUnits;
+                }
+            }
+            amounts.buyerAssets = amounts.sellerAssets.mulDivDown(buyerPrice, sellerPrice);
+            amounts.sellerObligationShares = amounts.sellerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+            amounts.buyerObligationShares = amounts.buyerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+        } else if (amounts.sellerObligationUnits > 0) {
+            uint256 grossSellerAssets = amounts.sellerObligationUnits.mulDivDown(sellerPrice, WAD);
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerAssets = amounts.sellerObligationUnits
+                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.sellerAssets = grossSellerAssets;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRate / WAD)
+                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                } else {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits;
+                }
+            }
+            amounts.buyerAssets = amounts.sellerObligationUnits.mulDivDown(buyerPrice, WAD);
+            amounts.sellerObligationShares = amounts.sellerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+            amounts.buyerObligationShares = amounts.buyerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+        } else if (amounts.sellerObligationShares > 0) {
+            amounts.sellerObligationUnits = amounts.sellerObligationShares.mulDivDown(_totalUnits + 1, _totalShares + 1);
+            uint256 grossSellerAssets = amounts.sellerObligationUnits.mulDivDown(sellerPrice, WAD);
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerAssets = amounts.sellerObligationUnits
+                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.sellerAssets = grossSellerAssets;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits * (WAD + buyerPrice * feeRate / WAD)
+                        / WAD * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                } else {
+                    amounts.buyerObligationUnits = amounts.sellerObligationUnits;
+                }
+            }
+            amounts.buyerAssets = amounts.sellerObligationUnits.mulDivDown(buyerPrice, WAD);
+            amounts.buyerObligationShares = (amounts.buyerObligationUnits == amounts.sellerObligationUnits)
+                ? amounts.sellerObligationShares
+                : amounts.buyerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+        } else if (amounts.buyerAssets > 0) {
+            uint256 grossBuyerUnits = amounts.buyerAssets.mulDivDown(WAD, buyerPrice);
+            uint256 grossSellerAssets = amounts.buyerAssets.mulDivDown(sellerPrice, buyerPrice);
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerAssets = amounts.buyerAssets
+                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / buyerPrice * WAD
+                        / (WAD + feeRate);
+                } else {
+                    amounts.sellerAssets = grossSellerAssets;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerObligationUnits = amounts.buyerAssets * (WAD + buyerPrice * feeRate / WAD) / buyerPrice
+                        * _buyerDebt / (_buyerDebt + _buyerRevenue * feeRate / WAD);
+                } else {
+                    amounts.buyerObligationUnits = grossBuyerUnits;
+                }
+            }
+            amounts.sellerObligationUnits = amounts.buyerAssets.mulDivDown(WAD, buyerPrice);
+            amounts.sellerObligationShares = amounts.sellerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+            amounts.buyerObligationShares = amounts.buyerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+        } else if (amounts.buyerObligationUnits > 0) {
+            uint256 grossSellerAssets = amounts.buyerObligationUnits.mulDivDown(sellerPrice, WAD);
+            uint256 grossBuyerAssets = amounts.buyerObligationUnits.mulDivDown(buyerPrice, WAD);
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerAssets = amounts.buyerObligationUnits
+                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.sellerAssets = grossSellerAssets;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerAssets = amounts.buyerObligationUnits
+                        * (buyerPrice + _buyerRevenue * feeRate / _buyerDebt) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.buyerAssets = grossBuyerAssets;
+                }
+            }
+            amounts.sellerObligationUnits = amounts.buyerObligationUnits;
+            amounts.sellerObligationShares = amounts.sellerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+            amounts.buyerObligationShares = amounts.buyerObligationUnits.mulDivDown(_totalShares + 1, _totalUnits + 1);
+        } else if (amounts.buyerObligationShares > 0) {
+            amounts.buyerObligationUnits = amounts.buyerObligationShares.mulDivDown(_totalUnits + 1, _totalShares + 1);
+            uint256 grossSellerAssets = amounts.buyerObligationUnits.mulDivDown(sellerPrice, WAD);
+            uint256 grossBuyerAssets = amounts.buyerObligationUnits.mulDivDown(buyerPrice, WAD);
+            {
+                uint256 sxtu = _sellerShares * _totalUnits;
+                bool sellerProfits = sxtu > 0
+                    && sellerPrice.mulDivDown(_sellerShares, _totalShares) > _sellerCost.mulDivUp(WAD, _totalUnits);
+                if (sellerProfits && feeRate > 0) {
+                    amounts.sellerAssets = amounts.buyerObligationUnits
+                        * (sellerPrice + _sellerCost * _totalShares * feeRate / sxtu) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.sellerAssets = grossSellerAssets;
+                }
+            }
+            {
+                bool buyerProfits = _buyerDebt > 0 && _buyerRevenue * WAD > buyerPrice * _buyerDebt;
+                if (buyerProfits && feeRate > 0) {
+                    amounts.buyerAssets = amounts.buyerObligationUnits
+                        * (buyerPrice + _buyerRevenue * feeRate / _buyerDebt) / WAD * WAD / (WAD + feeRate);
+                } else {
+                    amounts.buyerAssets = grossBuyerAssets;
+                }
+            }
+            amounts.sellerObligationUnits = amounts.buyerObligationUnits;
+            amounts.sellerObligationShares = amounts.buyerObligationShares;
         }
-
-        return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
     /// @dev Return the trading fee using piecewise linear interpolation between breakpoints.

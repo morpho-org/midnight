@@ -24,9 +24,7 @@ library EventsLib {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
-        address indexed taker,
-        uint256 sellerInterestFee,
-        uint256 buyerInterestFee
+        address indexed taker
     );
     event Withdraw(
         address indexed caller,

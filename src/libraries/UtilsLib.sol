@@ -24,6 +24,17 @@ library UtilsLib {
         }
     }
 
+    /// @dev Returns true if at most one of `a`, `b`, `c`, `d`, `e`, `f` is nonzero.
+    function atMostOneNonZero(uint256 a, uint256 b, uint256 c, uint256 d, uint256 e, uint256 f)
+        internal
+        pure
+        returns (bool z)
+    {
+        assembly {
+            z := gt(add(add(add(add(add(iszero(a), iszero(b)), iszero(c)), iszero(d)), iszero(e)), iszero(f)), 4)
+        }
+    }
+
     /// @dev Returns min(a, b).
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {

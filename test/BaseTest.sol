@@ -8,7 +8,7 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
-import {MorphoV2} from "../src/MorphoV2.sol";
+import {MorphoV2, Amounts} from "../src/MorphoV2.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
@@ -85,19 +85,15 @@ abstract contract BaseTest is Test {
         address taker,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
-        return morphoV2.take(
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
-            taker,
-            offer,
-            sig([offer]),
-            root([offer]),
-            proof([offer]),
-            address(0),
-            hex""
-        );
+        Amounts memory amounts;
+        amounts.buyerAssets = buyerAssets;
+        amounts.sellerAssets = sellerAssets;
+        amounts.buyerObligationUnits = obligationUnits;
+        amounts.buyerObligationShares = obligationShares;
+
+        Amounts memory result =
+            morphoV2.take(amounts, taker, offer, sig([offer]), root([offer]), proof([offer]), address(0), hex"");
+        return (result.buyerAssets, result.sellerAssets, result.buyerObligationUnits, result.buyerObligationShares);
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -222,11 +218,10 @@ abstract contract BaseTest is Test {
         borrowerOffer.startPrice = 1 ether;
         borrowerOffer.expiryPrice = 1 ether;
 
+        Amounts memory amounts;
+        amounts.buyerObligationUnits = obligationUnits;
         morphoV2.take(
-            0,
-            0,
-            obligationUnits,
-            0,
+            amounts,
             lender,
             borrowerOffer,
             sig([borrowerOffer]),

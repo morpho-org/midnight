@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
-import {MorphoV2} from "../src/MorphoV2.sol";
+import {MorphoV2, Amounts} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
@@ -1141,12 +1141,11 @@ contract TakeTest is BaseTest {
     // test tree / signatures.
 
     function testTakeWrongRoot() public {
+        Amounts memory amounts;
+        amounts.buyerAssets = 100;
         vm.expectRevert("invalid signature");
         morphoV2.take(
-            100,
-            0,
-            0,
-            0,
+            amounts,
             borrower,
             lenderOffer,
             sig([borrowerOffer]),
@@ -1158,12 +1157,11 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
+        Amounts memory amounts;
+        amounts.buyerAssets = 100;
         vm.expectRevert("invalid signature");
         morphoV2.take(
-            100,
-            0,
-            0,
-            0,
+            amounts,
             borrower,
             lenderOffer,
             Signature({v: 0, r: 0, s: 0}),
@@ -1175,22 +1173,21 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
+        Amounts memory amounts;
+        amounts.buyerAssets = 100;
         vm.assume(proof.length >= 1);
         vm.expectRevert("invalid proof");
-        morphoV2.take(
-            100, 0, 0, 0, borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof, address(0), hex""
-        );
+        morphoV2.take(amounts, borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof, address(0), hex"");
     }
 
     function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory proof) public {
+        Amounts memory amounts;
+        amounts.buyerAssets = 100;
         vm.assume(proof.length >= 1);
         vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
         morphoV2.take(
-            100,
-            0,
-            0,
-            0,
+            amounts,
             borrower,
             lenderOffer,
             sig([lenderOffer, otherOffer]),
@@ -1202,16 +1199,15 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeTwoLeaves(uint256 assets, Offer memory otherOffer) public {
+        Amounts memory amounts;
         assets = bound(assets, 0, maxAssets);
         deal(address(loanToken), lender, assets);
         collateralize(obligation, borrower, assets.mulDivDown(WAD, lenderOffer.startPrice));
         lenderOffer.assets = assets;
+        amounts.buyerAssets = assets;
 
         morphoV2.take(
-            assets,
-            0,
-            0,
-            0,
+            amounts,
             borrower,
             lenderOffer,
             sig([lenderOffer, otherOffer]),
@@ -1252,11 +1248,10 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, callback, collateral);
 
+        Amounts memory amounts;
+        amounts.buyerAssets = assets;
         morphoV2.take(
-            assets,
-            0,
-            0,
-            0,
+            amounts,
             borrower,
             lenderOffer,
             sig([lenderOffer]),
@@ -1286,6 +1281,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBuyBuyerCallback(uint256 assets) public {
+        Amounts memory amounts;
         assets = bound(assets, 0, maxAssets);
         (address otherLender,) = makeAddrAndKey("otherLender");
         vm.prank(otherLender);
@@ -1296,12 +1292,10 @@ contract TakeTest is BaseTest {
         borrowerOffer.expiryPrice = 1e18;
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, assets);
+        amounts.buyerAssets = assets;
 
         morphoV2.take(
-            assets,
-            0,
-            0,
-            0,
+            amounts,
             otherLender,
             borrowerOffer,
             sig([borrowerOffer]),
@@ -1317,17 +1311,9 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onSell(
-        Obligation memory obligation,
-        address seller,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        bytes memory data
-    ) external {
+    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, uint256, bytes memory data)
+        external
+    {
         recordedData = data;
         (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
         ERC20(collateralToken).approve(msg.sender, amount);
@@ -1341,8 +1327,6 @@ contract BorrowCallback is ICallbacks {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
-        uint256,
-        uint256,
         bytes memory data
     ) external {}
 
@@ -1359,8 +1343,6 @@ contract LendCallback is ICallbacks {
         uint256,
         uint256,
         uint256,
-        uint256,
-        uint256,
         bytes memory data
     ) external {
         recordedData = data;
@@ -1374,8 +1356,6 @@ contract LendCallback is ICallbacks {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
-        uint256,
-        uint256,
         bytes memory data
     ) external {}
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
