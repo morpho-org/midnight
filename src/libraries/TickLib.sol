@@ -28,9 +28,11 @@ library TickLib {
             int256 x = LN_1_025_WAD * tick;
             uint256 price;
             if (tick >= 0) {
+                // forge-lint: disable-next-item(unsafe-typecast) x is positive
                 uint256 expWad = wExp(uint256(x));
                 price = WAD * WAD / (WAD + expWad);
             } else {
+                // forge-lint: disable-next-item(unsafe-typecast) x is negative
                 uint256 expWad = wExp(uint256(-x));
                 price = expWad * WAD / (WAD + expWad);
             }
@@ -60,6 +62,7 @@ library TickLib {
             mpow = roi << (127 - msb);
         }
 
+        // forge-lint: disable-next-item(unsafe-typecast) msb is a bit position
         int256 log2roiX10 = (int256(msb) - 96) << 10;
 
         assembly ("memory-safe") {
@@ -118,11 +121,14 @@ library TickLib {
 
     function wExp(uint256 x) internal pure returns (uint256) {
         unchecked {
+            // forge-lint: disable-next-item(unsafe-typecast) x should be small
             int256 q = (int256(x) + LN2_WAD / 2) / LN2_WAD;
+            // forge-lint: disable-next-item(unsafe-typecast) x should be small
             int256 r = int256(x) - q * LN2_WAD;
             int256 secondTerm = (r * r) / (2 * WAD_INT);
             int256 thirdTerm = (secondTerm * r) / (3 * WAD_INT);
             int256 expR = WAD_INT + r + secondTerm + thirdTerm;
+            // forge-lint: disable-next-line(unsafe-typecast) e^r positive, q positive
             return uint256(expR) << uint256(q);
         }
     }
