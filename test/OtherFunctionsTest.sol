@@ -7,7 +7,6 @@ import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
-import {console} from "../lib/forge-std/src/console.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -181,11 +180,5 @@ contract OtherFunctionsTest is BaseTest {
 
     function _return(uint256 price) internal pure returns (uint256) {
         return WAD.mulDivDown(WAD, price) - WAD;
-    }
-
-    function testTickToPriceRange() public view {
-        for (int256 i = MIN_TICK; i <= MAX_TICK; i++) {
-            console.log(morphoV2.tickToPrice(i));
-        }
     }
 }

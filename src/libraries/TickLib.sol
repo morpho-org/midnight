@@ -5,22 +5,19 @@ pragma solidity ^0.8.0;
 import {WAD} from "./ConstantsLib.sol";
 
 // Min and max useful ticks.
-// Without the PRICE_PRECISION rounding, if we round up the price for negative ticks and round it down for positive
-// ticks, the range is -1679 (price is 1) to 1679 (price is 0). 1 is reached naturally by rounding at -1679
-// -1 is reached naturally by rounding at 1679
-int256 constant MIN_TICK = -588;
-int256 constant MAX_TICK = 588;
+// Without the PRICE_STEP rounding, the tick range is -1679 for price 1 to 1679 for price 0.
+int256 constant MIN_TICK = -495;
+int256 constant MAX_TICK = 495;
 // ln(1.025) * 1e18
 int256 constant LN_1_025_WAD = 24692612590371416;
 // ln(2) * 1e18
 int256 constant LN2_WAD = 693147180559945344;
 int256 constant WAD_INT = 1e18;
-// x96 unit (still needed for roiToTick)
+// x96 unit
 uint256 constant X96 = 1 << 96;
 // (1/log2(1.025))x96
 int256 constant INV_LOG2_1_025_X96 = 2224016485364590939422807110544;
-
-uint256 constant PRICE_PRECISION = 1e12;
+uint256 constant PRICE_STEP = 1e13;
 
 library TickLib {
     function tickToPrice(int256 tick) internal pure returns (uint256) {
@@ -37,20 +34,32 @@ library TickLib {
                 price = expWad * WAD / (WAD + expWad);
             }
             // forge-lint: disable-next-item(divide-before-multiply) loss is the point
-            return ((price + PRICE_PRECISION / 2) / PRICE_PRECISION) * PRICE_PRECISION;
+            return ((price + PRICE_STEP / 2) / PRICE_STEP) * PRICE_STEP;
         }
     }
 
-    function priceToTick(uint256 price) internal pure returns (int256) {
-        if (price == 0) return MAX_TICK;
-        int256 tickOfRoi = roiToTick(((1e18 - price) << 96) / price);
-        if (tickOfRoi <= MIN_TICK) return MIN_TICK;
-        if (tickOfRoi >= MAX_TICK) return MAX_TICK;
-        return tickOfRoi;
+    function priceToTickAndTickAlignedPrice(uint256 price) internal pure returns (int256 tick, uint256 alignedPrice) {
+        if (price == 0) return (MAX_TICK, tickToPrice(MAX_TICK));
+        if (price >= WAD) return (MIN_TICK, tickToPrice(MIN_TICK));
+
+        tick = roiToTick(((WAD - price) << 96) / price);
+        alignedPrice = tickToPrice(tick);
+
+        if (alignedPrice > price && tick < MAX_TICK) {
+            uint256 nextAlignedPrice = tickToPrice(tick + 1);
+            if (2 * price < alignedPrice + nextAlignedPrice) {
+                return (tick + 1, nextAlignedPrice);
+            }
+        } else if (alignedPrice < price && tick > MIN_TICK) {
+            uint256 prevAlignedPrice = tickToPrice(tick - 1);
+            if (2 * price > alignedPrice + prevAlignedPrice) {
+                return (tick - 1, prevAlignedPrice);
+            }
+        }
+        return (tick, alignedPrice);
     }
 
     function roiToTick(uint256 roi) internal pure returns (int256) {
-        if (roi == 0) return MIN_TICK;
         uint256 msb;
         assembly {
             msb := sub(255, clz(roi))
@@ -64,60 +73,40 @@ library TickLib {
         }
 
         // forge-lint: disable-next-item(unsafe-typecast) msb is a bit position
-        int256 log2roiX10 = (int256(msb) - 96) << 10;
+        int256 log2roiX6 = (int256(msb) - 96) << 6;
 
         assembly ("memory-safe") {
             mpow := shr(127, mul(mpow, mpow))
             let highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(9, highbit))
+            log2roiX6 := or(log2roiX6, shl(5, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(8, highbit))
+            log2roiX6 := or(log2roiX6, shl(4, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(7, highbit))
+            log2roiX6 := or(log2roiX6, shl(3, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(6, highbit))
+            log2roiX6 := or(log2roiX6, shl(2, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(5, highbit))
+            log2roiX6 := or(log2roiX6, shl(1, highbit))
             mpow := shr(highbit, mpow)
 
             mpow := shr(127, mul(mpow, mpow))
             highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(4, highbit))
-            mpow := shr(highbit, mpow)
-
-            mpow := shr(127, mul(mpow, mpow))
-            highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(3, highbit))
-            mpow := shr(highbit, mpow)
-
-            mpow := shr(127, mul(mpow, mpow))
-            highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(2, highbit))
-            mpow := shr(highbit, mpow)
-
-            mpow := shr(127, mul(mpow, mpow))
-            highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, shl(1, highbit))
-            mpow := shr(highbit, mpow)
-
-            mpow := shr(127, mul(mpow, mpow))
-            highbit := shr(128, mpow)
-            log2roiX10 := or(log2roiX10, highbit)
+            log2roiX6 := or(log2roiX6, highbit)
         }
 
-        return (log2roiX10 * INV_LOG2_1_025_X96 + (1 << 105)) >> 106;
+        return (log2roiX6 * INV_LOG2_1_025_X96 + (1 << 101)) >> 102;
     }
 
     function wExp(uint256 x) internal pure returns (uint256) {

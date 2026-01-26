@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "../lib/forge-std/src/Test.sol";
-import {TickLib, MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {TickLib, MIN_TICK, MAX_TICK, PRICE_STEP} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 
 contract TickLibTest is Test {
@@ -18,16 +18,23 @@ contract TickLibTest is Test {
         }
     }
 
-    function testPriceToTickEdgeCases() public pure {
-        assertEq(TickLib.priceToTick(1e18), MIN_TICK);
-        assertEq(TickLib.priceToTick(0), MAX_TICK);
+    function testPriceToTickAndTickAlignedPrice() public pure {
+        for (uint256 price = 0; price < WAD; price += PRICE_STEP) {
+            (int256 t, uint256 alignedPrice) = TickLib.priceToTickAndTickAlignedPrice(price);
+
+            if (t > MIN_TICK) {
+                uint256 prevAlignedPrice = TickLib.tickToPrice(t - 1);
+                assertLe(dist(alignedPrice, price), dist(prevAlignedPrice, price), "closer to prev");
+            }
+
+            if (t < MAX_TICK) {
+                uint256 nextAlignedPrice = TickLib.tickToPrice(t + 1);
+                assertLe(dist(alignedPrice, price), dist(nextAlignedPrice, price), "closer to next");
+            }
+        }
     }
 
-    function testPricePreservedAfterRoundtrip() public pure {
-        for (int256 t = MIN_TICK; t <= MAX_TICK; t++) {
-            uint256 price = TickLib.tickToPrice(t);
-            uint256 priceAfterRoundtrip = TickLib.tickToPrice(TickLib.priceToTick(price));
-            assertEq(priceAfterRoundtrip, price, "P(t) should equal P(T(P(t)))");
-        }
+    function dist(uint256 x, uint256 y) internal pure returns (uint256) {
+        return x > y ? x - y : y - x;
     }
 }

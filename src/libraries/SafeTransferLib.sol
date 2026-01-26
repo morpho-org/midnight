@@ -10,7 +10,7 @@ library SafeTransferLib {
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transfer, (to, value)));
         if (!success) {
-            assembly {
+            assembly ("memory-safe") {
                 revert(add(returndata, 0x20), mload(returndata))
             }
         }
@@ -22,7 +22,7 @@ library SafeTransferLib {
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transferFrom, (from, to, value)));
         if (!success) {
-            assembly {
+            assembly ("memory-safe") {
                 revert(add(returndata, 0x20), mload(returndata))
             }
         }
