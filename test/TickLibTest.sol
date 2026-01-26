@@ -18,23 +18,24 @@ contract TickLibTest is Test {
         }
     }
 
-    function testPriceToTickAndTickAlignedPrice() public pure {
-        for (uint256 price = 0; price < WAD; price += PRICE_STEP) {
-            (int256 t, uint256 alignedPrice) = TickLib.priceToTickAndTickAlignedPrice(price);
-
-            if (t > MIN_TICK) {
-                uint256 prevAlignedPrice = TickLib.tickToPrice(t - 1);
-                assertLe(dist(alignedPrice, price), dist(prevAlignedPrice, price), "closer to prev");
+    function testPriceToTickAndTickAlignedPriceEdges() public pure {
+        // When exactly between 2 prices match the higher one.
+        for (int256 tick = MIN_TICK; tick <= MAX_TICK; tick++) {
+            uint256 price = TickLib.tickToPrice(tick);
+            if (tick < MAX_TICK) {
+                uint256 nextPrice = TickLib.tickToPrice(tick + 1);
+                if (price == nextPrice) continue;
+                uint256 edgePrice = price - (price - nextPrice) / 2;
+                (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                assertEq(alignedEdgePrice, price, "lower price up to same distance");
             }
-
-            if (t < MAX_TICK) {
-                uint256 nextAlignedPrice = TickLib.tickToPrice(t + 1);
-                assertLe(dist(alignedPrice, price), dist(nextAlignedPrice, price), "closer to next");
+            if (tick > MIN_TICK) {
+                uint256 prevPrice = TickLib.tickToPrice(tick - 1);
+                if (price == prevPrice) continue;
+                uint256 edgePrice = price + (prevPrice - price - 1) / 2;
+                (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                assertEq(alignedEdgePrice, price, "higher price not matching");
             }
         }
-    }
-
-    function dist(uint256 x, uint256 y) internal pure returns (uint256) {
-        return x > y ? x - y : y - x;
     }
 }

@@ -38,6 +38,8 @@ library TickLib {
         }
     }
 
+    /// @dev Returns the closest tick-aligned price and a tick of this price.
+    /// @dev If there are two equally close prices, the higher one is returned.
     function priceToTickAndTickAlignedPrice(uint256 price) internal pure returns (int256 tick, uint256 alignedPrice) {
         if (price == 0) return (MAX_TICK, tickToPrice(MAX_TICK));
         if (price >= WAD) return (MIN_TICK, tickToPrice(MIN_TICK));
@@ -52,7 +54,7 @@ library TickLib {
             }
         } else if (alignedPrice < price && tick > MIN_TICK) {
             uint256 prevAlignedPrice = tickToPrice(tick - 1);
-            if (2 * price > alignedPrice + prevAlignedPrice) {
+            if (2 * price >= alignedPrice + prevAlignedPrice) {
                 return (tick - 1, prevAlignedPrice);
             }
         }
