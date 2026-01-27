@@ -59,7 +59,7 @@ contract InterestFeeTest is BaseTest {
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        morphoV2.setInterestFee(id, fee);
+        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesBefore = morphoV2.totalShares(id);
         uint256 recipientSharesBefore = morphoV2.sharesOf(feeRecipient, id);
@@ -111,7 +111,7 @@ contract InterestFeeTest is BaseTest {
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        morphoV2.setInterestFee(id, fee);
+        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesBefore = morphoV2.totalShares(id);
         uint256 recipientSharesBefore = morphoV2.sharesOf(feeRecipient, id);
@@ -135,7 +135,7 @@ contract InterestFeeTest is BaseTest {
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        morphoV2.setInterestFee(id, fee);
+        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesInitial = morphoV2.totalShares(id);
         uint256 recipientSharesInitial = morphoV2.sharesOf(feeRecipient, id);

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Seizure} from "../interfaces/IMorphoV2.sol";
+import {Seizure, Obligation} from "../interfaces/IMorphoV2.sol";
 
 library EventsLib {
     event Constructor(address indexed owner);
@@ -11,12 +11,12 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
-    event SetObligationTradingFeeActivated(bytes32 indexed id, bool activated);
-    event SetDefaultTradingFeeActivated(address indexed loanToken, bool activated);
     event SetTradingFeeRecipient(address indexed recipient);
-    event SetInterestFee(bytes32 indexed id, uint256 interestFee);
+    event SetObligationInterestFee(bytes32 indexed id, uint256 interestFee);
+    event SetDefaultInterestFee(address indexed loanToken, uint256 interestFee);
     event SetInterestFeeRecipient(address indexed recipient);
 
+    event ObligationCreated(bytes32 indexed obligationId, Obligation obligation);
     event Take(
         address indexed caller,
         bytes32 indexed id,
