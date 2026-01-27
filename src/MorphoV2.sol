@@ -143,19 +143,21 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Overrides the interest fee of a specific obligation.
-    function setObligationInterestFee(bytes32 id, uint256 fee) external {
+    function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(fee <= MAX_INTEREST_FEE, "Interest fee too high");
-        obligationStorage[id].interestFees[0] = uint16(fee / FEE_STEP);
-        emit EventsLib.SetObligationInterestFee(id, fee);
+        require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
+        // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
+        obligationStorage[id].interestFees[0] = uint16(newInterestFee / FEE_STEP);
+        emit EventsLib.SetObligationInterestFee(id, newInterestFee);
     }
 
     /// @dev Doesn't change the fee of already created obligations.
-    function setDefaultInterestFee(address loanToken, uint256 fee) external {
+    function setDefaultInterestFee(address loanToken, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(fee <= MAX_INTEREST_FEE, "Interest fee too high");
-        defaultInterestFees[loanToken][0] = uint16(fee / FEE_STEP);
-        emit EventsLib.SetDefaultInterestFee(loanToken, fee);
+        require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
+        // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
+        defaultInterestFees[loanToken][0] = uint16(newInterestFee / FEE_STEP);
+        emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
     }
 
     /// ENTRY-POINTS ///

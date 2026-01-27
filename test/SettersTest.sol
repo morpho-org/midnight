@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {WAD, MAX_FEE, MAX_INTEREST_FEE} from "../src/libraries/ConstantsLib.sol";
+import {MAX_FEE, MAX_INTEREST_FEE} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 contract SettersTest is BaseTest {
