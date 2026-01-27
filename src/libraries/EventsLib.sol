@@ -16,7 +16,7 @@ library EventsLib {
     event SetDefaultInterestFee(address indexed loanToken, uint256 interestFee);
     event SetInterestFeeRecipient(address indexed recipient);
 
-    event ObligationCreated(bytes32 indexed obligationId, Obligation obligation);
+    event ObligationCreated(bytes32 indexed id, Obligation obligation);
     event Take(
         address indexed caller,
         bytes32 indexed id,

@@ -147,9 +147,9 @@ abstract contract BaseTest is Test {
         );
 
         // then empty the market (borrow side only).
-        deal(address(loanToken), address(this), morphoV2.debtOf(badBorrower, toId(obligation)));
-        morphoV2.repay(obligation, morphoV2.debtOf(badBorrower, toId(obligation)), badBorrower);
-        assertEq(morphoV2.debtOf(badBorrower, toId(obligation)), 0, "debt");
+        deal(address(loanToken), address(this), morphoV2.debtOf(toId(obligation), badBorrower));
+        morphoV2.repay(obligation, morphoV2.debtOf(toId(obligation), badBorrower), badBorrower);
+        assertEq(morphoV2.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
