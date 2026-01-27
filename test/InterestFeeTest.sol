@@ -51,23 +51,22 @@ contract InterestFeeTest is BaseTest {
         morphoV2.setInterestFeeRecipient(feeRecipient);
     }
 
-    /// @dev Helper to compute actual fee after truncation (matching implementation storage)
     function actualFee(uint256 fee) internal pure returns (uint256) {
         return uint256(uint16(fee / FEE_STEP)) * FEE_STEP;
     }
 
-    /// @dev Test that interest fees accrue correctly based on time elapsed and fee rate
-    /// Note: With current constants, fee truncation may result in 0 fee
     function testInterestFeeAccrualBasic(uint256 initialShares, uint256 fee, uint256 timeElapsed) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
+        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
         // Bound timeElapsed to ensure we don't exceed maturity
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
+        // Set default interest fee BEFORE creating the obligation
+        morphoV2.setDefaultInterestFee(address(loanToken), fee);
+
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
-
-        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesBefore = morphoV2.totalShares(id);
         uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
@@ -93,11 +92,11 @@ contract InterestFeeTest is BaseTest {
         assertGt(lastUpdateAfter, lastUpdateBefore, "lastUpdate should have advanced");
     }
 
-    /// @dev Test that zero interest fee results in no shares minted
     function testInterestFeeZeroFee(uint256 initialShares, uint256 timeElapsed) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
+        // No default fee set, so fee is 0
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
@@ -114,15 +113,16 @@ contract InterestFeeTest is BaseTest {
         assertEq(recipientSharesAfter, recipientSharesBefore, "recipient shares should not change with zero fee");
     }
 
-    /// @dev Test that no time elapsed results in no shares minted
     function testInterestFeeZeroTimeElapsed(uint256 initialShares, uint256 fee) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
+        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
+
+        // Set default interest fee BEFORE creating the obligation
+        morphoV2.setDefaultInterestFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
-
-        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesBefore = morphoV2.totalShares(id);
         uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
@@ -138,16 +138,16 @@ contract InterestFeeTest is BaseTest {
         );
     }
 
-    /// @dev Test that interest fees only accrue once (subsequent accruals are skipped)
-    /// This tests the early return behavior in accrueInterestFees when recipient already has shares
     function testInterestFeeAccruesOnlyOnce(uint256 initialShares, uint256 fee) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
+        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
+
+        // Set default interest fee BEFORE creating the obligation
+        morphoV2.setDefaultInterestFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
-
-        morphoV2.setObligationInterestFee(id, fee);
 
         uint256 totalSharesInitial = morphoV2.totalShares(id);
         uint256 recipientSharesInitial = morphoV2.sharesOf(id, feeRecipient);

@@ -146,6 +146,11 @@ contract MorphoV2 is IMorphoV2 {
     function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
+        require(newInterestFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        require(
+            newInterestFee <= uint256(obligationStorage[id].interestFees[0]) * FEE_STEP,
+            "New interest fee is higher than current"
+        );
         // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
         obligationStorage[id].interestFees[0] = uint16(newInterestFee / FEE_STEP);
         emit EventsLib.SetObligationInterestFee(id, newInterestFee);
