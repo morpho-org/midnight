@@ -83,6 +83,9 @@ abstract contract BaseTest is Test {
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
+        uint256 groupAssets,
+        uint256 groupUnits,
+        uint256 groupShares,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
         return morphoV2.take(
@@ -91,8 +94,12 @@ abstract contract BaseTest is Test {
             obligationUnits,
             obligationShares,
             taker,
+            offer.obligation.loanToken,
+            groupAssets,
+            groupUnits,
+            groupShares,
             offer,
-            sig([offer]),
+            sig([offer], groupAssets, groupUnits, groupShares),
             root([offer]),
             proof([offer]),
             address(0),
@@ -107,13 +114,12 @@ abstract contract BaseTest is Test {
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.assets = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.price = 1 ether;
 
         collateralize(obligation, otherBorrower, units);
-        take(0, 0, units, 0, otherBorrower, lenderOffer);
+        take(0, 0, units, 0, otherBorrower, units, 0, 0, lenderOffer);
     }
 
     function createBadDebt(Obligation memory obligation) internal {
@@ -127,7 +133,6 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.obligation = obligation;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
-        badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.price = 1 ether;
@@ -137,7 +142,7 @@ abstract contract BaseTest is Test {
 
         deal(address(loanToken), unluckyLender, 100);
 
-        take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
+        take(100, 0, 0, 0, unluckyLender, 100, 0, 0, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         morphoV2.liquidate(obligation, new Seizure[](0), badBorrower, "");
@@ -182,22 +187,45 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
     }
 
-    function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
+    function sig(
+        bytes32 _root,
+        address groupLoanToken,
+        uint256 groupAssets,
+        uint256 groupUnits,
+        uint256 groupShares,
+        uint256 _privateKey
+    ) internal view returns (Signature memory) {
+        bytes32 structHash = keccak256(
+            abi.encode(ROOT_TYPEHASH, _root, groupLoanToken, groupAssets, groupUnits, groupShares)
+        );
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         Signature memory signature;
         (signature.v, signature.r, signature.s) = vm.sign(_privateKey, messageHash);
         return signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[1] memory offers, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
+        internal
+        view
+        returns (Signature memory)
+    {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return
+            sig(
+                _root, offers[0].obligation.loanToken, groupAssets, groupUnits, groupShares, privateKey[offers[0].maker]
+            );
     }
 
-    function sig(Offer[2] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[2] memory offers, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
+        internal
+        view
+        returns (Signature memory)
+    {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return
+            sig(
+                _root, offers[0].obligation.loanToken, groupAssets, groupUnits, groupShares, privateKey[offers[0].maker]
+            );
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
@@ -220,7 +248,6 @@ abstract contract BaseTest is Test {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
-        borrowerOffer.assets = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.price = 1 ether;
@@ -231,8 +258,12 @@ abstract contract BaseTest is Test {
             obligationUnits,
             0,
             lender,
+            obligation.loanToken,
+            obligationUnits,
+            0,
+            0,
             borrowerOffer,
-            sig([borrowerOffer]),
+            sig([borrowerOffer], obligationUnits, 0, 0),
             root([borrowerOffer]),
             proof([borrowerOffer]),
             address(0),

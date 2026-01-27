@@ -155,10 +155,4 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.consume(group, amount);
         assertEq(morphoV2.consumed(user, group), amount, "consumed");
     }
-
-    function testShuffleSession(address user) public {
-        vm.prank(user);
-        morphoV2.shuffleSession();
-        assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
-    }
 }

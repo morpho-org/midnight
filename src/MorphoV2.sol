@@ -39,10 +39,6 @@ contract MorphoV2 is IMorphoV2 {
     /// obligationShares and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
-    /// @dev Offers should have the current session to be valid.
-    /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
-    mapping(address user => bytes32) public session;
-
     /// @dev Obligation trading fees for a given obligation id.
     /// @dev Bit 0: activated flag. Bits 1-144: 6 trading fees packed (24 bits each).
     /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d.
@@ -142,6 +138,10 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
+        address groupLoanToken,
+        uint256 groupAssets,
+        uint256 groupUnits,
+        uint256 groupShares,
         Offer memory offer,
         Signature memory sig,
         bytes32 root,
@@ -153,16 +153,15 @@ contract MorphoV2 is IMorphoV2 {
             UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
             "inconsistent input"
         );
-        require(
-            UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
-            "inconsistent offer input"
-        );
+        require(UtilsLib.atMostOneNonZero(groupAssets, groupUnits, groupShares), "inconsistent group input");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(signer(root, sig) == offer.maker, "invalid signature");
+        require(groupLoanToken == offer.obligation.loanToken, "group loan token mismatch");
+        require(
+            signer(root, groupLoanToken, groupAssets, groupUnits, groupShares, sig) == offer.maker, "invalid signature"
+        );
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
 
         (
@@ -200,15 +199,15 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
 
-        if (offer.assets > 0) {
+        if (groupAssets > 0) {
             require(
-                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= offer.assets,
+                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= groupAssets,
                 "consumed"
             );
-        } else if (offer.obligationUnits > 0) {
-            require((consumed[offer.maker][offer.group] += obligationUnits) <= offer.obligationUnits, "consumed");
+        } else if (groupUnits > 0) {
+            require((consumed[offer.maker][offer.group] += obligationUnits) <= groupUnits, "consumed");
         } else {
-            require((consumed[offer.maker][offer.group] += obligationShares) <= offer.obligationShares, "consumed");
+            require((consumed[offer.maker][offer.group] += obligationShares) <= groupShares, "consumed");
         }
 
         bool buyerIsLender = (debtOf[buyer][id] == 0);
@@ -429,14 +428,6 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.Consume(msg.sender, group, amount);
     }
 
-    /// @dev TODO: is it safe enough?
-    function shuffleSession() external {
-        bytes32 newSession = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
-        session[msg.sender] = newSession;
-
-        emit EventsLib.ShuffleSession(msg.sender, newSession);
-    }
-
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
 
@@ -487,8 +478,17 @@ contract MorphoV2 is IMorphoV2 {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
-    function signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+    function signer(
+        bytes32 root,
+        address groupLoanToken,
+        uint256 groupAssets,
+        uint256 groupUnits,
+        uint256 groupShares,
+        Signature memory signature
+    ) internal view returns (address) {
+        bytes32 structHash = keccak256(
+            abi.encode(ROOT_TYPEHASH, root, groupLoanToken, groupAssets, groupUnits, groupShares)
+        );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
