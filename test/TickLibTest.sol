@@ -24,17 +24,19 @@ contract TickLibTest is Test {
             uint256 price = TickLib.tickToPrice(tick);
             if (tick < MAX_TICK) {
                 uint256 nextPrice = TickLib.tickToPrice(tick + 1);
-                if (price == nextPrice) continue;
-                uint256 edgePrice = price - (price - nextPrice) / 2;
-                (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
-                assertEq(alignedEdgePrice, price, "lower price up to same distance");
+                if (price != nextPrice) {
+                    uint256 edgePrice = price - (price - nextPrice) / 2;
+                    (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                    assertEq(alignedEdgePrice, price, "lower price up to same distance");
+                }
             }
             if (tick > MIN_TICK) {
                 uint256 prevPrice = TickLib.tickToPrice(tick - 1);
-                if (price == prevPrice) continue;
-                uint256 edgePrice = price + (prevPrice - price - 1) / 2;
-                (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
-                assertEq(alignedEdgePrice, price, "higher price not matching");
+                if (price != prevPrice) {
+                    uint256 edgePrice = price + (prevPrice - price - 1) / 2;
+                    (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                    assertEq(alignedEdgePrice, price, "higher price not matching");
+                }
             }
         }
     }
