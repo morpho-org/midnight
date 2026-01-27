@@ -138,6 +138,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
+        bytes32 group,
         address groupLoanToken,
         uint256 groupAssets,
         uint256 groupUnits,
@@ -159,7 +160,8 @@ contract MorphoV2 is IMorphoV2 {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(groupLoanToken == offer.obligation.loanToken, "group loan token mismatch");
         require(
-            signer(root, groupLoanToken, groupAssets, groupUnits, groupShares, sig) == offer.maker, "invalid signature"
+            signer(root, group, groupLoanToken, groupAssets, groupUnits, groupShares, sig) == offer.maker,
+            "invalid signature"
         );
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         bytes32 id = touchObligation(offer.obligation);
@@ -200,14 +202,11 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         if (groupAssets > 0) {
-            require(
-                (consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets) <= groupAssets,
-                "consumed"
-            );
+            require((consumed[offer.maker][group] += offer.buy ? buyerAssets : sellerAssets) <= groupAssets, "consumed");
         } else if (groupUnits > 0) {
-            require((consumed[offer.maker][offer.group] += obligationUnits) <= groupUnits, "consumed");
+            require((consumed[offer.maker][group] += obligationUnits) <= groupUnits, "consumed");
         } else {
-            require((consumed[offer.maker][offer.group] += obligationShares) <= groupShares, "consumed");
+            require((consumed[offer.maker][group] += obligationShares) <= groupShares, "consumed");
         }
 
         bool buyerIsLender = (debtOf[buyer][id] == 0);
@@ -480,6 +479,7 @@ contract MorphoV2 is IMorphoV2 {
 
     function signer(
         bytes32 root,
+        bytes32 group,
         address groupLoanToken,
         uint256 groupAssets,
         uint256 groupUnits,
@@ -487,7 +487,7 @@ contract MorphoV2 is IMorphoV2 {
         Signature memory signature
     ) internal view returns (address) {
         bytes32 structHash = keccak256(
-            abi.encode(ROOT_TYPEHASH, root, groupLoanToken, groupAssets, groupUnits, groupShares)
+            abi.encode(ROOT_TYPEHASH, root, group, groupLoanToken, groupAssets, groupUnits, groupShares)
         );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);

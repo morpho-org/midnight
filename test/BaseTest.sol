@@ -94,12 +94,13 @@ abstract contract BaseTest is Test {
             obligationUnits,
             obligationShares,
             taker,
+            bytes32(0),
             offer.obligation.loanToken,
             groupAssets,
             groupUnits,
             groupShares,
             offer,
-            sig([offer], groupAssets, groupUnits, groupShares),
+            sig([offer], bytes32(0), groupAssets, groupUnits, groupShares),
             root([offer]),
             proof([offer]),
             address(0),
@@ -114,12 +115,30 @@ abstract contract BaseTest is Test {
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.price = 1 ether;
 
         collateralize(obligation, otherBorrower, units);
-        take(0, 0, units, 0, otherBorrower, units, 0, 0, lenderOffer);
+
+        bytes32 otherGroup = keccak256("non zero group");
+        morphoV2.take(
+            0,
+            0,
+            units,
+            0,
+            otherBorrower,
+            otherGroup,
+            lenderOffer.obligation.loanToken,
+            units,
+            0,
+            0,
+            lenderOffer,
+            sig([lenderOffer], otherGroup, units, 0, 0),
+            root([lenderOffer]),
+            proof([lenderOffer]),
+            address(0),
+            hex""
+        );
     }
 
     function createBadDebt(Obligation memory obligation) internal {
@@ -189,6 +208,7 @@ abstract contract BaseTest is Test {
 
     function sig(
         bytes32 _root,
+        bytes32 group,
         address groupLoanToken,
         uint256 groupAssets,
         uint256 groupUnits,
@@ -196,7 +216,7 @@ abstract contract BaseTest is Test {
         uint256 _privateKey
     ) internal view returns (Signature memory) {
         bytes32 structHash = keccak256(
-            abi.encode(ROOT_TYPEHASH, _root, groupLoanToken, groupAssets, groupUnits, groupShares)
+            abi.encode(ROOT_TYPEHASH, _root, group, groupLoanToken, groupAssets, groupUnits, groupShares)
         );
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         Signature memory signature;
@@ -204,28 +224,38 @@ abstract contract BaseTest is Test {
         return signature;
     }
 
-    function sig(Offer[1] memory offers, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
+    function sig(Offer[1] memory offers, bytes32 group, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
         internal
         view
         returns (Signature memory)
     {
         bytes32 _root = root(offers);
-        return
-            sig(
-                _root, offers[0].obligation.loanToken, groupAssets, groupUnits, groupShares, privateKey[offers[0].maker]
-            );
+        return sig(
+            _root,
+            group,
+            offers[0].obligation.loanToken,
+            groupAssets,
+            groupUnits,
+            groupShares,
+            privateKey[offers[0].maker]
+        );
     }
 
-    function sig(Offer[2] memory offers, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
+    function sig(Offer[2] memory offers, bytes32 group, uint256 groupAssets, uint256 groupUnits, uint256 groupShares)
         internal
         view
         returns (Signature memory)
     {
         bytes32 _root = root(offers);
-        return
-            sig(
-                _root, offers[0].obligation.loanToken, groupAssets, groupUnits, groupShares, privateKey[offers[0].maker]
-            );
+        return sig(
+            _root,
+            group,
+            offers[0].obligation.loanToken,
+            groupAssets,
+            groupUnits,
+            groupShares,
+            privateKey[offers[0].maker]
+        );
     }
 
     function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
@@ -258,12 +288,13 @@ abstract contract BaseTest is Test {
             obligationUnits,
             0,
             lender,
+            bytes32(0),
             obligation.loanToken,
             obligationUnits,
             0,
             0,
             borrowerOffer,
-            sig([borrowerOffer], obligationUnits, 0, 0),
+            sig([borrowerOffer], bytes32(0), obligationUnits, 0, 0),
             root([borrowerOffer]),
             proof([borrowerOffer]),
             address(0),
