@@ -18,7 +18,7 @@ contract TickLibTest is Test {
         }
     }
 
-    function testPriceToTickAndTickAlignedPriceEdges() public pure {
+    function testpriceToTickAlignedPriceAndTickEdges() public pure {
         // When exactly between 2 prices match the higher one.
         for (int256 tick = MIN_TICK; tick <= MAX_TICK; tick++) {
             uint256 price = TickLib.tickToPrice(tick);
@@ -26,7 +26,7 @@ contract TickLibTest is Test {
                 uint256 nextPrice = TickLib.tickToPrice(tick + 1);
                 if (price != nextPrice) {
                     uint256 edgePrice = price - (price - nextPrice) / 2;
-                    (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                    (uint256 alignedEdgePrice,) = TickLib.priceToTickAlignedPriceAndTick(edgePrice);
                     assertEq(alignedEdgePrice, price, "lower price up to same distance");
                 }
             }
@@ -34,7 +34,7 @@ contract TickLibTest is Test {
                 uint256 prevPrice = TickLib.tickToPrice(tick - 1);
                 if (price != prevPrice) {
                     uint256 edgePrice = price + (prevPrice - price - 1) / 2;
-                    (, uint256 alignedEdgePrice) = TickLib.priceToTickAndTickAlignedPrice(edgePrice);
+                    (uint256 alignedEdgePrice,) = TickLib.priceToTickAlignedPriceAndTick(edgePrice);
                     assertEq(alignedEdgePrice, price, "higher price not matching");
                 }
             }
