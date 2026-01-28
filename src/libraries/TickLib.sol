@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {WAD} from "./ConstantsLib.sol";
-import {MIN_TICK, MAX_TICK, MID_PRICE, PRICE_STEP} from "./ConstantsLib.sol";
+import {MAX_TICK, MID_PRICE, PRICE_STEP} from "./ConstantsLib.sol";
 
 library TickLib {
     // 1e5 scaled deltas to price 0.5 for tick 0 to -495.
