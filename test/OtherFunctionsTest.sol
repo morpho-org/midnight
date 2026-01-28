@@ -9,7 +9,7 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MIN_TICK, MAX_TICK} from "../src/libraries/ConstantsLib.sol";
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;

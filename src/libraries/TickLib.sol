@@ -60,9 +60,11 @@ library TickLib {
     function tickToPrice(int256 tick) internal pure returns (uint256) {
         unchecked {
             bytes memory deltas = PACKED_DELTAS;
-            if (tick <= 0) {
+            if (tick < 0) {
+                // forge-lint: disable-next-item(unsafe-typecast) tick is negative
                 return MID_PRICE + getDelta(deltas, uint256(-tick));
             } else {
+                // forge-lint: disable-next-item(unsafe-typecast) tick is positive
                 return WAD - (MID_PRICE + getDelta(deltas, uint256(tick)));
             }
         }
@@ -81,6 +83,8 @@ library TickLib {
 
             bytes memory deltas = PACKED_DELTAS;
             uint256 lowIndex = 0;
+
+            // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK is positive
             uint256 highIndex = uint256(MAX_TICK);
             while (highIndex - lowIndex > 1) {
                 uint256 mid = (lowIndex + highIndex) / 2;
@@ -93,14 +97,18 @@ library TickLib {
 
             if (price < MID_PRICE) {
                 if (delta - lowDelta > highDelta - delta) {
+                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
                     return (MID_PRICE - highDelta, int256(highIndex));
                 } else {
+                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
                     return (MID_PRICE - lowDelta, int256(lowIndex));
                 }
             } else {
                 if (delta - lowDelta >= highDelta - delta) {
+                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
                     return (MID_PRICE + highDelta, -int256(highIndex));
                 } else {
+                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
                     return (MID_PRICE + lowDelta, -int256(lowIndex));
                 }
             }

@@ -17,7 +17,8 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
-import {TickLib, MIN_TICK, MAX_TICK} from "./libraries/TickLib.sol";
+import {MIN_TICK, MAX_TICK} from "./libraries/ConstantsLib.sol";
+import {TickLib} from "./libraries/TickLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
