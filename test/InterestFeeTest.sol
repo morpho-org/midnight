@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, MAX_INTEREST_FEE, FEE_STEP} from "../src/libraries/ConstantsLib.sol";
+import {WAD, MAX_INTEREST_FEE, INTEREST_FEE_STEP} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
@@ -52,13 +52,13 @@ contract InterestFeeTest is BaseTest {
     }
 
     function actualFee(uint256 fee) internal pure returns (uint256) {
-        return uint256(uint16(fee / FEE_STEP)) * FEE_STEP;
+        return uint256(uint16(fee / INTEREST_FEE_STEP)) * INTEREST_FEE_STEP;
     }
 
     function testInterestFeeAccrualBasic(uint256 initialShares, uint256 fee, uint256 timeElapsed) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
-        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
+        fee = fee / INTEREST_FEE_STEP * INTEREST_FEE_STEP; // Align to INTEREST_FEE_STEP
         // Bound timeElapsed to ensure we don't exceed maturity
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
@@ -81,8 +81,7 @@ contract InterestFeeTest is BaseTest {
 
         // Calculate expected shares using actual (truncated) fee, matching implementation formula
         uint256 _actualFee = actualFee(fee);
-        uint256 expectedSharesMinted =
-            (totalSharesBefore * timeElapsed).mulDivDown(_actualFee.mulDivDown(WAD, 365 days), WAD);
+        uint256 expectedSharesMinted = (totalSharesBefore * timeElapsed).mulDivDown(_actualFee, WAD);
 
         assertEq(totalSharesAfter, totalSharesBefore + expectedSharesMinted, "total shares should increase");
         assertEq(
@@ -116,7 +115,7 @@ contract InterestFeeTest is BaseTest {
     function testInterestFeeZeroTimeElapsed(uint256 initialShares, uint256 fee) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
-        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
+        fee = fee / INTEREST_FEE_STEP * INTEREST_FEE_STEP; // Align to INTEREST_FEE_STEP
 
         // Set default interest fee BEFORE creating the obligation
         morphoV2.setDefaultInterestFee(address(loanToken), fee);
@@ -141,7 +140,7 @@ contract InterestFeeTest is BaseTest {
     function testInterestFeeAccruesOnlyOnce(uint256 initialShares, uint256 fee) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
         fee = bound(fee, MAX_INTEREST_FEE / 100, MAX_INTEREST_FEE);
-        fee = fee / FEE_STEP * FEE_STEP; // Align to FEE_STEP
+        fee = fee / INTEREST_FEE_STEP * INTEREST_FEE_STEP; // Align to INTEREST_FEE_STEP
 
         // Set default interest fee BEFORE creating the obligation
         morphoV2.setDefaultInterestFee(address(loanToken), fee);
@@ -160,7 +159,7 @@ contract InterestFeeTest is BaseTest {
 
         // Calculate expected shares for first accrual
         uint256 _actualFee = actualFee(fee);
-        uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(_actualFee.mulDivDown(WAD, 365 days), WAD);
+        uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(_actualFee, WAD);
 
         // Second take - should NOT accrue additional interest (early return)
         vm.warp(block.timestamp + 7 days);

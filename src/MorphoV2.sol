@@ -7,7 +7,8 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
-    FEE_STEP,
+    TRADING_FEE_STEP,
+    INTEREST_FEE_STEP,
     MAX_FEE,
     MAX_LIF,
     TIME_TO_MAX_LIF,
@@ -121,13 +122,13 @@ contract MorphoV2 is IMorphoV2 {
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(index <= 5, "Invalid index");
-        require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        require(newTradingFee % TRADING_FEE_STEP == 0, "fee should be a multiple of TRADING_FEE_STEP");
         require(
-            newTradingFee <= uint256(obligationStorage[id].tradingFees[index]) * FEE_STEP,
+            newTradingFee <= uint256(obligationStorage[id].tradingFees[index]) * TRADING_FEE_STEP,
             "New trading fee is higher than current"
         );
         // forge-lint: disable-next-line(unsafe-typecast) as newTradingFee is less than MAX_FEE
-        obligationStorage[id].tradingFees[index] = uint16(newTradingFee / FEE_STEP);
+        obligationStorage[id].tradingFees[index] = uint16(newTradingFee / TRADING_FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -136,9 +137,9 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newTradingFee <= MAX_FEE, "Trading fee too high");
         require(index <= 5, "Invalid index");
-        require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        require(newTradingFee % TRADING_FEE_STEP == 0, "fee should be a multiple of TRADING_FEE_STEP");
         // forge-lint: disable-next-line(unsafe-typecast) as newTradingFee is less than MAX_FEE
-        defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
+        defaultTradingFees[loanToken][index] = uint16(newTradingFee / TRADING_FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
@@ -146,13 +147,13 @@ contract MorphoV2 is IMorphoV2 {
     function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
-        require(newInterestFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        require(newInterestFee % INTEREST_FEE_STEP == 0, "fee should be a multiple of INTEREST_FEE_STEP");
         require(
-            newInterestFee <= uint256(obligationStorage[id].interestFees[0]) * FEE_STEP,
+            newInterestFee <= uint256(obligationStorage[id].interestFees[0]) * INTEREST_FEE_STEP,
             "New interest fee is higher than current"
         );
         // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        obligationStorage[id].interestFees[0] = uint16(newInterestFee / FEE_STEP);
+        obligationStorage[id].interestFees[0] = uint16(newInterestFee / INTEREST_FEE_STEP);
         emit EventsLib.SetObligationInterestFee(id, newInterestFee);
     }
 
@@ -161,7 +162,7 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
         // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        defaultInterestFees[loanToken][0] = uint16(newInterestFee / FEE_STEP);
+        defaultInterestFees[loanToken][0] = uint16(newInterestFee / INTEREST_FEE_STEP);
         emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
     }
 
@@ -499,8 +500,9 @@ contract MorphoV2 is IMorphoV2 {
         if (sharesOf[id][interestFeeRecipient] != 0) return;
         uint256 elapsed = block.timestamp - obligationStorage[id].lastUpdate;
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, block.timestamp);
+        uint256 lastTimeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, obligationStorage[id].lastUpdate);
         uint256 sharesToMint = (obligationStorage[id].totalShares * elapsed)
-        .mulDivDown(interestFee(id, timeToMaturity).mulDivDown(WAD, 365 days), WAD);
+        .mulDivDown(avgInterestFee(id, timeToMaturity, lastTimeToMaturity), WAD);
         obligationStorage[id].totalShares += UtilsLib.toUint128(sharesToMint);
         sharesOf[id][interestFeeRecipient] += sharesToMint;
         obligationStorage[id].lastUpdate = uint56(block.timestamp);
@@ -588,7 +590,7 @@ contract MorphoV2 is IMorphoV2 {
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         uint16[6] memory _tradingFees = obligationStorage[id].tradingFees;
 
-        if (timeToMaturity >= 180 days) return uint256(_tradingFees[5]) * FEE_STEP;
+        if (timeToMaturity >= 180 days) return uint256(_tradingFees[5]) * TRADING_FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 index, uint256 start, uint256 end) =
@@ -599,17 +601,38 @@ contract MorphoV2 is IMorphoV2 {
                                        (4, 90 days, 180 days);
         // forgefmt: disable-end
 
-        uint256 feeLower = uint256(_tradingFees[index]) * FEE_STEP;
-        uint256 feeUpper = uint256(_tradingFees[index + 1]) * FEE_STEP;
+        uint256 feeLower = uint256(_tradingFees[index]) * TRADING_FEE_STEP;
+        uint256 feeUpper = uint256(_tradingFees[index + 1]) * TRADING_FEE_STEP;
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
 
-    function interestFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+    function avgInterestFee(bytes32 id, uint256 timeToMaturity, uint256 lastTimeToMaturity)
+        public
+        view
+        returns (uint256)
+    {
+        if (timeToMaturity == lastTimeToMaturity) return 0;
+
         uint16[6] memory _interestFees = obligationStorage[id].interestFees;
 
-        if (timeToMaturity >= 180 days) return uint256(_interestFees[5]) * FEE_STEP;
+        // forgefmt: disable-start
+        uint256 timeSpentInThe180dBucket = UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 180 days));
+        uint256 timeSpentInThe90dBucket =  UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 90 days));
+        uint256 timeSpentInThe30dBucket =  UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 30 days));
+        uint256 timeSpentInThe7dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 7 days));
+        uint256 timeSpentInThe1dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 1 days));
+        uint256 timeSpentInThe0dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 0 days));
+        uint256 totalTimeSpent = lastTimeToMaturity - timeToMaturity;
 
-        return _interestFees[0] * FEE_STEP;
+        return (
+               timeSpentInThe180dBucket * _interestFees[5] * INTEREST_FEE_STEP +
+               timeSpentInThe90dBucket  * _interestFees[4] * INTEREST_FEE_STEP +
+               timeSpentInThe30dBucket  * _interestFees[3] * INTEREST_FEE_STEP +
+               timeSpentInThe7dBucket   * _interestFees[2] * INTEREST_FEE_STEP +
+               timeSpentInThe1dBucket   * _interestFees[1] * INTEREST_FEE_STEP +
+               timeSpentInThe0dBucket   * _interestFees[0] * INTEREST_FEE_STEP
+        ) / totalTimeSpent;
+        // forgefmt: disable-end
     }
 }
