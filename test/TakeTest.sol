@@ -4,12 +4,13 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
+import {IOracle} from "../src/interfaces/IOracle.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -1243,6 +1244,30 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets)
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+    }
+
+    function testMinCollateralInTake(uint256 buyerAssets, uint256 price, uint256 minCollateral) public {
+        buyerAssets = bound(buyerAssets, 1, maxAssets);
+        price = bound(price, 0.01e18, 1e18);
+        borrowerOffer.price = price;
+        borrowerOffer.assets = buyerAssets;
+        deal(address(loanToken), lender, buyerAssets);
+        uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
+        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
+        vm.assume(expectedUnits > 0);
+
+        uint256 collateralQuoted = expectedUnits.mulDivDown(WAD, obligation.collaterals[0].lltv)
+            .mulDivDown(IOracle(obligation.collaterals[0].oracle).price(), ORACLE_PRICE_SCALE)
+            .mulDivDown(obligation.collaterals[0].lltv, WAD);
+        minCollateral = bound(minCollateral, collateralQuoted + 2, type(uint256).max);
+
+        obligation.minCollateral = minCollateral;
+        borrowerOffer.obligation.minCollateral = minCollateral;
+
+        collateralize(obligation, borrower, expectedUnits);
+
+        vm.expectRevert("Seller is unhealthy");
+        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
     }
 }
 
