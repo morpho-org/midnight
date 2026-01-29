@@ -500,7 +500,7 @@ contract MorphoV2 is IMorphoV2 {
                     .mulDivDown(IOracle(_collateral.oracle).price(), ORACLE_PRICE_SCALE)
                     .mulDivDown(_collateral.lltv, WAD);
             }
-            return debt <= maxDebt;
+            return (debt <= maxDebt) && (maxDebt >= obligation.minCollateral);
         }
     }
 
