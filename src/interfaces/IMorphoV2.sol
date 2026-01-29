@@ -46,6 +46,12 @@ struct Seizure {
     uint256 seized;
 }
 
+struct Position {
+    uint256 shares;
+    uint256 debt;
+    mapping(address collateralToken => uint256) collateral;
+}
+
 struct ObligationStorage {
     uint128 totalUnits;
     uint128 totalShares;
@@ -58,6 +64,8 @@ struct ObligationStorage {
     // Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
     // Fees are stored divided by INTEREST_FEE_STEP (1e6) to fit in 16 bits. Max fee is 1% per year.
     uint16[6] interestFees;
+    // User positions within this obligation.
+    mapping(address user => Position) positions;
 }
 
 interface IMorphoV2 {}
