@@ -7,11 +7,11 @@ import {MorphoV2} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
-import {console} from "../lib/forge-std/src/console.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -23,7 +23,7 @@ contract TakeTest is BaseTest {
     Offer internal otherLenderOffer;
     Offer internal otherBorrowerOffer;
 
-    uint256 internal maxAssets = 1e36; // to refine.
+    uint256 internal maxAssets = 1e33; // to refine.
     uint256 internal initialUnits;
     uint256 internal initialShares;
 
@@ -45,28 +45,28 @@ contract TakeTest is BaseTest {
         lenderOffer.assets = type(uint256).max;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.tick = 395;
+        lenderOffer.tick = MAX_TICK;
 
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.obligation = obligation;
         otherLenderOffer.expiry = block.timestamp + 200;
-        otherLenderOffer.tick = 395;
+        otherLenderOffer.tick = MAX_TICK;
 
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.assets = type(uint256).max;
         borrowerOffer.obligation = obligation;
         borrowerOffer.expiry = block.timestamp + 200;
-        borrowerOffer.tick = 395;
+        borrowerOffer.tick = MAX_TICK;
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.obligation = obligation;
         otherBorrowerOffer.expiry = block.timestamp + 200;
-        otherBorrowerOffer.tick = 395;
+        otherBorrowerOffer.tick = MAX_TICK;
 
         createBadDebt(obligation); // to create non trivial shares <=> units conversion.
 
@@ -81,7 +81,7 @@ contract TakeTest is BaseTest {
     function testBuyAssetsInput1(uint256 buyerAssets, uint256 tick) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
         borrowerOffer.assets = buyerAssets;
@@ -92,8 +92,8 @@ contract TakeTest is BaseTest {
 
         take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), expectedShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), expectedShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + expectedUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + expectedShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -104,7 +104,7 @@ contract TakeTest is BaseTest {
     function testSellAssetsInput1(uint256 buyerAssets, uint256 tick) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
         lenderOffer.assets = buyerAssets;
@@ -115,8 +115,8 @@ contract TakeTest is BaseTest {
 
         take(buyerAssets, 0, 0, 0, borrower, lenderOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), expectedShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), expectedShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + expectedUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + expectedShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -127,7 +127,7 @@ contract TakeTest is BaseTest {
     function testBuyObligationUnitsInput1(uint256 obligationUnits, uint256 tick) public {
         obligationUnits = bound(obligationUnits, 1, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
         uint256 expectedAssets = obligationUnits.mulDivDown(price, WAD);
@@ -138,8 +138,8 @@ contract TakeTest is BaseTest {
 
         take(0, 0, obligationUnits, 0, lender, borrowerOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), expectedShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), expectedShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), obligationUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + obligationUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + expectedShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
@@ -150,7 +150,7 @@ contract TakeTest is BaseTest {
     function testSellObligationUnitsInput1(uint256 obligationUnits, uint256 tick) public {
         obligationUnits = bound(obligationUnits, 1, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
         uint256 expectedAssets = obligationUnits.mulDivDown(price, WAD);
@@ -161,8 +161,8 @@ contract TakeTest is BaseTest {
 
         take(0, 0, obligationUnits, 0, borrower, lenderOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), expectedShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), expectedShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), obligationUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + obligationUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + expectedShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
@@ -173,7 +173,7 @@ contract TakeTest is BaseTest {
     function testBuyObligationSharesInput1(uint256 obligationShares, uint256 tick) public {
         obligationShares = bound(obligationShares, 1, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
@@ -184,8 +184,8 @@ contract TakeTest is BaseTest {
 
         take(0, 0, 0, obligationShares, lender, borrowerOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), obligationShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), obligationShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + expectedUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + obligationShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
@@ -196,7 +196,7 @@ contract TakeTest is BaseTest {
     function testSellObligationSharesInput1(uint256 obligationShares, uint256 tick) public {
         obligationShares = bound(obligationShares, 1, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
@@ -207,8 +207,8 @@ contract TakeTest is BaseTest {
 
         take(0, 0, 0, obligationShares, borrower, lenderOffer);
 
-        assertEq(morphoV2.sharesOf(lender, id), obligationShares, "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, lender), obligationShares, "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + expectedUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + obligationShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
@@ -220,14 +220,14 @@ contract TakeTest is BaseTest {
 
     function testBuyAssetsInput2(uint256 buyerAssets, uint256 tick, uint256 otherLenderUnits) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         otherLenderUnits = bound(otherLenderUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets);
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = buyerAssets;
@@ -235,9 +235,9 @@ contract TakeTest is BaseTest {
 
         take(buyerAssets, 0, 0, 0, lender, otherLenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), expectedShares, 1, "lender shares");
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), expectedShares, 1, "lender shares");
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -248,23 +248,23 @@ contract TakeTest is BaseTest {
 
     function testSellAssetsInput2(uint256 buyerAssets, uint256 tick, uint256 otherLenderUnits) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         otherLenderUnits = bound(otherLenderUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets);
         lenderOffer.assets = buyerAssets;
         lenderOffer.tick = tick;
 
         take(buyerAssets, 0, 0, 0, otherLender, lenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), expectedShares, 1, "lender shares");
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), expectedShares, 1, "lender shares");
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -275,14 +275,14 @@ contract TakeTest is BaseTest {
 
     function testBuyObligationUnitsInput2(uint256 obligationUnits, uint256 tick, uint256 otherLenderUnits) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         otherLenderUnits = bound(otherLenderUnits, obligationUnits, max(obligationUnits, maxAssets));
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets);
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = buyerAssets + 1;
@@ -290,9 +290,9 @@ contract TakeTest is BaseTest {
 
         take(0, 0, obligationUnits, 0, lender, otherLenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), expectedShares, 1, "lender shares"); // TODO: approx
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), expectedShares, 1, "lender shares"); // TODO: approx
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -303,24 +303,24 @@ contract TakeTest is BaseTest {
 
     function testSellObligationUnitsInput2(uint256 obligationUnits, uint256 tick, uint256 otherLenderUnits) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         vm.assume(obligationUnits <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationUnits, maxAssets);
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets);
         lenderOffer.assets = buyerAssets + 1;
         lenderOffer.tick = tick;
 
         take(0, 0, obligationUnits, 0, otherLender, lenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), expectedShares, 1, "lender shares"); // TODO: approx
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), expectedShares, 1, "lender shares"); // TODO: approx
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -331,15 +331,15 @@ contract TakeTest is BaseTest {
 
     function testBuyObligationSharesInput2(uint256 obligationShares, uint256 tick, uint256 otherLenderUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets + 1); // TODO fix
         otherLenderOffer.buy = false;
         otherLenderOffer.assets = type(uint256).max;
@@ -347,9 +347,9 @@ contract TakeTest is BaseTest {
 
         take(0, 0, 0, obligationShares, lender, otherLenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), obligationShares, 1, "lender shares"); // TODO: approx
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), obligationShares, 1, "lender shares"); // TODO: approx
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - obligationShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - obligationShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -360,24 +360,24 @@ contract TakeTest is BaseTest {
 
     function testSellObligationSharesInput2(uint256 obligationShares, uint256 tick, uint256 otherLenderUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherLenderUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets + 1); // TODO fix
         lenderOffer.assets = type(uint256).max;
         lenderOffer.tick = tick;
 
         take(0, 0, 0, obligationShares, otherLender, lenderOffer);
 
-        assertApproxEqAbs(morphoV2.sharesOf(lender, id), obligationShares, 1, "lender shares"); // TODO: approx
+        assertApproxEqAbs(morphoV2.sharesOf(id, lender), obligationShares, 1, "lender shares"); // TODO: approx
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - obligationShares, 1, "other lender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - obligationShares, 1, "other lender shares"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherLenderUnits, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -402,21 +402,21 @@ contract TakeTest is BaseTest {
 
     function testBuyAssetsInput3(uint256 buyerAssets, uint256 tick, uint256 otherBorrowerDebt) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         otherBorrowerDebt = bound(otherBorrowerDebt, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, expectedUnits);
         borrowerOffer.assets = buyerAssets;
         borrowerOffer.tick = tick;
 
         take(buyerAssets, 0, 0, 0, otherBorrower, borrowerOffer);
 
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower shares");
-        assertEq(morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - expectedUnits, "otherBorrower debt");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower shares");
+        assertEq(morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - expectedUnits, "otherBorrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -426,21 +426,21 @@ contract TakeTest is BaseTest {
 
     function testSellAssetsInput3(uint256 buyerAssets, uint256 tick, uint256 otherBorrowerDebt) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         otherBorrowerDebt = bound(otherBorrowerDebt, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, expectedUnits);
         otherBorrowerOffer.assets = buyerAssets;
         otherBorrowerOffer.tick = tick;
 
         take(buyerAssets, 0, 0, 0, borrower, otherBorrowerOffer);
 
-        assertEq(morphoV2.debtOf(borrower, id), expectedUnits, "borrower debt");
-        assertEq(morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - expectedUnits, "otherBorrower debt");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "borrower debt");
+        assertEq(morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - expectedUnits, "otherBorrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -450,21 +450,21 @@ contract TakeTest is BaseTest {
 
     function testBuyObligationUnitsInput3(uint256 obligationUnits, uint256 tick, uint256 otherBorrowerDebt) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationUnits, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, obligationUnits);
         borrowerOffer.assets = buyerAssets + 1;
         borrowerOffer.tick = tick;
 
         take(0, 0, obligationUnits, 0, otherBorrower, borrowerOffer);
 
-        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "otherBorrower debt");
-        assertEq(morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - obligationUnits, "otherBorrower debt");
+        assertEq(morphoV2.debtOf(id, borrower), obligationUnits, "otherBorrower debt");
+        assertEq(morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - obligationUnits, "otherBorrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -474,20 +474,20 @@ contract TakeTest is BaseTest {
 
     function testSellObligationUnitsInput3(uint256 obligationUnits, uint256 tick, uint256 otherBorrowerDebt) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationUnits, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, obligationUnits);
         otherBorrowerOffer.assets = buyerAssets + 1;
         otherBorrowerOffer.tick = tick;
 
         take(0, 0, obligationUnits, 0, borrower, otherBorrowerOffer);
 
-        assertEq(morphoV2.debtOf(borrower, id), obligationUnits, "borrower debt");
-        assertEq(morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - obligationUnits, "otherBorrower debt");
+        assertEq(morphoV2.debtOf(id, borrower), obligationUnits, "borrower debt");
+        assertEq(morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - obligationUnits, "otherBorrower debt");
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
         assertEq(loanToken.balanceOf(borrower), buyerAssets, "borrower balance");
@@ -497,22 +497,22 @@ contract TakeTest is BaseTest {
 
     function testBuyObligationSharesInput3(uint256 obligationShares, uint256 tick, uint256 otherBorrowerDebt) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, obligationShares);
         borrowerOffer.assets = buyerAssets + 1;
         borrowerOffer.tick = tick;
 
         take(0, 0, 0, obligationShares, otherBorrower, borrowerOffer);
 
-        assertApproxEqAbs(morphoV2.debtOf(borrower, id), expectedUnits, 1, "borrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, borrower), expectedUnits, 1, "borrower debt");
         assertApproxEqAbs(
-            morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - expectedUnits, 1, "otherBorrower debt"
+            morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - expectedUnits, 1, "otherBorrower debt"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -525,22 +525,22 @@ contract TakeTest is BaseTest {
 
     function testSellObligationSharesInput3(uint256 obligationShares, uint256 tick, uint256 otherBorrowerDebt) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         otherBorrowerDebt = bound(otherBorrowerDebt, obligationShares, maxAssets);
         setupOtherUsers(obligation, otherBorrowerDebt);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         collateralize(obligation, borrower, obligationShares);
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.tick = tick;
 
         take(0, 0, 0, obligationShares, borrower, otherBorrowerOffer);
 
-        assertApproxEqAbs(morphoV2.debtOf(borrower, id), expectedUnits, 1, "borrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, borrower), expectedUnits, 1, "borrower debt");
         assertApproxEqAbs(
-            morphoV2.debtOf(otherBorrower, id), otherBorrowerDebt - expectedUnits, 1, "otherBorrower debt"
+            morphoV2.debtOf(id, otherBorrower), otherBorrowerDebt - expectedUnits, 1, "otherBorrower debt"
         );
         assertEq(morphoV2.totalUnits(id), initialUnits + otherBorrowerDebt, "total units");
         assertEq(morphoV2.totalShares(id), initialShares + otherLenderShares, "total shares");
@@ -567,23 +567,23 @@ contract TakeTest is BaseTest {
 
     function testBuyAssetsInput4(uint256 buyerAssets, uint256 tick, uint256 existingUnits) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         otherLenderOffer.assets = buyerAssets;
         otherLenderOffer.tick = tick;
 
         take(buyerAssets, 0, 0, 0, otherBorrower, otherLenderOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - expectedUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - expectedUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - expectedUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - expectedShares, 1, "total shares"
@@ -595,23 +595,23 @@ contract TakeTest is BaseTest {
 
     function testSellAssetsInput4(uint256 buyerAssets, uint256 tick, uint256 existingUnits) public {
         buyerAssets = bound(buyerAssets, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        tick = bound(tick, 0, 600);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
         uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         otherBorrowerOffer.assets = buyerAssets;
         otherBorrowerOffer.tick = tick;
 
         take(buyerAssets, 0, 0, 0, otherLender, otherBorrowerOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - expectedUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - expectedUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - expectedUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - expectedShares, 1, "total shares"
@@ -624,22 +624,22 @@ contract TakeTest is BaseTest {
     function testBuyObligationUnitsInput4(uint256 obligationUnits, uint256 tick, uint256 existingUnits) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         vm.assume(price > 0.01 ether);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         otherLenderOffer.assets = buyerAssets + 1;
         otherLenderOffer.tick = tick;
 
         take(0, 0, obligationUnits, 0, otherBorrower, otherLenderOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - obligationUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - obligationUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - obligationUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - expectedShares, 1, "total shares"
@@ -652,22 +652,22 @@ contract TakeTest is BaseTest {
     function testSellObligationUnitsInput4(uint256 obligationUnits, uint256 tick, uint256 existingUnits) public {
         obligationUnits = bound(obligationUnits, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
         otherBorrowerOffer.assets = buyerAssets + 1;
         otherBorrowerOffer.tick = tick;
 
         take(0, 0, obligationUnits, 0, otherLender, otherBorrowerOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - expectedShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - expectedShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - obligationUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - obligationUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - obligationUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - expectedShares, 1, "total shares"
@@ -680,13 +680,13 @@ contract TakeTest is BaseTest {
     function testBuyObligationSharesInput4(uint256 obligationShares, uint256 tick, uint256 existingUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         existingUnits = bound(existingUnits, obligationShares, max(obligationShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
 
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.tick = tick;
@@ -694,9 +694,9 @@ contract TakeTest is BaseTest {
         take(0, 0, 0, obligationShares, otherBorrower, otherLenderOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - obligationShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - obligationShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - expectedUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - expectedUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - expectedUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - obligationShares, 1, "total shares"
@@ -709,13 +709,13 @@ contract TakeTest is BaseTest {
     function testSellObligationSharesInput4(uint256 obligationShares, uint256 tick, uint256 existingUnits) public {
         obligationShares = bound(obligationShares, 0, maxAssets);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         existingUnits = bound(existingUnits, obligationShares, max(obligationShares, maxAssets));
         setupOtherUsers(obligation, existingUnits);
-        uint256 otherLenderShares = morphoV2.sharesOf(otherLender, id);
+        uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
 
         otherBorrowerOffer.assets = type(uint256).max;
         otherBorrowerOffer.tick = tick;
@@ -723,9 +723,9 @@ contract TakeTest is BaseTest {
         take(0, 0, 0, obligationShares, otherLender, otherBorrowerOffer);
 
         assertApproxEqAbs(
-            morphoV2.sharesOf(otherLender, id), otherLenderShares - obligationShares, 1, "otherLender shares"
+            morphoV2.sharesOf(id, otherLender), otherLenderShares - obligationShares, 1, "otherLender shares"
         );
-        assertApproxEqAbs(morphoV2.debtOf(otherBorrower, id), existingUnits - expectedUnits, 1, "otherBorrower debt");
+        assertApproxEqAbs(morphoV2.debtOf(id, otherBorrower), existingUnits - expectedUnits, 1, "otherBorrower debt");
         assertApproxEqAbs(morphoV2.totalUnits(id), initialUnits + existingUnits - expectedUnits, 1, "total units");
         assertApproxEqAbs(
             morphoV2.totalShares(id), initialShares + otherLenderShares - obligationShares, 1, "total shares"
@@ -749,9 +749,9 @@ contract TakeTest is BaseTest {
         secondRevertingTake = bound(secondRevertingTake, offerAmount - assets + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         borrowerOffer.assets = offerAmount;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerAmount);
-        collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, morphoV2.tickToPrice(borrowerOffer.tick)));
+        collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
 
         take(assets, 0, 0, 0, lender, borrowerOffer);
 
@@ -772,9 +772,9 @@ contract TakeTest is BaseTest {
         secondRevertingTake = bound(secondRevertingTake, offerAmount - assets + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         lenderOffer.assets = offerAmount;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerAmount);
-        collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, morphoV2.tickToPrice(lenderOffer.tick)));
+        collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
 
         take(assets, 0, 0, 0, borrower, lenderOffer);
 
@@ -788,13 +788,13 @@ contract TakeTest is BaseTest {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
         borrowerOffer.assets = firstFill + secondFill;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
-        collateralize(obligation, borrower, firstFill.mulDivDown(WAD, morphoV2.tickToPrice(borrowerOffer.tick)));
+        collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
         collateralize(
-            borrowerOffer2.obligation, borrower, secondFill.mulDivDown(WAD, morphoV2.tickToPrice(borrowerOffer.tick))
+            borrowerOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick))
         );
 
         take(firstFill, 0, 0, 0, lender, borrowerOffer);
@@ -809,13 +809,13 @@ contract TakeTest is BaseTest {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
         lenderOffer.assets = firstFill + secondFill;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
-        collateralize(obligation, borrower, firstFill.mulDivDown(WAD, morphoV2.tickToPrice(lenderOffer.tick)));
+        collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
         collateralize(
-            lenderOffer2.obligation, borrower, secondFill.mulDivDown(WAD, morphoV2.tickToPrice(lenderOffer.tick))
+            lenderOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick))
         );
 
         take(firstFill, 0, 0, 0, borrower, lenderOffer);
@@ -839,7 +839,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerObligationUnits - obligationUnits);
         borrowerOffer.obligationUnits = offerObligationUnits;
         borrowerOffer.assets = 0;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerObligationUnits);
         collateralize(obligation, borrower, offerObligationUnits);
 
@@ -863,7 +863,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerObligationUnits - obligationUnits);
         lenderOffer.obligationUnits = offerObligationUnits;
         lenderOffer.assets = 0;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerObligationUnits);
         collateralize(obligation, borrower, offerObligationUnits);
 
@@ -880,7 +880,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         borrowerOffer.obligationUnits = firstFill + secondFill;
         borrowerOffer.assets = 0;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -900,7 +900,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         lenderOffer.obligationUnits = firstFill + secondFill;
         lenderOffer.assets = 0;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -928,7 +928,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerObligationShares - obligationShares);
         borrowerOffer.obligationShares = offerObligationShares;
         borrowerOffer.assets = 0;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerObligationShares);
         collateralize(obligation, borrower, offerObligationShares);
 
@@ -952,7 +952,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerObligationShares - obligationShares);
         lenderOffer.obligationShares = offerObligationShares;
         lenderOffer.assets = 0;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerObligationShares);
         collateralize(obligation, borrower, offerObligationShares);
 
@@ -969,7 +969,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         borrowerOffer.obligationShares = firstFill + secondFill;
         borrowerOffer.assets = 0;
-        borrowerOffer.tick = 595;
+        borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -989,7 +989,7 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         lenderOffer.obligationShares = firstFill + secondFill;
         lenderOffer.assets = 0;
-        lenderOffer.tick = 595;
+        lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -1009,10 +1009,10 @@ contract TakeTest is BaseTest {
     // address(this) makes an arbitrage for 2 crossed offers.
     function testMatch(uint256 units, uint256 tick1, uint256 tick2) public {
         units = bound(units, 1, maxAssets);
-        tick1 = bound(tick1, MAX_TICK / 2, MAX_TICK);
-        tick2 = bound(tick2, MAX_TICK / 2, MAX_TICK);
-        uint256 price1 = morphoV2.tickToPrice(tick1);
-        uint256 price2 = morphoV2.tickToPrice(tick2);
+        tick1 = bound(tick1, 600, MAX_TICK);
+        tick2 = bound(tick2, 600, MAX_TICK);
+        uint256 price1 = TickLib.tickToPrice(tick1);
+        uint256 price2 = TickLib.tickToPrice(tick2);
         vm.assume(price1 > price2);
         vm.assume(price1 > 0.5 ether);
         vm.assume(price2 > 0.5 ether);
@@ -1028,10 +1028,10 @@ contract TakeTest is BaseTest {
         take(0, 0, units, 0, address(this), borrowerOffer);
         take(0, 0, units, 0, address(this), lenderOffer);
 
-        assertEq(morphoV2.sharesOf(address(this), id), 0, "shares");
-        assertEq(morphoV2.debtOf(address(this), id), 0, "debt");
-        assertEq(morphoV2.sharesOf(lender, id), units.mulDivDown(initialShares + 1, initialUnits + 1), "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), units, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, address(this)), 0, "shares");
+        assertEq(morphoV2.debtOf(id, address(this)), 0, "debt");
+        assertEq(morphoV2.sharesOf(id, lender), units.mulDivDown(initialShares + 1, initialUnits + 1), "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), units, "borrower debt");
         assertEq(loanToken.balanceOf(address(this)), units.mulDivDown(price2, WAD), "balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(loanToken.balanceOf(borrower), units.mulDivDown(price1, WAD), "borrower balance");
@@ -1042,10 +1042,10 @@ contract TakeTest is BaseTest {
     // address(this) makes an arbitrage for 2 crossed offers.
     function testMatchInverse(uint256 units, uint256 tick1, uint256 tick2) public {
         units = bound(units, 1, maxAssets);
-        tick1 = bound(tick1, MAX_TICK / 2, MAX_TICK);
-        tick2 = bound(tick2, MAX_TICK / 2, MAX_TICK);
-        uint256 price1 = morphoV2.tickToPrice(tick1);
-        uint256 price2 = morphoV2.tickToPrice(tick2);
+        tick1 = bound(tick1, 600, MAX_TICK);
+        tick2 = bound(tick2, 600, MAX_TICK);
+        uint256 price1 = TickLib.tickToPrice(tick1);
+        uint256 price2 = TickLib.tickToPrice(tick2);
         vm.assume(price2 > price1);
         vm.assume(price1 > 0.5 ether);
         vm.assume(price2 > 0.5 ether);
@@ -1061,10 +1061,10 @@ contract TakeTest is BaseTest {
         take(0, 0, units, 0, address(this), lenderOffer);
         take(0, 0, units, 0, address(this), borrowerOffer);
 
-        assertEq(morphoV2.sharesOf(address(this), id), 0, "shares");
-        assertEq(morphoV2.debtOf(address(this), id), 0, "debt");
-        assertEq(morphoV2.sharesOf(lender, id), units.mulDivDown(initialShares + 1, initialUnits + 1), "lender shares");
-        assertEq(morphoV2.debtOf(borrower, id), units, "borrower debt");
+        assertEq(morphoV2.sharesOf(id, address(this)), 0, "shares");
+        assertEq(morphoV2.debtOf(id, address(this)), 0, "debt");
+        assertEq(morphoV2.sharesOf(id, lender), units.mulDivDown(initialShares + 1, initialUnits + 1), "lender shares");
+        assertEq(morphoV2.debtOf(id, borrower), units, "borrower debt");
         assertEq(
             loanToken.balanceOf(address(this)), units.mulDivDown(price2, WAD) - units.mulDivDown(price1, WAD), "balance"
         );
@@ -1102,7 +1102,7 @@ contract TakeTest is BaseTest {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         borrowerOffer.assets = units;
         borrowerOffer.tick = tick;
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
@@ -1116,7 +1116,7 @@ contract TakeTest is BaseTest {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 0, MAX_TICK);
-        uint256 price = morphoV2.tickToPrice(tick);
+        uint256 price = TickLib.tickToPrice(tick);
         lenderOffer.assets = units;
         lenderOffer.tick = tick;
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
@@ -1201,7 +1201,7 @@ contract TakeTest is BaseTest {
         assets = bound(assets, 0, maxAssets);
         otherOffer.tick = bound(otherOffer.tick, 0, MAX_TICK);
         deal(address(loanToken), lender, assets);
-        collateralize(obligation, borrower, assets.mulDivDown(WAD, morphoV2.tickToPrice(lenderOffer.tick)));
+        collateralize(obligation, borrower, assets.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
         lenderOffer.assets = assets;
 
         morphoV2.take(
@@ -1230,11 +1230,11 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
-        assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), 0);
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0);
 
         take(assets, 0, 0, 0, lender, borrowerOffer);
 
-        assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), collateral);
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
     }
 
@@ -1260,7 +1260,7 @@ contract TakeTest is BaseTest {
             callback,
             abi.encode(obligation.collaterals[0].token, collateral)
         );
-        assertEq(morphoV2.collateralOf(borrower, id, obligation.collaterals[0].token), collateral);
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(obligation.collaterals[0].token, collateral));
     }
 

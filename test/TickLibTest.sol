@@ -4,8 +4,11 @@ pragma solidity ^0.8.0;
 import {Test, console} from "../lib/forge-std/src/Test.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 contract TickLibTest is Test {
+    using UtilsLib for uint256;
+
     function testSomeTicks() public pure {
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18);
         assertEq(TickLib.tickToPrice(MAX_TICK / 2), WAD / 2);
@@ -16,6 +19,20 @@ contract TickLibTest is Test {
         for (uint256 t = 0; t < MAX_TICK; t++) {
             assertLe(TickLib.tickToPrice(t), TickLib.tickToPrice(t + 1), "price should be monotonically increasing");
         }
+    }
+
+    function testReturnJumps() public pure {
+        for (uint256 i = 207; i <= 729; i++) {
+            uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
+            uint256 currentReturn = _return(TickLib.tickToPrice(i));
+            assertApproxEqRel(
+                currentReturn.mulDivDown(1e18, previousReturn), 1.025e18, 0.1e18, string.concat("tick ", vm.toString(i))
+            );
+        }
+    }
+
+    function _return(uint256 price) internal pure returns (uint256) {
+        return uint256(1e18).mulDivDown(1e18, price) - 1e18;
     }
 
     function testPriceToTickRoundtrip() public pure {

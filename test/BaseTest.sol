@@ -6,6 +6,7 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
@@ -131,7 +132,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.tick = 895;
+        badBorrowerOffer.tick = MAX_TICK;
 
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
@@ -148,9 +149,9 @@ abstract contract BaseTest is Test {
         );
 
         // then empty the market (borrow side only).
-        deal(address(loanToken), address(this), morphoV2.debtOf(badBorrower, toId(obligation)));
-        morphoV2.repay(obligation, morphoV2.debtOf(badBorrower, toId(obligation)), badBorrower);
-        assertEq(morphoV2.debtOf(badBorrower, toId(obligation)), 0, "debt");
+        deal(address(loanToken), address(this), morphoV2.debtOf(toId(obligation), badBorrower));
+        morphoV2.repay(obligation, morphoV2.debtOf(toId(obligation), badBorrower), badBorrower);
+        assertEq(morphoV2.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);

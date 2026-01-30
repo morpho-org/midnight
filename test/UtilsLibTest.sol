@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {console} from "../lib/forge-std/src/console.sol";
 
 contract UtilsLibTest is Test {
     function testAtMostOneNonZero(uint256 x, uint256 y) public pure {
