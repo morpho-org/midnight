@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD_INT} from "./ConstantsLib.sol";
-
 library UtilsLib {
     /// @dev Returns true if at most one of `x` and `y` is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
@@ -64,16 +62,9 @@ library UtilsLib {
         return x < y ? abi.encodePacked(x, y) : abi.encodePacked(y, x);
     }
 
-    function wExp(int256 x) internal pure returns (uint256) {
-        int256 ln2 = 0.693147180559945309e18;
-        int256 q = (x + ln2 / 2) / ln2;
-        int256 r = x - q * ln2;
-        int256 secondTerm = r * r / (2 * WAD_INT);
-        int256 thirdTerm = secondTerm * r / (3 * WAD_INT);
-        int256 expR = WAD_INT + r + secondTerm + thirdTerm;
-        // forge-lint: disable-next-line(unsafe-typecast)
-        if (q > 0) return uint256(expR) << uint256(q);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        else return uint256(expR) >> uint256(-q);
+    function toUint128(uint256 x) internal pure returns (uint128) {
+        require(x <= type(uint128).max, "uint256 overflows uint128");
+        // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
+        return uint128(x);
     }
 }
