@@ -12,6 +12,18 @@ contract TickLibTest is Test {
         assertEq(TickLib.tickToPrice(MAX_TICK), 0);
     }
 
+    function testSomePrices() public pure {
+        (uint256 p, int256 t) = TickLib.priceToTickAlignedPriceAndTick(0);
+        assertEq(p, 0);
+        assertEq(t, MAX_TICK);
+        (p, t) = TickLib.priceToTickAlignedPriceAndTick(WAD / 2);
+        assertEq(p, WAD / 2);
+        assertEq(t, 0);
+        (p, t) = TickLib.priceToTickAlignedPriceAndTick(WAD);
+        assertEq(p, WAD);
+        assertEq(t, MIN_TICK);
+    }
+
     function testTickToPriceMonotone() public pure {
         for (int256 t = MIN_TICK; t < MAX_TICK; t++) {
             assertGe(TickLib.tickToPrice(t), TickLib.tickToPrice(t + 1), "price should be monotonically decreasing");

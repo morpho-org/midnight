@@ -18,6 +18,10 @@ uint256 constant X96 = 1 << 96;
 // (1/log2(1.025))x96
 int256 constant INV_LOG2_1_025_X96 = 2224016485364590939422807110544;
 uint256 constant PRICE_STEP = 1e13;
+// highest price that corresponds to MAX_TICK
+uint256 constant LOW_MAX_TICK_PRICE = 4841021780733;
+// lowest price that corresponds to MIN_TICK
+uint256 constant HIGH_MIN_TICK_PRICE = 999995106263206288;
 
 library TickLib {
     function tickToPrice(int256 tick) internal pure returns (uint256) {
@@ -42,10 +46,10 @@ library TickLib {
     /// @dev If there are two equally close prices, the higher one is returned.
     function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, int256) {
         unchecked {
-            if (price == 0) return (tickToPrice(MAX_TICK), MAX_TICK);
-            if (price >= WAD) return (tickToPrice(MIN_TICK), MIN_TICK);
+            if (price > HIGH_MIN_TICK_PRICE) return (WAD, MIN_TICK);
+            if (price < LOW_MAX_TICK_PRICE) return (0, MAX_TICK);
 
-            int256 tick = roiToTick(((WAD - price) << 96) / price);
+            int256 tick = log1025(((WAD - price) << 96) / price);
             uint256 alignedPrice = tickToPrice(tick);
 
             if (alignedPrice > price && tick < MAX_TICK) {
@@ -63,7 +67,9 @@ library TickLib {
         }
     }
 
-    function roiToTick(uint256 roi) internal pure returns (int256) {
+    /// @dev Returns an approximation of the log base 1.025.
+    /// @dev x must be a 96-bit fixed-point number.
+    function log1025(uint256 roi) internal pure returns (int256) {
         uint256 msb;
         assembly {
             msb := sub(255, clz(roi))
