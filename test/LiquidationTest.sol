@@ -58,7 +58,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
 
         morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
     }
@@ -67,7 +67,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
         Oracle(obligation.collaterals[0].oracle).setPrice(0);
 
         morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");

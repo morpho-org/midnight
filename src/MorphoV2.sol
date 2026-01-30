@@ -60,6 +60,9 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    /// @dev Maximum allowed time to maturity for new obligations. Can only be increased.
+    uint256 public maxTimeToMaturity;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -120,6 +123,14 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == owner, "Only owner");
         tradingFeeRecipient = recipient;
         emit EventsLib.SetTradingFeeRecipient(recipient);
+    }
+
+    /// @dev Sets the maximum time to maturity for new obligations. Can only be increased.
+    function setMaxTimeToMaturity(uint256 newMaxTimeToMaturity) external {
+        require(msg.sender == owner, "Only owner");
+        require(newMaxTimeToMaturity >= maxTimeToMaturity, "can only increase");
+        maxTimeToMaturity = newMaxTimeToMaturity;
+        emit EventsLib.SetMaxTimeToMaturity(newMaxTimeToMaturity);
     }
 
     /// ENTRY-POINTS ///
@@ -455,6 +466,8 @@ contract MorphoV2 is IMorphoV2 {
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
         if (!obligationState[id].created) {
+            require(obligation.maturity.zeroFloorSub(block.timestamp) <= maxTimeToMaturity, "max ttm exceeded");
+
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;

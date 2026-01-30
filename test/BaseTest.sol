@@ -33,6 +33,7 @@ abstract contract BaseTest is Test {
     function setUp() public virtual {
         morphoV2 = new MorphoV2();
 
+        morphoV2.setMaxTimeToMaturity(10000 * 365 days);
         morphoV2.setFeeSetter(address(this));
 
         uint256 _privateKey;
