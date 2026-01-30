@@ -9,7 +9,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
-import {MIN_TICK, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 

@@ -10,5 +10,4 @@ uint256 constant TIME_TO_MAX_LIF = 15 minutes; // Time to reach MAX_LIF
 bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
 bytes32 constant ROOT_TYPEHASH = keccak256("Root(bytes32 root)");
 
-uint256 constant MIN_TICK = 0;
 uint256 constant MAX_TICK = 990;

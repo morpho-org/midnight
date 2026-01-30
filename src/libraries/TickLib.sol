@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, MIN_TICK, MAX_TICK} from "./ConstantsLib.sol";
+import {WAD, MAX_TICK} from "./ConstantsLib.sol";
 
 // forge-lint: disable-next-item(unsafe-typecast) max tick small enough
 int256 constant MAX_LOG_ROI = int256(MAX_TICK / 2);
@@ -17,7 +17,7 @@ uint256 constant PRICE_STEP = 1e13;
 library TickLib {
     /// @dev Converts a tick to a price.
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
-        require(MIN_TICK <= tick && tick <= MAX_TICK, "tick out of range");
+        require(tick <= MAX_TICK, "tick out of range");
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast) tick bounded
             return logRoiToPrice(MAX_LOG_ROI - int256(tick));
@@ -47,12 +47,12 @@ library TickLib {
     function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, uint256) {
         unchecked {
             if (price == WAD) return (WAD, MAX_TICK);
-            if (price == 0) return (0, MIN_TICK);
+            if (price == 0) return (0, 0);
 
             int256 logRoi = log1025(((WAD - price) << 96) / price);
 
             if (logRoi < MIN_LOG_ROI) return (WAD, MAX_TICK);
-            if (logRoi > MAX_LOG_ROI) return (0, MIN_TICK);
+            if (logRoi > MAX_LOG_ROI) return (0, 0);
 
             uint256 alignedPrice = logRoiToPrice(logRoi);
 
