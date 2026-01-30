@@ -104,7 +104,15 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
-    /// @dev Doesn't change the fee of already created obligations.
+    /// @dev Activates or deactivates custom fees for an obligation.
+    /// @dev When deactivated, the obligation uses defaultFees[loanToken] instead.
+    function setObligationCustomFeeActivated(bytes32 id, bool customFeeActivated) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        obligationState[id].customFeeActivated = customFeeActivated;
+        emit EventsLib.SetObligationCustomFeeActivated(id, customFeeActivated);
+    }
+
+    /// @dev Affects all obligations with customFeeActivated=false for this loan token.
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(index <= 5, "Invalid index");
@@ -171,7 +179,7 @@ contract MorphoV2 is IMorphoV2 {
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
+        uint256 _tradingFee = tradingFee(id, offer.obligation.loanToken, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offer.price - _tradingFee : offer.price;
         uint256 buyerPrice = sellerPrice + _tradingFee;
         require(buyerPrice <= WAD, "cannot trade at price above one");
@@ -461,7 +469,6 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             obligationState[id].created = true;
-            obligationState[id].fees = defaultFees[obligation.loanToken];
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -488,6 +495,10 @@ contract MorphoV2 is IMorphoV2 {
 
     function fees(bytes32 id) external view returns (uint16[6] memory) {
         return obligationState[id].fees;
+    }
+
+    function customFeeActivated(bytes32 id) external view returns (bool) {
+        return obligationState[id].customFeeActivated;
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {
@@ -520,8 +531,10 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
-    function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        uint16[6] memory _fees = obligationState[id].fees;
+    /// @dev If customFeeActivated is false, uses defaultFees[loanToken] instead of obligation-specific fees.
+    function tradingFee(bytes32 id, address loanToken, uint256 timeToMaturity) public view returns (uint256) {
+        ObligationState storage _obligationState = obligationState[id];
+        uint16[6] memory _fees = _obligationState.customFeeActivated ? _obligationState.fees : defaultFees[loanToken];
 
         if (timeToMaturity >= 180 days) return uint256(_fees[5]) * FEE_STEP;
 
