@@ -24,7 +24,7 @@ struct Offer {
     uint256 obligationShares;
     uint256 start;
     uint256 expiry;
-    int256 tick;
+    uint256 tick;
     bytes32 group;
     bytes32 session;
     address callback;

@@ -451,7 +451,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW FUNCTIONS ///
 
-    function tickToPrice(int256 tick) public pure returns (uint256) {
+    function tickToPrice(uint256 tick) public pure returns (uint256) {
         return TickLib.tickToPrice(tick);
     }
 

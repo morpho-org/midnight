@@ -169,10 +169,10 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testReturnJumps() public view {
-        uint256 previousReturn = _return(morphoV2.tickToPrice(-200));
-        for (int256 i = -199; i <= 200; i++) {
+        uint256 previousReturn = _return(morphoV2.tickToPrice(294));
+        for (uint256 i = 295; i <= 695; i++) {
             assertApproxEqRel(
-                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(1025, 1000), 0.01e18, "tick i"
+                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(1000, 1025), 0.01e18, "tick i"
             );
             previousReturn = _return(morphoV2.tickToPrice(i));
         }
