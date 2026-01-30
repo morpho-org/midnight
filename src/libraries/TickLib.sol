@@ -4,16 +4,13 @@ pragma solidity ^0.8.0;
 
 import {WAD, MIN_TICK, MAX_TICK} from "./ConstantsLib.sol";
 
-/// @dev Ticks are converted to/from log_1.025(roi) by MAX_TICK/2 - x.
 // forge-lint: disable-next-item(unsafe-typecast) max tick small enough
 int256 constant MAX_LOG_ROI = int256(MAX_TICK / 2);
 int256 constant MIN_LOG_ROI = -MAX_LOG_ROI;
-// ln(1.025) * 1e18
 int256 constant LN_1_025_WAD = 24692612590371416;
-// ln(2) * 1e18
 int256 constant LN2_WAD = 693147180559945344;
 int256 constant WAD_INT = 1e18;
-// (1/log2(1.025))x96
+/// @dev (1/log2(1.025))x96
 int256 constant INV_LOG2_1_025_X96 = 2224016485364590939422807110544;
 uint256 constant PRICE_STEP = 1e13;
 
@@ -45,7 +42,7 @@ library TickLib {
         }
     }
 
-    /// @dev Converts a price to a tick-aligned price and a tick that maps to it.
+    /// @dev Converts a price to the closest tick-aligned price and a tick that maps to it.
     /// @dev If there are two equally close prices, the higher one is returned.
     function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, uint256) {
         unchecked {
