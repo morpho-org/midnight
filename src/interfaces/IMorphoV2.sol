@@ -41,4 +41,14 @@ struct Seizure {
     uint256 seized;
 }
 
+/// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
+/// @dev Fees are stored divided by FEE_STEP (1e12) to fit in 16 bits. Max fee is 1% (0.01e18).
+struct ObligationState {
+    uint128 totalUnits;
+    uint128 totalShares;
+    uint256 withdrawable;
+    bool created;
+    uint16[6] fees;
+}
+
 interface IMorphoV2 {}
