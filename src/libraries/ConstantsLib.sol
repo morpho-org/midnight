@@ -3,14 +3,8 @@
 pragma solidity ^0.8.0;
 
 uint256 constant WAD = 1e18;
-int256 constant WAD_INT = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
 uint256 constant MAX_LIF = 1.15e18; // Liquidation Incentive Factor
 uint256 constant TIME_TO_MAX_LIF = 15 minutes; // Time to reach MAX_LIF
 bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
 bytes32 constant ROOT_TYPEHASH = keccak256("Root(bytes32 root)");
-
-int256 constant MIN_TICK = -495;
-int256 constant MAX_TICK = 495;
-uint256 constant MID_PRICE = 0.5e18;
-uint256 constant PRICE_STEP = 1e13;

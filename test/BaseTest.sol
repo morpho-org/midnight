@@ -9,7 +9,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
-import {MIN_TICK} from "../src/libraries/ConstantsLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
@@ -111,7 +111,7 @@ abstract contract BaseTest is Test {
         lenderOffer.assets = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.tick = MIN_TICK;
+        lenderOffer.tick = MAX_TICK;
 
         collateralize(obligation, otherBorrower, units);
         take(0, 0, units, 0, otherBorrower, lenderOffer);
@@ -131,7 +131,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.tick = -400;
+        badBorrowerOffer.tick = 895;
 
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
@@ -224,7 +224,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.assets = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
-        borrowerOffer.tick = MIN_TICK;
+        borrowerOffer.tick = MAX_TICK;
 
         morphoV2.take(
             0,

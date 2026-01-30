@@ -17,8 +17,7 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IMorphoV2, Obligation, Offer, Signature, Collateral, Seizure} from "./interfaces/IMorphoV2.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
-import {MIN_TICK, MAX_TICK} from "./libraries/ConstantsLib.sol";
-import {TickLib} from "./libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "./libraries/TickLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -160,7 +159,7 @@ contract MorphoV2 is IMorphoV2 {
         );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
-        require(MIN_TICK <= offer.tick && offer.tick <= MAX_TICK, "tick out of range");
+        require(offer.tick <= MAX_TICK, "tick out of range");
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
@@ -452,7 +451,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// VIEW FUNCTIONS ///
 
-    function tickToPrice(int256 tick) public pure returns (uint256) {
+    function tickToPrice(uint256 tick) public pure returns (uint256) {
         return TickLib.tickToPrice(tick);
     }
 

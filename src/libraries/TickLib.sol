@@ -3,11 +3,13 @@
 pragma solidity ^0.8.0;
 
 import {WAD} from "./ConstantsLib.sol";
-import {MAX_TICK, MID_PRICE, PRICE_STEP} from "./ConstantsLib.sol";
+
+uint256 constant MAX_TICK = 990;
+uint256 constant PRICE_STEP = 1e13;
 
 library TickLib {
-    // 1e5 scaled deltas to price 0.5 for tick 0 to -495.
-    // Rounded from 1/(1+1.025^tick), but they can be shifted to keep the map injective.
+    // 1e5 scaled deltas to price 0.5 for tick 495 to 990.
+    // Rounded from 1/(1+1.025^(495-tick)), but they can be shifted to keep the map injective.
     // To generate the map: https://gist.github.com/d67bcf5c3f62e5d734f7745c95e11407
     bytes internal constant PACKED_DELTAS = hex"0000" hex"0269" hex"04d2" hex"073b" hex"09a3" hex"0c0b" hex"0e71"
         hex"10d6" hex"133b" hex"159d" hex"17fe" hex"1a5d" hex"1cba" hex"1f15" hex"216d" hex"23c3" hex"2617" hex"2867"
@@ -57,28 +59,26 @@ library TickLib {
         hex"c34c" hex"c34d" hex"c34e" hex"c34f" hex"c350";
 
     /// @dev Does not check price bounds
-    function tickToPrice(int256 tick) internal pure returns (uint256) {
+    function tickToPrice(uint256 tick) internal pure returns (uint256) {
         unchecked {
             bytes memory deltas = PACKED_DELTAS;
-            if (tick < 0) {
-                // forge-lint: disable-next-item(unsafe-typecast) tick is negative
-                return MID_PRICE + getDelta(deltas, uint256(-tick));
+            if (tick > MAX_TICK / 2) {
+                return WAD / 2 + getDelta(deltas, tick - MAX_TICK / 2);
             } else {
-                // forge-lint: disable-next-item(unsafe-typecast) tick is positive
-                return WAD - (MID_PRICE + getDelta(deltas, uint256(tick)));
+                return WAD - (WAD / 2 + getDelta(deltas, MAX_TICK / 2 - tick));
             }
         }
     }
 
     /// @dev Returns the closest tick-aligned price and its tick.
     /// @dev If there are two equally close prices, returns the higher one.
-    function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, int256) {
+    function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, uint256) {
         unchecked {
             uint256 delta;
-            if (price < MID_PRICE) {
-                delta = WAD - price - MID_PRICE;
+            if (price < WAD / 2) {
+                delta = WAD - price - WAD / 2;
             } else {
-                delta = price - MID_PRICE;
+                delta = price - WAD / 2;
             }
 
             bytes memory deltas = PACKED_DELTAS;
@@ -95,23 +95,21 @@ library TickLib {
             uint256 lowDelta = getDelta(deltas, lowIndex);
             uint256 highDelta = getDelta(deltas, highIndex);
 
-            if (price < MID_PRICE) {
+            // forge-lint: disable-start(unsafe-typecast) index bounded
+            if (price < WAD / 2) {
                 if (delta - lowDelta > highDelta - delta) {
-                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
-                    return (MID_PRICE - highDelta, int256(highIndex));
+                    return (WAD / 2 - highDelta, MAX_TICK / 2 - highIndex);
                 } else {
-                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
-                    return (MID_PRICE - lowDelta, int256(lowIndex));
+                    return (WAD / 2 - lowDelta, MAX_TICK / 2 - lowIndex);
                 }
             } else {
                 if (delta - lowDelta >= highDelta - delta) {
-                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
-                    return (MID_PRICE + highDelta, -int256(highIndex));
+                    return (WAD / 2 + highDelta, MAX_TICK / 2 + highIndex);
                 } else {
-                    // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK at most
-                    return (MID_PRICE + lowDelta, -int256(lowIndex));
+                    return (WAD / 2 + lowDelta, MAX_TICK / 2 + lowIndex);
                 }
             }
+            // forge-lint: disable-end
         }
     }
 

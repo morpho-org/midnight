@@ -9,7 +9,7 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MIN_TICK, MAX_TICK} from "../src/libraries/ConstantsLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
@@ -169,10 +169,10 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testReturnJumps() public view {
-        uint256 previousReturn = _return(morphoV2.tickToPrice(-200));
-        for (int256 i = -199; i <= 200; i++) {
+        uint256 previousReturn = _return(morphoV2.tickToPrice(295));
+        for (uint256 i = 296; i <= 695; i++) {
             assertApproxEqRel(
-                _return(morphoV2.tickToPrice(i)), previousReturn.mulDivDown(1025, 1000), 0.01e18, "tick i"
+                previousReturn, _return(morphoV2.tickToPrice(i)).mulDivDown(1025, 1000), 0.01e18, "tick i"
             );
             previousReturn = _return(morphoV2.tickToPrice(i));
         }
