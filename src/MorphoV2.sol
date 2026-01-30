@@ -106,10 +106,10 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Activates or deactivates custom fees for an obligation.
     /// @dev When deactivated, the obligation uses defaultFees[loanToken] instead.
-    function setObligationCustomFeeActivated(bytes32 id, bool customFeeActivated) external {
+    function setObligationCustomFeeActivated(bytes32 id, bool newCustomFeeActivated) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        obligationState[id].customFeeActivated = customFeeActivated;
-        emit EventsLib.SetObligationCustomFeeActivated(id, customFeeActivated);
+        obligationState[id].customFeeActivated = newCustomFeeActivated;
+        emit EventsLib.SetObligationCustomFeeActivated(id, newCustomFeeActivated);
     }
 
     /// @dev Affects all obligations with customFeeActivated=false for this loan token.
