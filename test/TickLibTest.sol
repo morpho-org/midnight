@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
-import {WAD, MAX_TICK} from "../src/libraries/ConstantsLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 contract TickLibTest is Test {

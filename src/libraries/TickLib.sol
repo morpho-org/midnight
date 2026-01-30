@@ -2,7 +2,9 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, MAX_TICK} from "./ConstantsLib.sol";
+import {WAD} from "./ConstantsLib.sol";
+
+uint256 constant MAX_TICK = 990;
 
 // forge-lint: disable-next-item(unsafe-typecast) max tick small enough
 int256 constant MAX_LOG_ROI = int256(MAX_TICK / 2);
