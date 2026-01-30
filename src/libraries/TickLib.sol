@@ -6,8 +6,8 @@ import {WAD, MIN_TICK, MAX_TICK} from "./ConstantsLib.sol";
 
 /// @dev Ticks are converted to/from log_1.025(roi) by MAX_TICK/2 - x.
 // forge-lint: disable-next-item(unsafe-typecast) max tick small enough
-int256 constant MAX_ROI_LOG = int256(MAX_TICK / 2);
-int256 constant MIN_ROI_LOG = -MAX_ROI_LOG;
+int256 constant MAX_LOG_ROI = int256(MAX_TICK / 2);
+int256 constant MIN_LOG_ROI = -MAX_LOG_ROI;
 // ln(1.025) * 1e18
 int256 constant LN_1_025_WAD = 24692612590371416;
 // ln(2) * 1e18
@@ -23,15 +23,15 @@ library TickLib {
         require(MIN_TICK <= tick && tick <= MAX_TICK, "tick out of range");
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast) tick bounded
-            return roiLogToPrice(MAX_ROI_LOG - int256(tick));
+            return logRoiToPrice(MAX_LOG_ROI - int256(tick));
         }
     }
 
-    function roiLogToPrice(int256 roiLog) internal pure returns (uint256) {
+    function logRoiToPrice(int256 logRoi) internal pure returns (uint256) {
         unchecked {
-            int256 x = LN_1_025_WAD * roiLog;
+            int256 x = LN_1_025_WAD * logRoi;
             uint256 price;
-            if (roiLog >= 0) {
+            if (logRoi >= 0) {
                 // forge-lint: disable-next-item(unsafe-typecast) x is positive
                 uint256 expWad = wExp(uint256(x));
                 price = WAD * WAD / (WAD + expWad);
@@ -52,28 +52,28 @@ library TickLib {
             if (price == WAD) return (WAD, MAX_TICK);
             if (price == 0) return (0, MIN_TICK);
 
-            int256 roiLog = log1025(((WAD - price) << 96) / price);
+            int256 logRoi = log1025(((WAD - price) << 96) / price);
 
-            if (roiLog < MIN_ROI_LOG) return (WAD, MAX_TICK);
-            if (roiLog > MAX_ROI_LOG) return (0, MIN_TICK);
+            if (logRoi < MIN_LOG_ROI) return (WAD, MAX_TICK);
+            if (logRoi > MAX_LOG_ROI) return (0, MIN_TICK);
 
-            uint256 alignedPrice = roiLogToPrice(roiLog);
+            uint256 alignedPrice = logRoiToPrice(logRoi);
 
-            if (alignedPrice > price && roiLog < MAX_ROI_LOG) {
-                uint256 nextAlignedPrice = roiLogToPrice(roiLog + 1);
+            if (alignedPrice > price && logRoi < MAX_LOG_ROI) {
+                uint256 nextAlignedPrice = logRoiToPrice(logRoi + 1);
                 if (2 * price < alignedPrice + nextAlignedPrice) {
                     alignedPrice = nextAlignedPrice;
-                    roiLog += 1;
+                    logRoi += 1;
                 }
-            } else if (alignedPrice < price && roiLog > MIN_ROI_LOG) {
-                uint256 prevAlignedPrice = roiLogToPrice(roiLog - 1);
+            } else if (alignedPrice < price && logRoi > MIN_LOG_ROI) {
+                uint256 prevAlignedPrice = logRoiToPrice(logRoi - 1);
                 if (2 * price >= alignedPrice + prevAlignedPrice) {
                     alignedPrice = prevAlignedPrice;
-                    roiLog -= 1;
+                    logRoi -= 1;
                 }
             }
-            // forge-lint: disable-next-item(unsafe-typecast) roiLog bounded
-            return (alignedPrice, uint256(MAX_ROI_LOG - roiLog));
+            // forge-lint: disable-next-item(unsafe-typecast) logRoi bounded
+            return (alignedPrice, uint256(MAX_LOG_ROI - logRoi));
         }
     }
 
