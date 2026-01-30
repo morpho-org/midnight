@@ -8,7 +8,6 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;

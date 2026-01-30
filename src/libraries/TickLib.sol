@@ -84,8 +84,7 @@ library TickLib {
             bytes memory deltas = PACKED_DELTAS;
             uint256 lowIndex = 0;
 
-            // forge-lint: disable-next-item(unsafe-typecast) MAX_TICK is positive
-            uint256 highIndex = uint256(MAX_TICK);
+            uint256 highIndex = MAX_TICK;
             while (highIndex - lowIndex > 1) {
                 uint256 mid = (lowIndex + highIndex) / 2;
                 if (getDelta(deltas, mid) < delta) lowIndex = mid;
@@ -95,7 +94,6 @@ library TickLib {
             uint256 lowDelta = getDelta(deltas, lowIndex);
             uint256 highDelta = getDelta(deltas, highIndex);
 
-            // forge-lint: disable-start(unsafe-typecast) index bounded
             if (price < WAD / 2) {
                 if (delta - lowDelta > highDelta - delta) {
                     return (WAD / 2 - highDelta, MAX_TICK / 2 - highIndex);
@@ -109,7 +107,6 @@ library TickLib {
                     return (WAD / 2 + lowDelta, MAX_TICK / 2 + lowIndex);
                 }
             }
-            // forge-lint: disable-end
         }
     }
 
