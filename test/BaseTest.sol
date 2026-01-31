@@ -6,6 +6,7 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
@@ -116,7 +117,7 @@ abstract contract BaseTest is Test {
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.price = 1 ether;
+        lenderOffer.tick = TICK_RANGE;
 
         collateralize(obligation, otherBorrower, units);
 
@@ -154,7 +155,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.price = 1 ether;
+        badBorrowerOffer.tick = TICK_RANGE;
 
         deal(obligation.collaterals[0].token, address(this), 135);
         morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
@@ -280,7 +281,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.maker = borrower;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
-        borrowerOffer.price = 1 ether;
+        borrowerOffer.tick = TICK_RANGE;
 
         morphoV2.take(
             0,

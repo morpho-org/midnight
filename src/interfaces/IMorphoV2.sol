@@ -21,7 +21,7 @@ struct Offer {
     address maker;
     uint256 start;
     uint256 expiry;
-    uint256 price;
+    uint256 tick;
     address callback;
     bytes callbackData;
 }

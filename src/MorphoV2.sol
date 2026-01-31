@@ -3,6 +3,7 @@
 pragma solidity 0.8.31;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
+import {TickLib, TICK_RANGE} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
     WAD,
@@ -95,7 +96,7 @@ contract MorphoV2 is IMorphoV2 {
         require(index <= 5, "Invalid index");
         require(newTradingFee <= MAX_FEE, "Trading fee too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
-        // forge-lint: disable-next-line(unsafe-typecast) as newTradingFee is less than MAX_FEE
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than MAX_FEE
         obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
@@ -106,7 +107,7 @@ contract MorphoV2 is IMorphoV2 {
         require(index <= 5, "Invalid index");
         require(newTradingFee <= MAX_FEE, "Trading fee too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
-        // forge-lint: disable-next-line(unsafe-typecast) as newTradingFee is less than MAX_FEE
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than MAX_FEE
         defaultFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
@@ -150,6 +151,7 @@ contract MorphoV2 is IMorphoV2 {
         require(UtilsLib.atMostOneNonZero(groupAssets, groupUnits, groupShares), "inconsistent group input");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
+        require(offer.tick <= TICK_RANGE, "tick too high");
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(groupLoanToken == offer.obligation.loanToken, "group loan token mismatch");
         require(
@@ -171,11 +173,11 @@ contract MorphoV2 is IMorphoV2 {
             ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
             : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
 
+        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offer.price - _tradingFee : offer.price;
+        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        require(buyerPrice <= WAD, "cannot trade at price above one");
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);

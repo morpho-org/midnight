@@ -7,7 +7,11 @@ import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+
 contract OtherFunctionsTest is BaseTest {
+    using UtilsLib for uint256;
+
     Obligation internal obligation;
     bytes32 internal id;
 

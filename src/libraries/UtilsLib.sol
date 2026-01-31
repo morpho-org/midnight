@@ -64,7 +64,7 @@ library UtilsLib {
 
     function toUint128(uint256 x) internal pure returns (uint128) {
         require(x <= type(uint128).max, "uint256 overflows uint128");
-        // forge-lint: disable-next-line(unsafe-typecast) as x is less than type(uint128).max
+        // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
         return uint128(x);
     }
 }
