@@ -1313,7 +1313,6 @@ contract TakeTest is BaseTest {
         borrowerOffer.assets = buyerAssets;
         deal(address(loanToken), lender, buyerAssets);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
-        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         vm.assume(expectedUnits > 0);
 
         uint256 collateralQuoted = expectedUnits.mulDivDown(WAD, obligation.collaterals[0].lltv)
