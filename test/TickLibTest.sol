@@ -38,16 +38,16 @@ contract TickLibTest is Test {
     function testPriceToTickRoundtrip() public pure {
         for (uint256 t = 0; t <= MAX_TICK; t++) {
             uint256 price = TickLib.tickToPrice(t);
-            (, uint256 tick) = TickLib.priceToTickAlignedPriceAndTick(price);
+            uint256 tick = TickLib.priceToTick(price);
             assertEq(tick, t, "roundtrip failed");
         }
     }
 
     function testPriceToTick(uint256 price) public pure {
         price = bound(price, 0, WAD);
-        (uint256 alignedPrice, uint256 tick) = TickLib.priceToTickAlignedPriceAndTick(price);
+        uint256 tick = TickLib.priceToTick(price);
+        uint256 alignedPrice = TickLib.tickToPrice(tick);
 
-        assertEq(alignedPrice, TickLib.tickToPrice(tick), "aligned price mismatch");
         assertGe(tick, 0, "tick below min");
         assertLe(tick, MAX_TICK, "tick above max");
 
