@@ -16,15 +16,15 @@ contract TickLibTest is Test {
     }
 
     function testSomePrices() public pure {
-        (uint256 p, uint256 t) = TickLib.priceToTickAlignedPriceAndTick(0);
-        assertEq(p, 0);
+        uint256 t = TickLib.priceToTick(0);
         assertEq(t, 0);
-        (p, t) = TickLib.priceToTickAlignedPriceAndTick(WAD / 2);
-        assertEq(p, WAD / 2);
+        assertEq(TickLib.tickToPrice(t), 0);
+        t = TickLib.priceToTick(WAD / 2);
         assertEq(t, MAX_TICK / 2);
-        (p, t) = TickLib.priceToTickAlignedPriceAndTick(WAD);
-        assertEq(p, WAD);
+        assertEq(TickLib.tickToPrice(t), WAD / 2);
+        t = TickLib.priceToTick(WAD);
         assertEq(t, MAX_TICK);
+        assertEq(TickLib.tickToPrice(t), WAD);
     }
 
     function testTickToPriceMonotone() public pure {
@@ -47,7 +47,7 @@ contract TickLibTest is Test {
         return uint256(1e18).mulDivDown(1e18, price) - 1e18;
     }
 
-    function testpriceToTickAlignedPriceAndTickEdges() public pure {
+    function testPriceToTick() public pure {
         // When exactly between 2 prices match the higher one.
         for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 price = TickLib.tickToPrice(tick);
@@ -55,16 +55,16 @@ contract TickLibTest is Test {
                 uint256 nextPrice = TickLib.tickToPrice(tick + 1);
                 if (price != nextPrice) {
                     uint256 edgePrice = price + (nextPrice - price - 1) / 2;
-                    (uint256 alignedEdgePrice,) = TickLib.priceToTickAlignedPriceAndTick(edgePrice);
-                    assertEq(alignedEdgePrice, price, "lower price up to same distance");
+                    assertEq(
+                        TickLib.tickToPrice(TickLib.priceToTick(edgePrice)), price, "lower price up to same distance"
+                    );
                 }
             }
             if (tick > 0) {
                 uint256 prevPrice = TickLib.tickToPrice(tick - 1);
                 if (price != prevPrice) {
                     uint256 edgePrice = price - (price - prevPrice) / 2;
-                    (uint256 alignedEdgePrice,) = TickLib.priceToTickAlignedPriceAndTick(edgePrice);
-                    assertEq(alignedEdgePrice, price, "higher price not matching");
+                    assertEq(TickLib.tickToPrice(TickLib.priceToTick(edgePrice)), price, "higher price not matching");
                 }
             }
         }

@@ -44,35 +44,33 @@ library TickLib {
         }
     }
 
-    /// @dev Converts a price to the closest tick-aligned price and a tick that maps to it.
+    /// @dev Converts a price to a tick that maps to the closest possible tick-aligned price.
     /// @dev If there are two equally close prices, the higher one is returned.
-    function priceToTickAlignedPriceAndTick(uint256 price) internal pure returns (uint256, uint256) {
+    function priceToTick(uint256 price) internal pure returns (uint256) {
         unchecked {
-            if (price == WAD) return (WAD, MAX_TICK);
-            if (price == 0) return (0, 0);
+            if (price == WAD) return MAX_TICK;
+            if (price == 0) return 0;
 
             int256 logRoi = log1025(((WAD - price) << 96) / price);
 
-            if (logRoi < MIN_LOG_ROI) return (WAD, MAX_TICK);
-            if (logRoi > MAX_LOG_ROI) return (0, 0);
+            if (logRoi < MIN_LOG_ROI) return MAX_TICK;
+            if (logRoi > MAX_LOG_ROI) return 0;
 
             uint256 alignedPrice = logRoiToPrice(logRoi);
 
             if (alignedPrice > price && logRoi < MAX_LOG_ROI) {
                 uint256 nextAlignedPrice = logRoiToPrice(logRoi + 1);
                 if (2 * price < alignedPrice + nextAlignedPrice) {
-                    alignedPrice = nextAlignedPrice;
                     logRoi += 1;
                 }
             } else if (alignedPrice < price && logRoi > MIN_LOG_ROI) {
                 uint256 prevAlignedPrice = logRoiToPrice(logRoi - 1);
                 if (2 * price >= alignedPrice + prevAlignedPrice) {
-                    alignedPrice = prevAlignedPrice;
                     logRoi -= 1;
                 }
             }
             // forge-lint: disable-next-item(unsafe-typecast) logRoi bounded
-            return (alignedPrice, uint256(MAX_LOG_ROI - logRoi));
+            return uint256(MAX_LOG_ROI - logRoi);
         }
     }
 
