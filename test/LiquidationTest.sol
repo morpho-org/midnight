@@ -296,6 +296,19 @@ contract LiquidationTest is BaseTest {
         );
     }
 
+    // recovery close factor
+
+    function testCannotLiquidateMoreThanRecoveryCloseFactor(uint256 units) public {
+        units = bound(units, 10, MAX_TEST_AMOUNT - 1);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
+        deal(address(loanToken), address(this), units);
+
+        vm.expectRevert("recovery close factory violated");
+        morphoV2.liquidate(obligation, 0, units, 0, borrower, "");
+    }
+
     // helpers.
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256 _repaidAssets, address, bytes memory data)
