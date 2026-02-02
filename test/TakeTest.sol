@@ -1309,7 +1309,7 @@ contract TakeTest is BaseTest {
     function testMinCollateralInTake(uint256 buyerAssets, uint256 price, uint256 minCollateral) public {
         buyerAssets = bound(buyerAssets, 1, maxAssets);
         price = bound(price, 0.01e18, 1e18);
-        borrowerOffer.price = price;
+        borrowerOffer.tick = TICK_RANGE;
         borrowerOffer.assets = buyerAssets;
         deal(address(loanToken), lender, buyerAssets);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
@@ -1317,8 +1317,7 @@ contract TakeTest is BaseTest {
         vm.assume(expectedUnits > 0);
 
         uint256 collateralQuoted = expectedUnits.mulDivDown(WAD, obligation.collaterals[0].lltv)
-            .mulDivDown(IOracle(obligation.collaterals[0].oracle).price(), ORACLE_PRICE_SCALE)
-            .mulDivDown(obligation.collaterals[0].lltv, WAD);
+            .mulDivDown(IOracle(obligation.collaterals[0].oracle).price(), ORACLE_PRICE_SCALE);
         minCollateral = bound(minCollateral, collateralQuoted + 2, type(uint256).max);
 
         obligation.minCollateral = minCollateral;
