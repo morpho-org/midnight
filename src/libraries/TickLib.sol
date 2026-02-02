@@ -48,7 +48,7 @@ library TickLib {
     /// @dev If there are two equally close prices, the higher one is returned.
     function priceToTick(uint256 price) internal pure returns (uint256) {
         unchecked {
-            if (price == WAD) return MAX_TICK;
+            if (price >= WAD) return MAX_TICK;
             if (price == 0) return 0;
 
             int256 logRoi = log1025(((WAD - price) << 96) / price);
