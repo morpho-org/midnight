@@ -45,7 +45,7 @@ library TickLib {
     }
 
     /// @dev Converts a price to a tick that maps to the closest possible tick-aligned price.
-    /// @dev If there are two equally close prices, the higher one is returned.
+    /// @dev If there are two equally close prices, the higher one is preferred.
     function priceToTick(uint256 price) internal pure returns (uint256) {
         unchecked {
             if (price >= WAD) return MAX_TICK;
