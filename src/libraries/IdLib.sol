@@ -24,7 +24,16 @@ library IdLib {
         returns (bytes memory)
     {
         bytes memory prefix = hex"603f380380603f5f395ff3";
-        return abi.encodePacked(prefix, chainId, morphoV2, abi.encode(obligation));
+        bytes memory encodedObligation = abi.encode(obligation);
+        bytes memory runtimeCode;
+        uint256 runtimeCodeLength = encodedObligation.length - 32;
+        assembly ("memory-safe") {
+            runtimeCode := mload(0x40)
+            mcopy(add(runtimeCode, 0x20), add(encodedObligation, 0x40), runtimeCodeLength)
+            mstore(runtimeCode, runtimeCodeLength)
+            mstore(0x40, add(runtimeCode, runtimeCodeLength))
+        }
+        return abi.encodePacked(prefix, chainId, morphoV2, runtimeCode);
     }
 
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes32) {
@@ -34,7 +43,7 @@ library IdLib {
     function idToObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
         address create2Address =
             address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))));
-        return abi.decode(create2Address.code, (Obligation));
+        return abi.decode(bytes.concat(bytes32(uint256(0x20)), create2Address.code), (Obligation));
     }
 
     /// @dev Deploys a contract with runtime code = abi.encode(obligation)
