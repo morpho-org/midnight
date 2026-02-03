@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes32 id) external returns uint256 envfree;
+    function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function totalShares(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
@@ -11,6 +11,7 @@ methods {
     function debtOf(bytes32 id, address owner) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
+    function toId(MorphoV2.Obligation memory obligation) internal returns (bytes32) => NONDET;
 }
 
 /// HELPERS ///

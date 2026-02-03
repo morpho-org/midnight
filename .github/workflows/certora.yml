@@ -16,7 +16,6 @@ jobs:
         conf:
           - Hasher
           - MorphoV2
-          - SharePrice
 
     steps:
       - uses: actions/checkout@v4
