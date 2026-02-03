@@ -157,6 +157,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         deal(address(loanToken), address(this), units);
         deal(address(loanToken), address(this), units);
 
@@ -172,6 +173,7 @@ contract LiquidationTest is BaseTest {
             seized, morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token) + 1, MAX_TEST_AMOUNT * 2
         );
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         deal(address(loanToken), address(this), units);
         deal(address(loanToken), address(this), units);
 
@@ -206,6 +208,7 @@ contract LiquidationTest is BaseTest {
         seized = bound(seized, 0, initialCollateral);
         uint256 oraclePrice = 0.5e36;
         Oracle(obligation.collaterals[0].oracle).setPrice(oraclePrice);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         uint256 repayable = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token).mulDivUp(WAD, MAX_LIF)
             .mulDivUp(oraclePrice, ORACLE_PRICE_SCALE);
         uint256 expectedBadDebt = units - repayable;
@@ -245,6 +248,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2); // TODO fuzz
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         deal(address(loanToken), address(this), units); // not needed.
 
         morphoV2.liquidate(obligation, 0, 0, initialCollateral, borrower, "");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.31;
+pragma solidity 0.8.28;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
@@ -370,6 +370,10 @@ contract MorphoV2 is IMorphoV2 {
 
         uint256 originalDebt = debtOf[id][borrower];
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+        uint256 maxSeizableAssets = block.timestamp > obligation.maturity || liquidatedCollateralPrice == 0
+            ? type(uint256).max
+            : (originalDebt - maxDebt).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
+                .mulDivDown(WAD, obligation.collaterals[collateralIndex].lltv);
 
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
@@ -378,7 +382,6 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 lltv = obligation.collaterals[collateralIndex].lltv;
             uint256 lif = originalDebt > maxDebt
                 ? MAX_LIF
                 : UtilsLib.min(
@@ -392,14 +395,7 @@ contract MorphoV2 is IMorphoV2 {
                     repaidUnits.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice).mulDivDown(lif, WAD);
             }
 
-            if (block.timestamp <= obligation.maturity) {
-                uint256 _collateralOf = collateralOf[id][borrower][obligation.collaterals[collateralIndex].token];
-                uint256 newMaxDebt = maxDebt
-                    - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD)
-                    + (_collateralOf - seizedAssets).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                        .mulDivDown(lltv, WAD);
-                require(originalDebt - repaidUnits >= newMaxDebt, "recovery close factory violated");
-            }
+            require(seizedAssets <= maxSeizableAssets, "recovery close factory violated");
 
             collateralOf[id][borrower][obligation.collaterals[collateralIndex].token] -= seizedAssets;
             _obligationState.withdrawable += repaidUnits;
