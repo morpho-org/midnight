@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {ERC20} from "./helpers/ERC20.sol";
@@ -158,6 +159,43 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(user);
         morphoV2.consume(group, amount);
         assertEq(morphoV2.consumed(user, group), amount, "consumed");
+    }
+
+    function testTouchObligation(Obligation memory _obligation) public {
+        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
+
+        bytes32 _id = morphoV2.touchObligation(_obligation);
+        assertEq(morphoV2.obligationCreated(_id), true, "obligation created");
+        uint16[6] memory fees = morphoV2.fees(_id);
+        for (uint256 i = 0; i < 6; i++) {
+            assertEq(fees[i], morphoV2.defaultFees(_obligation.loanToken, i), "fees");
+        }
+    }
+
+    function testIdToObligation(Obligation memory _obligation) public {
+        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
+
+        bytes32 _id = morphoV2.touchObligation(_obligation);
+        Obligation memory obligationFromId = IdLib.idToObligation(_id, address(morphoV2));
+        assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
+        assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
+        assertEq(_obligation.collaterals.length, obligationFromId.collaterals.length, "collaterals length");
+        for (uint256 i = 0; i < obligationFromId.collaterals.length; i++) {
+            assertEq(_obligation.collaterals[i].token, obligationFromId.collaterals[i].token, "collateral token");
+            assertEq(_obligation.collaterals[i].lltv, obligationFromId.collaterals[i].lltv, "lltv");
+            assertEq(_obligation.collaterals[i].oracle, obligationFromId.collaterals[i].oracle, "oracle");
+        }
+    }
+
+    function testSstore2CodeStartsWithStop(Obligation memory _obligation) public {
+        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
+
+        bytes32 _id = morphoV2.touchObligation(_obligation);
+        address sstore2Address =
+            address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), address(morphoV2), bytes32(0), _id)))));
+
+        assertGt(sstore2Address.code.length, 0, "code should exist");
+        assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
     function testShuffleSession(address user) public {
