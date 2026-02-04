@@ -320,6 +320,19 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[id][onBehalf][collateral] += assets;
 
+        uint256 collateralIndex = 0;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            if (obligation.collaterals[i].token == collateral) {
+                collateralIndex = i;
+                break;
+            }
+        }
+        require(
+            (collateralOf[id][onBehalf][collateral] == 0)
+                || (collateralOf[id][onBehalf][collateral] >= obligation.collaterals[collateralIndex].minCollateral),
+            "Collateral below min"
+        );
+
         emit EventsLib.SupplyCollateral(msg.sender, id, collateral, assets, onBehalf);
 
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
@@ -333,6 +346,19 @@ contract MorphoV2 is IMorphoV2 {
         collateralOf[id][onBehalf][collateral] -= assets;
 
         require(isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
+
+        uint256 collateralIndex = 0;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            if (obligation.collaterals[i].token == collateral) {
+                collateralIndex = i;
+                break;
+            }
+        }
+        require(
+            (collateralOf[id][onBehalf][collateral] == 0)
+                || (collateralOf[id][onBehalf][collateral] >= obligation.collaterals[collateralIndex].minCollateral),
+            "Collateral below min"
+        );
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf);
 

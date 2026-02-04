@@ -13,6 +13,7 @@ struct Collateral {
     address token;
     uint256 lltv;
     address oracle;
+    uint256 minCollateral; // quoted in collateral token
 }
 
 struct Offer {

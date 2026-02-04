@@ -32,9 +32,17 @@ contract TakeTest is BaseTest {
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
+            .push(
+                Collateral({
+                    token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1), minCollateral: 0
+                })
+            );
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
+                .push(
+                Collateral({
+                    token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2), minCollateral: 0
+                })
+            );
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = toId(obligation);
@@ -1302,6 +1310,52 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets)
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+    }
+
+    function testMinCollateralInSupplyCollateral(uint256 buyerAssets, uint256 price, uint256 minCollateral) public {
+        buyerAssets = bound(buyerAssets, 1, maxAssets);
+        price = bound(price, 0.01e18, 1e18);
+        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.assets = buyerAssets;
+        deal(address(loanToken), lender, buyerAssets);
+        uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
+        vm.assume(expectedUnits > 0);
+
+        uint256 collateral = expectedUnits.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        minCollateral = bound(minCollateral, collateral + 2, type(uint256).max);
+        obligation.collaterals[0].minCollateral = minCollateral;
+
+        deal(address(obligation.collaterals[0].token), address(this), collateral);
+        collateralToken1.approve(address(morphoV2), collateral);
+        vm.expectRevert("Collateral below min");
+        morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
+    }
+
+    function testMinCollateralInWithdrawCollateral(
+        uint256 buyerAssets,
+        uint256 price,
+        uint256 minCollateral,
+        uint256 withdrawnCollateral
+    ) public {
+        buyerAssets = bound(buyerAssets, 1, maxAssets);
+        price = bound(price, 0.01e18, 1e18);
+        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.assets = buyerAssets;
+        deal(address(loanToken), lender, buyerAssets);
+        uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
+        vm.assume(expectedUnits > 0);
+
+        uint256 collateral = expectedUnits.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        minCollateral = bound(minCollateral, 2, collateral);
+        obligation.collaterals[0].minCollateral = minCollateral;
+        withdrawnCollateral = bound(withdrawnCollateral, collateral - minCollateral + 1, collateral - 1);
+
+        deal(address(obligation.collaterals[0].token), address(this), collateral);
+        collateralToken1.approve(address(morphoV2), collateral);
+        morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, borrower);
+
+        vm.expectRevert("Collateral below min");
+        morphoV2.withdrawCollateral(obligation, address(obligation.collaterals[0].token), withdrawnCollateral, borrower);
     }
 }
 
