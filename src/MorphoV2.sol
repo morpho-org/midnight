@@ -270,8 +270,8 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        (bool isHealthy, bool belowMinCollateral) = isHealthy(offer.obligation, id, seller);
-        require(isHealthy, "Seller is unhealthy");
+        (bool _isHealthy, bool belowMinCollateral) = isHealthy(offer.obligation, id, seller);
+        require(_isHealthy, "Seller is unhealthy");
         require(!belowMinCollateral, "Seller collateral below min");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
@@ -334,8 +334,8 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[id][onBehalf][collateral] -= assets;
 
-        (bool isHealthy, bool belowMinCollateral) = isHealthy(obligation, id, onBehalf);
-        require(isHealthy, "Unhealthy borrower");
+        (bool _isHealthy, bool belowMinCollateral) = isHealthy(obligation, id, onBehalf);
+        require(_isHealthy, "Unhealthy borrower");
         require(!belowMinCollateral, "Borrower collateral below min");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf);
