@@ -35,6 +35,7 @@ library TickLib {
     }
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
+        require(tick <= TICK_RANGE, "tick out of range");
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)

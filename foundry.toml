@@ -3,9 +3,10 @@ via_ir = true
 optimizer = true
 optimizer_runs = 4294967295
 evm_version = "osaka"
+fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
 
 [profile.default.fmt]
 wrap_comments = true
 
 [lint]
-exclude_lints = ["asm-keccak256", "incorrect-shift"]
+exclude_lints = ["asm-keccak256", "unsafe-cheatcode"]
