@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import {Test, console} from "forge-std/Test.sol";
+import {BaseTest} from "./BaseTest.sol";
+import {console} from "forge-std/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 
-contract TickLibTest is Test {
+contract TickLibTest is BaseTest {
     using UtilsLib for uint256;
 
     // Tick to price
@@ -75,5 +76,55 @@ contract TickLibTest is Test {
     function testGasPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
         TickLib.priceToTick(price);
+    }
+
+    function loadExactPrices() internal view returns (uint256[] memory) {
+        uint256[] memory exactPrices = new uint256[](TICK_RANGE + 1);
+        string memory json = vm.readFile("test/ticks_exact.json");
+        string[] memory priceStrings = vm.parseJsonStringArray(json, ".prices");
+        for (uint256 i = 0; i < priceStrings.length; i++) {
+            exactPrices[i] = vm.parseUint(priceStrings[i]);
+        }
+        return exactPrices;
+    }
+
+    function testTickToPriceAccuracy() public view {
+        uint256[] memory exactPrices = loadExactPrices();
+        uint256 maxAbsErrorWad;
+        uint256 maxRelErrorWad;
+        uint256 totalAbsErrorWad;
+        uint256 totalRelErrorWad;
+
+        for (uint256 tick = 0; tick <= TICK_RANGE; tick++) {
+            uint256 solPrice = TickLib.tickToPrice(tick);
+            uint256 exactPrice = exactPrices[tick];
+
+            uint256 absErrorWad = absDiff(solPrice, exactPrice);
+            maxAbsErrorWad = max(maxAbsErrorWad, absErrorWad);
+            totalAbsErrorWad += absErrorWad;
+            uint256 relErrorWad = absDiff(solPrice, exactPrice) * 1e18 / exactPrice;
+            totalRelErrorWad += relErrorWad;
+            maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
+
+            assertLe(absErrorWad, 0.00015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 1.5 bps"));
+            if (solPrice > 0.01e18) {
+                assertLe(relErrorWad, 0.001e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.1%"));
+            }
+
+            // Check exact price is bracketed by adjacent sol prices (only where prices vary per-tick)
+            if (tick > 0 && tick < TICK_RANGE) {
+                uint256 prevSolPrice = TickLib.tickToPrice(tick - 1);
+                uint256 nextSolPrice = TickLib.tickToPrice(tick + 1);
+                if (prevSolPrice < solPrice && solPrice < nextSolPrice) {
+                    assertGe(exactPrice, prevSolPrice, string.concat("Tick ", vm.toString(tick), " exact < prev sol"));
+                    assertLe(exactPrice, nextSolPrice, string.concat("Tick ", vm.toString(tick), " exact > next sol"));
+                }
+            }
+        }
+
+        console.log("Max absolute error (wad):", maxAbsErrorWad);
+        console.log("Avg absolute error (wad):", totalAbsErrorWad / TICK_RANGE);
+        console.log("Max relative error (wad):", maxRelErrorWad);
+        console.log("Avg relative error (wad):", totalRelErrorWad / TICK_RANGE);
     }
 }

@@ -6,6 +6,7 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
@@ -157,7 +158,7 @@ abstract contract BaseTest is Test {
     }
 
     function toId(Obligation memory obligation) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, address(morphoV2), obligation));
+        return IdLib.toId(obligation, block.chainid, address(morphoV2));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -214,6 +215,22 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
+    // Returns an obligation with sorted, non-zero and unique collaterals (done by adding the index to the hash of the
+    // token).
+    function sortedAndUniqueCollateralsInObligation(Obligation memory obligation)
+        internal
+        pure
+        returns (Obligation memory)
+    {
+        Collateral[] memory collaterals = new Collateral[](obligation.collaterals.length);
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
+        }
+        collaterals = sortCollaterals(collaterals);
+        obligation.collaterals = collaterals;
+        return obligation;
+    }
+
     function setupObligation(Obligation memory obligation, uint256 obligationUnits) internal {
         deal(address(loanToken), lender, obligationUnits);
 
@@ -243,5 +260,9 @@ abstract contract BaseTest is Test {
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
+    }
+
+    function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a - b : b - a;
     }
 }

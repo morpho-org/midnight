@@ -3,6 +3,7 @@
 pragma solidity 0.8.31;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
+import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
@@ -269,7 +270,7 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        (bool isHealthy, bool belowMinCollateral) = isHealthy(offer.obligation, seller);
+        (bool isHealthy, bool belowMinCollateral) = isHealthy(offer.obligation, id, seller);
         require(isHealthy, "Seller is unhealthy");
         require(!belowMinCollateral, "Seller collateral below min");
 
@@ -333,7 +334,7 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[id][onBehalf][collateral] -= assets;
 
-        (bool isHealthy, bool belowMinCollateral) = isHealthy(obligation, onBehalf);
+        (bool isHealthy, bool belowMinCollateral) = isHealthy(obligation, id, onBehalf);
         require(isHealthy, "Unhealthy borrower");
         require(!belowMinCollateral, "Borrower collateral below min");
 
@@ -344,7 +345,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev At least one of `repaidUnits` or `seizedAssets` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity is reached.
-    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factory).
+    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
     /// @dev Returns repaid units and seized assets.
@@ -359,6 +360,8 @@ contract MorphoV2 is IMorphoV2 {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "INCONSISTENT_INPUT");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        // Reverts if collateralIndex is out of bounds.
+        address liquidatedCollateralToken = obligation.collaterals[collateralIndex].token;
 
         uint256 repayableDebt;
         uint256 maxDebt;
@@ -382,7 +385,6 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 lltv = obligation.collaterals[collateralIndex].lltv;
             uint256 lif = originalDebt > maxDebt
                 ? MAX_LIF
                 : UtilsLib.min(
@@ -397,22 +399,23 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             if (block.timestamp <= obligation.maturity) {
-                uint256 _collateralOf = collateralOf[id][borrower][obligation.collaterals[collateralIndex].token];
+                uint256 lltv = obligation.collaterals[collateralIndex].lltv;
+                uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollateralToken];
                 uint256 newMaxDebt = maxDebt
                     - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD)
                     + (_collateralOf - seizedAssets).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                         .mulDivDown(lltv, WAD);
-                require(originalDebt - repaidUnits >= newMaxDebt, "recovery close factory violated");
+                require(originalDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
             }
 
-            collateralOf[id][borrower][obligation.collaterals[collateralIndex].token] -= seizedAssets;
+            collateralOf[id][borrower][liquidatedCollateralToken] -= seizedAssets;
             _obligationState.withdrawable += repaidUnits;
             debtOf[id][borrower] -= repaidUnits;
         }
 
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
 
-        SafeTransferLib.safeTransfer(obligation.collaterals[collateralIndex].token, msg.sender, seizedAssets);
+        SafeTransferLib.safeTransfer(liquidatedCollateralToken, msg.sender, seizedAssets);
 
         if (data.length > 0) {
             ICallbacks(msg.sender).onLiquidate(obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
@@ -449,7 +452,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
-        bytes32 id = toId(obligation);
+        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
         if (!obligationState[id].created) {
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
@@ -460,6 +463,7 @@ contract MorphoV2 is IMorphoV2 {
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
+            IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -492,8 +496,7 @@ contract MorphoV2 is IMorphoV2 {
         return keccak256(abi.encode(block.chainid, address(this), obligation));
     }
 
-    function isHealthy(Obligation memory obligation, address borrower) public view returns (bool, bool) {
-        bytes32 id = toId(obligation);
+    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool, bool) {
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;
         uint256 collateralValue;

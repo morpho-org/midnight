@@ -32,6 +32,11 @@ contract LiquidationTest is BaseTest {
         id = toId(obligation);
     }
 
+    function testLiquidateInvalidCollateralIndex() public {
+        vm.expectRevert(stdError.indexOOBError);
+        morphoV2.liquidate(obligation, 2, 0, 0, borrower, "");
+    }
+
     function testLiquidateHealthyPreMaturity(uint256 units) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         collateralize(obligation, borrower, units);
@@ -305,7 +310,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
         deal(address(loanToken), address(this), units);
 
-        vm.expectRevert("recovery close factory violated");
+        vm.expectRevert("recovery close factor violated");
         morphoV2.liquidate(obligation, 0, units, 0, borrower, "");
     }
 
