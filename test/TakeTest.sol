@@ -1324,7 +1324,7 @@ contract TakeTest is BaseTest {
 
         collateralize(obligation, borrower, expectedUnits);
 
-        vm.expectRevert("Seller is unhealthy");
+        vm.expectRevert("Seller collateral below min");
         take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
     }
 }

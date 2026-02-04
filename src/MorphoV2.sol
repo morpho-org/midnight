@@ -269,7 +269,9 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        require(isHealthy(offer.obligation, seller), "Seller is unhealthy");
+        (bool isHealthy, bool belowMinCollateral) = isHealthy(offer.obligation, seller);
+        require(isHealthy, "Seller is unhealthy");
+        require(!belowMinCollateral, "Seller collateral below min");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -331,7 +333,9 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[id][onBehalf][collateral] -= assets;
 
-        require(isHealthy(obligation, onBehalf), "Unhealthy borrower");
+        (bool isHealthy, bool belowMinCollateral) = isHealthy(obligation, onBehalf);
+        require(isHealthy, "Unhealthy borrower");
+        require(!belowMinCollateral, "Borrower collateral below min");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf);
 
@@ -488,11 +492,12 @@ contract MorphoV2 is IMorphoV2 {
         return keccak256(abi.encode(block.chainid, address(this), obligation));
     }
 
-    function isHealthy(Obligation memory obligation, address borrower) public view returns (bool) {
+    function isHealthy(Obligation memory obligation, address borrower) public view returns (bool, bool) {
         bytes32 id = toId(obligation);
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;
         uint256 collateralValue;
+        bool belowMinCollateral = false;
         for (uint256 i = 0; i < obligation.collaterals.length && maxDebt < debt; i++) {
             Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
@@ -500,8 +505,10 @@ contract MorphoV2 is IMorphoV2 {
                 collateralOf[id][borrower][collateral.token].mulDivDown(price, ORACLE_PRICE_SCALE);
             collateralValue += collateralQuoted;
             maxDebt += collateralQuoted.mulDivDown(collateral.lltv, WAD);
+            belowMinCollateral =
+                belowMinCollateral || (collateralQuoted > 0 && collateralQuoted < obligation.minCollateral);
         }
-        return (maxDebt >= debt) && (collateralValue >= obligation.minCollateral);
+        return (maxDebt >= debt, belowMinCollateral);
     }
 
     function domainSeparator() internal view returns (bytes32) {
