@@ -108,6 +108,14 @@ contract IdLibTest is BaseTest {
         IdLib.pack(obligation);
     }
 
+    function testStoreInCodeRevertsOnInvalidObligation() public {
+        Obligation memory obligation;
+        obligation.maturity = uint256(type(uint48).max) + 1;
+
+        vm.expectRevert("Failed to create SStore2 contract");
+        morphoV2.touchObligation(obligation);
+    }
+
     /// forge-config: default.allow_internal_expect_revert = true
     function testPackRejectsLargeMaturity() public {
         Obligation memory obligation;

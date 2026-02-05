@@ -59,7 +59,7 @@ library IdLib {
         assembly ("memory-safe") {
             create2Address := create2(0, add(_creationCode, 0x20), mload(_creationCode), 0)
         }
-        require(create2Address != address(0), "Failed to create SStore2 contract");
+        require(create2Address.code.length > 0, "Failed to create SStore2 contract");
     }
 
     /// @dev Returns a packed representation of the obligation.
