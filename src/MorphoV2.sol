@@ -53,6 +53,9 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[6]) public defaultFees;
 
+    /// @dev Default continuous fee per loan token. Locked at obligation creation.
+    mapping(address loanToken => uint256) public defaultContinuousFee;
+
     address public tradingFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
@@ -121,6 +124,12 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == owner, "Only owner");
         tradingFeeRecipient = recipient;
         emit EventsLib.SetTradingFeeRecipient(recipient);
+    }
+
+    function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        defaultContinuousFee[loanToken] = newContinuousFee;
+        emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
     /// ENTRY-POINTS ///
@@ -215,6 +224,10 @@ contract MorphoV2 is IMorphoV2 {
         bool buyerIsLender = (debtOf[id][buyer] == 0);
         bool sellerIsBorrower = (sharesOf[id][seller] == 0);
         if (buyerIsLender && sellerIsBorrower) {
+            require(
+                defaultContinuousFee[offer.obligation.loanToken] <= offer.obligation.continuousFee,
+                "continuous fee increased"
+            );
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
             debtOf[id][seller] += obligationUnits;
@@ -466,6 +479,8 @@ contract MorphoV2 is IMorphoV2 {
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
                 previousCollateralToken = collateralToken;
             }
+
+            require(obligation.continuousFee == defaultContinuousFee[obligation.loanToken], "invalid continuous fee");
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];

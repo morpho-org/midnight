@@ -216,7 +216,7 @@ abstract contract BaseTest is Test {
     }
 
     // Returns an obligation with sorted, non-zero and unique collaterals (done by adding the index to the hash of the
-    // token).
+    // token). Also sets continuousFee to 0 to match the default.
     function sortedAndUniqueCollateralsInObligation(Obligation memory obligation)
         internal
         pure
@@ -228,6 +228,7 @@ abstract contract BaseTest is Test {
         }
         collaterals = sortCollaterals(collaterals);
         obligation.collaterals = collaterals;
+        obligation.continuousFee = 0;
         return obligation;
     }
 
