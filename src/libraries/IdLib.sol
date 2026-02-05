@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation} from "../interfaces/IMorphoV2.sol";
+import {Obligation, Collateral} from "../interfaces/IMorphoV2.sol";
 
 library IdLib {
     /// @dev Creation code that returns the code after the prefix as runtime bytecode, except for the first 52 bytes.
@@ -24,7 +24,7 @@ library IdLib {
         returns (bytes memory)
     {
         bytes memory prefix = hex"603f380380603f5f395ff3";
-        return abi.encodePacked(prefix, chainId, morphoV2, abi.encode(obligation));
+        return abi.encodePacked(prefix, chainId, morphoV2, pack(obligation));
     }
 
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes32) {
@@ -34,11 +34,11 @@ library IdLib {
     function idToObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
         address create2Address =
             address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))));
-        return abi.decode(create2Address.code, (Obligation));
+        return unpack(create2Address.code);
     }
 
-    /// @dev Deploys a contract with runtime code = abi.encode(obligation)
-    /// @dev The contract code begins with 0x00 (STOP), because the first word is the offset of the obligation.
+    /// @dev Deploys a contract with runtime code = pack(obligation)
+    /// @dev The contract code begins with 0x00 (STOP) for safety.
     function storeInCode(Obligation memory obligation) internal {
         bytes memory _creationCode = creationCode(obligation, block.chainid, address(this));
         address create2Address;
@@ -46,5 +46,85 @@ library IdLib {
             create2Address := create2(0, add(_creationCode, 0x20), mload(_creationCode), 0)
         }
         require(create2Address != address(0), "Failed to create SStore2 contract");
+    }
+
+    /// @dev Returns a packed representation of the obligation.
+    /// @dev The maturity must fit on 6 bytes.
+    /// @dev The collateral count must fit on 1 byte.
+    /// @dev All lltvs must fit on 8 bytes.
+    function pack(Obligation memory obligation) internal pure returns (bytes memory result) {
+        require(obligation.maturity <= type(uint48).max, "maturity too large");
+        require(obligation.collaterals.length <= type(uint8).max, "collateral count too large");
+        Collateral[] memory collaterals = obligation.collaterals;
+        uint256 len = collaterals.length;
+
+        uint256 ptr;
+        assembly ("memory-safe") {
+            result := mload(0x40)
+            let size := add(28, mul(len, 48))
+            mstore(result, size)
+
+            ptr := add(result, 32)
+            // [stop, 1 byte][loanToken, 20 bytes][maturity, 6 bytes][collateral count, 1 byte]
+            let header := or(or(shl(88, mload(obligation)), shl(40, mload(add(obligation, 0x40)))), shl(32, len))
+            mstore(ptr, header)
+            ptr := add(ptr, 28)
+        }
+
+        for (uint256 i = 0; i < len; i++) {
+            Collateral memory c = collaterals[i];
+            require(c.lltv <= type(uint64).max, "lltv too large");
+
+            assembly ("memory-safe") {
+                // [token, 20 bytes][lltv, 8 bytes]
+                mstore(ptr, or(shl(96, mload(c)), shl(32, mload(add(c, 0x20)))))
+                ptr := add(ptr, 28)
+
+                // [oracle, 20 bytes]
+                mstore(ptr, shl(96, mload(add(c, 0x40))))
+                ptr := add(ptr, 20)
+            }
+        }
+
+        assembly ("memory-safe") {
+            // Round up to the next 32-byte word for the free memory pointer.
+            mstore(0x40, and(add(ptr, 31), not(31)))
+        }
+    }
+
+    function unpack(bytes memory data) internal pure returns (Obligation memory obligation) {
+        require(data.length > 0, "empty data");
+        unchecked {
+            address loanToken;
+            uint256 maturity;
+            uint8 len;
+            assembly ("memory-safe") {
+                let ptr := add(data, 32)
+                loanToken := shr(96, mload(add(ptr, 1)))
+                maturity := shr(208, mload(add(ptr, 21)))
+                len := shr(248, mload(add(ptr, 27)))
+            }
+
+            obligation.loanToken = loanToken;
+            obligation.maturity = maturity;
+
+            Collateral[] memory collaterals = new Collateral[](len);
+
+            for (uint256 i = 0; i < len; i++) {
+                uint256 offset = 28 + i * 48;
+                address token;
+                uint256 lltv;
+                address oracle;
+                assembly ("memory-safe") {
+                    let ptr := add(add(data, 32), offset)
+                    token := shr(96, mload(ptr))
+                    lltv := shr(192, mload(add(ptr, 20)))
+                    oracle := shr(96, mload(add(ptr, 28)))
+                }
+                collaterals[i] = Collateral({token: token, lltv: lltv, oracle: oracle});
+            }
+
+            obligation.collaterals = collaterals;
+        }
     }
 }

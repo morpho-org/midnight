@@ -265,4 +265,16 @@ abstract contract BaseTest is Test {
     function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a - b : b - a;
     }
+
+    function boundObligation(Obligation memory obligation) internal pure {
+        obligation.maturity = bound(obligation.maturity, 0, type(uint48).max);
+        uint256 len = bound(obligation.collaterals.length, 0, type(uint8).max);
+        Collateral[] memory collaterals = new Collateral[](len);
+        for (uint256 i = 0; i < len; i++) {
+            collaterals[i] = obligation.collaterals[i];
+            collaterals[i].lltv = bound(obligation.collaterals[i].lltv, 0, type(uint64).max);
+            collaterals[i].oracle = obligation.collaterals[i].oracle;
+        }
+        obligation.collaterals = collaterals;
+    }
 }
