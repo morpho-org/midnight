@@ -86,6 +86,7 @@ abstract contract BaseTest is Test {
         address taker,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
+        vm.prank(taker);
         return morphoV2.take(
             takerAssets,
             obligationUnits,
@@ -241,6 +242,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = TICK_RANGE;
 
+        vm.prank(lender);
         morphoV2.take(
             0,
             obligationUnits,

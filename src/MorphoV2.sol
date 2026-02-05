@@ -50,6 +50,9 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
 
+    /// @dev Whether an address is authorized to manage positions on behalf of another address.
+    mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
+
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[6]) public defaultFees;
 
@@ -143,6 +146,7 @@ contract MorphoV2 is IMorphoV2 {
         address takerCallback,
         bytes memory takerCallbackData
     ) public returns (uint256, uint256, uint256, uint256) {
+        require(taker == msg.sender || isAuthorized[taker][msg.sender], "UNAUTHORIZED");
         require(UtilsLib.atMostOneNonZero(takerAssets, obligationUnits, obligationShares), "inconsistent input");
         require(
             UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
@@ -291,6 +295,7 @@ contract MorphoV2 is IMorphoV2 {
         external
         returns (uint256, uint256)
     {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -339,6 +344,7 @@ contract MorphoV2 is IMorphoV2 {
     function withdrawCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
         external
     {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         bytes32 id = touchObligation(obligation);
 
         collateralOf[id][onBehalf][collateral] -= assets;
@@ -442,6 +448,11 @@ contract MorphoV2 is IMorphoV2 {
         session[msg.sender] = newSession;
 
         emit EventsLib.ShuffleSession(msg.sender, newSession);
+    }
+
+    function setIsAuthorized(address authorized, bool newIsAuthorized) external {
+        isAuthorized[msg.sender][authorized] = newIsAuthorized;
+        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized);
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {

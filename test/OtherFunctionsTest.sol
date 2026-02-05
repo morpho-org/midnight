@@ -44,18 +44,19 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawCollateralNoBorrow(address user, uint256 supply, uint256 withdraw) public {
-        vm.assume(user != address(morphoV2));
+        vm.assume(user != address(morphoV2) && user != address(0));
         withdraw = bound(withdraw, 0, supply);
         address collateralToken = address(new ERC20("collat", "c"));
         deal(collateralToken, address(this), supply);
         ERC20(collateralToken).approve(address(morphoV2), supply);
         morphoV2.supplyCollateral(obligation, collateralToken, supply, user);
 
+        vm.prank(user);
         morphoV2.withdrawCollateral(obligation, collateralToken, withdraw, user);
 
         assertEq(morphoV2.collateralOf(id, user, collateralToken), supply - withdraw, "collateral of");
         assertEq(ERC20(collateralToken).balanceOf(address(morphoV2)), supply - withdraw, "balance of morphoV2");
-        assertEq(ERC20(collateralToken).balanceOf(address(this)), withdraw, "balance of this");
+        assertEq(ERC20(collateralToken).balanceOf(user), withdraw, "balance of user");
     }
 
     function testWithdrawCollateralWithBorrowHealthy(uint256 additionalCollateral, uint256 withdraw, uint256 units)
@@ -71,13 +72,14 @@ contract OtherFunctionsTest is BaseTest {
         withdraw = bound(withdraw, 0, additionalCollateral);
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, collateralToken);
 
+        vm.prank(borrower);
         morphoV2.withdrawCollateral(obligation, collateralToken, withdraw, borrower);
 
         assertEq(morphoV2.collateralOf(id, borrower, collateralToken), initialCollateral - withdraw, "collateral of");
         assertEq(
             ERC20(collateralToken).balanceOf(address(morphoV2)), initialCollateral - withdraw, "balance of morphoV2"
         );
-        assertEq(ERC20(collateralToken).balanceOf(address(this)), withdraw, "balance of this");
+        assertEq(ERC20(collateralToken).balanceOf(borrower), withdraw, "balance of borrower");
     }
 
     function testWithdrawCollateralWithBorrowUnhealthy(uint256 additionalCollateral, uint256 withdraw, uint256 units)
@@ -93,6 +95,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, collateralToken);
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
+        vm.prank(borrower);
         vm.expectRevert("Unhealthy borrower");
         morphoV2.withdrawCollateral(obligation, collateralToken, withdraw, borrower);
     }
@@ -117,6 +120,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testWithdrawInconsistentInput(uint256 units, uint256 shares) public {
         vm.assume(units > 0 && shares > 0);
+        vm.prank(lender);
         vm.expectRevert("INCONSISTENT_INPUT");
         morphoV2.withdraw(obligation, units, shares, lender);
     }
