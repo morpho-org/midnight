@@ -95,36 +95,24 @@ library IdLib {
     function unpack(bytes memory data) internal pure returns (Obligation memory obligation) {
         require(data.length > 0, "empty data");
         unchecked {
-            address loanToken;
-            uint256 maturity;
-            uint8 len;
-            assembly ("memory-safe") {
-                let ptr := add(data, 32)
-                loanToken := shr(96, mload(add(ptr, 1)))
-                maturity := shr(208, mload(add(ptr, 21)))
-                len := shr(248, mload(add(ptr, 27)))
-            }
+            obligation.loanToken = address(uint160(get(data, 1) >> 96));
+            obligation.maturity = uint48(get(data, 21) >> 208);
+            uint8 len = uint8(data[27]);
 
-            obligation.loanToken = loanToken;
-            obligation.maturity = maturity;
-
-            Collateral[] memory collaterals = new Collateral[](len);
+            obligation.collaterals = new Collateral[](len);
 
             for (uint256 i = 0; i < len; i++) {
                 uint256 offset = 28 + i * 48;
-                address token;
-                uint256 lltv;
-                address oracle;
-                assembly ("memory-safe") {
-                    let ptr := add(add(data, 32), offset)
-                    token := shr(96, mload(ptr))
-                    lltv := shr(192, mload(add(ptr, 20)))
-                    oracle := shr(96, mload(add(ptr, 28)))
-                }
-                collaterals[i] = Collateral({token: token, lltv: lltv, oracle: oracle});
+                obligation.collaterals[i].token = address(uint160(get(data, offset) >> 96));
+                obligation.collaterals[i].lltv = uint64(get(data, offset + 20) >> 192);
+                obligation.collaterals[i].oracle = address(uint160(get(data, offset + 28) >> 96));
             }
+        }
+    }
 
-            obligation.collaterals = collaterals;
+    function get(bytes memory data, uint256 offset) private pure returns (uint256 w) {
+        assembly ("memory-safe") {
+            w := mload(add(add(data, 32), offset))
         }
     }
 }
