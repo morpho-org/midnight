@@ -3,28 +3,42 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Collateral} from "../interfaces/IMorphoV2.sol";
+import {IMorphoV2} from "../interfaces/IMorphoV2.sol";
 
 library IdLib {
-    /// @dev Creation code that returns the code after the prefix as runtime bytecode, except for the first 52 bytes.
+    /// @dev Calls its deployer with its 74:end bytes.
+    /// @dev Uses the returned bytes as runtime code.
     /// @dev Explanation of the prefix:
-    /// hex       opcode          stack              comments
-    /// ------------------------------------------------------------------------------
-    /// 60 3f     PUSH1 0x3f      [63]               63 = len(prefix+chainId+morphoV2)
-    /// 38        CODESIZE        [codesize, 63]
-    /// 03        SUB             [len]              with len = codesize - 63
-    /// 80        DUP1            [len, len]
-    /// 60 3f     PUSH1 0x3f      [63, len, len]     code offset = 63
-    /// 5f        PUSH0           [0, 63, len, len]  mem offset = 0
-    /// 39        CODECOPY        [len]              mem[0:len] <- code[63:63+len]
-    /// 5f        PUSH0           [0, len]           return offset = 0
-    /// f3        RETURN          []                 mem[0:len] is returned
+    /// hex     opcode           stack                               comments
+    /// -----------------------------------------------------------------------------------------------
+    /// 60 4a   PUSH1 0x4a      [74]                                74 = len(prefix+chainId+morphoV2)
+    /// 38      codeSize        [codeSize, 74]
+    /// 80      DUP1            [codeSize, codeSize, 74]
+    /// 91      SWAP2           [74, codeSize, codeSize]
+    /// 5f      PUSH0           [0, 74, codeSize, codeSize]
+    /// 39      CODECOPY        [codeSize]                          mem[0:codeSize] <- code[74:], zero-padded
+    /// 5f      PUSH0           [0, codeSize]
+    /// 5f      PUSH0           [0, 0, codeSize]
+    /// 91      SWAP2           [codeSize, 0, 0]
+    /// 5f      PUSH0           [0, codeSize, 0, 0]
+    /// 33      CALLER          [caller, 0, codeSize, 0, 0]
+    /// 5a      GAS             [gas, caller, 0, codeSize, 0, 0]
+    /// fa      STATICCALL      [ok]
+    /// 3d      RETURNDATASIZE  [returnDataSize, ok]
+    /// 02      MUL             [retSize]                           0 if failed staticcall
+    /// 80      DUP1            [retSize, retSize]
+    /// 5f      PUSH0           [0, retSize, retSize]
+    /// 5f      PUSH0           [0, 0, retSize, retSize]
+    /// 3e      RETURNDATACOPY  [retSize]                           mem[0:retSize] <- returndata[0:retSize]
+    /// 5f      PUSH0           [0, retSize]
+    /// f3      RETURN          []                                  return mem[0:retSize]
     function creationCode(Obligation memory obligation, uint256 chainId, address morphoV2)
         internal
         pure
         returns (bytes memory)
     {
-        bytes memory prefix = hex"603f380380603f5f395ff3";
-        return abi.encodePacked(prefix, chainId, morphoV2, pack(obligation));
+        bytes memory prefix = hex"604a3880915f395f5f915f335afa3d02805f5f3e5ff3";
+        return abi.encodePacked(prefix, chainId, morphoV2, IMorphoV2.packObligation.selector, abi.encode(obligation));
     }
 
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes32) {
@@ -55,40 +69,15 @@ library IdLib {
     function pack(Obligation memory obligation) internal pure returns (bytes memory result) {
         require(obligation.maturity <= type(uint48).max, "maturity too large");
         require(obligation.collaterals.length <= type(uint8).max, "collateral count too large");
-        Collateral[] memory collaterals = obligation.collaterals;
-        uint256 len = collaterals.length;
 
-        uint256 ptr;
-        assembly ("memory-safe") {
-            result := mload(0x40)
-            let size := add(28, mul(len, 48))
-            mstore(result, size)
+        result = abi.encodePacked(
+            bytes1(0x00), obligation.loanToken, uint48(obligation.maturity), uint8(obligation.collaterals.length)
+        );
 
-            ptr := add(result, 32)
-            // [stop, 1 byte][loanToken, 20 bytes][maturity, 6 bytes][collateral count, 1 byte]
-            let header := or(or(shl(88, mload(obligation)), shl(40, mload(add(obligation, 0x40)))), shl(32, len))
-            mstore(ptr, header)
-            ptr := add(ptr, 28)
-        }
-
-        for (uint256 i = 0; i < len; i++) {
-            Collateral memory c = collaterals[i];
-            require(c.lltv <= type(uint64).max, "lltv too large");
-
-            assembly ("memory-safe") {
-                // [token, 20 bytes][lltv, 8 bytes]
-                mstore(ptr, or(shl(96, mload(c)), shl(32, mload(add(c, 0x20)))))
-                ptr := add(ptr, 28)
-
-                // [oracle, 20 bytes]
-                mstore(ptr, shl(96, mload(add(c, 0x40))))
-                ptr := add(ptr, 20)
-            }
-        }
-
-        assembly ("memory-safe") {
-            // Round up to the next 32-byte word for the free memory pointer.
-            mstore(0x40, and(add(ptr, 31), not(31)))
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            Collateral memory collateral = obligation.collaterals[i];
+            require(collateral.lltv <= type(uint64).max, "lltv too large");
+            result = abi.encodePacked(result, collateral.token, uint64(collateral.lltv), collateral.oracle);
         }
     }
 

@@ -538,4 +538,15 @@ contract MorphoV2 is IMorphoV2 {
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
+
+    /// EXTERNAL FUNCTIONS FOR INTERNAL USE ///
+
+    /// @dev Returns a packed representation of the obligation.
+    /// @dev Does not return valid ABI-encoded bytes.
+    function packObligation(Obligation memory obligation) external pure returns (bytes memory) {
+        bytes memory result = IdLib.pack(obligation);
+        assembly ("memory-safe") {
+            return(add(result, 32), mload(result))
+        }
+    }
 }

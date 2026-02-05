@@ -277,4 +277,12 @@ abstract contract BaseTest is Test {
         }
         obligation.collaterals = collaterals;
     }
+
+    function packObligation(Obligation memory obligation) external pure returns (bytes memory) {
+        // Must return raw bytes via assembly (not ABI-encoded) to match MorphoV2's behavior
+        bytes memory result = IdLib.pack(obligation);
+        assembly ("memory-safe") {
+            return(add(result, 32), mload(result))
+        }
+    }
 }

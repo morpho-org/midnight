@@ -56,4 +56,6 @@ struct ObligationState {
     uint16[6] fees;
 }
 
-interface IMorphoV2 {}
+interface IMorphoV2 {
+    function packObligation(Obligation memory obligation) external pure returns (bytes memory);
+}
