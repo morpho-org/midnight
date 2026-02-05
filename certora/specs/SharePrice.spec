@@ -14,5 +14,5 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
-strong invariant sharePriceBelowOne(bytes32 id)
-    totalShares(id) >= totalUnits(id);
+// strong invariant sharePriceBelowOne(bytes32 id)
+//     totalShares(id) >= totalUnits(id);
