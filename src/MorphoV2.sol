@@ -132,8 +132,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
     function take(
-        uint256 buyerAssets,
-        uint256 sellerAssets,
+        uint256 takerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
@@ -144,10 +143,7 @@ contract MorphoV2 is IMorphoV2 {
         address takerCallback,
         bytes memory takerCallbackData
     ) public returns (uint256, uint256, uint256, uint256) {
-        require(
-            UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
-            "inconsistent input"
-        );
+        require(UtilsLib.atMostOneNonZero(takerAssets, obligationUnits, obligationShares), "inconsistent input");
         require(
             UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
             "inconsistent offer input"
@@ -177,6 +173,8 @@ contract MorphoV2 is IMorphoV2 {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
+        uint256 buyerAssets = offer.buy ? 0 : takerAssets;
+        uint256 sellerAssets = offer.buy ? takerAssets : 0;
 
         if (buyerAssets > 0) {
             obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);

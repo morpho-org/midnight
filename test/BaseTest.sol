@@ -80,16 +80,14 @@ abstract contract BaseTest is Test {
 
     // hardcodes the right root, signature, proof, and callback (no callback)
     function take(
-        uint256 buyerAssets,
-        uint256 sellerAssets,
+        uint256 takerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
         return morphoV2.take(
-            buyerAssets,
-            sellerAssets,
+            takerAssets,
             obligationUnits,
             obligationShares,
             taker,
@@ -115,7 +113,7 @@ abstract contract BaseTest is Test {
         lenderOffer.tick = TICK_RANGE;
 
         collateralize(obligation, otherBorrower, units);
-        take(0, 0, units, 0, otherBorrower, lenderOffer);
+        take(0, units, 0, otherBorrower, lenderOffer);
     }
 
     function createBadDebt(Obligation memory obligation) internal {
@@ -139,7 +137,7 @@ abstract contract BaseTest is Test {
 
         deal(address(loanToken), unluckyLender, 100);
 
-        take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
+        take(100, 0, 0, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         morphoV2.liquidate(obligation, new Seizure[](0), badBorrower, "");
@@ -244,7 +242,6 @@ abstract contract BaseTest is Test {
         borrowerOffer.tick = TICK_RANGE;
 
         morphoV2.take(
-            0,
             0,
             obligationUnits,
             0,

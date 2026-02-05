@@ -55,7 +55,7 @@ contract TradingFeeTest is BaseTest {
         morphoV2.setTradingFeeRecipient(feeRecipient);
     }
 
-    function testBuyBuyerAssets(uint256 buyerAssets, uint256 sellerTick, uint256 tradingFee) public {
+    function testBuyTakerAssets(uint256 buyerAssets, uint256 sellerTick, uint256 tradingFee) public {
         buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
         sellerTick = bound(sellerTick, 0, TICK_RANGE);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
@@ -69,52 +69,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+        take(buyerAssets, 0, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
 
-    function testSellBuyerAssets(uint256 tradingFee, uint256 buyerTick, uint256 buyerAssets) public {
-        buyerAssets = bound(buyerAssets, 0, MAX_TEST_AMOUNT);
-        buyerTick = bound(buyerTick, 0, TICK_RANGE);
-        uint256 buyerPrice = TickLib.tickToPrice(buyerTick);
-        vm.assume(buyerPrice >= 0.5e18);
-        tradingFee = bound(tradingFee, 0, min(MAX_FEE, buyerPrice)) / 1e12 * 1e12;
-        morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        lenderOffer.tick = buyerTick;
-
-        uint256 sellerPrice = buyerPrice - tradingFee;
-        uint256 expectedSellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-        uint256 expectedFee = buyerAssets - expectedSellerAssets;
-
-        collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, borrower, lenderOffer);
-
-        assertApproxEqAbs(
-            loanToken.balanceOf(feeRecipient), expectedFee, buyerAssets / 1e6 + 100, "fee recipient balance"
-        );
-    }
-
-    function testBuySellerAssets(uint256 tradingFee, uint256 sellerTick, uint256 sellerAssets) public {
-        sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
-        uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
-        vm.assume(sellerPrice >= 0.5e18);
-        tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
-        morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        borrowerOffer.tick = sellerTick;
-
-        uint256 buyerPrice = sellerPrice + tradingFee;
-        uint256 expectedBuyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-        uint256 expectedFee = expectedBuyerAssets - sellerAssets;
-
-        collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(0, sellerAssets, 0, 0, lender, borrowerOffer);
-
-        assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
-    }
-
-    function testSellSellerAssets(uint256 tradingFee, uint256 buyerTick, uint256 sellerAssets) public {
+    function testSellTakerAssets(uint256 tradingFee, uint256 buyerTick, uint256 sellerAssets) public {
         sellerAssets = bound(sellerAssets, 0, MAX_TEST_AMOUNT);
         buyerTick = bound(buyerTick, 0, TICK_RANGE);
         uint256 buyerPrice = TickLib.tickToPrice(buyerTick);
@@ -128,7 +88,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = expectedBuyerAssets - sellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 10);
-        take(0, sellerAssets, 0, 0, borrower, lenderOffer);
+        take(sellerAssets, 0, 0, borrower, lenderOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -148,7 +108,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 10);
-        take(0, 0, obligationUnits, 0, lender, borrowerOffer);
+        take(0, obligationUnits, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -168,7 +128,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(0, 0, obligationUnits, 0, borrower, lenderOffer);
+        take(0, obligationUnits, 0, borrower, lenderOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -188,7 +148,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(0, 0, 0, obligationShares, lender, borrowerOffer);
+        take(0, 0, obligationShares, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -208,7 +168,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(0, 0, 0, obligationShares, borrower, lenderOffer);
+        take(0, 0, obligationShares, borrower, lenderOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -227,7 +187,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+        take(buyerAssets, 0, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -258,7 +218,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+        take(buyerAssets, 0, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -285,7 +245,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+        take(buyerAssets, 0, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
@@ -313,7 +273,7 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedFee = buyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_TEST_AMOUNT * 3);
-        take(buyerAssets, 0, 0, 0, lender, borrowerOffer);
+        take(buyerAssets, 0, 0, lender, borrowerOffer);
 
         assertApproxEqAbs(loanToken.balanceOf(feeRecipient), expectedFee, 100, "fee recipient balance");
     }
