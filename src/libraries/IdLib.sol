@@ -67,6 +67,8 @@ library IdLib {
         }
     }
 
+    /// @dev Unpacks a packed representation of the obligation.
+    /// @dev Should only be used on data known to be a packed obligation.
     function unpack(bytes memory data) internal pure returns (Obligation memory obligation) {
         require(data.length > 0, "empty data");
         unchecked {
