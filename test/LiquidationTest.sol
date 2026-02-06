@@ -3,12 +3,13 @@
 pragma solidity ^0.8.0;
 
 import {MAX_LIF, WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Collateral, Seizure, Offer} from "../src/interfaces/IMorphoV2.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
-
+import {ERC20} from "./helpers/ERC20.sol";
+import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 contract LiquidationTest is BaseTest {
     using UtilsLib for uint256;
 
@@ -395,6 +396,110 @@ contract LiquidationTest is BaseTest {
             morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token),
             initialCollateral - repaid.mulDivDown(lif, WAD),
             "collateral"
+        );
+    }
+  // gas tests
+
+    /// forge-config: default.isolate = true
+    function testGasLiquidateMultipleCollaterals() public {
+        uint256 n = 25;
+        uint256[] memory collateralCounts = new uint256[](n);
+
+        for(uint256 i = 1; i <= n ; i++) {
+            collateralCounts[i-1] = 2*i;
+        }
+
+        emit log("[");
+        for (uint256 i = 0; i < collateralCounts.length; i++) {
+            uint256 snapshot = vm.snapshotState();
+            bool isLast = (i == collateralCounts.length - 1);
+            _testGasLiquidateNCollaterals(collateralCounts[i], isLast);
+            vm.revertToState(snapshot);
+        }
+        emit log("]");
+    }
+
+    function _testGasLiquidateNCollaterals(uint256 n, bool isLast) internal {
+        require(n >= 1, "n must be at least 1");
+
+        // Create N collateral tokens and oracles.
+        ERC20[] memory collateralTokens = new ERC20[](n);
+        Oracle[] memory oracles = new Oracle[](n);
+        Collateral[] memory collaterals = new Collateral[](n);
+
+        for (uint256 i = 0; i < n; i++) {
+            collateralTokens[i] =
+                new ERC20(string.concat("collat", vm.toString(i)), string.concat("C", vm.toString(i)));
+            oracles[i] = new Oracle();
+            collaterals[i] =
+                Collateral({token: address(collateralTokens[i]), lltv: 0.75e18, oracle: address(oracles[i])});
+        }
+        collaterals = sortCollaterals(collaterals);
+
+        // Create obligation with N collaterals.
+        Obligation memory gasObligation;
+        gasObligation.loanToken = address(loanToken);
+        gasObligation.maturity = block.timestamp + 100;
+        gasObligation.collaterals = collaterals;
+
+        uint256 units = 1000e18;
+        uint256 collateralAmount = units.mulDivUp(WAD, 0.75e18);
+
+        // Supply all collaterals.
+        for (uint256 i = 0; i < n; i++) {
+            address token = gasObligation.collaterals[i].token;
+            deal(token, address(this), collateralAmount);
+            ERC20(token).approve(address(morphoV2), collateralAmount);
+            morphoV2.supplyCollateral(gasObligation, token, collateralAmount, borrower);
+        }
+
+        // Setup obligation with debt.
+        deal(address(loanToken), lender, units);
+        Offer memory borrowerOffer;
+        borrowerOffer.obligation = gasObligation;
+        borrowerOffer.buy = false;
+        borrowerOffer.maker = borrower;
+        borrowerOffer.assets = units;
+        borrowerOffer.start = block.timestamp;
+        borrowerOffer.expiry = block.timestamp;
+        borrowerOffer.tick = TICK_RANGE;
+        vm.prank(lender);
+        morphoV2.take(
+            0,
+            0,
+            units,
+            0,
+            lender,
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer]),
+            address(0),
+            hex""
+        );
+
+        // Make position liquidatable.
+        for (uint256 i = 0; i < n; i++) {
+            Oracle(gasObligation.collaterals[i].oracle).setPrice(0.5e36);
+        }
+        vm.warp(gasObligation.maturity + TIME_TO_MAX_LIF);
+        deal(address(loanToken), address(this), units);
+        uint256 repay = units / n;
+
+        // Measure gas.
+        Seizure[] memory seizure = new Seizure[](n);
+        for (uint256 i = 0; i < n; i++) {
+            seizure[i] = Seizure({collateralIndex: i, repaid: repay, seized: 0});
+        }
+
+        uint256 gasBefore = gasleft();
+        morphoV2.liquidate(gasObligation, seizure, borrower, "");
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Log gas results as JSON.
+        string memory suffix = isLast ? "" : ",";
+        emit log(
+            string.concat('{"collaterals": ', vm.toString(n), ', "gas": ', vm.toString(gasUsed), "}", suffix)
         );
     }
 
