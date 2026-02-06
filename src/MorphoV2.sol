@@ -414,14 +414,22 @@ contract MorphoV2 is IMorphoV2 {
                     repaidUnits.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice).mulDivDown(lif, WAD);
             }
 
+
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollateralToken];
+                uint256 minCollatRepaidUnits = (_collateralOf < obligation.minCollateral) ? 0 : (_collateralOf - obligation.minCollateral).mulDivUp(WAD, lif).mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE);
+
                 uint256 newMaxDebt = maxDebt
                     - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD)
                     + (_collateralOf - seizedAssets).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                         .mulDivDown(lltv, WAD);
-                require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
+                uint256 minCollatMaxDebt = (_collateralOf < obligation.minCollateral) ? 0 : maxDebt - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD) + (obligation.minCollateral).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
+
+                // If seizing up to min collat is still liquidatable, remove the recovery close factor.
+                if (originalDebt - badDebt - minCollatRepaidUnits >= minCollatMaxDebt) {
+                    require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
+                }
             }
 
             collateralOf[id][borrower][liquidatedCollateralToken] -= seizedAssets;
