@@ -373,11 +373,16 @@ contract MorphoV2 is IMorphoV2 {
 
         uint256 originalDebt = debtOf[id][borrower];
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+
         uint256 maxSeizableAssets = block.timestamp > obligation.maturity || liquidatedCollateralPrice == 0
             ? type(uint256).max
             : (originalDebt - maxDebt).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
                 .mulDivDown(WAD, obligation.collaterals[collateralIndex].lltv);
 
+        // TODO bad debt considerations ?
+        if (maxSeizableAssets > _collateralOf - obligation.minCollateral) {
+            maxSeizableAssets = type(uint256).max;
+        }
         uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
             debtOf[id][borrower] -= badDebt;
