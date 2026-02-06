@@ -433,6 +433,7 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             collateralOf[id][borrower][liquidatedCollateralToken] -= seizedAssets;
+            require(collateralOf[id][borrower][liquidatedCollateralToken] == 0 ||collateralOf[id][borrower][liquidatedCollateralToken] >= obligation.minCollateral, "collateral below min");
             _obligationState.withdrawable += repaidUnits;
             debtOf[id][borrower] -= repaidUnits;
         }
