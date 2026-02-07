@@ -72,24 +72,25 @@ library IdLib {
     function unpack(bytes memory data) internal pure returns (Obligation memory obligation) {
         require(data.length > 0, "empty data");
         unchecked {
-            obligation.loanToken = address(uint160(get(data, 1) >> 96));
-            obligation.maturity = uint48(get(data, 21) >> 208);
+            obligation.loanToken = address(uint160(get(data, 1, 160)));
+            obligation.maturity = uint48(get(data, 21, 48));
             uint8 len = uint8(data[27]);
 
             obligation.collaterals = new Collateral[](len);
 
             for (uint256 i = 0; i < len; i++) {
                 uint256 offset = 28 + i * 48;
-                obligation.collaterals[i].token = address(uint160(get(data, offset) >> 96));
-                obligation.collaterals[i].lltv = uint64(get(data, offset + 20) >> 192);
-                obligation.collaterals[i].oracle = address(uint160(get(data, offset + 28) >> 96));
+                obligation.collaterals[i].token = address(uint160(get(data, offset, 160)));
+                obligation.collaterals[i].lltv = uint64(get(data, offset + 20, 64));
+                obligation.collaterals[i].oracle = address(uint160(get(data, offset + 28, 160)));
             }
         }
     }
 
-    function get(bytes memory data, uint256 offset) private pure returns (uint256 w) {
+    function get(bytes memory data, uint256 offset, uint256 size) private pure returns (uint256 w) {
+        uint256 shift = 256 - size;
         assembly ("memory-safe") {
-            w := mload(add(add(data, 32), offset))
+            w := shr(shift, mload(add(add(data, 32), offset)))
         }
     }
 }
