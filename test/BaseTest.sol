@@ -67,6 +67,12 @@ abstract contract BaseTest is Test {
         loanToken.approve(address(morphoV2), type(uint256).max);
         collateralToken1.approve(address(morphoV2), type(uint256).max);
         collateralToken2.approve(address(morphoV2), type(uint256).max);
+
+        // Set MVP limits to max so existing tests are not blocked.
+        morphoV2.setMaxTotalUnits(address(loanToken), type(uint128).max);
+        morphoV2.setMaxTakeableAssets(address(loanToken), type(uint256).max);
+        morphoV2.setMaxCollateralPerUser(address(collateralToken1), type(uint256).max);
+        morphoV2.setMaxCollateralPerUser(address(collateralToken2), type(uint256).max);
     }
 
     // helpers.

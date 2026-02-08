@@ -33,6 +33,7 @@ contract OtherFunctionsTest is BaseTest {
     function testSupplyCollateral(address user, uint256 amount) public {
         vm.assume(user != address(morphoV2));
         address collateralToken = address(new ERC20("collat", "c"));
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, address(this), amount);
         ERC20(collateralToken).approve(address(morphoV2), amount);
 
@@ -47,6 +48,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(user != address(morphoV2));
         withdraw = bound(withdraw, 0, supply);
         address collateralToken = address(new ERC20("collat", "c"));
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, address(this), supply);
         ERC20(collateralToken).approve(address(morphoV2), supply);
         morphoV2.supplyCollateral(obligation, collateralToken, supply, user);

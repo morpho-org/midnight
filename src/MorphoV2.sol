@@ -41,6 +41,11 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 id => mapping(address user => mapping(address collateralToken => uint256))) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
 
+    /// @dev MVP limits.
+    mapping(address loanToken => uint128) public maxTotalUnits;
+    mapping(address loanToken => uint256) public maxTakeableAssets;
+    mapping(address collateralToken => uint256) public maxCollateralPerUser;
+
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
     /// obligationShares and loan token.
@@ -121,6 +126,27 @@ contract MorphoV2 is IMorphoV2 {
         require(msg.sender == owner, "Only owner");
         tradingFeeRecipient = recipient;
         emit EventsLib.SetTradingFeeRecipient(recipient);
+    }
+
+    /// @dev Set max total units for a loan asset.
+    function setMaxTotalUnits(address loanToken, uint128 newMaxTotalUnits) external {
+        require(msg.sender == owner, "Only owner");
+        maxTotalUnits[loanToken] = newMaxTotalUnits;
+        emit EventsLib.SetMaxTotalUnits(loanToken, newMaxTotalUnits);
+    }
+
+    /// @dev Set max takeable assets for a loan asset.
+    function setMaxTakeableAssets(address loanToken, uint256 newMaxTakeableAssets) external {
+        require(msg.sender == owner, "Only owner");
+        maxTakeableAssets[loanToken] = newMaxTakeableAssets;
+        emit EventsLib.SetMaxTakeableAssets(loanToken, newMaxTakeableAssets);
+    }
+
+    /// @dev Set max collateral per user for a collateral token.
+    function setMaxCollateralPerUser(address collateralToken, uint256 newMaxCollateralPerUser) external {
+        require(msg.sender == owner, "Only owner");
+        maxCollateralPerUser[collateralToken] = newMaxCollateralPerUser;
+        emit EventsLib.SetMaxCollateralPerUser(collateralToken, newMaxCollateralPerUser);
     }
 
     /// ENTRY-POINTS ///
@@ -285,6 +311,10 @@ contract MorphoV2 is IMorphoV2 {
 
         require(isHealthy(offer.obligation, id, seller), "Seller is unhealthy");
 
+        // MVP limits.
+        require(buyerAssets <= maxTakeableAssets[offer.obligation.loanToken], "exceeds max takeable");
+        require(_obligationState.totalUnits <= maxTotalUnits[offer.obligation.loanToken], "exceeds max total units");
+
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
@@ -334,6 +364,11 @@ contract MorphoV2 is IMorphoV2 {
         collateralOf[id][onBehalf][collateral] += assets;
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateral, assets, onBehalf);
+
+        require(
+            collateralOf[id][onBehalf][collateral] <= maxCollateralPerUser[collateral],
+            "exceeds max collateral per user"
+        );
 
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }

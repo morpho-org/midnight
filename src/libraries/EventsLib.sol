@@ -12,6 +12,9 @@ library EventsLib {
     event SetObligationTradingFee(bytes32 indexed id, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
     event SetTradingFeeRecipient(address indexed recipient);
+    event SetMaxTotalUnits(address indexed loanToken, uint128 maxTotalUnits);
+    event SetMaxTakeableAssets(address indexed loanToken, uint256 maxTakeableAssets);
+    event SetMaxCollateralPerUser(address indexed collateralToken, uint256 maxCollateralPerUser);
 
     event ObligationCreated(bytes32 indexed id, Obligation obligation);
     event Take(
