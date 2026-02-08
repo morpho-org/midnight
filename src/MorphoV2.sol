@@ -42,8 +42,11 @@ contract MorphoV2 is IMorphoV2 {
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev MVP limits.
+    // max total units per obligation of a given loan token
     mapping(address loanToken => uint128) public maxTotalUnits;
+    // max assets per take of given loan token.
     mapping(address loanToken => uint256) public maxTakeableAssets;
+    // max collateral per user per obligation of a given collateral token.
     mapping(address collateralToken => uint256) public maxCollateralPerUser;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
