@@ -65,6 +65,7 @@ contract AuthorizationTest is BaseTest {
         address user = makeAddr("user");
         address collateralToken = address(new ERC20("collat", "c"));
 
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, address(this), collateralAmount);
         ERC20(collateralToken).approve(address(morphoV2), collateralAmount);
         morphoV2.supplyCollateral(obligation, collateralToken, collateralAmount, user);
@@ -105,6 +106,7 @@ contract AuthorizationTest is BaseTest {
         address operator = makeAddr("operator");
         address collateralToken = address(new ERC20("collat", "c"));
 
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, address(this), collateralAmount);
         ERC20(collateralToken).approve(address(morphoV2), collateralAmount);
         morphoV2.supplyCollateral(obligation, collateralToken, collateralAmount, user);
@@ -143,6 +145,7 @@ contract AuthorizationTest is BaseTest {
         address user = makeAddr("user");
         address collateralToken = address(new ERC20("collat", "c"));
 
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
         ERC20(collateralToken).approve(address(morphoV2), collateralAmount);
