@@ -1137,6 +1137,7 @@ contract TakeTest is BaseTest {
 
     function testTakeWrongRoot() public {
         vm.expectRevert("invalid signature");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
@@ -1154,6 +1155,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("invalid signature");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
@@ -1172,6 +1174,7 @@ contract TakeTest is BaseTest {
     function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
         vm.expectRevert("invalid proof");
+        vm.prank(borrower);
         morphoV2.take(
             100, 0, 0, 0, borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof, address(0), hex""
         );
@@ -1181,6 +1184,7 @@ contract TakeTest is BaseTest {
         vm.assume(proof.length >= 1);
         vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
@@ -1202,6 +1206,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, assets.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
         lenderOffer.assets = assets;
 
+        vm.prank(borrower);
         morphoV2.take(
             assets,
             0,
@@ -1245,6 +1250,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, callback, collateral);
 
+        vm.prank(borrower);
         morphoV2.take(
             assets,
             0,
@@ -1279,8 +1285,8 @@ contract TakeTest is BaseTest {
 
     function testBuyBuyerCallback(uint256 assets) public {
         assets = bound(assets, 0, maxAssets);
-        (address otherLender,) = makeAddrAndKey("otherLender");
-        vm.prank(otherLender);
+        (address _otherLender,) = makeAddrAndKey("otherLender");
+        vm.prank(_otherLender);
         loanToken.approve(address(morphoV2), assets);
         address callback = address(new LendCallback());
         borrowerOffer.assets = assets;
@@ -1288,12 +1294,13 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, assets);
 
+        vm.prank(_otherLender);
         morphoV2.take(
             assets,
             0,
             0,
             0,
-            otherLender,
+            _otherLender,
             borrowerOffer,
             sig([borrowerOffer]),
             root([borrowerOffer]),
