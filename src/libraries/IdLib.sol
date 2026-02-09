@@ -53,17 +53,39 @@ library IdLib {
     /// @dev The collateral count must fit on 1 byte.
     /// @dev All lltvs must fit on 8 bytes.
     function pack(Obligation memory obligation) internal pure returns (bytes memory result) {
-        require(obligation.maturity <= type(uint48).max, "maturity too large");
-        require(obligation.collaterals.length <= type(uint8).max, "collateral count too large");
+        unchecked {
+            require(obligation.maturity <= type(uint48).max, "maturity too large");
+            require(obligation.collaterals.length <= type(uint8).max, "collateral count too large");
 
-        result = abi.encodePacked(
-            bytes1(0x00), obligation.loanToken, uint48(obligation.maturity), uint8(obligation.collaterals.length)
-        );
+            Collateral[] memory collaterals = obligation.collaterals;
+            uint256 len = collaterals.length;
 
-        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-            Collateral memory collateral = obligation.collaterals[i];
-            require(collateral.lltv <= type(uint64).max, "lltv too large");
-            result = abi.encodePacked(result, collateral.token, uint64(collateral.lltv), collateral.oracle);
+            assembly ("memory-safe") {
+                result := mload(0x40)
+                mstore(result, add(28, mul(len, 48)))
+                mstore(0x40, add(result, mul(add(len, 1), 64)))
+            }
+
+            set(result, 0, 0, 8);
+            set(result, 1, uint256(uint160(obligation.loanToken)), 160);
+            set(result, 21, obligation.maturity, 48);
+            set(result, 27, len, 8);
+
+            for (uint256 i = 0; i < len; i++) {
+                Collateral memory c = collaterals[i];
+                require(c.lltv <= type(uint64).max, "lltv too large");
+                uint256 offset = 28 + i * 48;
+
+                set(result, offset, uint256(uint160(c.token)), 160);
+                set(result, offset + 20, c.lltv, 64);
+                set(result, offset + 28, uint256(uint160(c.oracle)), 160);
+            }
+        }
+    }
+
+    function set(bytes memory data, uint256 offset, uint256 value, uint256 bits) private pure {
+        assembly ("memory-safe") {
+            mstore(add(add(data, 32), offset), shl(sub(256, bits), value))
         }
     }
 
@@ -72,25 +94,24 @@ library IdLib {
     function unpack(bytes memory data) internal pure returns (Obligation memory obligation) {
         require(data.length > 0, "empty data");
         unchecked {
-            obligation.loanToken = address(uint160(get(data, 1, 160)));
-            obligation.maturity = uint48(get(data, 21, 48));
-            uint8 len = uint8(data[27]);
+            obligation.loanToken = address(uint160(getArray(data, 1, 160)));
+            obligation.maturity = uint48(getArray(data, 21, 48));
+            uint8 len = uint8(getArray(data, 27, 8));
 
             obligation.collaterals = new Collateral[](len);
 
             for (uint256 i = 0; i < len; i++) {
                 uint256 offset = 28 + i * 48;
-                obligation.collaterals[i].token = address(uint160(get(data, offset, 160)));
-                obligation.collaterals[i].lltv = uint64(get(data, offset + 20, 64));
-                obligation.collaterals[i].oracle = address(uint160(get(data, offset + 28, 160)));
+                obligation.collaterals[i].token = address(uint160(getArray(data, offset, 160)));
+                obligation.collaterals[i].lltv = uint64(getArray(data, offset + 20, 64));
+                obligation.collaterals[i].oracle = address(uint160(getArray(data, offset + 28, 160)));
             }
         }
     }
 
-    function get(bytes memory data, uint256 offset, uint256 size) private pure returns (uint256 w) {
-        uint256 shift = 256 - size;
+    function getArray(bytes memory data, uint256 offset, uint256 size) private pure returns (uint256 w) {
         assembly ("memory-safe") {
-            w := shr(shift, mload(add(add(data, 32), offset)))
+            w := shr(sub(256, size), mload(add(add(data, 32), offset)))
         }
     }
 }
