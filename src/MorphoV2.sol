@@ -445,8 +445,9 @@ contract MorphoV2 is IMorphoV2 {
                     require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
                 } else {
                     require(
-                        _collateralOf == 0 || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                            >= obligation.minCollateral,
+                        _collateralOf == 0
+                            || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                                >= obligation.minCollateral,
                         "Below min collateral"
                     );
                 }
