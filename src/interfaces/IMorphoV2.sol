@@ -24,7 +24,7 @@ struct Offer {
     uint256 obligationShares;
     uint256 start;
     uint256 expiry;
-    uint256 price;
+    uint256 tick;
     bytes32 group;
     bytes32 session;
     address callback;
@@ -46,17 +46,16 @@ struct Seizure {
     uint256 seized;
 }
 
-struct ObligationStorage {
+/// @dev Trading fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
+/// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits. Max fee is 1% (0.01e18).
+/// @dev Interest fees are stored divided by INTEREST_FEE_STEP (1e6) to fit in 16 bits. Max fee is 1% per year.
+struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
     uint256 withdrawable;
     bool created;
     uint56 lastUpdate;
-    // Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
-    // Fees are stored divided by TRADING_FEE_STEP (1e12) to fit in 16 bits. Max fee is 1% (0.01e18).
-    uint16[6] tradingFees;
-    // Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
-    // Fees are stored divided by INTEREST_FEE_STEP (1e6) to fit in 16 bits. Max fee is 1% per year.
+    uint16[6] fees;
     uint16[6] interestFees;
 }
 

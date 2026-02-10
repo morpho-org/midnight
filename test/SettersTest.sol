@@ -62,7 +62,7 @@ contract SettersTest is BaseTest {
         // touch obligation with this loan token
         Obligation memory obligation =
             Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
-        bytes32 id = morphoV2.toId(obligation);
+        bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         morphoV2.setObligationTradingFee(id, 0, zeroSecondsFee);
@@ -152,7 +152,7 @@ contract SettersTest is BaseTest {
         // touch obligation with this loan token
         Obligation memory obligation =
             Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
-        bytes32 id = morphoV2.toId(obligation);
+        bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         assertEq(morphoV2.tradingFee(id, 0), postMaturityFee, "0 days default fee");
@@ -191,7 +191,7 @@ contract SettersTest is BaseTest {
         // touch obligation with this loan token
         Obligation memory obligation =
             Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
-        bytes32 id = morphoV2.toId(obligation);
+        bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         // Test breakpoint 0: 0 days (post maturity)
@@ -231,7 +231,7 @@ contract SettersTest is BaseTest {
         // touch obligation with this loan token
         Obligation memory obligation =
             Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
-        bytes32 id = morphoV2.toId(obligation);
+        bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         // Test exact breakpoints

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD, MAX_INTEREST_FEE, INTEREST_FEE_STEP} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
@@ -37,14 +38,15 @@ contract InterestFeeTest is BaseTest {
         lenderOffer.assets = type(uint256).max;
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 365 days;
-        lenderOffer.price = 1 ether;
+        lenderOffer.tick = TICK_RANGE;
 
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.assets = type(uint256).max;
+        borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp + 365 days;
-        borrowerOffer.price = 1 ether;
+        borrowerOffer.tick = TICK_RANGE;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 100);
 
