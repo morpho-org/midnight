@@ -47,6 +47,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
+        borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.assets = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 200;
 

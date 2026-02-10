@@ -87,6 +87,8 @@ abstract contract BaseTest is Test {
         address taker,
         Offer memory offer
     ) internal returns (uint256, uint256, uint256, uint256) {
+        // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
+        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
         return morphoV2.take(
             buyerAssets,
@@ -94,12 +96,13 @@ abstract contract BaseTest is Test {
             obligationUnits,
             obligationShares,
             taker,
+            address(0),
+            hex"",
+            taker,
             offer,
             sig([offer]),
             root([offer]),
-            proof([offer]),
-            address(0),
-            hex""
+            proof([offer])
         );
     }
 
@@ -130,6 +133,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.obligation = obligation;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
+        badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.assets = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
@@ -239,6 +243,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
+        borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.assets = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
@@ -251,12 +256,13 @@ abstract contract BaseTest is Test {
             obligationUnits,
             0,
             lender,
+            address(0),
+            hex"",
+            borrower,
             borrowerOffer,
             sig([borrowerOffer]),
             root([borrowerOffer]),
-            proof([borrowerOffer]),
-            address(0),
-            hex""
+            proof([borrowerOffer])
         );
     }
 
