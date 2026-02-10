@@ -145,22 +145,24 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Overrides the interest fee of a specific obligation.
-    function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
+    function setObligationInterestFee(bytes32 id, uint256 index, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
+        require(index <= 5, "Invalid index");
         require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
         require(newInterestFee % INTEREST_FEE_STEP == 0, "fee should be a multiple of INTEREST_FEE_STEP");
         // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        obligationState[id].interestFees[0] = uint16(newInterestFee / INTEREST_FEE_STEP);
-        emit EventsLib.SetObligationInterestFee(id, newInterestFee);
+        obligationState[id].interestFees[index] = uint16(newInterestFee / INTEREST_FEE_STEP);
+        emit EventsLib.SetObligationInterestFee(id, index, newInterestFee);
     }
 
     /// @dev Doesn't change the fee of already created obligations.
-    function setDefaultInterestFee(address loanToken, uint256 newInterestFee) external {
+    function setDefaultInterestFee(address loanToken, uint256 index, uint256 newInterestFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
+        require(index <= 5, "Invalid index");
         require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
         // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        defaultInterestFees[loanToken][0] = uint16(newInterestFee / INTEREST_FEE_STEP);
-        emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
+        defaultInterestFees[loanToken][index] = uint16(newInterestFee / INTEREST_FEE_STEP);
+        emit EventsLib.SetDefaultInterestFee(loanToken, index, newInterestFee);
     }
 
     /// ENTRY-POINTS ///
@@ -652,17 +654,16 @@ contract MorphoV2 is IMorphoV2 {
         returns (uint256)
     {
         if (timeToMaturity == lastTimeToMaturity) return 0;
-
         uint16[6] memory _interestFees = obligationState[id].interestFees;
+        uint256 totalTimeSpent = lastTimeToMaturity - timeToMaturity;
 
         // forgefmt: disable-start
-        uint256 timeSpentInThe180dBucket = UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 180 days));
-        uint256 timeSpentInThe90dBucket =  UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 90 days));
-        uint256 timeSpentInThe30dBucket =  UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 30 days));
-        uint256 timeSpentInThe7dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 7 days));
-        uint256 timeSpentInThe1dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 1 days));
-        uint256 timeSpentInThe0dBucket =   UtilsLib.zeroFloorSub(lastTimeToMaturity, UtilsLib.max(timeToMaturity, 0 days));
-        uint256 totalTimeSpent = lastTimeToMaturity - timeToMaturity;
+        uint256 timeSpentInThe180dBucket = UtilsLib.zeroFloorSub(lastTimeToMaturity,                         UtilsLib.max(timeToMaturity, 180 days));
+        uint256 timeSpentInThe90dBucket =  UtilsLib.zeroFloorSub(UtilsLib.min(lastTimeToMaturity, 180 days), UtilsLib.max(timeToMaturity, 90 days));
+        uint256 timeSpentInThe30dBucket =  UtilsLib.zeroFloorSub(UtilsLib.min(lastTimeToMaturity, 90 days),  UtilsLib.max(timeToMaturity, 30 days));
+        uint256 timeSpentInThe7dBucket =   UtilsLib.zeroFloorSub(UtilsLib.min(lastTimeToMaturity, 30 days),  UtilsLib.max(timeToMaturity, 7 days));
+        uint256 timeSpentInThe1dBucket =   UtilsLib.zeroFloorSub(UtilsLib.min(lastTimeToMaturity, 7 days),   UtilsLib.max(timeToMaturity, 1 days));
+        uint256 timeSpentInThe0dBucket =   UtilsLib.zeroFloorSub(UtilsLib.min(lastTimeToMaturity, 1 days),   timeToMaturity);
 
         return (
                timeSpentInThe180dBucket * _interestFees[5] * INTEREST_FEE_STEP +

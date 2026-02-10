@@ -65,7 +65,9 @@ contract InterestFeeTest is BaseTest {
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
         // Set default interest fee BEFORE creating the obligation
-        morphoV2.setDefaultInterestFee(address(loanToken), fee);
+        for (uint256 i = 0; i < 6; i++) {
+            morphoV2.setDefaultInterestFee(address(loanToken), i, fee);
+        }
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
@@ -120,7 +122,9 @@ contract InterestFeeTest is BaseTest {
         fee = fee / INTEREST_FEE_STEP * INTEREST_FEE_STEP; // Align to INTEREST_FEE_STEP
 
         // Set default interest fee BEFORE creating the obligation
-        morphoV2.setDefaultInterestFee(address(loanToken), fee);
+        for (uint256 i = 0; i < 6; i++) {
+            morphoV2.setDefaultInterestFee(address(loanToken), i, fee);
+        }
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
@@ -145,7 +149,9 @@ contract InterestFeeTest is BaseTest {
         fee = fee / INTEREST_FEE_STEP * INTEREST_FEE_STEP; // Align to INTEREST_FEE_STEP
 
         // Set default interest fee BEFORE creating the obligation
-        morphoV2.setDefaultInterestFee(address(loanToken), fee);
+        for (uint256 i = 0; i < 6; i++) {
+            morphoV2.setDefaultInterestFee(address(loanToken), i, fee);
+        }
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
@@ -155,13 +161,11 @@ contract InterestFeeTest is BaseTest {
 
         // First accrual
         vm.warp(block.timestamp + 1 days);
+        uint256 _actualFee = actualFee(fee);
+        uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(_actualFee, WAD);
         take(0, 0, 0, 0, borrower, lenderOffer);
         uint256 totalSharesAfter1 = morphoV2.totalShares(id);
         uint256 recipientSharesAfter1 = morphoV2.sharesOf(id, feeRecipient);
-
-        // Calculate expected shares for first accrual
-        uint256 _actualFee = actualFee(fee);
-        uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(_actualFee, WAD);
 
         // Second take - should NOT accrue additional interest (early return)
         vm.warp(block.timestamp + 7 days);
@@ -187,5 +191,48 @@ contract InterestFeeTest is BaseTest {
 
         assertEq(totalSharesAfter3, totalSharesAfter1, "third take should not change total shares");
         assertEq(recipientSharesAfter3, recipientSharesAfter1, "third take should not change recipient shares");
+    }
+
+    function testInterestFeeDifferentLevels() public {
+        uint256 initialShares = 1e18;
+
+        uint256 fee0 = actualFee(MAX_INTEREST_FEE / 10);
+        uint256 fee1 = actualFee(MAX_INTEREST_FEE / 9);
+        uint256 fee2 = actualFee(MAX_INTEREST_FEE / 8);
+        uint256 fee3 = actualFee(MAX_INTEREST_FEE / 7);
+        uint256 fee4 = actualFee(MAX_INTEREST_FEE / 6);
+        uint256 fee5 = actualFee(MAX_INTEREST_FEE / 5);
+
+        morphoV2.setDefaultInterestFee(address(loanToken), 0, fee0);
+        morphoV2.setDefaultInterestFee(address(loanToken), 1, fee1);
+        morphoV2.setDefaultInterestFee(address(loanToken), 2, fee2);
+        morphoV2.setDefaultInterestFee(address(loanToken), 3, fee3);
+        morphoV2.setDefaultInterestFee(address(loanToken), 4, fee4);
+        morphoV2.setDefaultInterestFee(address(loanToken), 5, fee5);
+
+        collateralize(obligation, borrower, initialShares);
+        take(initialShares, 0, 0, 0, borrower, lenderOffer);
+
+        uint256 totalSharesBefore = morphoV2.totalShares(id);
+        uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
+        uint256 lastUpdateBefore = morphoV2.lastUpdate(id);
+
+        uint256 timeElapsed = 70 days;
+        vm.warp(block.timestamp + timeElapsed);
+
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, block.timestamp);
+        uint256 lastTimeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, lastUpdateBefore);
+        uint256 avgFee = morphoV2.avgInterestFee(id, timeToMaturity, lastTimeToMaturity);
+        uint256 expectedSharesMinted = (totalSharesBefore * timeElapsed).mulDivDown(avgFee, WAD);
+
+        take(0, 0, 0, 0, borrower, lenderOffer);
+
+        uint256 totalSharesAfter = morphoV2.totalShares(id);
+        uint256 recipientSharesAfter = morphoV2.sharesOf(id, feeRecipient);
+
+        assertEq(totalSharesAfter, totalSharesBefore + expectedSharesMinted, "total shares should increase");
+        assertEq(
+            recipientSharesAfter, recipientSharesBefore + expectedSharesMinted, "recipient should receive fee shares"
+        );
     }
 }
