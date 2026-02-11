@@ -430,7 +430,7 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 partialMaxDebt = maxDebt
                     - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
                 uint256 collateralToRepayToReachMinCollateral = _collateralOf.zeroFloorSub(
-                    obligation.minCollateral.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
                         .mulDivDown(lltv, WAD)
                 );
                 if (
