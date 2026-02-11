@@ -427,13 +427,16 @@ contract MorphoV2 is IMorphoV2 {
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollateralToken];
+                uint256 collateralToSeizeToReachMinCollateral = _collateralOf.zeroFloorSub(
+                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
+                );
                 if (
                     maxDebt
-                            - _collateralOf.zeroFloorSub(
-                                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
-                                ).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD)
+                            - collateralToSeizeToReachMinCollateral.mulDivDown(
+                                    liquidatedCollateralPrice, ORACLE_PRICE_SCALE
+                                ).mulDivDown(lltv, WAD)
                         <= originalDebt - badDebt
-                            - collateralToRepayToReachMinCollateral.mulDivUp(WAD, lif)
+                            - collateralToSeizeToReachMinCollateral.mulDivUp(WAD, lif)
                                 .mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                 ) {
                     uint256 newMaxDebt = maxDebt
