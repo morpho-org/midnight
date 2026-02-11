@@ -427,25 +427,21 @@ contract MorphoV2 is IMorphoV2 {
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollateralToken];
-                uint256 partialMaxDebt = maxDebt
-                    - _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-                uint256 collateralToRepayToReachMinCollateral = _collateralOf.zeroFloorSub(
-                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
-                        .mulDivDown(lltv, WAD)
-                );
                 if (
-                    partialMaxDebt + obligation.minCollateral.mulDivDown(lltv, WAD)
+                    maxDebt
+                            - _collateralOf.zeroFloorSub(
+                                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
+                                ).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD)
                         <= originalDebt - badDebt
                             - collateralToRepayToReachMinCollateral.mulDivUp(WAD, lif)
                                 .mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                 ) {
-                    uint256 newMaxDebt = partialMaxDebt
-                        + (_collateralOf - seizedAssets).mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(lltv, WAD);
+                    uint256 newMaxDebt = maxDebt
+                        - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
                     require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
                 } else {
                     require(
-                        _collateralOf == 0
+                        originalDebt - badDebt - repaidUnits == 0 || _collateralOf == 0
                             || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                                 >= obligation.minCollateral,
                         "Below min collateral"
