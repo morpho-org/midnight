@@ -362,6 +362,30 @@ contract LiquidationTest is BaseTest {
         emit log_named_uint("Gas 2nd seizure (warm)", gas2 - gas1);
     }
 
+    function testMinCollateralBonusSeizure() public {
+        obligation.minCollateral = 50e18;
+        id = toId(obligation);
+
+        uint256 units = 100e18;
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
+
+        uint256 oraclePrice = 0.5e36;
+        Oracle(obligation.collaterals[0].oracle).setPrice(oraclePrice);
+
+        uint256 requested = initialCollateral - 50e18;
+
+        uint256 repaid = requested.mulDivUp(WAD, MAX_LIF).mulDivUp(oraclePrice, ORACLE_PRICE_SCALE);
+        deal(address(loanToken), address(this), repaid);
+
+        (uint256 repaidUnits, uint256 seizedAssets) = morphoV2.liquidate(obligation, 0, 0, requested, borrower, "");
+
+        assertEq(seizedAssets, initialCollateral, "seized should be all collateral");
+        assertEq(repaidUnits, repaid, "repaid units unchanged");
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "no collateral left");
+    }
+
     // helpers.
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256 _repaidUnits, address, bytes memory data) public {
