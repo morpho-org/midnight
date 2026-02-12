@@ -112,10 +112,10 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    function setTradingFeeRecipient(address recipient) external {
+    function setTradingFeeRecipient(address feeRecipient) external {
         require(msg.sender == owner, "Only owner");
-        tradingFeeRecipient = recipient;
-        emit EventsLib.SetTradingFeeRecipient(recipient);
+        tradingFeeRecipient = feeRecipient;
+        emit EventsLib.SetTradingFeeRecipient(feeRecipient);
     }
 
     /// ENTRY-POINTS ///
@@ -132,12 +132,13 @@ contract MorphoV2 is IMorphoV2 {
         uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
+        address takerCallback,
+        bytes memory takerCallbackData,
+        address receiverIfTakerIsSeller,
         Offer memory offer,
         Signature memory sig,
         bytes32 root,
-        bytes32[] memory proof,
-        address takerCallback,
-        bytes memory takerCallbackData
+        bytes32[] memory proof
     ) public returns (uint256, uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "UNAUTHORIZED");
         require(
@@ -163,10 +164,27 @@ contract MorphoV2 is IMorphoV2 {
             bytes memory buyerCallbackData,
             address seller,
             address sellerCallback,
-            bytes memory sellerCallbackData
+            bytes memory sellerCallbackData,
+            address receiver
         ) = offer.buy
-            ? (offer.maker, offer.callback, offer.callbackData, taker, takerCallback, takerCallbackData)
-            : (taker, takerCallback, takerCallbackData, offer.maker, offer.callback, offer.callbackData);
+            ? (
+                offer.maker,
+                offer.callback,
+                offer.callbackData,
+                taker,
+                takerCallback,
+                takerCallbackData,
+                receiverIfTakerIsSeller
+            )
+            : (
+                taker,
+                takerCallback,
+                takerCallbackData,
+                offer.maker,
+                offer.callback,
+                offer.callbackData,
+                offer.receiverIfMakerIsSeller
+            );
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -244,6 +262,7 @@ contract MorphoV2 is IMorphoV2 {
             obligationShares,
             buyerIsLender,
             sellerIsBorrower,
+            receiver,
             offer.group,
             newConsumed
         );
@@ -264,7 +283,7 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(
             offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, seller, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
@@ -285,10 +304,13 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdraw(Obligation memory obligation, uint256 obligationUnits, uint256 shares, address onBehalf)
-        external
-        returns (uint256, uint256)
-    {
+    function withdraw(
+        Obligation memory obligation,
+        uint256 obligationUnits,
+        uint256 shares,
+        address onBehalf,
+        address receiver
+    ) external returns (uint256, uint256) {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes32 id = touchObligation(obligation);
@@ -305,9 +327,9 @@ contract MorphoV2 is IMorphoV2 {
         _obligationState.totalShares -= UtilsLib.toUint128(shares);
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
 
-        emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf);
+        emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, msg.sender, obligationUnits);
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
 
         return (obligationUnits, shares);
     }
@@ -335,7 +357,7 @@ contract MorphoV2 is IMorphoV2 {
         uint256 _collateralOf = collateralOf[id][onBehalf][collateralToken];
         require(
             _collateralOf == 0
-                || _collateralOf.mulDivDown(IOracle(oracle).price(), ORACLE_PRICE_SCALE) >= obligation.minCollateral,
+                || _collateralOf.mulDivDown(IOracle(oracle).price(), ORACLE_PRICE_SCALE) >= obligation.minCollatValue,
             "Below min collateral"
         );
 
@@ -345,9 +367,13 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev This function does not call any oracle if all the collateral is withdrawn and the borrower has no debt.
-    function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
-        external
-    {
+    function withdrawCollateral(
+        Obligation memory obligation,
+        uint256 collateralIndex,
+        uint256 assets,
+        address onBehalf,
+        address receiver
+    ) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
@@ -360,13 +386,13 @@ contract MorphoV2 is IMorphoV2 {
         uint256 _collateralOf = collateralOf[id][onBehalf][collateralToken];
         require(
             _collateralOf == 0
-                || _collateralOf.mulDivDown(IOracle(oracle).price(), ORACLE_PRICE_SCALE) >= obligation.minCollateral,
+                || _collateralOf.mulDivDown(IOracle(oracle).price(), ORACLE_PRICE_SCALE) >= obligation.minCollatValue,
             "Below min collateral"
         );
 
-        emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf);
+        emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(collateralToken, msg.sender, assets);
+        SafeTransferLib.safeTransfer(collateralToken, receiver, assets);
     }
 
     /// @dev At least one of `repaidUnits` or `seizedAssets` should be equal to zero.
@@ -387,15 +413,15 @@ contract MorphoV2 is IMorphoV2 {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         // Reverts if collateralIndex is out of bounds.
-        address liquidatedCollateralToken = obligation.collaterals[collateralIndex].token;
+        address liquidatedCollatToken = obligation.collaterals[collateralIndex].token;
 
         uint256 repayableDebt;
         uint256 maxDebt;
-        uint256 liquidatedCollateralPrice;
+        uint256 liquidatedCollatPrice;
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
             Collateral memory _collateral = obligation.collaterals[i];
             uint256 price = IOracle(_collateral.oracle).price();
-            if (i == collateralIndex) liquidatedCollateralPrice = price;
+            if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = collateralOf[id][borrower][_collateral.token];
             maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
             repayableDebt += _collateralOf.mulDivUp(WAD, MAX_LIF).mulDivUp(price, ORACLE_PRICE_SCALE);
@@ -418,49 +444,47 @@ contract MorphoV2 is IMorphoV2 {
                 );
 
             if (seizedAssets > 0) {
-                repaidUnits = seizedAssets.mulDivUp(WAD, lif).mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE);
+                repaidUnits = seizedAssets.mulDivUp(WAD, lif).mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE);
             } else {
-                seizedAssets =
-                    repaidUnits.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice).mulDivDown(lif, WAD);
+                seizedAssets = repaidUnits.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice).mulDivDown(lif, WAD);
             }
 
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
-                uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollateralToken];
+                uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollatToken];
                 uint256 collateralToSeizeToReachMinCollateral = _collateralOf.zeroFloorSub(
-                    obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
+                    obligation.minCollatValue.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice)
                 );
-                uint256 newCollateral = _collateralOf - seizedAssets;
-                uint256 newDebt = originalDebt - badDebt - repaidUnits;
-                uint256 newMaxDebt = maxDebt
-                    - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-                bool positionIsStillUnhealthy = newMaxDebt <= newDebt;
                 bool recoveryCloseFactorDeactivated = maxDebt.zeroFloorSub(
-                    collateralToSeizeToReachMinCollateral.mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                    collateralToSeizeToReachMinCollateral.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                         .mulDivUp(lltv, WAD)
                 )
-                > (originalDebt - badDebt)
+                < (originalDebt - badDebt)
                 .zeroFloorSub(
                     collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
-                        .mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                        .mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                 );
-                require(positionIsStillUnhealthy || recoveryCloseFactorDeactivated, "recovery close factor violated");
+                uint256 maxSeized = (debtOf[id][borrower].mulDivUp(ORACLE_PRICE_SCALE, liquidatedCollatPrice)
+                        - _collateralOf.mulDivDown(lltv, WAD))
+                .mulDivUp(WAD, WAD.mulDivDown(WAD, lif) - lltv);
+                require(recoveryCloseFactorDeactivated || seizedAssets <= maxSeized, "recovery close factor violated");
+                uint256 newCollateral = _collateralOf - seizedAssets;
                 require(
-                    newDebt == 0 || newCollateral == 0
-                        || newCollateral.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                            >= obligation.minCollateral,
+                    originalDebt - badDebt - repaidUnits == 0 || newCollateral == 0
+                        || newCollateral.mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
+                            >= obligation.minCollatValue,
                     "Below min collateral"
                 );
             }
 
-            collateralOf[id][borrower][liquidatedCollateralToken] -= seizedAssets;
+            collateralOf[id][borrower][liquidatedCollatToken] -= seizedAssets;
             _obligationState.withdrawable += repaidUnits;
             debtOf[id][borrower] -= repaidUnits;
         }
 
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
 
-        SafeTransferLib.safeTransfer(liquidatedCollateralToken, msg.sender, seizedAssets);
+        SafeTransferLib.safeTransfer(liquidatedCollatToken, msg.sender, seizedAssets);
 
         if (data.length > 0) {
             ICallbacks(msg.sender).onLiquidate(obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);

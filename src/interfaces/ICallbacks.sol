@@ -27,7 +27,7 @@ interface ICallbacks {
         Obligation memory obligation,
         uint256 collateralIndex,
         uint256 seizedAssets,
-        uint256 repaidAssets,
+        uint256 repaidUnits,
         address borrower,
         bytes memory data
     ) external;

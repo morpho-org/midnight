@@ -14,21 +14,21 @@ contract ERC20 {
         symbol = _symbol;
     }
 
-    function transfer(address recipient, uint256 amount) public returns (bool) {
+    function transfer(address receiver, uint256 amount) public returns (bool) {
         require(amount <= balanceOf[msg.sender], "Insufficient balance");
 
         balanceOf[msg.sender] -= amount;
-        balanceOf[recipient] += amount;
+        balanceOf[receiver] += amount;
 
         return true;
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+    function transferFrom(address sender, address receiver, uint256 amount) public returns (bool) {
         require(amount <= balanceOf[sender], "Insufficient balance");
         require(amount <= allowance[sender][msg.sender], "Insufficient allowance");
 
         balanceOf[sender] -= amount;
-        balanceOf[recipient] += amount;
+        balanceOf[receiver] += amount;
         allowance[sender][msg.sender] -= amount;
 
         return true;

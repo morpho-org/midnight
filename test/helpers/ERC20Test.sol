@@ -18,49 +18,49 @@ contract ERC20Test is Test {
         assertEq(erc20.allowance(address(this), spender), amount);
     }
 
-    function testTransfer(address recipient, uint256 amount) public {
+    function testTransfer(address receiver, uint256 amount) public {
         vm.assume(amount > 0);
         deal(address(erc20), address(this), amount);
-        assertTrue(erc20.transfer(recipient, amount));
-        assertEq(erc20.balanceOf(recipient), amount);
+        assertTrue(erc20.transfer(receiver, amount));
+        assertEq(erc20.balanceOf(receiver), amount);
 
-        if (recipient != address(this)) {
+        if (receiver != address(this)) {
             assertEq(erc20.balanceOf(address(this)), 0);
         }
     }
 
-    function testTransferFrom(address sender, address recipient, uint256 amount) public {
+    function testTransferFrom(address sender, address receiver, uint256 amount) public {
         vm.assume(amount > 0);
-        vm.assume(sender != recipient);
+        vm.assume(sender != receiver);
         deal(address(erc20), sender, amount);
         vm.prank(sender);
         erc20.approve(address(this), amount);
-        assertTrue(erc20.transferFrom(sender, recipient, amount));
-        assertEq(erc20.balanceOf(recipient), amount);
-        if (sender != recipient) {
+        assertTrue(erc20.transferFrom(sender, receiver, amount));
+        assertEq(erc20.balanceOf(receiver), amount);
+        if (sender != receiver) {
             assertEq(erc20.balanceOf(sender), 0);
         }
         assertEq(erc20.allowance(sender, address(this)), 0);
     }
 
-    function testTransferInsufficientBalance(address recipient, uint256 amount) public {
+    function testTransferInsufficientBalance(address receiver, uint256 amount) public {
         vm.assume(amount > 0);
         vm.expectRevert("Insufficient balance");
-        assertFalse(erc20.transfer(recipient, amount));
+        assertFalse(erc20.transfer(receiver, amount));
     }
 
-    function testTransferFromInsufficientBalance(address sender, address recipient, uint256 amount) public {
+    function testTransferFromInsufficientBalance(address sender, address receiver, uint256 amount) public {
         vm.assume(amount > 0);
         vm.prank(sender);
         erc20.approve(address(this), amount);
         vm.expectRevert("Insufficient balance");
-        assertFalse(erc20.transferFrom(sender, recipient, amount));
+        assertFalse(erc20.transferFrom(sender, receiver, amount));
     }
 
-    function testTransferFromInsufficientAllowance(address sender, address recipient, uint256 amount) public {
+    function testTransferFromInsufficientAllowance(address sender, address receiver, uint256 amount) public {
         vm.assume(amount > 0);
         deal(address(erc20), sender, amount);
         vm.expectRevert("Insufficient allowance");
-        assertFalse(erc20.transferFrom(sender, recipient, amount));
+        assertFalse(erc20.transferFrom(sender, receiver, amount));
     }
 }

@@ -8,7 +8,7 @@ struct Obligation {
     Collateral[] collaterals;
     uint256 maturity;
     // Minimum collateral value (quoted in loan token) to be left on supply & withdraw collateral.
-    uint256 minCollateral;
+    uint256 minCollatValue;
 }
 
 struct Collateral {
@@ -31,6 +31,7 @@ struct Offer {
     bytes32 session;
     address callback;
     bytes callbackData;
+    address receiverIfMakerIsSeller;
 }
 
 struct Signature {
