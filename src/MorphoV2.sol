@@ -435,21 +435,20 @@ contract MorphoV2 is IMorphoV2 {
                             - collateralToSeizeToReachMinCollateral.mulDivDown(
                                     liquidatedCollateralPrice, ORACLE_PRICE_SCALE
                                 ).mulDivDown(lltv, WAD)
-                        <= originalDebt - badDebt
+                        > originalDebt - badDebt
                             - collateralToSeizeToReachMinCollateral.mulDivUp(WAD, lif)
                                 .mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                 ) {
                     uint256 newMaxDebt = maxDebt
                         - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
                     require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
-                } else {
-                    require(
-                        originalDebt - badDebt - repaidUnits == 0 || _collateralOf == 0
-                            || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                                >= obligation.minCollateral,
-                        "Below min collateral"
-                    );
                 }
+                require(
+                    originalDebt - badDebt - repaidUnits == 0 || _collateralOf == 0
+                        || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                            >= obligation.minCollateral,
+                    "Below min collateral"
+                );
             }
 
             collateralOf[id][borrower][liquidatedCollateralToken] -= seizedAssets;
