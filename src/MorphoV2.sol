@@ -430,22 +430,23 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 collateralToSeizeToReachMinCollateral = _collateralOf.zeroFloorSub(
                     obligation.minCollateral.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollateralPrice)
                 );
-                if (
+                uint256 newCollateral = _collateralOf - seizedAssets;
+                uint256 newDebt = originalDebt - badDebt - repaidUnits;
+                uint256 newMaxDebt = maxDebt
+                    - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
+                bool positionIsStillUnhealthy = newMaxDebt <= newDebt;
+                bool recoveryCloseFactorDeactivated =
                     maxDebt
-                            - collateralToSeizeToReachMinCollateral.mulDivDown(
+                            - collateralToSeizeToReachMinCollateral.mulDivUp(
                                     liquidatedCollateralPrice, ORACLE_PRICE_SCALE
-                                ).mulDivDown(lltv, WAD)
+                                ).mulDivUp(lltv, WAD)
                         > originalDebt - badDebt
-                            - collateralToSeizeToReachMinCollateral.mulDivUp(WAD, lif)
-                                .mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
-                ) {
-                    uint256 newMaxDebt = maxDebt
-                        - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-                    require(originalDebt - badDebt - repaidUnits >= newMaxDebt, "recovery close factor violated");
-                }
+                            - collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
+                                .mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE);
+                require(positionIsStillUnhealthy || recoveryCloseFactorDeactivated, "recovery close factor violated");
                 require(
-                    originalDebt - badDebt - repaidUnits == 0 || _collateralOf == 0
-                        || _collateralOf.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                    newDebt == 0 || newCollateral == 0
+                        || newCollateral.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
                             >= obligation.minCollateral,
                     "Below min collateral"
                 );
