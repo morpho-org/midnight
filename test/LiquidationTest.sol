@@ -209,6 +209,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 10, MAX_TEST_AMOUNT); // if the amount is too small, no bad debt is created.
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         seized = bound(seized, 0, initialCollateral);
         uint256 oraclePrice = 0.5e36;
@@ -231,6 +232,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 10, MAX_TEST_AMOUNT); // if the amount is too small, no bad debt is created.
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         Oracle(obligation.collaterals[0].oracle).setPrice(0.5e36);
         uint256 repayableDebt = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token)
             .mulDivUp(WAD, MAX_LIF).mulDivUp(0.5e36, ORACLE_PRICE_SCALE);

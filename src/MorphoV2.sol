@@ -435,14 +435,15 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 newMaxDebt = maxDebt
                     - seizedAssets.mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
                 bool positionIsStillUnhealthy = newMaxDebt <= newDebt;
-                bool recoveryCloseFactorDeactivated =
-                    maxDebt
-                            - collateralToSeizeToReachMinCollateral.mulDivUp(
-                                    liquidatedCollateralPrice, ORACLE_PRICE_SCALE
-                                ).mulDivUp(lltv, WAD)
-                        > originalDebt - badDebt
-                            - collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
-                                .mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE);
+                bool recoveryCloseFactorDeactivated = maxDebt.zeroFloorSub(
+                    collateralToSeizeToReachMinCollateral.mulDivUp(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                        .mulDivUp(lltv, WAD)
+                )
+                > (originalDebt - badDebt)
+                .zeroFloorSub(
+                    collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
+                        .mulDivDown(liquidatedCollateralPrice, ORACLE_PRICE_SCALE)
+                );
                 require(positionIsStillUnhealthy || recoveryCloseFactorDeactivated, "recovery close factor violated");
                 require(
                     newDebt == 0 || newCollateral == 0
