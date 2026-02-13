@@ -28,7 +28,7 @@ contract OtherFunctionsTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.minCollateral = 0;
+        obligation.minCollatValue = 0;
 
         id = toId(obligation);
     }
@@ -212,14 +212,14 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
-    function testMinCollateralInSupplyCollateral(uint256 collateral, uint256 price, uint256 minCollateral) public {
+    function testminCollatValueInSupplyCollateral(uint256 collateral, uint256 price, uint256 minCollatValue) public {
         collateral = bound(collateral, 1, MAX_TEST_AMOUNT);
         price = bound(price, 1, ORACLE_PRICE_SCALE);
         Oracle(obligation.collaterals[0].oracle).setPrice(price);
 
         uint256 collateralValue = collateral.mulDivDown(price, ORACLE_PRICE_SCALE);
-        minCollateral = bound(minCollateral, collateralValue + 1, type(uint256).max);
-        obligation.minCollateral = minCollateral;
+        minCollatValue = bound(minCollatValue, collateralValue + 1, type(uint256).max);
+        obligation.minCollatValue = minCollatValue;
 
         address collateralToken = obligation.collaterals[0].token;
         deal(collateralToken, address(this), collateral);
@@ -228,11 +228,11 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.supplyCollateral(obligation, 0, collateral, borrower);
     }
 
-    function testMinCollateralInWithdrawCollateral(
+    function testminCollatValueInWithdrawCollateral(
         uint256 collateral,
         uint256 price,
         uint256 withdrawnCollateral,
-        uint256 minCollateral
+        uint256 minCollatValue
     ) public {
         collateral = bound(collateral, 2, MAX_TEST_AMOUNT);
         price = bound(price, 1, ORACLE_PRICE_SCALE);
@@ -245,10 +245,10 @@ contract OtherFunctionsTest is BaseTest {
         withdrawnCollateral = bound(withdrawnCollateral, 1, collateral - 1);
         uint256 remainingValue = (collateral - withdrawnCollateral).mulDivDown(price, ORACLE_PRICE_SCALE);
 
-        // minCollateral must be in (remainingValue, initialValue] for supply to succeed and withdraw to fail
+        // minCollatValue must be in (remainingValue, initialValue] for supply to succeed and withdraw to fail
         vm.assume(remainingValue < initialValue);
-        minCollateral = bound(minCollateral, remainingValue + 1, initialValue);
-        obligation.minCollateral = minCollateral;
+        minCollatValue = bound(minCollatValue, remainingValue + 1, initialValue);
+        obligation.minCollatValue = minCollatValue;
 
         address collateralToken = obligation.collaterals[0].token;
         deal(collateralToken, address(this), collateral);
