@@ -309,7 +309,6 @@ contract LiquidationTest is BaseTest {
         seized = bound(seized, 1, maxS);
 
         morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
-        assertFalse();
     }
 
     /// @dev Fuzz: any seized amount > maxSeized should revert.
