@@ -379,8 +379,6 @@ contract LiquidationTest is BaseTest {
 
         uint256 maxS = _computeMaxSeized(units, _maxDebt, obligation.collaterals[liqIdx].lltv, droppedPrice);
 
-        uint256 repaid = maxS.mulDivUp(WAD, MAX_LIF).mulDivUp(droppedPrice, ORACLE_PRICE_SCALE);
-
         morphoV2.liquidate(obligation, liqIdx, 0, maxS, borrower, "");
     }
 
