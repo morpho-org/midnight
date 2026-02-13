@@ -464,9 +464,8 @@ contract MorphoV2 is IMorphoV2 {
                     collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
                         .mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                 );
-                uint256 maxSeized = (debtOf[id][borrower].mulDivUp(ORACLE_PRICE_SCALE, liquidatedCollatPrice)
-                        - _collateralOf.mulDivDown(lltv, WAD))
-                .mulDivUp(WAD, WAD.mulDivDown(WAD, lif) - lltv);
+                uint256 maxSeized = (debtOf[id][borrower] - maxDebt)
+                .mulDivUp(WAD, (WAD.mulDivDown(WAD, lif) - lltv).mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE));
                 require(recoveryCloseFactorDeactivated || seizedAssets <= maxSeized, "recovery close factor violated");
                 uint256 newCollateral = _collateralOf - seizedAssets;
                 require(
