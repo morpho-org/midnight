@@ -2,11 +2,11 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
-import {IdLib} from "../src/libraries/IdLib.sol";
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
@@ -37,6 +37,7 @@ contract TakeTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.minCollatValue = 0;
 
         id = morphoV2.createObligation(obligation);
 
@@ -1260,7 +1261,7 @@ contract TakeTest is BaseTest {
         assets = bound(assets, 0, maxAssets);
         uint256 collateral = assets.mulDivUp(WAD, obligation.collaterals[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
-        borrowerOffer.callbackData = abi.encode(obligation.collaterals[0].token, collateral);
+        borrowerOffer.callbackData = abi.encode(0, collateral);
         borrowerOffer.assets = assets;
         borrowerOffer.tick = TICK_RANGE;
         deal(address(loanToken), lender, assets);
@@ -1290,7 +1291,7 @@ contract TakeTest is BaseTest {
             0,
             borrower,
             callback,
-            abi.encode(obligation.collaterals[0].token, collateral),
+            abi.encode(0, collateral),
             borrower,
             lenderOffer,
             sig([lenderOffer]),
@@ -1298,7 +1299,7 @@ contract TakeTest is BaseTest {
             proof([lenderOffer])
         );
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
-        assertEq(BorrowCallback(callback).recordedData(), abi.encode(obligation.collaterals[0].token, collateral));
+        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
     function testSellBuyerCallback(uint256 assets) public {
@@ -1495,10 +1496,11 @@ contract BorrowCallback is ICallbacks {
         external
     {
         recordedData = data;
-        (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
-        bytes32 id = IdLib.toId(obligation, block.chainid, msg.sender);
+        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
+        address collateralToken = obligation.collaterals[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
-        MorphoV2(msg.sender).supplyCollateral(id, collateralToken, amount, seller);
+        bytes32 id = IdLib.toId(obligation, block.chainid, msg.sender);
+        MorphoV2(msg.sender).supplyCollateral(id, collateralIndex, amount, seller);
     }
 
     function onBuy(
@@ -1511,7 +1513,7 @@ contract BorrowCallback is ICallbacks {
         bytes memory data
     ) external {}
 
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1530,7 +1532,15 @@ contract LendCallback is ICallbacks {
         require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
     }
 
-    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, uint256, bytes memory data)
-        external {}
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onSell(
+        Obligation memory obligation,
+        address seller,
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        bytes memory data
+    ) external {}
+
+    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
