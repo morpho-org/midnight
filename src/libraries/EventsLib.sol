@@ -11,7 +11,7 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
-    event SetTradingFeeRecipient(address indexed recipient);
+    event SetTradingFeeRecipient(address indexed feeRecipient);
     event SetMaxTotalUnits(address indexed loanToken, uint128 maxTotalUnits);
     event SetMaxTakeableAssets(address indexed loanToken, uint256 maxTakeableAssets);
     event SetMaxCollateralPerUser(address indexed collateralToken, uint256 maxCollateralPerUser);
@@ -29,11 +29,17 @@ library EventsLib {
         uint256 obligationShares,
         bool buyerIsLender,
         bool sellerIsBorrower,
+        address sellerReceiver,
         bytes32 group,
         uint256 consumed
     );
     event Withdraw(
-        address indexed caller, bytes32 indexed id, uint256 obligationUnits, uint256 shares, address indexed onBehalf
+        address caller,
+        bytes32 indexed id,
+        uint256 obligationUnits,
+        uint256 shares,
+        address indexed onBehalf,
+        address indexed receiver
     );
     event Repay(address indexed caller, bytes32 indexed id, uint256 obligationUnits, address indexed onBehalf);
     event SupplyCollateral(
@@ -41,7 +47,12 @@ library EventsLib {
     );
 
     event WithdrawCollateral(
-        address caller, bytes32 indexed id, address indexed collateral, uint256 assets, address indexed onBehalf
+        address caller,
+        bytes32 indexed id,
+        address indexed collateral,
+        uint256 assets,
+        address indexed onBehalf,
+        address receiver
     );
 
     event Liquidate(

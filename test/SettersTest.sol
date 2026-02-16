@@ -89,9 +89,9 @@ contract SettersTest is BaseTest {
         morphoV2.setObligationTradingFee(id, 0, 0);
     }
 
-    function testSetTradingFeeRecipientSuccess(address recipient) public {
-        morphoV2.setTradingFeeRecipient(recipient);
-        assertEq(morphoV2.tradingFeeRecipient(), recipient, "recipient set");
+    function testSetTradingFeeRecipientSuccess(address feeRecipient) public {
+        morphoV2.setTradingFeeRecipient(feeRecipient);
+        assertEq(morphoV2.tradingFeeRecipient(), feeRecipient, "fee recipient set");
     }
 
     function testSetTradingFeeRecipientOnlyOwner(address rdm) public {

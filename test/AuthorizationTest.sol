@@ -57,7 +57,7 @@ contract AuthorizationTest is BaseTest {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert("UNAUTHORIZED");
-        morphoV2.withdraw(obligation, units, 0, lender);
+        morphoV2.withdraw(obligation, units, 0, lender, lender);
     }
 
     function testWithdrawCollateralUnauthorized() public {
@@ -74,7 +74,7 @@ contract AuthorizationTest is BaseTest {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert("UNAUTHORIZED");
-        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user);
+        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user, user);
     }
 
     function testWithdrawAuthorized() public {
@@ -95,7 +95,7 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can withdraw on behalf of lender
         vm.prank(operator);
-        morphoV2.withdraw(obligation, units, 0, lender);
+        morphoV2.withdraw(obligation, units, 0, lender, operator);
 
         assertEq(loanToken.balanceOf(operator), units);
     }
@@ -117,7 +117,7 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can withdraw on behalf of user
         vm.prank(operator);
-        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user);
+        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user, operator);
 
         assertEq(ERC20(collateralToken).balanceOf(operator), collateralAmount);
     }
@@ -135,7 +135,7 @@ contract AuthorizationTest is BaseTest {
 
         // Lender can withdraw their own shares (no authorization needed)
         vm.prank(lender);
-        morphoV2.withdraw(obligation, units, 0, lender);
+        morphoV2.withdraw(obligation, units, 0, lender, lender);
 
         assertEq(loanToken.balanceOf(lender), units);
     }
@@ -154,7 +154,7 @@ contract AuthorizationTest is BaseTest {
 
         // User can withdraw their own collateral (no authorization needed)
         vm.prank(user);
-        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user);
+        morphoV2.withdrawCollateral(obligation, collateralToken, collateralAmount, user, user);
 
         assertEq(ERC20(collateralToken).balanceOf(user), collateralAmount);
     }
@@ -178,7 +178,9 @@ contract AuthorizationTest is BaseTest {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert("UNAUTHORIZED");
-        morphoV2.take(assets, 0, 0, 0, taker, offer, sig([offer]), root([offer]), proof([offer]), address(0), hex"");
+        morphoV2.take(
+            assets, 0, 0, 0, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer])
+        );
     }
 
     function testTakeAuthorized() public {
@@ -203,7 +205,9 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can take on behalf of taker
         vm.prank(operator);
-        morphoV2.take(assets, 0, 0, 0, taker, offer, sig([offer]), root([offer]), proof([offer]), address(0), hex"");
+        morphoV2.take(
+            assets, 0, 0, 0, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer])
+        );
 
         assertEq(morphoV2.debtOf(id, taker), assets);
     }

@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes32 id) external returns uint256 envfree;
+    function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function totalShares(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
@@ -11,6 +11,9 @@ methods {
     function debtOf(bytes32 id, address owner) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
+    function IdLib.toId(MorphoV2.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
+    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 }
 
 /// HELPERS ///
@@ -31,13 +34,13 @@ hook Sstore debtOf[KEY bytes32 id][KEY address owner] uint256 newDebt (uint256 o
     sumDebtOf[id] = sumDebtOf[id] - oldDebt + newDebt;
 }
 
-rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallbackAddress, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
     assert buyerAssets == 0 || buyerAssetsOutput == buyerAssets;
     assert sellerAssets == 0 || sellerAssetsOutput == sellerAssets;
@@ -45,7 +48,7 @@ rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets
     assert obligationShares == 0 || obligationSharesOutput == obligationShares;
 }
 
-rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     uint256 buyerAssetsOutput;
@@ -53,14 +56,14 @@ rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint2
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallbackAddress, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
     assert offer.assets == 0 || consumed(offer.maker, offer.group) == consumedBefore + (offer.buy ? buyerAssetsOutput : sellerAssetsOutput);
     assert offer.obligationUnits == 0 || consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsOutput;
     assert offer.obligationShares == 0 || consumed(offer.maker, offer.group) == consumedBefore + obligationSharesOutput;
 }
 
-rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     uint256 buyerAssetsOutput;
@@ -68,7 +71,7 @@ rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, offer, signature, root, proof, takerCallbackAddress, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
     assert offer.assets == 0 || (offer.buy ? buyerAssetsOutput : sellerAssetsOutput) <= offer.assets - consumedBefore;
     assert offer.obligationUnits == 0 || obligationUnitsOutput <= offer.obligationUnits - consumedBefore;
