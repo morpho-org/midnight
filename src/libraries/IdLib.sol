@@ -31,10 +31,16 @@ library IdLib {
         return keccak256(creationCode(obligation, chainId, morphoV2));
     }
 
-    function idToObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
-        address create2Address =
-            address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))));
-        return abi.decode(create2Address.code, (Obligation));
+    function toAddress(bytes32 id, address morphoV2) internal pure returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))));
+    }
+
+    function isCreated(bytes32 id, address morphoV2) internal view returns (bool) {
+        return toAddress(id, morphoV2).code.length > 0;
+    }
+
+    function toObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
+        return abi.decode(toAddress(id, morphoV2).code, (Obligation));
     }
 
     /// @dev Deploys a contract with runtime code = abi.encode(obligation)

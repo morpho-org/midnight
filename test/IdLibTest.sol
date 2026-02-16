@@ -5,7 +5,7 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {Obligation} from "../src/interfaces/IMorphoV2.sol";
 
-// idToObligation is tested in OtherFunctionsTest.sol, to test actual implementation (avoid introducing mocks).
+// toObligation is tested in OtherFunctionsTest.sol, to test actual implementation (avoid introducing mocks).
 contract IdLibTest is Test {
     function testToIdIsInjectiveInObligation(
         Obligation memory obligation1,

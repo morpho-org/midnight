@@ -496,7 +496,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
-        if (!obligationState[id].created) {
+        if (!IdLib.isCreated(id, address(this))) {
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
@@ -504,7 +504,6 @@ contract MorphoV2 is IMorphoV2 {
                 previousCollateralToken = collateralToken;
             }
 
-            obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
@@ -524,7 +523,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
-        return obligationState[id].created;
+        return IdLib.isCreated(id, address(this));
     }
 
     function withdrawable(bytes32 id) external view returns (uint256) {

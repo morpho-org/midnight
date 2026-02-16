@@ -210,7 +210,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.touchObligation(_obligation);
-        Obligation memory obligationFromId = IdLib.idToObligation(_id, address(morphoV2));
+        Obligation memory obligationFromId = IdLib.toObligation(_id, address(morphoV2));
         assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
         assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
         assertEq(_obligation.collaterals.length, obligationFromId.collaterals.length, "collaterals length");
@@ -230,6 +230,16 @@ contract OtherFunctionsTest is BaseTest {
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
+    }
+
+    function testObligationCreated(Obligation memory _obligation) public {
+        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
+
+        bytes32 _id = toId(_obligation);
+        assertEq(morphoV2.obligationCreated(_id), false, "not created before touch");
+
+        morphoV2.touchObligation(_obligation);
+        assertEq(morphoV2.obligationCreated(_id), true, "created after touch");
     }
 
     function testShuffleSession(address user) public {

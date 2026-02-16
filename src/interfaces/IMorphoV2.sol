@@ -53,7 +53,6 @@ struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
     uint256 withdrawable;
-    bool created;
     uint16[6] fees;
 }
 
