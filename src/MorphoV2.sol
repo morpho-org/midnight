@@ -471,22 +471,19 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
-    function createObligation(Obligation memory obligation) public returns (bytes32) {
-        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
-        if (!IdLib.codeIsCreated(id, address(this))) {
-            address previousCollateralToken;
-            for (uint256 i = 0; i < obligation.collaterals.length; i++) {
-                address collateralToken = obligation.collaterals[i].token;
-                require(collateralToken > previousCollateralToken, "collaterals not sorted");
-                previousCollateralToken = collateralToken;
-            }
+    function createObligation(Obligation memory obligation) external returns (bytes32 id) {
+        id = IdLib.createCode(obligation);
 
-            obligationState[id].fees = defaultFees[obligation.loanToken];
-            IdLib.createCode(obligation);
-
-            emit EventsLib.ObligationCreated(id, obligation);
+        address previousCollateralToken;
+        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+            address collateralToken = obligation.collaterals[i].token;
+            require(collateralToken > previousCollateralToken, "collaterals not sorted");
+            previousCollateralToken = collateralToken;
         }
-        return id;
+
+        obligationState[id].fees = defaultFees[obligation.loanToken];
+
+        emit EventsLib.ObligationCreated(id, obligation);
     }
 
     /// VIEW FUNCTIONS ///
