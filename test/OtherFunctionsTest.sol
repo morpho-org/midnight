@@ -180,6 +180,7 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, 1, MAX_TEST_AMOUNT);
         withdraw = bound(withdraw, 1, supply);
         address collateralToken = address(new ERC20("collat", "c"));
+        morphoV2.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         address receiver = makeAddr("receiver");
         deal(collateralToken, address(this), supply);
         ERC20(collateralToken).approve(address(morphoV2), supply);
