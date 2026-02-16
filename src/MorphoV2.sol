@@ -293,7 +293,7 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        require(isHealthy(id, seller), "Seller is unhealthy");
+        require(_isHealthy(obligation, id, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -338,7 +338,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function supplyCollateral(bytes32 id, address collateral, uint256 assets, address onBehalf) external {
-        idToObligation(id);
+        require(IdLib.codeIsCreated(id, address(this)), "obligation not created");
 
         collateralOf[id][onBehalf][collateral] += assets;
 
@@ -354,7 +354,7 @@ contract MorphoV2 is IMorphoV2 {
 
         collateralOf[id][onBehalf][collateral] -= assets;
 
-        require(isHealthy(id, onBehalf), "Unhealthy borrower");
+        require(_isHealthy(idToObligation(id), id, onBehalf), "Unhealthy borrower");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf, receiver);
 
@@ -472,7 +472,8 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function createObligation(Obligation memory obligation) public returns (bytes32) {
-        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
+        bytes memory creationCode = IdLib.creationCode(obligation, block.chainid, address(this));
+        bytes32 id = keccak256(creationCode);
         if (!IdLib.codeIsCreated(id, address(this))) {
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
@@ -482,7 +483,7 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             obligationState[id].fees = defaultFees[obligation.loanToken];
-            IdLib.createCode(obligation);
+            IdLib.createCode(creationCode);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -492,7 +493,6 @@ contract MorphoV2 is IMorphoV2 {
     /// VIEW FUNCTIONS ///
 
     function idToObligation(bytes32 id) public view returns (Obligation memory) {
-        require(IdLib.codeIsCreated(id, address(this)), "obligation not created");
         return IdLib.toObligation(id, address(this));
     }
 
@@ -516,9 +516,11 @@ contract MorphoV2 is IMorphoV2 {
         return obligationState[id].fees;
     }
 
-    /// @dev This function should be called with the id corresponding to the obligation.
-    function isHealthy(bytes32 id, address borrower) public view returns (bool) {
-        Obligation memory obligation = idToObligation(id);
+    function isHealthy(bytes32 id, address borrower) external view returns (bool) {
+        return _isHealthy(idToObligation(id), id, borrower);
+    }
+
+    function _isHealthy(Obligation memory obligation, bytes32 id, address borrower) internal view returns (bool) {
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;
         for (uint256 i = 0; i < obligation.collaterals.length && maxDebt < debt; i++) {
