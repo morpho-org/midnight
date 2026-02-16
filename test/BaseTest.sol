@@ -75,7 +75,7 @@ abstract contract BaseTest is Test {
         uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(morphoV2), collateral);
-        morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, _borrower);
+        morphoV2.supplyCollateral(toId(obligation), address(obligation.collaterals[0].token), collateral, _borrower);
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
@@ -110,7 +110,7 @@ abstract contract BaseTest is Test {
         deal(address(loanToken), otherLender, units); // assets = units because price is 1.
 
         Offer memory lenderOffer;
-        lenderOffer.obligation = obligation;
+        lenderOffer.obligationId = toId(obligation);
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.assets = units;
@@ -129,8 +129,10 @@ abstract contract BaseTest is Test {
         vm.prank(unluckyLender);
         loanToken.approve(address(morphoV2), type(uint256).max);
 
+        bytes32 _id = toId(obligation);
+
         Offer memory badBorrowerOffer;
-        badBorrowerOffer.obligation = obligation;
+        badBorrowerOffer.obligationId = _id;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
@@ -140,23 +142,21 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.tick = TICK_RANGE;
 
         deal(obligation.collaterals[0].token, address(this), 135);
-        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
+        morphoV2.supplyCollateral(_id, obligation.collaterals[0].token, 135, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
         take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        morphoV2.liquidate(obligation, new Seizure[](0), badBorrower, "");
+        morphoV2.liquidate(_id, new Seizure[](0), badBorrower, "");
 
-        assertNotEq(
-            morphoV2.totalUnits(toId(obligation)), morphoV2.totalShares(toId(obligation)), "total units != total shares"
-        );
+        assertNotEq(morphoV2.totalUnits(_id), morphoV2.totalShares(_id), "total units != total shares");
 
         // then empty the market (borrow side only).
-        deal(address(loanToken), address(this), morphoV2.debtOf(toId(obligation), badBorrower));
-        morphoV2.repay(obligation, morphoV2.debtOf(toId(obligation), badBorrower), badBorrower);
-        assertEq(morphoV2.debtOf(toId(obligation), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), morphoV2.debtOf(_id, badBorrower));
+        morphoV2.repay(_id, morphoV2.debtOf(_id, badBorrower), badBorrower);
+        assertEq(morphoV2.debtOf(_id, badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
@@ -240,7 +240,7 @@ abstract contract BaseTest is Test {
         deal(address(loanToken), lender, obligationUnits);
 
         Offer memory borrowerOffer;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.obligationId = toId(obligation);
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;

@@ -163,7 +163,8 @@ contract MorphoV2 is IMorphoV2 {
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes32 id = touchObligation(offer.obligation);
+        bytes32 id = offer.obligationId;
+        Obligation memory obligation = idToObligation(id);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -195,7 +196,7 @@ contract MorphoV2 is IMorphoV2 {
             );
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
@@ -278,50 +279,33 @@ contract MorphoV2 is IMorphoV2 {
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
                 .onBuy(
-                    offer.obligation,
-                    buyer,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    buyerCallbackData
+                    obligation, buyer, buyerAssets, sellerAssets, obligationUnits, obligationShares, buyerCallbackData
                 );
         }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
-        );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
                 .onSell(
-                    offer.obligation,
-                    seller,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    sellerCallbackData
+                    obligation, seller, buyerAssets, sellerAssets, obligationUnits, obligationShares, sellerCallbackData
                 );
         }
 
-        require(isHealthy(offer.obligation, id, seller), "Seller is unhealthy");
+        require(isHealthy(id, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdraw(
-        Obligation memory obligation,
-        uint256 obligationUnits,
-        uint256 shares,
-        address onBehalf,
-        address receiver
-    ) external returns (uint256, uint256) {
+    function withdraw(bytes32 id, uint256 obligationUnits, uint256 shares, address onBehalf, address receiver)
+        external
+        returns (uint256, uint256)
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
-        bytes32 id = touchObligation(obligation);
+        Obligation memory obligation = idToObligation(id);
         ObligationState storage _obligationState = obligationState[id];
 
         if (obligationUnits > 0) {
@@ -342,8 +326,8 @@ contract MorphoV2 is IMorphoV2 {
         return (obligationUnits, shares);
     }
 
-    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
-        bytes32 id = touchObligation(obligation);
+    function repay(bytes32 id, uint256 obligationUnits, address onBehalf) external {
+        Obligation memory obligation = idToObligation(id);
 
         debtOf[id][onBehalf] -= obligationUnits;
         obligationState[id].withdrawable += obligationUnits;
@@ -353,10 +337,8 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
 
-    function supplyCollateral(Obligation memory obligation, address collateral, uint256 assets, address onBehalf)
-        external
-    {
-        bytes32 id = touchObligation(obligation);
+    function supplyCollateral(bytes32 id, address collateral, uint256 assets, address onBehalf) external {
+        idToObligation(id);
 
         collateralOf[id][onBehalf][collateral] += assets;
 
@@ -365,19 +347,14 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(collateral, msg.sender, address(this), assets);
     }
 
-    function withdrawCollateral(
-        Obligation memory obligation,
-        address collateral,
-        uint256 assets,
-        address onBehalf,
-        address receiver
-    ) external {
+    function withdrawCollateral(bytes32 id, address collateral, uint256 assets, address onBehalf, address receiver)
+        external
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
-        bytes32 id = touchObligation(obligation);
 
         collateralOf[id][onBehalf][collateral] -= assets;
 
-        require(isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
+        require(isHealthy(id, onBehalf), "Unhealthy borrower");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateral, assets, onBehalf, receiver);
 
@@ -388,19 +365,19 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity is reached.
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
-    /// @param obligation The obligation.
+    /// @param id The obligation id.
     /// @param seizures An array of amounts of debt to repay or assets to seize with the index of the collateral in the
     /// obligation's collateral assets.
     /// @param borrower The debtor of the loan.
     /// @param data Arbitrary data to pass to the callback. Pass empty data if not needed.
     /// @return A collection of the actual amounts of debt repaid or asset seized with the collateral index.
-    function liquidate(Obligation memory obligation, Seizure[] memory seizures, address borrower, bytes calldata data)
+    function liquidate(bytes32 id, Seizure[] memory seizures, address borrower, bytes calldata data)
         external
         returns (Seizure[] memory)
     {
         uint256 repayableDebt;
         uint256 maxDebt;
-        bytes32 id = touchObligation(obligation);
+        Obligation memory obligation = idToObligation(id);
         ObligationState storage _obligationState = obligationState[id];
         uint256[] memory prices = new uint256[](obligation.collaterals.length);
 
@@ -494,9 +471,9 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
-    function touchObligation(Obligation memory obligation) public returns (bytes32) {
+    function createObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
-        if (!IdLib.isCreated(id, address(this))) {
+        if (!IdLib.codeIsCreated(id, address(this))) {
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
@@ -505,7 +482,7 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             obligationState[id].fees = defaultFees[obligation.loanToken];
-            IdLib.storeInCode(obligation);
+            IdLib.createCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -513,6 +490,11 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// VIEW FUNCTIONS ///
+
+    function idToObligation(bytes32 id) public view returns (Obligation memory) {
+        require(IdLib.codeIsCreated(id, address(this)), "obligation not created");
+        return IdLib.toObligation(id, address(this));
+    }
 
     function totalUnits(bytes32 id) external view returns (uint256) {
         return obligationState[id].totalUnits;
@@ -523,7 +505,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
-        return IdLib.isCreated(id, address(this));
+        return IdLib.codeIsCreated(id, address(this));
     }
 
     function withdrawable(bytes32 id) external view returns (uint256) {
@@ -535,7 +517,8 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+    function isHealthy(bytes32 id, address borrower) public view returns (bool) {
+        Obligation memory obligation = idToObligation(id);
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;
         for (uint256 i = 0; i < obligation.collaterals.length && maxDebt < debt; i++) {

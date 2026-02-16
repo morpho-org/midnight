@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -37,12 +38,12 @@ contract TakeTest is BaseTest {
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
-        id = toId(obligation);
+        id = morphoV2.createObligation(obligation);
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.assets = type(uint256).max;
-        lenderOffer.obligation = obligation;
+        lenderOffer.obligationId = id;
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = TICK_RANGE;
 
@@ -50,7 +51,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.assets = type(uint256).max;
-        otherLenderOffer.obligation = obligation;
+        otherLenderOffer.obligationId = id;
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = TICK_RANGE;
 
@@ -58,14 +59,14 @@ contract TakeTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.assets = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.obligationId = id;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = TICK_RANGE;
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.assets = type(uint256).max;
-        otherBorrowerOffer.obligation = obligation;
+        otherBorrowerOffer.obligationId = id;
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = TICK_RANGE;
 
@@ -790,13 +791,14 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         borrowerOffer.assets = firstFill + secondFill;
         borrowerOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
-        borrowerOffer2.obligation.maturity = obligation.maturity + 100;
+        borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
-        collateralize(
-            borrowerOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick))
-        );
+        collateralize(obligation2, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
 
         take(firstFill, 0, 0, 0, lender, borrowerOffer);
 
@@ -811,13 +813,14 @@ contract TakeTest is BaseTest {
         secondFill = bound(secondFill, 0, maxAssets);
         lenderOffer.assets = firstFill + secondFill;
         lenderOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
-        lenderOffer2.obligation.maturity = obligation.maturity + 100;
+        lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
-        collateralize(
-            lenderOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick))
-        );
+        collateralize(obligation2, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
 
         take(firstFill, 0, 0, 0, borrower, lenderOffer);
 
@@ -882,11 +885,14 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationUnits = firstFill + secondFill;
         borrowerOffer.assets = 0;
         borrowerOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
-        borrowerOffer2.obligation.maturity = obligation.maturity + 100;
+        borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(borrowerOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(0, 0, firstFill, 0, lender, borrowerOffer);
 
@@ -902,11 +908,14 @@ contract TakeTest is BaseTest {
         lenderOffer.obligationUnits = firstFill + secondFill;
         lenderOffer.assets = 0;
         lenderOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
-        lenderOffer2.obligation.maturity = obligation.maturity + 100;
+        lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(lenderOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(0, 0, firstFill, 0, borrower, lenderOffer);
 
@@ -971,11 +980,14 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationShares = firstFill + secondFill;
         borrowerOffer.assets = 0;
         borrowerOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
-        borrowerOffer2.obligation.maturity = obligation.maturity + 100;
+        borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(borrowerOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(0, 0, 0, firstFill, lender, borrowerOffer);
 
@@ -991,11 +1003,14 @@ contract TakeTest is BaseTest {
         lenderOffer.obligationShares = firstFill + secondFill;
         lenderOffer.assets = 0;
         lenderOffer.tick = TICK_RANGE;
+        Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
+        obligation2.maturity = obligation.maturity + 100;
+        bytes32 id2 = morphoV2.createObligation(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
-        lenderOffer2.obligation.maturity = obligation.maturity + 100;
+        lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(lenderOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(0, 0, 0, firstFill, borrower, lenderOffer);
 
@@ -1481,17 +1496,18 @@ contract BorrowCallback is ICallbacks {
     {
         recordedData = data;
         (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
+        bytes32 id = IdLib.toId(obligation, block.chainid, msg.sender);
         ERC20(collateralToken).approve(msg.sender, amount);
-        MorphoV2(msg.sender).supplyCollateral(obligation, collateralToken, amount, seller);
+        MorphoV2(msg.sender).supplyCollateral(id, collateralToken, amount, seller);
     }
 
     function onBuy(
         Obligation memory obligation,
         address buyer,
         uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
+        uint256,
+        uint256,
+        uint256,
         bytes memory data
     ) external {}
 
@@ -1514,14 +1530,7 @@ contract LendCallback is ICallbacks {
         require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
     }
 
-    function onSell(
-        Obligation memory obligation,
-        address seller,
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        bytes memory data
-    ) external {}
+    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, uint256, bytes memory data)
+        external {}
     function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
 }

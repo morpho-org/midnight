@@ -35,7 +35,7 @@ library IdLib {
         return address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))));
     }
 
-    function isCreated(bytes32 id, address morphoV2) internal view returns (bool) {
+    function codeIsCreated(bytes32 id, address morphoV2) internal view returns (bool) {
         return toAddress(id, morphoV2).code.length > 0;
     }
 
@@ -45,7 +45,7 @@ library IdLib {
 
     /// @dev Deploys a contract with runtime code = abi.encode(obligation)
     /// @dev The contract code begins with 0x00 (STOP), because the first word is the offset of the obligation.
-    function storeInCode(Obligation memory obligation) internal {
+    function createCode(Obligation memory obligation) internal {
         bytes memory _creationCode = creationCode(obligation, block.chainid, address(this));
         address create2Address;
         assembly ("memory-safe") {

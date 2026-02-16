@@ -33,7 +33,7 @@ contract LiquidationTest is BaseTest {
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
-        id = toId(obligation);
+        id = morphoV2.createObligation(obligation);
     }
 
     function testLiquidateHealthyPreMaturity(uint256 units) public {
@@ -42,7 +42,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
 
         vm.expectRevert("position is not liquidatable");
-        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+        morphoV2.liquidate(id, new Seizure[](0), borrower, "");
     }
 
     function testLiquidateUnhealthyPreMaturity(uint256 units) public {
@@ -51,26 +51,26 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(0);
 
-        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+        morphoV2.liquidate(id, new Seizure[](0), borrower, "");
     }
 
     function testLiquidateHealthyPostMaturity(uint256 units) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
 
-        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+        morphoV2.liquidate(id, new Seizure[](0), borrower, "");
     }
 
     function testLiquidateUnhealthyPostMaturity(uint256 units) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
         Oracle(obligation.collaterals[0].oracle).setPrice(0);
 
-        morphoV2.liquidate(obligation, new Seizure[](0), borrower, "");
+        morphoV2.liquidate(id, new Seizure[](0), borrower, "");
     }
 
     function testLiquidateNoOp(uint256 units) public {
@@ -79,7 +79,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(0);
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     function testLiquidateInconsistentInput(uint256 units) public {
@@ -90,7 +90,7 @@ contract LiquidationTest is BaseTest {
         seizures.push(Seizure({collateralIndex: 0, repaid: 1, seized: 1}));
 
         vm.expectRevert("INCONSISTENT_INPUT");
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     function testLiquidateObligationUnitsInput(uint256 units, uint256 repaid) public {
@@ -103,7 +103,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), repaid);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        Seizure[] memory actualSeizures = morphoV2.liquidate(obligation, seizures, borrower, "");
+        Seizure[] memory actualSeizures = morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(actualSeizures.length, 1, "seizures length");
         assertEq(actualSeizures[0].collateralIndex, 0, "collateral index");
@@ -133,7 +133,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), repaid);
         seizures.push(Seizure({collateralIndex: 0, repaid: 0, seized: seized}));
 
-        Seizure[] memory actualSeizures = morphoV2.liquidate(obligation, seizures, borrower, "");
+        Seizure[] memory actualSeizures = morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(actualSeizures.length, 1, "seizures length");
         assertEq(actualSeizures[0].collateralIndex, 0, "collateral index");
@@ -163,7 +163,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), units);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, data);
+        morphoV2.liquidate(id, seizures, borrower, data);
 
         assertEq(recordedSeizures.length, 1, "seizures length");
         assertEq(recordedSeizures[0].repaid, repaid, "repaid units");
@@ -193,11 +193,9 @@ contract LiquidationTest is BaseTest {
         seized1 = bound(seized1, 0, (totalCollateral - secondCollateral) / 2);
         seized2 = bound(seized2, 0, secondCollateral / 2);
         deal(obligation.collaterals[0].token, address(this), totalCollateral - secondCollateral);
-        morphoV2.supplyCollateral(
-            obligation, obligation.collaterals[0].token, totalCollateral - secondCollateral, borrower
-        );
+        morphoV2.supplyCollateral(id, obligation.collaterals[0].token, totalCollateral - secondCollateral, borrower);
         deal(obligation.collaterals[1].token, address(this), secondCollateral);
-        morphoV2.supplyCollateral(obligation, obligation.collaterals[1].token, secondCollateral, borrower);
+        morphoV2.supplyCollateral(id, obligation.collaterals[1].token, secondCollateral, borrower);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(oraclePrice1);
         Oracle(obligation.collaterals[1].oracle).setPrice(oraclePrice2);
@@ -205,7 +203,7 @@ contract LiquidationTest is BaseTest {
         seizures.push(Seizure({collateralIndex: 1, repaid: 0, seized: seized2}));
         deal(address(loanToken), address(this), units); // over-approx.
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     function testLiquidateTwoCollateralsRepaidInput(
@@ -231,11 +229,9 @@ contract LiquidationTest is BaseTest {
             repaid2, 0, (secondCollateral / 2).mulDivDown(WAD, MAX_LIF).mulDivDown(oraclePrice2, ORACLE_PRICE_SCALE)
         );
         deal(obligation.collaterals[0].token, address(this), totalCollateral - secondCollateral);
-        morphoV2.supplyCollateral(
-            obligation, obligation.collaterals[0].token, totalCollateral - secondCollateral, borrower
-        );
+        morphoV2.supplyCollateral(id, obligation.collaterals[0].token, totalCollateral - secondCollateral, borrower);
         deal(obligation.collaterals[1].token, address(this), secondCollateral);
-        morphoV2.supplyCollateral(obligation, obligation.collaterals[1].token, secondCollateral, borrower);
+        morphoV2.supplyCollateral(id, obligation.collaterals[1].token, secondCollateral, borrower);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(oraclePrice1);
         Oracle(obligation.collaterals[1].oracle).setPrice(oraclePrice2);
@@ -243,7 +239,7 @@ contract LiquidationTest is BaseTest {
         seizures.push(Seizure({collateralIndex: 1, repaid: repaid2, seized: 0}));
         deal(address(loanToken), address(this), units); // over-approx.
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     function testCannotRepayMoreThanDebt(uint256 units, uint256 repaid) public {
@@ -257,7 +253,7 @@ contract LiquidationTest is BaseTest {
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
         vm.expectRevert(stdError.arithmeticError);
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     function testCannotSeizeMoreThanCollateral(uint256 units, uint256 seized) public {
@@ -273,7 +269,7 @@ contract LiquidationTest is BaseTest {
         seizures.push(Seizure({collateralIndex: 0, repaid: 0, seized: seized}));
 
         vm.expectRevert(stdError.arithmeticError);
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
     }
 
     // Test bad debt.
@@ -288,7 +284,7 @@ contract LiquidationTest is BaseTest {
             .mulDivUp(oraclePrice, ORACLE_PRICE_SCALE);
         uint256 expectedBadDebt = units - repayable;
 
-        morphoV2.liquidate(obligation, seizures, borrower, ""); // empty seizures.
+        morphoV2.liquidate(id, seizures, borrower, ""); // empty seizures.
 
         assertEq(morphoV2.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(morphoV2.totalUnits(id), units - expectedBadDebt, "total units");
@@ -311,7 +307,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), units); // over-approx.
         seizures.push(Seizure({collateralIndex: 0, repaid: 0, seized: seized}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - expectedBadDebt - repaid, "debt");
         assertEq(morphoV2.totalUnits(id), units - expectedBadDebt, "total units");
@@ -330,7 +326,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), repaid);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - repaid - expectedBadDebt, "debt");
         assertEq(morphoV2.totalUnits(id), units - expectedBadDebt, "total units");
@@ -347,7 +343,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), units); // not needed.
         seizures.push(Seizure({collateralIndex: 0, repaid: 0, seized: initialCollateral}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0);
     }
@@ -365,7 +361,7 @@ contract LiquidationTest is BaseTest {
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - repaid, "debt");
         assertEq(
@@ -386,7 +382,7 @@ contract LiquidationTest is BaseTest {
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         seizures.push(Seizure({collateralIndex: 0, repaid: repaid, seized: 0}));
 
-        morphoV2.liquidate(obligation, seizures, borrower, "");
+        morphoV2.liquidate(id, seizures, borrower, "");
 
         uint256 lif = WAD + (MAX_LIF - WAD) * delay / TIME_TO_MAX_LIF;
 

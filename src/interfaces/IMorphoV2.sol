@@ -16,7 +16,7 @@ struct Collateral {
 }
 
 struct Offer {
-    Obligation obligation;
+    bytes32 obligationId;
     bool buy;
     address maker;
     uint256 assets;
