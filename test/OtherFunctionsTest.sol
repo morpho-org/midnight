@@ -240,6 +240,11 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.obligationCreated(_id), true, "created after call");
     }
 
+    function testIdToObligationRevertsIfNotCreated(bytes32 _id) public {
+        vm.expectRevert();
+        morphoV2.idToObligation(_id);
+    }
+
     function testShuffleSession(address user) public {
         vm.prank(user);
         morphoV2.shuffleSession();
