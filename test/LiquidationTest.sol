@@ -412,6 +412,94 @@ contract LiquidationTest is BaseTest {
         morphoV2.liquidate(obligation, liqIdx, maxR, 0, borrower, "");
     }
 
+    // min collateral in liquidation
+
+    function testMinCollatLiquidationReverts(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE - 1);
+
+        vm.expectRevert("Below min collateral");
+        morphoV2.liquidate(obligation, 0, 1, 0, borrower, "");
+    }
+
+    function testMinCollatLiquidationSucceeds(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = 1;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE - 1);
+
+        morphoV2.liquidate(obligation, 0, 1, 0, borrower, "");
+
+        assertGt(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "collateral remaining");
+        assertGt(morphoV2.debtOf(id, borrower), 0, "debt remaining");
+    }
+
+    function testMinCollatBypassWhenAllDebtRepaid(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+
+        morphoV2.liquidate(obligation, 0, 0, 0, borrower, ""); // realize bad debt
+        morphoV2.liquidate(obligation, 0, morphoV2.debtOf(id, borrower), 0, borrower, ""); // why this reverts?
+
+        assertEq(morphoV2.debtOf(id, borrower), 0, "all debt repaid");
+    }
+
+    function testMinCollatBypassWhenAllCollateralSeized(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+
+        morphoV2.liquidate(obligation, 0, 0, collatAmount, borrower, ""); // why this doesn't revert?
+
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "all collateral seized");
+    }
+
+    function testMinCollatDeactivatesRecoveryCloseFactor(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE - 1);
+
+        morphoV2.liquidate(obligation, 0, units, 0, borrower, "");
+
+        assertEq(morphoV2.debtOf(id, borrower), 0, "all debt repaid");
+    }
+
+    function testMinCollatNotEnforcedPostMaturity(uint256 units) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
+        id = toId(obligation);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
+
+        morphoV2.liquidate(obligation, 0, units / 2, 0, borrower, "");
+
+        assertGt(morphoV2.debtOf(id, borrower), 0, "debt remaining");
+        assertGt(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "collateral remaining");
+    }
+
     // gas tests
 
     /// forge-config: default.isolate = true
