@@ -193,7 +193,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.consumed(user, group), amount, "consumed");
     }
 
-    function testTouchObligation(Obligation memory _obligation) public {
+    function testCreateObligation(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.createObligation(_obligation);
@@ -228,16 +228,6 @@ contract OtherFunctionsTest is BaseTest {
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
-    }
-
-    function testObligationCreated(Obligation memory _obligation) public {
-        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
-
-        bytes32 _id = toId(_obligation);
-        assertEq(morphoV2.obligationCreated(_id), false, "not created before call");
-
-        morphoV2.createObligation(_obligation);
-        assertEq(morphoV2.obligationCreated(_id), true, "created after call");
     }
 
     function testIdToObligationRevertsIfNotCreated(bytes32 _id) public {
