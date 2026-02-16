@@ -396,8 +396,10 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev At least one of `repaidUnits` or `seizedAssets` should be equal to zero.
-    /// @dev Accounts are liquidatable if they are unhealthy or if the maturity is reached.
+    /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
     /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor).
+    /// @dev In that case, we want debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is equivalent to
+    /// repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
     /// @dev Returns repaid units and seized assets.
@@ -412,7 +414,6 @@ contract MorphoV2 is IMorphoV2 {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "INCONSISTENT_INPUT");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        // Reverts if collateralIndex is out of bounds.
         address liquidatedCollatToken = obligation.collaterals[collateralIndex].token;
 
         uint256 repayableDebt;
@@ -464,9 +465,10 @@ contract MorphoV2 is IMorphoV2 {
                     collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
                         .mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                 );
-                uint256 maxSeized = (debtOf[id][borrower] - maxDebt)
-                .mulDivUp(WAD, (WAD.mulDivDown(WAD, lif) - lltv).mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE));
-                require(recoveryCloseFactorDeactivated || seizedAssets <= maxSeized, "recovery close factor violated");
+                // Rounded up to avoid consecutive max liquidations.
+                // Acknowledged that the position could be slightly healthy after a liquidation.
+                uint256 maxRepaid = (debtOf[id][borrower] - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                require(recoveryCloseFactorDeactivated || repaidUnits <= maxRepaid, "recovery close factor violated");
                 uint256 newCollateral = _collateralOf - seizedAssets;
                 require(
                     originalDebt - badDebt - repaidUnits == 0 || newCollateral == 0
@@ -531,6 +533,7 @@ contract MorphoV2 is IMorphoV2 {
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
+                require(obligation.collaterals[i].lltv < WAD.mulDivDown(WAD, MAX_LIF), "lltv too high or LIF too high"); // temporary.
                 previousCollateralToken = collateralToken;
             }
 
@@ -566,7 +569,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
-    /// @dev This function does not call the oracle if debt is 0.
+    /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;

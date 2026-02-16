@@ -296,34 +296,63 @@ contract LiquidationTest is BaseTest {
 
     // recovery close factor
 
-    /// @dev Fuzz: any seized amount <= maxSeized should succeed.
-    /// bounds: oraclePrice >= lltv*MAX_LIF/WAD + 2% ensures position is unhealthy,
-    /// maxSeized <= collatAmount (no bad debt), and repaid <= units.
-    function testRecoveryCloseFactorPassing(uint256 units, uint256 oraclePrice, uint256 seized) public {
+    function testMaxRepaid(uint256 units, uint256 oraclePrice, uint256 repaid) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
-        oraclePrice = bound(oraclePrice, _minOraclePrice(), ORACLE_PRICE_SCALE - 1);
+        oraclePrice = bound(oraclePrice, badDebtPrice() * 1.01e18 / 1e18, ORACLE_PRICE_SCALE - 1);
 
         (, uint256 _maxDebt) = _setupUnhealthy(units, oraclePrice);
 
-        uint256 maxS = _computeMaxSeized(units, _maxDebt, obligation.collaterals[0].lltv, oraclePrice);
-        seized = bound(seized, 1, maxS);
+        uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
 
-        morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
+        repaid = bound(repaid, maxR + 1, units);
+        vm.expectRevert("recovery close factor violated");
+        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+
+        repaid = bound(repaid, 1, maxR);
+        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
     }
 
-    /// @dev Fuzz: any seized amount > maxSeized should revert.
-    /// bounds: oraclePrice >= lltv*MAX_LIF/WAD + 2% ensures maxSeized < collatAmount.
-    function testRecoveryCloseFactorViolated(uint256 units, uint256 oraclePrice, uint256 seized) public {
+    function testMaxRepaidMeansRecovery(uint256 units, uint256 oraclePrice) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
-        oraclePrice = bound(oraclePrice, _minOraclePrice(), ORACLE_PRICE_SCALE - 1);
+        oraclePrice = bound(oraclePrice, badDebtPrice() * 1.01e18 / 1e18, ORACLE_PRICE_SCALE - 1);
+
+        (, uint256 _maxDebt) = _setupUnhealthy(units, oraclePrice);
+
+        uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
+
+        morphoV2.liquidate(obligation, 0, maxR, 0, borrower, "");
+
+        uint256 remainingCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
+        uint256 remainingDebt = morphoV2.debtOf(id, borrower);
+        uint256 newMaxDebt = remainingCollateral.mulDivDown(oraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(obligation.collaterals[0].lltv, WAD);
+        // After max repayment the position should be just healthy or almost healthy (within rounding tolerance).
+        assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
+    }
+
+    /// @dev When price is low enough to create bad debt, maxRepaid >= debtAfterBadDebt,
+    /// so repaying all remaining debt is allowed.
+    function testMaxRepaidWithBadDebt(uint256 units, uint256 oraclePrice) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        oraclePrice = bound(oraclePrice, badDebtPrice() / 2, badDebtPrice() * 0.99e18 / 1e18);
 
         (uint256 collatAmount, uint256 _maxDebt) = _setupUnhealthy(units, oraclePrice);
 
-        uint256 maxS = _computeMaxSeized(units, _maxDebt, obligation.collaterals[0].lltv, oraclePrice);
-        seized = bound(seized, maxS + 1, collatAmount);
+        uint256 repayableDebt = collatAmount.mulDivUp(WAD, MAX_LIF).mulDivUp(oraclePrice, ORACLE_PRICE_SCALE);
+        vm.assume(repayableDebt < units); // Ensure there is bad debt.
 
-        vm.expectRevert("recovery close factor violated");
-        morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
+        uint256 debtAfterBadDebt = repayableDebt;
+
+        uint256 maxR =
+            (debtAfterBadDebt - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
+
+        assertGe(maxR, debtAfterBadDebt, "maxRepaid should cover all remaining debt with bad debt");
+
+        // Seize all collateral — should repay all remaining debt.
+        morphoV2.liquidate(obligation, 0, 0, collatAmount, borrower, "");
+
+        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "all collateral seized");
+        assertEq(morphoV2.debtOf(id, borrower), 0, "all remaining debt repaid");
     }
 
     /// @dev Recovery close factor applies at exact maturity but not one second after.
@@ -377,9 +406,10 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collaterals[liqIdx].lltv, WAD)
         + otherCollat.mulDivDown(obligation.collaterals[otherIdx].lltv, WAD);
 
-        uint256 maxS = _computeMaxSeized(units, _maxDebt, obligation.collaterals[liqIdx].lltv, droppedPrice);
+        uint256 maxR =
+            (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[liqIdx].lltv, WAD));
 
-        morphoV2.liquidate(obligation, liqIdx, 0, maxS, borrower, "");
+        morphoV2.liquidate(obligation, liqIdx, maxR, 0, borrower, "");
     }
 
     // gas tests
@@ -430,20 +460,10 @@ contract LiquidationTest is BaseTest {
 
     // helpers.
 
-    function _computeMaxSeized(uint256 debt, uint256 _maxDebt, uint256 lltv, uint256 collatPrice)
-        internal
-        pure
-        returns (uint256)
-    {
-        return (debt - _maxDebt)
-        .mulDivUp(WAD, (WAD.mulDivDown(WAD, MAX_LIF) - lltv).mulDivDown(collatPrice, ORACLE_PRICE_SCALE));
-    }
-
-    /// @dev Minimum oracle price for collateral[0] such that maxSeized < collatAmount (no bad debt).
-    /// Critical threshold is lltv * MAX_LIF / WAD; add 2% margin for rounding safety with units >= 100.
-    function _minOraclePrice() internal view returns (uint256) {
+    /// @dev Minimum oracle price for collateral[0] such that there won't be bad debt.
+    function badDebtPrice() internal view returns (uint256) {
         uint256 lltv = obligation.collaterals[0].lltv;
-        return lltv.mulDivUp(MAX_LIF, WAD) * (ORACLE_PRICE_SCALE / WAD) + ORACLE_PRICE_SCALE / 50;
+        return lltv.mulDivUp(MAX_LIF, WAD) * (ORACLE_PRICE_SCALE / WAD);
     }
 
     function _setupUnhealthy(uint256 units, uint256 oraclePrice)

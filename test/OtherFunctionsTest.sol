@@ -212,7 +212,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
-    function testminCollatValueInSupplyCollateral(uint256 collateral, uint256 price, uint256 minCollatValue) public {
+    function testMinCollatValueInSupplyCollateral(uint256 collateral, uint256 price, uint256 minCollatValue) public {
         collateral = bound(collateral, 1, MAX_TEST_AMOUNT);
         price = bound(price, 1, ORACLE_PRICE_SCALE);
         Oracle(obligation.collaterals[0].oracle).setPrice(price);
@@ -228,7 +228,7 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.supplyCollateral(obligation, 0, collateral, borrower);
     }
 
-    function testminCollatValueInWithdrawCollateral(
+    function testMinCollatValueInWithdrawCollateral(
         uint256 collateral,
         uint256 price,
         uint256 withdrawnCollateral,

@@ -16,7 +16,7 @@ contract IdLibTest is Test {
         bool sameLoanToken = obligation1.loanToken == obligation2.loanToken;
         bool sameMaturity = obligation1.maturity == obligation2.maturity;
         bool sameCollaterals = obligation1.collaterals.length == obligation2.collaterals.length;
-        bool sameminCollatValue = obligation1.minCollatValue == obligation2.minCollatValue;
+        bool sameMinCollatValue = obligation1.minCollatValue == obligation2.minCollatValue;
         if (sameCollaterals) {
             for (uint256 i = 0; i < obligation1.collaterals.length; i++) {
                 if (obligation1.collaterals[i].token != obligation2.collaterals[i].token) sameCollaterals = false;
@@ -25,7 +25,7 @@ contract IdLibTest is Test {
             }
         }
 
-        vm.assume(!(sameLoanToken && sameMaturity && sameCollaterals && sameminCollatValue));
+        vm.assume(!(sameLoanToken && sameMaturity && sameCollaterals && sameMinCollatValue));
 
         bytes32 id1 = IdLib.toId(obligation1, chainid, morphoV2);
         bytes32 id2 = IdLib.toId(obligation2, chainid, morphoV2);
