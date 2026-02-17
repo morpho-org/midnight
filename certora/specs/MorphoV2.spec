@@ -8,7 +8,7 @@ methods {
     function totalShares(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address owner) external returns (uint256) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
     function IdLib.toId(MorphoV2.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -30,7 +30,7 @@ persistent ghost mapping(bytes32 => mathint) sumDebtOf {
     init_state axiom (forall bytes32 id. sumDebtOf[id] == 0);
 }
 
-hook Sstore debtOf[KEY bytes32 id][KEY address owner] uint256 newDebt (uint256 oldDebt) {
+hook Sstore borrowerState[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
     sumDebtOf[id] = sumDebtOf[id] - oldDebt + newDebt;
 }
 

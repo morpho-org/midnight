@@ -248,6 +248,7 @@ contract LiquidationTest is BaseTest {
         morphoV2.liquidate(obligation, 0, initialCollateral, 0, borrower, "");
 
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0);
+        assertEq(UtilsLib.countBits(morphoV2.activatedCollaterals(id, borrower)), 0, "no bits should be set");
     }
 
     // post maturity liquidation.

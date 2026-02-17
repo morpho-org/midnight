@@ -9,7 +9,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
+import {ORACLE_PRICE_SCALE, MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 contract OtherFunctionsTest is BaseTest {
@@ -310,5 +310,113 @@ contract OtherFunctionsTest is BaseTest {
             0,
             "collateral should be 0 after withdrawal"
         );
+    }
+
+    // Bitmap tests.
+
+    function _createMultiCollateralObligation(uint256 numCollaterals) internal returns (Obligation memory _obligation) {
+        Collateral[] memory collaterals = new Collateral[](numCollaterals);
+        for (uint256 i = 0; i < numCollaterals; i++) {
+            ERC20 token = new ERC20("", "");
+            Oracle _oracle = new Oracle();
+            collaterals[i] = Collateral({token: address(token), lltv: 0.75e18, oracle: address(_oracle)});
+        }
+        collaterals = sortCollaterals(collaterals);
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        _obligation.collaterals = collaterals;
+        _obligation.minCollatValue = 0;
+    }
+
+    function testMaxCollaterals(uint256 numCollaterals) public {
+        numCollaterals = bound(numCollaterals, MAX_COLLATERALS + 1, 1000);
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        vm.expectRevert("too many collaterals");
+        morphoV2.touchObligation(_obligation);
+    }
+
+    function testBelowExactMaxCollaterals(uint256 numCollaterals) public {
+        numCollaterals = bound(numCollaterals, 1, MAX_COLLATERALS - 1);
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        morphoV2.touchObligation(_obligation);
+    }
+
+    function testMaxCollateralsPerBorrower() public {
+        uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER + 1;
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        for (uint256 i = 0; i < MAX_COLLATERALS_PER_BORROWER; i++) {
+            address token = _obligation.collaterals[i].token;
+            deal(token, address(this), 1e18);
+            ERC20(token).approve(address(morphoV2), 1e18);
+            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+        }
+
+        address lastToken = _obligation.collaterals[numCollaterals - 1].token;
+        deal(lastToken, address(this), 1e18);
+        ERC20(lastToken).approve(address(morphoV2), 1e18);
+        vm.expectRevert("too many collaterals per borrower");
+        morphoV2.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
+    }
+
+    function testBitmapCtzSingleCollateral(uint256 collateralIndex) public {
+        uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
+        collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        address token = _obligation.collaterals[collateralIndex].token;
+        deal(token, address(this), 1e18);
+        ERC20(token).approve(address(morphoV2), 1e18);
+        morphoV2.supplyCollateral(_obligation, collateralIndex, 1e18, borrower);
+
+        uint256 bitmap = morphoV2.activatedCollaterals(toId(_obligation), borrower);
+
+        assertEq(bitmap, 1 << collateralIndex, "bitmap should have only bit at collateralIndex");
+        assertEq(UtilsLib.msb(bitmap), collateralIndex, "msb should equal collateralIndex");
+    }
+
+    function testBitmapCountBitsAfterMultipleSupplies(uint256 k) public {
+        uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
+        k = bound(k, 1, numCollaterals);
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        for (uint256 i = 0; i < k; i++) {
+            address token = _obligation.collaterals[i].token;
+            deal(token, address(this), 1e18);
+            ERC20(token).approve(address(morphoV2), 1e18);
+            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+        }
+
+        bytes32 _id = toId(_obligation);
+        uint256 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        assertEq(UtilsLib.countBits(bitmap), k, "countBits should equal number of supplied collaterals");
+        assertEq(UtilsLib.msb(bitmap), k - 1, "msb should equal number of supplied collaterals - 1");
+    }
+
+    function testBitmapClearedOnFullWithdraw(uint256 collateralIndex) public {
+        uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
+        collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
+        Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+
+        // Supply all collaterals.
+        for (uint256 i = 0; i < numCollaterals; i++) {
+            address token = _obligation.collaterals[i].token;
+            deal(token, address(this), 1e18);
+            ERC20(token).approve(address(morphoV2), 1e18);
+            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+        }
+
+        bytes32 _id = toId(_obligation);
+        assertEq(UtilsLib.countBits(morphoV2.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
+
+        // Withdraw one collateral fully.
+        vm.prank(borrower);
+        morphoV2.withdrawCollateral(_obligation, collateralIndex, 1e18, borrower, borrower);
+
+        uint256 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
+        assertEq(bitmap & (1 << collateralIndex), 0, "withdrawn collateral bit should be cleared");
     }
 }
