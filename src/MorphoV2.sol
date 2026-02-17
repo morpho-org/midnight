@@ -402,7 +402,7 @@ contract MorphoV2 is IMorphoV2 {
     /// repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
-    /// @dev Returns repaid units and seized assets.
+    /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
         uint256 collateralIndex,
@@ -493,7 +493,7 @@ contract MorphoV2 is IMorphoV2 {
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
 
-        return (repaidUnits, seizedAssets);
+        return (seizedAssets, repaidUnits);
     }
 
     function consume(bytes32 group, uint256 amount) external {
