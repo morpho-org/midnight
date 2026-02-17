@@ -9,4 +9,20 @@ contract Utils {
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) external pure returns (bytes32) {
         return keccak256(IdLib.creationCode(obligation, chainId, morphoV2));
     }
+
+    function naiveId(Obligation memory obligation) external pure returns (bytes32) {
+        return keccak256(abi.encode(obligation));
+    }
+
+    function naiveId2(Obligation memory obligation) external pure returns (bytes32) {
+        return keccak256(abi.encode(address(1), obligation));
+    }
+
+    function naiveId3(Obligation memory obligation) external pure returns (bytes32) {
+        return keccak256(abi.encode(address(1), abi.encode(obligation)));
+    }
+
+    function naiveId4(Obligation memory obligation) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(address(1), abi.encode(obligation)));
+    }
 }

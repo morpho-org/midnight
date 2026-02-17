@@ -9,6 +9,10 @@ methods {
 
     function MorphoV2.obligationCreated(bytes32) external returns (bool) envfree;
     function Utils.toId(MorphoV2.Obligation, uint256, address) external returns (bytes32) envfree;
+    function Utils.naiveId(MorphoV2.Obligation) external returns (bytes32) envfree;
+    function Utils.naiveId2(MorphoV2.Obligation) external returns (bytes32) envfree;
+    function Utils.naiveId3(MorphoV2.Obligation) external returns (bytes32) envfree;
+    function Utils.naiveId4(MorphoV2.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -76,4 +80,34 @@ rule obligationIsCreatedAfterWithdrawCollateral(env e, MorphoV2.Obligation oblig
 rule obligationIsCreatedAfterLiquidate(env e, MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     MorphoV2.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert MorphoV2.obligationCreated(summaryToId(obligation));
+}
+
+rule sameIdImpliesSameLoanToken(MorphoV2.Obligation obligation1, MorphoV2.Obligation obligation2) {
+    require summaryToId(obligation2) == summaryToId(obligation1), "assume that obligations have the same IDs";
+
+    assert obligation1.loanToken == obligation2.loanToken;
+}
+
+rule sameIdNaiveImpliesSameLoanToken(MorphoV2.Obligation obligation1, MorphoV2.Obligation obligation2) {
+    require Utils.naiveId(obligation2) == Utils.naiveId(obligation1), "assume that obligations have the same naive IDs";
+
+    assert obligation1.loanToken == obligation2.loanToken;
+}
+
+rule sameIdNaive2ImpliesSameLoanToken(MorphoV2.Obligation obligation1, MorphoV2.Obligation obligation2) {
+    require Utils.naiveId2(obligation2) == Utils.naiveId2(obligation1), "assume that obligations have the same naive IDs";
+
+    assert obligation1.loanToken == obligation2.loanToken;
+}
+
+rule sameIdNaive3ImpliesSameLoanToken(MorphoV2.Obligation obligation1, MorphoV2.Obligation obligation2) {
+    require Utils.naiveId3(obligation2) == Utils.naiveId3(obligation1), "assume that obligations have the same naive IDs";
+
+    assert obligation1.loanToken == obligation2.loanToken;
+}
+
+rule sameIdNaive4ImpliesSameLoanToken(MorphoV2.Obligation obligation1, MorphoV2.Obligation obligation2) {
+    require Utils.naiveId4(obligation2) == Utils.naiveId4(obligation1), "assume that obligations have the same naive IDs";
+
+    assert obligation1.loanToken == obligation2.loanToken;
 }
