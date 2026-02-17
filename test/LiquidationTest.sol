@@ -427,21 +427,23 @@ contract LiquidationTest is BaseTest {
         morphoV2.liquidate(obligation, 0, 1, 0, borrower, "");
     }
 
-    function testMinCollatLiquidationSucceeds(uint256 units) public {
+    function testMinCollatBypassWhenAllDebtRepaid(uint256 units) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
-        obligation.minCollatValue = 1;
+        uint256 collatAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        obligation.minCollatValue = collatAmount;
         id = toId(obligation);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE - 1);
 
-        morphoV2.liquidate(obligation, 0, 1, 0, borrower, "");
+        vm.expectRevert("Below min collateral");
+        morphoV2.liquidate(obligation, 0, 0, units - 1, borrower, "");
 
+        morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
+
+        assertEq(morphoV2.debtOf(id, borrower), 0, "all debt repaid");
         assertGt(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "collateral remaining");
-        assertGt(morphoV2.debtOf(id, borrower), 0, "debt remaining");
     }
-
-    // min collat bypassed when all debt repaid is not tested because it's not always reachable.
 
     function testMinCollatBypassWhenAllCollateralSeized(uint256 units) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
