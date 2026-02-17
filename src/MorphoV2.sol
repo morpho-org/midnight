@@ -499,10 +499,6 @@ contract MorphoV2 is IMorphoV2 {
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
-
-        obligationState[id].fees = defaultFees[obligation.loanToken];
-
-        emit EventsLib.ObligationCreated(id, obligation);
         return id;
     }
 
