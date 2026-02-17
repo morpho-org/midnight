@@ -72,7 +72,7 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        if (!IdLib.codeIsCreated(toId(obligation), address(morphoV2))) morphoV2.createObligation(obligation);
+        morphoV2.createObligation(obligation);
         uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(morphoV2), collateral);

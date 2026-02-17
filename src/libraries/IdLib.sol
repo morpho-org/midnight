@@ -18,23 +18,27 @@ library IdLib {
     /// 39        CODECOPY        [len]              mem[0:len] <- code[63:63+len]
     /// 5f        PUSH0           [0, len]           return offset = 0
     /// f3        RETURN          []                 mem[0:len] is returned
-    function creationCode(Obligation memory obligation, uint256 chainId, address morphoV2)
+    function creationCode(bytes memory encodedObligation, uint256 chainId, address morphoV2)
         internal
         pure
         returns (bytes memory)
     {
-        bytes memory prefix = hex"603f380380603f5f395ff3";
-        return abi.encodePacked(prefix, chainId, morphoV2, abi.encode(obligation));
+        return abi.encodePacked(hex"603f380380603f5f395ff3", chainId, morphoV2, encodedObligation);
     }
 
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes32) {
-        return keccak256(creationCode(obligation, chainId, morphoV2));
+        return keccak256(creationCode(abi.encode(obligation), chainId, morphoV2));
     }
 
-    function codeIsCreated(bytes32 id, address morphoV2) internal view returns (bool) {
-        return
-            address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id))))).code.length
-                > 0;
+    function codeIsCreated(bytes memory encodedObligation, uint256 chainId, address morphoV2)
+        internal
+        view
+        returns (bool, bytes32)
+    {
+        bytes32 id = keccak256(creationCode(encodedObligation, chainId, morphoV2));
+        bool created = address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))))
+                .code.length > 0;
+        return (created, id);
     }
 
     function toObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
@@ -44,18 +48,14 @@ library IdLib {
         );
     }
 
-    /// @dev Deploys a contract with runtime code = abi.encode(obligation) unless it already exists.
+    /// @dev Deploys a contract with runtime code encodedObligation.
     /// @dev The contract code begins with 0x00 (STOP), because the first word is the offset of the obligation.
-    /// @dev Returns the id of the created obligation.
-    function createCode(Obligation memory obligation) internal returns (bytes32) {
-        bytes memory _creationCode = creationCode(obligation, block.chainid, address(this));
+    function createCode(bytes memory encodedObligation) internal {
+        bytes memory _creationCode = creationCode(encodedObligation, block.chainid, address(this));
         address create2Address;
         assembly ("memory-safe") {
             create2Address := create2(0, add(_creationCode, 0x20), mload(_creationCode), 0)
         }
-        bytes32 id = keccak256(_creationCode);
-        require(create2Address != address(0) || codeIsCreated(id, address(this)), "Failed to create SStore2 contract");
-
-        return id;
+        require(create2Address != address(0), "Failed to create SStore2 contract");
     }
 }
