@@ -395,7 +395,7 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransfer(collateralToken, receiver, assets);
     }
 
-    /// @dev At least one of `repaidUnits` or `seizedAssets` should be equal to zero.
+    /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
     /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor).
     /// @dev In that case, we want debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is equivalent to
@@ -406,8 +406,8 @@ contract MorphoV2 is IMorphoV2 {
     function liquidate(
         Obligation calldata obligation,
         uint256 collateralIndex,
-        uint256 repaidUnits,
         uint256 seizedAssets,
+        uint256 repaidUnits,
         address borrower,
         bytes calldata data
     ) external returns (uint256, uint256) {

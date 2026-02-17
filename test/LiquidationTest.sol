@@ -106,7 +106,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
-        (uint256 repaidUnits, uint256 seizedAssets) = morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        (uint256 repaidUnits, uint256 seizedAssets) = morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         assertEq(repaidUnits, repaid, "repaid units");
         assertEq(
@@ -126,7 +126,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
-        (uint256 repaidUnits, uint256 seizedAssets) = morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
+        (uint256 repaidUnits, uint256 seizedAssets) = morphoV2.liquidate(obligation, 0, seized, 0, borrower, "");
 
         assertEq(repaidUnits, seized.mulDivUp(WAD, MAX_LIF).mulDivUp(1e36 - 1, ORACLE_PRICE_SCALE), "repaid units");
         assertEq(seizedAssets, seized, "seized assets");
@@ -148,7 +148,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, data);
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, data);
 
         assertEq(recordedRepaidUnits, repaid, "repaid units");
         assertEq(recordedData, data, "data");
@@ -163,7 +163,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
 
         vm.expectRevert(stdError.arithmeticError);
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
     }
 
     function testCannotSeizeMoreThanCollateral(uint256 units, uint256 seized) public {
@@ -177,7 +177,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(1e36 - 1);
 
         vm.expectRevert(stdError.arithmeticError);
-        morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
+        morphoV2.liquidate(obligation, 0, seized, 0, borrower, "");
     }
 
     // Test bad debt.
@@ -213,7 +213,7 @@ contract LiquidationTest is BaseTest {
         uint256 expectedBadDebt = units - repayable;
         uint256 repaid = seized.mulDivUp(WAD, MAX_LIF).mulDivUp(oraclePrice, ORACLE_PRICE_SCALE);
 
-        morphoV2.liquidate(obligation, 0, 0, seized, borrower, "");
+        morphoV2.liquidate(obligation, 0, seized, 0, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - expectedBadDebt - repaid, "debt");
         assertEq(morphoV2.totalUnits(id), units - expectedBadDebt, "total units");
@@ -231,7 +231,7 @@ contract LiquidationTest is BaseTest {
         repaid = bound(repaid, 0, repayableDebt - 1); // TODO fix - 1.
         uint256 expectedBadDebt = units - repayableDebt;
 
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - repaid - expectedBadDebt, "debt");
         assertEq(morphoV2.totalUnits(id), units - expectedBadDebt, "total units");
@@ -245,7 +245,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2); // TODO fuzz
-        morphoV2.liquidate(obligation, 0, 0, initialCollateral, borrower, "");
+        morphoV2.liquidate(obligation, 0, initialCollateral, 0, borrower, "");
 
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0);
     }
@@ -262,7 +262,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
 
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         assertEq(morphoV2.debtOf(id, borrower), units - repaid, "debt");
         assertEq(
@@ -282,7 +282,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 initialCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
 
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         uint256 lif = WAD + (MAX_LIF - WAD) * delay / TIME_TO_MAX_LIF;
 
@@ -306,10 +306,10 @@ contract LiquidationTest is BaseTest {
 
         repaid = bound(repaid, maxR + 1, units);
         vm.expectRevert("recovery close factor violated");
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         repaid = bound(repaid, 1, maxR);
-        morphoV2.liquidate(obligation, 0, repaid, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
     }
 
     function testMaxRepaidMeansRecovery(uint256 units, uint256 oraclePrice) public {
@@ -320,7 +320,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
 
-        morphoV2.liquidate(obligation, 0, maxR, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, maxR, borrower, "");
 
         uint256 remainingCollateral = morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token);
         uint256 remainingDebt = morphoV2.debtOf(id, borrower);
@@ -349,7 +349,7 @@ contract LiquidationTest is BaseTest {
         assertGe(maxR, debtAfterBadDebt, "maxRepaid should cover all remaining debt with bad debt");
 
         // Seize all collateral — should repay all remaining debt.
-        morphoV2.liquidate(obligation, 0, 0, collatAmount, borrower, "");
+        morphoV2.liquidate(obligation, 0, collatAmount, 0, borrower, "");
 
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0, "all collateral seized");
         assertEq(morphoV2.debtOf(id, borrower), 0, "all remaining debt repaid");
@@ -365,11 +365,11 @@ contract LiquidationTest is BaseTest {
         // At exact maturity: recovery close factor applies.
         vm.warp(obligation.maturity);
         vm.expectRevert("recovery close factor violated");
-        morphoV2.liquidate(obligation, 0, units, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
 
         // One second later: recovery close factor no longer applies.
         vm.warp(obligation.maturity + 1);
-        morphoV2.liquidate(obligation, 0, units, 0, borrower, "");
+        morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
         assertEq(morphoV2.debtOf(id, borrower), 0);
     }
 
@@ -409,7 +409,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR =
             (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[liqIdx].lltv, WAD));
 
-        morphoV2.liquidate(obligation, liqIdx, maxR, 0, borrower, "");
+        morphoV2.liquidate(obligation, liqIdx, 0, maxR, borrower, "");
     }
 
     // min collateral in liquidation
@@ -528,7 +528,7 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 1 liquidation.
         bytes[] memory calls1 = new bytes[](1);
-        calls1[0] = abi.encodeCall(morphoV2.liquidate, (obligation, 0, repay, 0, borrower, ""));
+        calls1[0] = abi.encodeCall(morphoV2.liquidate, (obligation, 0, 0, repay, borrower, ""));
         uint256 gasBefore1 = gasleft();
         morphoV2.multicall(calls1);
         uint256 gas1 = gasBefore1 - gasleft();
@@ -536,8 +536,8 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 2 liquidations.
         bytes[] memory calls2 = new bytes[](2);
-        calls2[0] = abi.encodeCall(morphoV2.liquidate, (obligation, 0, repay, 0, borrower, ""));
-        calls2[1] = abi.encodeCall(morphoV2.liquidate, (obligation, 1, repay, 0, borrower, ""));
+        calls2[0] = abi.encodeCall(morphoV2.liquidate, (obligation, 0, 0, repay, borrower, ""));
+        calls2[1] = abi.encodeCall(morphoV2.liquidate, (obligation, 1, 0, repay, borrower, ""));
         uint256 gasBefore2 = gasleft();
         morphoV2.multicall(calls2);
         uint256 gas2 = gasBefore2 - gasleft();
