@@ -480,7 +480,7 @@ contract MorphoV2 is IMorphoV2 {
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollatToken];
-                uint256 _debtOf = debtOf[id][borrower];
+                uint256 _debtOf = _state.debt;
                 uint256 collateralToSeizeToReachMinCollateral = _collateralOf.zeroFloorSub(
                     obligation.minCollatValue.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice)
                 );
