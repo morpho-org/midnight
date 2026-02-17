@@ -248,11 +248,14 @@ contract MorphoV2 is IMorphoV2 {
         bool buyerIsLender = (debtOf[id][buyer] == 0);
         bool sellerIsBorrower = (sharesOf[id][seller] == 0);
         uint256 lendingFeePaid;
-        if (buyerIsLender) _onLenderSharesIncrease(id, buyer, offer.obligation.loanToken, _obligationState);
+        if (buyerIsLender) {
+            _onLenderSharesIncrease(
+                id, buyer, offer.obligation.loanToken, obligationUnits, offer.obligation.maturity, _obligationState
+            );
+        }
         if (!sellerIsBorrower) {
-            // Never decrease lender share value through fee collection.
-            uint256 maxCharge = sellerAssets.zeroFloorSub(obligationUnits);
-            lendingFeePaid = _settleLendingFeeOnSharesDecrease(id, seller, obligationShares, maxCharge, _obligationState);
+            lendingFeePaid =
+                _settleLendingFeeOnSharesDecrease(id, seller, obligationShares, sellerAssets, offer.obligation.maturity, _obligationState);
         }
 
         if (buyerIsLender && sellerIsBorrower) {
@@ -350,9 +353,8 @@ contract MorphoV2 is IMorphoV2 {
             obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         }
 
-        // Never decrease lender share value through fee collection.
         uint256 lendingFeePaid = _settleLendingFeeOnSharesDecrease(
-            id, onBehalf, shares, obligationUnits.zeroFloorSub(shares), _obligationState
+            id, onBehalf, shares, obligationUnits, obligation.maturity, _obligationState
         );
         sharesOf[id][onBehalf] -= shares;
         _obligationState.withdrawable -= obligationUnits;
@@ -631,16 +633,34 @@ contract MorphoV2 is IMorphoV2 {
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
 
-    function _onLenderSharesIncrease(bytes32 id, address lender, address loanToken, ObligationState storage _obligationState)
+    function _onLenderSharesIncrease(
+        bytes32 id,
+        address lender,
+        address loanToken,
+        uint256 addedUnits,
+        uint256 maturity,
+        ObligationState storage _obligationState
+    )
         internal
     {
         if (sharesOf[id][lender] == 0) {
             LenderFeeState storage state = lenderFeeState[id][lender];
             state.fee = defaultLendingFee[loanToken];
-            state.lastUpdate = uint40(block.timestamp);
+            state.lastUpdate = uint40(UtilsLib.min(block.timestamp, maturity));
             return;
         }
-        _accrueLendingFee(id, lender, _obligationState);
+        _accrueLendingFee(id, lender, maturity, _obligationState);
+
+        if (addedUnits == 0) return;
+        LenderFeeState storage state = lenderFeeState[id][lender];
+        uint256 oldShares = sharesOf[id][lender];
+        uint256 oldUnits = oldShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 totalUnitsAfterIncrease = oldUnits + addedUnits;
+        if (totalUnitsAfterIncrease == 0) return;
+        uint256 blendedFee = (oldUnits * uint256(state.fee) + addedUnits * uint256(defaultLendingFee[loanToken]))
+            / totalUnitsAfterIncrease;
+        // forge-lint: disable-next-item(unsafe-typecast) as blendedFee is bounded by MAX_LENDING_FEE / FEE_STEP.
+        state.fee = uint16(blendedFee);
     }
 
     function _settleLendingFeeOnSharesDecrease(
@@ -648,42 +668,47 @@ contract MorphoV2 is IMorphoV2 {
         address lender,
         uint256 removedShares,
         uint256 maxCharge,
+        uint256 maturity,
         ObligationState storage _obligationState
     ) internal returns (uint256 feeAmount) {
         if (removedShares == 0) return 0;
         uint256 oldShares = sharesOf[id][lender];
         if (oldShares == 0) return 0;
 
-        _accrueLendingFee(id, lender, _obligationState);
+        _accrueLendingFee(id, lender, maturity, _obligationState);
         LenderFeeState storage state = lenderFeeState[id][lender];
         feeAmount = UtilsLib.min(state.accrued, maxCharge);
         state.accrued -= uint192(feeAmount);
-        if (removedShares >= oldShares) {
+        if (removedShares >= oldShares && state.accrued == 0) {
             delete lenderFeeState[id][lender];
         }
     }
 
-    function _accrueLendingFee(bytes32 id, address lender, ObligationState storage _obligationState) internal {
+    function _accrueLendingFee(bytes32 id, address lender, uint256 maturity, ObligationState storage _obligationState)
+        internal
+    {
         LenderFeeState storage state = lenderFeeState[id][lender];
         uint40 lastUpdate = state.lastUpdate;
-        if (lastUpdate == 0 || block.timestamp == lastUpdate) return;
+        uint256 accrualTimestamp = UtilsLib.min(block.timestamp, maturity);
+        if (lastUpdate == 0 || accrualTimestamp <= lastUpdate) return;
 
         uint256 userShares = sharesOf[id][lender];
         if (userShares == 0 || state.fee == 0) {
-            state.lastUpdate = uint40(block.timestamp);
+            state.lastUpdate = uint40(accrualTimestamp);
             return;
         }
 
         uint256 units = userShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        uint256 feeAccrued = units.mulDivDown(uint256(state.fee) * FEE_STEP, WAD).mulDivDown(block.timestamp - lastUpdate, 365 days);
+        uint256 feeAccrued =
+            units.mulDivDown(uint256(state.fee) * FEE_STEP, WAD).mulDivDown(accrualTimestamp - lastUpdate, 365 days);
         if (feeAccrued == 0) {
-            state.lastUpdate = uint40(block.timestamp);
+            state.lastUpdate = uint40(accrualTimestamp);
             return;
         }
 
         uint256 newAccrued = uint256(state.accrued) + feeAccrued;
         require(newAccrued <= type(uint192).max, "accrued fee overflow");
         state.accrued = uint192(newAccrued);
-        state.lastUpdate = uint40(block.timestamp);
+        state.lastUpdate = uint40(accrualTimestamp);
     }
 }
