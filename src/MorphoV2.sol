@@ -453,6 +453,7 @@ contract MorphoV2 is IMorphoV2 {
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 uint256 _collateralOf = collateralOf[id][borrower][liquidatedCollatToken];
+                uint256 _debtOf = debtOf[id][borrower];
                 uint256 collateralToSeizeToReachMinCollateral = _collateralOf.zeroFloorSub(
                     obligation.minCollatValue.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice)
                 );
@@ -460,8 +461,7 @@ contract MorphoV2 is IMorphoV2 {
                     collateralToSeizeToReachMinCollateral.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                         .mulDivUp(lltv, WAD)
                 )
-                < (originalDebt - badDebt)
-                .zeroFloorSub(
+                < _debtOf.zeroFloorSub(
                     collateralToSeizeToReachMinCollateral.mulDivDown(WAD, lif)
                         .mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                 );
@@ -471,7 +471,7 @@ contract MorphoV2 is IMorphoV2 {
                 require(recoveryCloseFactorDeactivated || repaidUnits <= maxRepaid, "recovery close factor violated");
                 uint256 newCollateral = _collateralOf - seizedAssets;
                 require(
-                    originalDebt - badDebt - repaidUnits == 0 || newCollateral == 0
+                    _debtOf - repaidUnits == 0 || newCollateral == 0
                         || newCollateral.mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
                             >= obligation.minCollatValue,
                     "Below min collateral"
