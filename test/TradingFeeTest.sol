@@ -63,7 +63,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
@@ -83,7 +82,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, buyerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - tradingFee;
@@ -105,7 +103,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
@@ -125,7 +122,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, buyerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - tradingFee;
@@ -145,7 +141,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(sellerPrice >= 0.01e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
@@ -166,7 +161,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, buyerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - tradingFee;
@@ -187,7 +181,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
@@ -208,7 +201,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, buyerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - tradingFee;
@@ -229,7 +221,6 @@ contract TradingFeeTest is BaseTest {
         vm.assume(sellerPrice >= 0.5e18);
         tradingFee = bound(tradingFee, 0, min(MAX_FEE, 1 ether - sellerPrice)) / 1e12 * 1e12;
         morphoV2.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        morphoV2.createObligation(obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
@@ -255,7 +246,7 @@ contract TradingFeeTest is BaseTest {
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
         morphoV2.setDefaultTradingFee(address(loanToken), 1, fee1Day);
         morphoV2.setDefaultTradingFee(address(loanToken), 2, fee7Days);
-        id = morphoV2.createObligation(obligation);
+        id = toId(obligation);
         lenderOffer.obligationId = id;
         borrowerOffer.obligationId = id;
         borrowerOffer.tick = sellerTick;
@@ -283,7 +274,7 @@ contract TradingFeeTest is BaseTest {
         obligation.maturity = maturity;
 
         morphoV2.setDefaultTradingFee(address(loanToken), 0, fee0Day);
-        id = morphoV2.createObligation(obligation);
+        id = toId(obligation);
         lenderOffer.obligationId = id;
         borrowerOffer.obligationId = id;
         borrowerOffer.tick = sellerTick;
@@ -311,7 +302,7 @@ contract TradingFeeTest is BaseTest {
         obligation.maturity = maturity;
 
         morphoV2.setDefaultTradingFee(address(loanToken), 5, fee180Days);
-        id = morphoV2.createObligation(obligation);
+        id = toId(obligation);
         lenderOffer.obligationId = id;
         borrowerOffer.obligationId = id;
         borrowerOffer.tick = sellerTick;

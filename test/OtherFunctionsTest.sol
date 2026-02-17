@@ -171,7 +171,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.createObligation(_obligation);
-        assertEq(morphoV2.obligationCreated(_id), true, "obligation not created");
+        assertEq(IdLib.codeIsCreated(_id, address(morphoV2)), true, "obligation created");
         uint16[6] memory fees = morphoV2.fees(_id);
         for (uint256 i = 0; i < 6; i++) {
             assertEq(fees[i], morphoV2.defaultFees(_obligation.loanToken, i), "fees");
@@ -181,9 +181,9 @@ contract OtherFunctionsTest is BaseTest {
     function testCreateObligationIdempotent(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
         bytes32 _id = IdLib.toId(_obligation, block.chainid, address(morphoV2));
-        assertEq(morphoV2.obligationCreated(_id), false, "obligation created");
+        assertEq(IdLib.codeIsCreated(_id, address(morphoV2)), false, "obligation created");
         morphoV2.createObligation(_obligation);
-        assertEq(morphoV2.obligationCreated(_id), true, "obligation not created");
+        assertEq(IdLib.codeIsCreated(_id, address(morphoV2)), true, "obligation not created");
         morphoV2.createObligation(_obligation);
     }
 

@@ -794,7 +794,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -816,7 +816,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -888,7 +888,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -911,7 +911,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -983,7 +983,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -1006,7 +1006,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = morphoV2.createObligation(obligation2);
+        bytes32 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);

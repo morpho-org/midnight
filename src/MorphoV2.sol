@@ -285,7 +285,7 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
-        require(_isHealthy(obligation, id, seller), "Seller is unhealthy");
+        require(isHealthy(obligation, id, seller), "Seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -357,7 +357,7 @@ contract MorphoV2 is IMorphoV2 {
         address collateralToken = obligation.collaterals[collateralIndex].token;
         collateralOf[id][onBehalf][collateralToken] -= assets;
 
-        require(_isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
+        require(isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
 
         address oracle = obligation.collaterals[collateralIndex].oracle;
         uint256 _collateralOf = collateralOf[id][onBehalf][collateralToken];
@@ -483,7 +483,7 @@ contract MorphoV2 is IMorphoV2 {
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
-    function createObligation(Obligation memory obligation) public returns (bytes32) {
+    function createObligation(Obligation memory obligation) external returns (bytes32) {
         bytes32 id = IdLib.createCode(obligation);
         address previousCollateralToken;
         for (uint256 i = 0; i < obligation.collaterals.length; i++) {
@@ -513,10 +513,6 @@ contract MorphoV2 is IMorphoV2 {
         return obligationState[id].totalShares;
     }
 
-    function obligationCreated(bytes32 id) external view returns (bool) {
-        return IdLib.codeIsCreated(id, address(this));
-    }
-
     function withdrawable(bytes32 id) external view returns (uint256) {
         return obligationState[id].withdrawable;
     }
@@ -525,13 +521,8 @@ contract MorphoV2 is IMorphoV2 {
         return obligationState[id].fees;
     }
 
-    function isHealthy(bytes32 id, address borrower) external view returns (bool) {
-        return _isHealthy(idToObligation(id), id, borrower);
-    }
-
-    /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
-    function _isHealthy(Obligation memory obligation, bytes32 id, address borrower) internal view returns (bool) {
+    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         uint256 debt = debtOf[id][borrower];
         uint256 maxDebt;
         for (uint256 i = 0; i < obligation.collaterals.length && maxDebt < debt; i++) {
