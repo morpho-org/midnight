@@ -46,12 +46,15 @@ library IdLib {
 
     /// @dev Deploys a contract with runtime code = abi.encode(obligation)
     /// @dev The contract code begins with 0x00 (STOP), because the first word is the offset of the obligation.
-    function createCode(Obligation memory obligation) internal {
+    /// @dev Returns the id of the created obligation.
+    function createCode(Obligation memory obligation) internal returns (bytes32) {
         bytes memory _creationCode = creationCode(obligation, block.chainid, address(this));
         address create2Address;
         assembly ("memory-safe") {
             create2Address := create2(0, add(_creationCode, 0x20), mload(_creationCode), 0)
         }
         require(create2Address != address(0), "Failed to create SStore2 contract");
+
+        return keccak256(_creationCode);
     }
 }
