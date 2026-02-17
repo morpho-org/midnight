@@ -60,8 +60,12 @@ contract SettersTest is BaseTest {
         morphoV2.setDefaultTradingFee(loanToken, 5, oneEightyDaysFee);
 
         // touch obligation with this loan token
-        Obligation memory obligation =
-            Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
+        Obligation memory obligation = Obligation({
+            loanToken: loanToken,
+            maturity: block.timestamp + 1 days,
+            collaterals: new Collateral[](0),
+            minCollatValue: 0
+        });
         bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
@@ -135,8 +139,12 @@ contract SettersTest is BaseTest {
         morphoV2.setDefaultTradingFee(loanToken, 5, oneEightyDaysFee);
 
         // touch obligation with this loan token
-        Obligation memory obligation =
-            Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
+        Obligation memory obligation = Obligation({
+            loanToken: loanToken,
+            maturity: block.timestamp + 1 days,
+            collaterals: new Collateral[](0),
+            minCollatValue: 0
+        });
         bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
@@ -174,8 +182,12 @@ contract SettersTest is BaseTest {
         morphoV2.setDefaultTradingFee(loanToken, 5, 0.01e18);
 
         // touch obligation with this loan token
-        Obligation memory obligation =
-            Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
+        Obligation memory obligation = Obligation({
+            loanToken: loanToken,
+            maturity: block.timestamp + 1 days,
+            collaterals: new Collateral[](0),
+            minCollatValue: 0
+        });
         bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
@@ -214,8 +226,12 @@ contract SettersTest is BaseTest {
         morphoV2.setDefaultTradingFee(loanToken, 5, 0.01e18); // 180d: 1%
 
         // touch obligation with this loan token
-        Obligation memory obligation =
-            Obligation({loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0)});
+        Obligation memory obligation = Obligation({
+            loanToken: loanToken,
+            maturity: block.timestamp + 1 days,
+            collaterals: new Collateral[](0),
+            minCollatValue: 0
+        });
         bytes32 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 

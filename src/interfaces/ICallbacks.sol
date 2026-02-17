@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity >=0.5.0;
 
-import {Seizure, Obligation} from "./IMorphoV2.sol";
+import {Obligation} from "./IMorphoV2.sol";
 
 interface ICallbacks {
     function onBuy(
@@ -23,7 +23,14 @@ interface ICallbacks {
         uint256 obligationShares,
         bytes memory data
     ) external;
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external;
+    function onLiquidate(
+        Obligation memory obligation,
+        uint256 collateralIndex,
+        uint256 seizedAssets,
+        uint256 repaidUnits,
+        address borrower,
+        bytes memory data
+    ) external;
 }
 
 interface IFlashLoanCallback {
