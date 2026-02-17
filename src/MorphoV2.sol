@@ -26,6 +26,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 contract MorphoV2 is IMorphoV2 {
     using UtilsLib for uint256;
 
+    struct LenderFeeState {
+        uint192 accrued;
+        uint40 lastUpdate;
+        uint16 fee;
+    }
+
     /// STORAGE ///
 
     mapping(bytes32 id => mapping(address user => uint256)) public sharesOf;
@@ -47,8 +53,12 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[6]) public defaultFees;
+    /// @dev Default annual lending fee per loan token, divided by FEE_STEP.
+    mapping(address loanToken => uint16) public defaultLendingFee;
+    mapping(bytes32 id => mapping(address user => LenderFeeState)) public lenderFeeState;
 
     address public tradingFeeRecipient;
+    uint256 public immutable maxLendingFee;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -60,6 +70,7 @@ contract MorphoV2 is IMorphoV2 {
 
     constructor() {
         owner = msg.sender;
+        maxLendingFee = MAX_FEE;
         emit EventsLib.Constructor(owner);
     }
 
@@ -110,6 +121,15 @@ contract MorphoV2 is IMorphoV2 {
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than MAX_FEE
         defaultFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
+    }
+
+    function setDefaultLendingFee(address loanToken, uint256 newLendingFee) external {
+        require(msg.sender == feeSetter, "Only feeSetter");
+        require(newLendingFee <= maxLendingFee, "Lending fee too high");
+        require(newLendingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        // forge-lint: disable-next-item(unsafe-typecast) as newLendingFee is less than maxLendingFee.
+        defaultLendingFee[loanToken] = uint16(newLendingFee / FEE_STEP);
+        emit EventsLib.SetDefaultLendingFee(loanToken, newLendingFee);
     }
 
     function setTradingFeeRecipient(address feeRecipient) external {
@@ -228,6 +248,10 @@ contract MorphoV2 is IMorphoV2 {
 
         bool buyerIsLender = (debtOf[id][buyer] == 0);
         bool sellerIsBorrower = (sharesOf[id][seller] == 0);
+        uint256 lendingFeePaid;
+        if (buyerIsLender) _onLenderSharesIncrease(id, buyer, offer.obligation.loanToken, _obligationState);
+        if (!sellerIsBorrower) lendingFeePaid = _settleLendingFeeOnSharesDecrease(id, seller, obligationShares, _obligationState);
+
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
@@ -280,10 +304,12 @@ contract MorphoV2 is IMorphoV2 {
                 );
         }
 
+        require(lendingFeePaid <= sellerAssets, "lending fee exceeds proceeds");
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets + lendingFeePaid
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets - lendingFeePaid);
+        if (lendingFeePaid > 0) emit EventsLib.LendingFeePaid(seller, id, lendingFeePaid, false);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
@@ -322,6 +348,7 @@ contract MorphoV2 is IMorphoV2 {
             obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         }
 
+        uint256 lendingFeePaid = _settleLendingFeeOnSharesDecrease(id, onBehalf, shares, _obligationState);
         sharesOf[id][onBehalf] -= shares;
         _obligationState.withdrawable -= obligationUnits;
         _obligationState.totalShares -= UtilsLib.toUint128(shares);
@@ -329,7 +356,12 @@ contract MorphoV2 is IMorphoV2 {
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
+        require(lendingFeePaid <= obligationUnits, "lending fee exceeds withdrawal");
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits - lendingFeePaid);
+        if (lendingFeePaid > 0) {
+            SafeTransferLib.safeTransfer(obligation.loanToken, tradingFeeRecipient, lendingFeePaid);
+            emit EventsLib.LendingFeePaid(onBehalf, id, lendingFeePaid, true);
+        }
 
         return (obligationUnits, shares);
     }
@@ -593,5 +625,64 @@ contract MorphoV2 is IMorphoV2 {
         uint256 feeUpper = uint256(_fees[index + 1]) * FEE_STEP;
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+    }
+
+    function _onLenderSharesIncrease(bytes32 id, address lender, address loanToken, ObligationState storage _obligationState)
+        internal
+    {
+        if (sharesOf[id][lender] == 0) {
+            LenderFeeState storage state = lenderFeeState[id][lender];
+            state.fee = defaultLendingFee[loanToken];
+            state.lastUpdate = uint40(block.timestamp);
+            return;
+        }
+        _accrueLendingFee(id, lender, _obligationState);
+    }
+
+    function _settleLendingFeeOnSharesDecrease(
+        bytes32 id,
+        address lender,
+        uint256 removedShares,
+        ObligationState storage _obligationState
+    ) internal returns (uint256 feeAmount) {
+        if (removedShares == 0) return 0;
+        uint256 oldShares = sharesOf[id][lender];
+        if (oldShares == 0) return 0;
+
+        _accrueLendingFee(id, lender, _obligationState);
+        LenderFeeState storage state = lenderFeeState[id][lender];
+        uint256 accrued = state.accrued;
+        if (removedShares >= oldShares) {
+            feeAmount = accrued;
+            delete lenderFeeState[id][lender];
+            return feeAmount;
+        }
+
+        feeAmount = accrued.mulDivDown(removedShares, oldShares);
+        state.accrued = uint192(accrued - feeAmount);
+    }
+
+    function _accrueLendingFee(bytes32 id, address lender, ObligationState storage _obligationState) internal {
+        LenderFeeState storage state = lenderFeeState[id][lender];
+        uint40 lastUpdate = state.lastUpdate;
+        if (lastUpdate == 0 || block.timestamp == lastUpdate) return;
+
+        uint256 userShares = sharesOf[id][lender];
+        if (userShares == 0 || state.fee == 0) {
+            state.lastUpdate = uint40(block.timestamp);
+            return;
+        }
+
+        uint256 units = userShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 feeAccrued = units.mulDivDown(uint256(state.fee) * FEE_STEP, WAD).mulDivDown(block.timestamp - lastUpdate, 365 days);
+        if (feeAccrued == 0) {
+            state.lastUpdate = uint40(block.timestamp);
+            return;
+        }
+
+        uint256 newAccrued = uint256(state.accrued) + feeAccrued;
+        require(newAccrued <= type(uint192).max, "accrued fee overflow");
+        state.accrued = uint192(newAccrued);
+        state.lastUpdate = uint40(block.timestamp);
     }
 }
