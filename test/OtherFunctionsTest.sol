@@ -321,6 +321,7 @@ contract OtherFunctionsTest is BaseTest {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
             collaterals[i] = Collateral({token: address(token), lltv: 0.75e18, oracle: address(_oracle)});
+            morphoV2.setMaxCollateralPerUser(address(token), type(uint256).max);
         }
         collaterals = sortCollaterals(collaterals);
         _obligation.loanToken = address(loanToken);
