@@ -68,6 +68,23 @@ library UtilsLib {
         return uint128(x);
     }
 
+    /// @dev Returns the number of set bits in x < 2^256-1, 0 otherwise.
+    function countBits(uint256 x) internal pure returns (uint256) {
+        unchecked {
+            x = x - ((x >> 1) & 0x5555555555555555555555555555555555555555555555555555555555555555);
+            x = (x & 0x3333333333333333333333333333333333333333333333333333333333333333)
+                + ((x >> 2) & 0x3333333333333333333333333333333333333333333333333333333333333333);
+            x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f;
+            return (x * 0x0101010101010101010101010101010101010101010101010101010101010101) >> 248;
+        }
+    }
+
+    function msb(uint256 bitmap) internal pure returns (uint256 res) {
+        assembly {
+            res := sub(255, clz(bitmap))
+        }
+    }
+
     /// @dev Creation code that deploys data as runtime bytecode.
     /// @dev Explanation of the prefix:
     /// hex       opcode          stack              comments
