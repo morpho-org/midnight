@@ -72,7 +72,7 @@ library UtilsLib {
     /// @dev Explanation of the prefix:
     /// hex       opcode          stack              comments
     /// ------------------------------------------------------------------------------
-    /// 60 0b     PUSH1 0x0b      [11]               11 = len(prefix)
+    /// 60 0b     PUSH1 0x0b      [11]               11 = length(prefix)
     /// 38        CODESIZE        [codesize, 11]
     /// 03        SUB             [len]              with len = codesize - 11
     /// 80        DUP1            [len, len]
