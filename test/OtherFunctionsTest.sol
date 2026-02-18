@@ -171,8 +171,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.createObligation(_obligation);
-        (bool created,) = IdLib.codeIsCreated(abi.encode(_obligation), block.chainid, address(morphoV2));
-        assertEq(created, true, "obligation not created");
+        assertGt(address(uint160(uint256(_id))).code.length, 0, "obligation not created");
         uint16[6] memory fees = morphoV2.fees(_id);
         for (uint256 i = 0; i < 6; i++) {
             assertEq(fees[i], morphoV2.defaultFees(_obligation.loanToken, i), "fees");
@@ -181,12 +180,10 @@ contract OtherFunctionsTest is BaseTest {
 
     function testCreateObligationIdempotent(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
-        bytes memory encoded = abi.encode(_obligation);
-        (bool created, bytes32 _id) = IdLib.codeIsCreated(encoded, block.chainid, address(morphoV2));
-        assertEq(created, false, "obligation created");
+        bytes32 _id = toId(_obligation);
+        assertEq(address(uint160(uint256(_id))).code.length, 0, "obligation created");
         morphoV2.createObligation(_obligation);
-        (created,) = IdLib.codeIsCreated(encoded, block.chainid, address(morphoV2));
-        assertEq(created, true, "obligation not created");
+        assertGt(address(uint160(uint256(_id))).code.length, 0, "obligation not created");
 
         morphoV2.setObligationTradingFee(_id, 0, 0.01e18);
         morphoV2.createObligation(_obligation);
@@ -197,7 +194,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.createObligation(_obligation);
-        Obligation memory obligationFromId = IdLib.toObligation(_id, address(morphoV2));
+        Obligation memory obligationFromId = IdLib.toObligation(_id);
         assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
         assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
         assertEq(_obligation.collaterals.length, obligationFromId.collaterals.length, "collaterals length");
@@ -212,8 +209,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes32 _id = morphoV2.createObligation(_obligation);
-        address sstore2Address =
-            address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), address(morphoV2), bytes32(0), _id)))));
+        address sstore2Address = address(uint160(uint256(_id)));
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");

@@ -3,59 +3,14 @@
 pragma solidity ^0.8.0;
 
 import {Obligation} from "../interfaces/IMorphoV2.sol";
+import {UtilsLib} from "./UtilsLib.sol";
 
 library IdLib {
-    /// @dev Creation code that returns the code after the prefix as runtime bytecode, except for the first 52 bytes.
-    /// @dev Explanation of the prefix:
-    /// hex       opcode          stack              comments
-    /// ------------------------------------------------------------------------------
-    /// 60 3f     PUSH1 0x3f      [63]               63 = len(prefix+chainId+morphoV2)
-    /// 38        CODESIZE        [codesize, 63]
-    /// 03        SUB             [len]              with len = codesize - 63
-    /// 80        DUP1            [len, len]
-    /// 60 3f     PUSH1 0x3f      [63, len, len]     code offset = 63
-    /// 5f        PUSH0           [0, 63, len, len]  mem offset = 0
-    /// 39        CODECOPY        [len]              mem[0:len] <- code[63:63+len]
-    /// 5f        PUSH0           [0, len]           return offset = 0
-    /// f3        RETURN          []                 mem[0:len] is returned
-    function creationCode(bytes memory encodedObligation, uint256 chainId, address morphoV2)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encodePacked(hex"603f380380603f5f395ff3", chainId, morphoV2, encodedObligation);
-    }
-
     function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes32) {
-        return keccak256(creationCode(abi.encode(obligation), chainId, morphoV2));
+        return UtilsLib.create2Hash(morphoV2, chainId, UtilsLib.sstore2Code(abi.encode(obligation)));
     }
 
-    function codeIsCreated(bytes memory encodedObligation, uint256 chainId, address morphoV2)
-        internal
-        view
-        returns (bool, bytes32)
-    {
-        bytes32 id = keccak256(creationCode(encodedObligation, chainId, morphoV2));
-        bool created = address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id)))))
-                .code.length > 0;
-        return (created, id);
-    }
-
-    function toObligation(bytes32 id, address morphoV2) internal view returns (Obligation memory) {
-        return abi.decode(
-            address(uint160(uint256(keccak256(abi.encodePacked(uint8(0xff), morphoV2, bytes32(0), id))))).code,
-            (Obligation)
-        );
-    }
-
-    /// @dev Deploys a contract with runtime code encodedObligation.
-    /// @dev The contract code begins with 0x00 (STOP), because the first word is the offset of the obligation.
-    function createCode(bytes memory encodedObligation) internal {
-        bytes memory _creationCode = creationCode(encodedObligation, block.chainid, address(this));
-        address create2Address;
-        assembly ("memory-safe") {
-            create2Address := create2(0, add(_creationCode, 0x20), mload(_creationCode), 0)
-        }
-        require(create2Address != address(0), "Failed to create SStore2 contract");
+    function toObligation(bytes32 id) internal view returns (Obligation memory) {
+        return abi.decode(address(uint160(uint256(id))).code, (Obligation));
     }
 }

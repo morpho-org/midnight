@@ -67,4 +67,34 @@ library UtilsLib {
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
         return uint128(x);
     }
+
+    /// @dev Creation code that deploys data as runtime bytecode.
+    /// @dev Explanation of the prefix:
+    /// hex       opcode          stack              comments
+    /// ------------------------------------------------------------------------------
+    /// 60 0b     PUSH1 0x0b      [11]               11 = length(prefix)
+    /// 38        CODESIZE        [codesize, 11]
+    /// 03        SUB             [len]              with len = codesize - 11
+    /// 80        DUP1            [len, len]
+    /// 60 0b     PUSH1 0x0b      [11, len, len]     code offset = 11
+    /// 5f        PUSH0           [0, 11, len, len]  mem offset = 0
+    /// 39        CODECOPY        [len]              mem[0:len] <- code[11:11+len]
+    /// 5f        PUSH0           [0, len]           return offset = 0
+    /// f3        RETURN          []                 return mem[0:len]
+    function sstore2Code(bytes memory data) internal pure returns (bytes memory) {
+        require(data[0] == 0x00, "data must start with STOP");
+        return abi.encodePacked(hex"600b380380600b5f395ff3", data);
+    }
+
+    /// @dev Returns the hash that truncates to the CREATE2 address for the given parameters.
+    function create2Hash(address deployer, uint256 salt, bytes memory creationCode) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(uint8(0xff), deployer, salt, keccak256(creationCode)));
+    }
+
+    function create2Deploy(bytes memory creationCode, uint256 salt) internal returns (address addr) {
+        assembly ("memory-safe") {
+            addr := create2(0, add(creationCode, 0x20), mload(creationCode), salt)
+        }
+        require(addr != address(0), "create2 failed");
+    }
 }
