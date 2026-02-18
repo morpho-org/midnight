@@ -506,7 +506,7 @@ contract MorphoV2 is IMorphoV2 {
     /// VIEW FUNCTIONS ///
 
     function idToObligation(bytes32 id) public view returns (Obligation memory) {
-        return IdLib.toObligation(id, address(this));
+        return IdLib.toObligation(id);
     }
 
     function totalUnits(bytes32 id) external view returns (uint256) {
