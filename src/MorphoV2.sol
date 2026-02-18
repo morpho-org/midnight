@@ -506,7 +506,10 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             collateralOf[id][borrower][liquidatedCollatToken] -= seizedAssets;
-            if (collateralOf[id][borrower][liquidatedCollatToken] == 0 && seizedAssets > 0) {
+            if (
+                (collateralOf[id][borrower][liquidatedCollatToken] == 0 && seizedAssets > 0)
+                    || _state.debt - repaidUnits == 0
+            ) {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
