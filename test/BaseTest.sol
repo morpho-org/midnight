@@ -8,7 +8,13 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TICK_RANGE} from "../src/libraries/TickLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    MAX_COLLATERALS,
+    EIP712_DOMAIN_TYPEHASH,
+    ROOT_TYPEHASH
+} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 
@@ -227,8 +233,9 @@ abstract contract BaseTest is Test {
         pure
         returns (Obligation memory)
     {
-        Collateral[] memory collaterals = new Collateral[](obligation.collaterals.length);
-        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+        uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
+        Collateral[] memory collaterals = new Collateral[](len);
+        for (uint256 i = 0; i < len; i++) {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
         }
         collaterals = sortCollaterals(collaterals);
