@@ -496,6 +496,7 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             obligationState[id].fees = defaultFees[obligation.loanToken];
+            // The deployed code begins with 0x00 (STOP), because the first word is the offset of the obligation.
             UtilsLib.create2Deploy(creationCode, block.chainid);
 
             emit EventsLib.ObligationCreated(id, obligation);
