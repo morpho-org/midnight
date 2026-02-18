@@ -6,18 +6,21 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 
 contract UtilsLibTest is Test {
-    function testFuzzCountBits(uint256 bitmap) public pure {
-        if (bitmap == type(uint256).max) {
-            assertEq(UtilsLib.countBits(bitmap), 0);
-        } else {
-            uint256 actual = UtilsLib.countBits(bitmap);
-            uint256 expected;
-            while (bitmap != 0) {
-                bitmap &= bitmap - 1;
-                expected++;
-            }
-            assertEq(actual, expected);
+    function testFuzzCountBits(uint256[] memory offsets) public pure {
+        // Create a bitmap with less than 16 set bits.
+        uint256 bitmap = 0;
+        uint256 length = bound(offsets.length, 0, 15);
+        for (uint256 i = 0; i < length; i++) {
+            bitmap |= 1 << bound(offsets[i], 0, 255);
         }
+
+        uint256 actual = UtilsLib.countBits(bitmap);
+        uint256 expected;
+        while (bitmap != 0) {
+            bitmap &= bitmap - 1;
+            expected++;
+        }
+        assertEq(actual, expected);
     }
 
     function testAtMostOneNonZero(uint256 x, uint256 y) public pure {
