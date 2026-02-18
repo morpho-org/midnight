@@ -484,9 +484,9 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function createObligation(Obligation memory obligation) public returns (bytes32) {
-        bytes memory encoded = abi.encode(obligation);
-        (bool created, bytes32 id) = IdLib.codeIsCreated(encoded, block.chainid, address(this));
-        if (!created) {
+        bytes memory creationCode = UtilsLib.sstore2Code(abi.encode(obligation));
+        bytes32 id = UtilsLib.create2Hash(address(this), block.chainid, creationCode);
+        if (address(uint160(uint256(id))).code.length == 0) {
             address previousCollateralToken;
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
@@ -496,7 +496,7 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             obligationState[id].fees = defaultFees[obligation.loanToken];
-            IdLib.createCode(encoded);
+            UtilsLib.create2Deploy(creationCode, block.chainid);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }

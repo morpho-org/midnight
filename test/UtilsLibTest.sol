@@ -96,6 +96,13 @@ contract UtilsLibTest is Test {
         assertTrue(UtilsLib.isLeaf(root, x, proof));
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testSstore2CodeReverts() public {
+        vm.expectRevert("data must start with STOP");
+        UtilsLib.sstore2Code(hex"01020304");
+        UtilsLib.sstore2Code(hex"00020304");
+    }
+
     function mulDivDown(uint256 x, uint256 y, uint256 d) external pure {
         UtilsLib.mulDivDown(x, y, d);
     }
