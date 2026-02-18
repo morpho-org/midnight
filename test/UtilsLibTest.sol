@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
+import {MAX_COLLATERALS_PER_BORROWER} from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
     function testFuzzCountBits(uint256[] memory offsets) public pure {
@@ -21,6 +22,15 @@ contract UtilsLibTest is Test {
             expected++;
         }
         assertEq(actual, expected);
+    }
+
+    function testMaxCountBits() public pure {
+        // create a bitmap with MAX_COLLATERALS_PER_BORROWER set bits.
+        uint256 bitmap = 0;
+        for (uint256 i = 0; i < MAX_COLLATERALS_PER_BORROWER; i++) {
+            bitmap |= 1 << i;
+        }
+        assertEq(UtilsLib.countBits(bitmap), MAX_COLLATERALS_PER_BORROWER);
     }
 
     function testAtMostOneNonZero(uint256 x, uint256 y) public pure {

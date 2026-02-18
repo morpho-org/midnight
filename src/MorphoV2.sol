@@ -365,10 +365,10 @@ contract MorphoV2 is IMorphoV2 {
         collateralOf[id][onBehalf][collateralToken] = newCollateralOf;
 
         if (newCollateralOf == assets && assets > 0) {
+            uint128 bitmap = borrowerState[id][onBehalf].activatedCollaterals;
+            require(UtilsLib.countBits(bitmap) < MAX_COLLATERALS_PER_BORROWER, "too many collaterals per borrower");
             // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
-            uint128 newBitmap = borrowerState[id][onBehalf].activatedCollaterals | uint128(1 << collateralIndex);
-            borrowerState[id][onBehalf].activatedCollaterals = newBitmap;
-            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, "too many collaterals per borrower");
+            borrowerState[id][onBehalf].activatedCollaterals = bitmap | uint128(1 << collateralIndex);
         }
 
         require(
