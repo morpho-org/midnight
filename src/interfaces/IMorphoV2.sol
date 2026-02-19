@@ -7,6 +7,8 @@ struct Obligation {
     // Must be sorted by address.
     Collateral[] collaterals;
     uint256 maturity;
+    // Minimum collateral value (quoted in loan token) to be left on supply & withdraw collateral.
+    uint256 minCollatValue;
 }
 
 struct Collateral {
@@ -29,6 +31,7 @@ struct Offer {
     bytes32 session;
     address callback;
     bytes callbackData;
+    address receiverIfMakerIsSeller;
 }
 
 struct Signature {
@@ -37,13 +40,9 @@ struct Signature {
     bytes32 s;
 }
 
-struct Seizure {
-    // Index of the collateral in the obligation's collateral assets.
-    uint256 collateralIndex;
-    // Amount of obligation units to repay.
-    uint256 repaid;
-    // Amount of collateral to seize.
-    uint256 seized;
+struct BorrowerState {
+    uint128 debt;
+    uint128 activatedCollaterals;
 }
 
 /// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.

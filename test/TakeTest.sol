@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -36,6 +36,7 @@ contract TakeTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.minCollatValue = 0;
 
         id = toId(obligation);
 
@@ -48,6 +49,7 @@ contract TakeTest is BaseTest {
 
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
+        otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.assets = type(uint256).max;
         otherLenderOffer.obligation = obligation;
         otherLenderOffer.expiry = block.timestamp + 200;
@@ -55,6 +57,7 @@ contract TakeTest is BaseTest {
 
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
+        borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.assets = type(uint256).max;
         borrowerOffer.obligation = obligation;
         borrowerOffer.expiry = block.timestamp + 200;
@@ -1137,43 +1140,59 @@ contract TakeTest is BaseTest {
 
     function testTakeWrongRoot() public {
         vm.expectRevert("invalid signature");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
             0,
             0,
             borrower,
+            address(0),
+            hex"",
+            borrower,
             lenderOffer,
             sig([borrowerOffer]),
             root([lenderOffer]),
-            proof([lenderOffer]),
-            address(0),
-            hex""
+            proof([lenderOffer])
         );
     }
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("invalid signature");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
             0,
             0,
             borrower,
+            address(0),
+            hex"",
+            borrower,
             lenderOffer,
             Signature({v: 0, r: 0, s: 0}),
             root([lenderOffer]),
-            proof([lenderOffer]),
-            address(0),
-            hex""
+            proof([lenderOffer])
         );
     }
 
     function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
         vm.expectRevert("invalid proof");
+        vm.prank(borrower);
         morphoV2.take(
-            100, 0, 0, 0, borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof, address(0), hex""
+            100,
+            0,
+            0,
+            0,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof
         );
     }
 
@@ -1181,18 +1200,20 @@ contract TakeTest is BaseTest {
         vm.assume(proof.length >= 1);
         vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
+        vm.prank(borrower);
         morphoV2.take(
             100,
             0,
             0,
             0,
             borrower,
+            address(0),
+            hex"",
+            borrower,
             lenderOffer,
             sig([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
-            proof,
-            address(0),
-            hex""
+            proof
         );
     }
 
@@ -1202,18 +1223,20 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, assets.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
         lenderOffer.assets = assets;
 
+        vm.prank(borrower);
         morphoV2.take(
             assets,
             0,
             0,
             0,
             borrower,
+            address(0),
+            hex"",
+            borrower,
             lenderOffer,
             sig([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
-            proof([lenderOffer, otherOffer]),
-            address(0),
-            hex""
+            proof([lenderOffer, otherOffer])
         );
     }
 
@@ -1223,7 +1246,7 @@ contract TakeTest is BaseTest {
         assets = bound(assets, 0, maxAssets);
         uint256 collateral = assets.mulDivUp(WAD, obligation.collaterals[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
-        borrowerOffer.callbackData = abi.encode(obligation.collaterals[0].token, collateral);
+        borrowerOffer.callbackData = abi.encode(0, collateral);
         borrowerOffer.assets = assets;
         borrowerOffer.tick = TICK_RANGE;
         deal(address(loanToken), lender, assets);
@@ -1245,21 +1268,23 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, callback, collateral);
 
+        vm.prank(borrower);
         morphoV2.take(
             assets,
             0,
             0,
             0,
             borrower,
+            callback,
+            abi.encode(0, collateral),
+            borrower,
             lenderOffer,
             sig([lenderOffer]),
             root([lenderOffer]),
-            proof([lenderOffer]),
-            callback,
-            abi.encode(obligation.collaterals[0].token, collateral)
+            proof([lenderOffer])
         );
         assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
-        assertEq(BorrowCallback(callback).recordedData(), abi.encode(obligation.collaterals[0].token, collateral));
+        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
     function testSellBuyerCallback(uint256 assets) public {
@@ -1279,8 +1304,8 @@ contract TakeTest is BaseTest {
 
     function testBuyBuyerCallback(uint256 assets) public {
         assets = bound(assets, 0, maxAssets);
-        (address otherLender,) = makeAddrAndKey("otherLender");
-        vm.prank(otherLender);
+        (address _otherLender,) = makeAddrAndKey("otherLender");
+        vm.prank(_otherLender);
         loanToken.approve(address(morphoV2), assets);
         address callback = address(new LendCallback());
         borrowerOffer.assets = assets;
@@ -1288,20 +1313,164 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, assets);
 
+        vm.prank(_otherLender);
         morphoV2.take(
             assets,
             0,
             0,
             0,
-            otherLender,
+            _otherLender,
+            callback,
+            abi.encode(address(loanToken), assets),
+            address(0),
             borrowerOffer,
             sig([borrowerOffer]),
             root([borrowerOffer]),
-            proof([borrowerOffer]),
-            callback,
-            abi.encode(address(loanToken), assets)
+            proof([borrowerOffer])
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+    }
+
+    // Summary of zero price tests:
+    //
+    // Trading at 0 succeeds in those cases:
+    // - any offer / unit or share take input / 0 trading fee.
+    // - sell offer / unit, share or buyer take input / > 0 trading fee.
+    //
+    // Otherwise it fails:
+    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by division by zero in all other cases.
+
+    // fee=0, sell, buyer assets
+    function testPriceZero_NoTradingFee_sell_buyerAssets() public {
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 1e18;
+        deal(address(loanToken), lender, 1e18);
+        collateralize(obligation, borrower, 1e18);
+        vm.expectRevert();
+        take(1e18, 0, 0, 0, lender, borrowerOffer);
+    }
+
+    // fee=0, sell, seller assets
+    function testPriceZero_NoTradingFee_sell_sellerAssets() public {
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 1e18;
+        collateralize(obligation, borrower, 1e18);
+        vm.expectRevert();
+        take(0, 1e18, 0, 0, lender, borrowerOffer);
+    }
+
+    // fee=0, sell, units
+    function testPriceZero_NoTradingFee_sell_units() public {
+        uint256 units = 1e18;
+        uint256 shares = units.mulDivDown(initialShares + 1, initialUnits + 1);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 0;
+        borrowerOffer.obligationUnits = units;
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets,,) = take(0, 0, units, 0, lender, borrowerOffer);
+        assertEq(buyerAssets, 0, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
+        assertEq(morphoV2.debtOf(id, borrower), units, "debtOf");
+    }
+
+    // fee=0, sell, shares
+    function testPriceZero_NoTradingFee_sell_shares() public {
+        uint256 units = 1e18;
+        uint256 shares = units.mulDivDown(initialShares + 1, initialUnits + 1);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 0;
+        borrowerOffer.obligationShares = shares;
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets,,) = take(0, 0, 0, shares, lender, borrowerOffer);
+        uint256 expectedUnits = shares.mulDivDown(initialUnits + 1, initialShares + 1);
+        assertEq(buyerAssets, 0, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "debtOf");
+    }
+
+    // fee>0, buy, units
+    function testPriceZero_WithTradingFee_buy_units() public {
+        morphoV2.setObligationTradingFee(id, 0, 1e12);
+        morphoV2.setObligationTradingFee(id, 1, 1e12);
+        lenderOffer.tick = 0;
+        lenderOffer.assets = 0;
+        lenderOffer.obligationUnits = 1e18;
+        collateralize(obligation, borrower, 1e18);
+        vm.expectRevert();
+        take(0, 0, 1e18, 0, borrower, lenderOffer);
+    }
+
+    // fee>0, sell, buyer assets
+    function testPriceZero_WithTradingFee_sell_buyerAssets() public {
+        morphoV2.setObligationTradingFee(id, 0, 1e12);
+        morphoV2.setObligationTradingFee(id, 1, 1e12);
+        uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 units = 1e18;
+        uint256 shares = units.mulDivDown(initialShares + 1, initialUnits + 1);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = fee;
+        deal(address(loanToken), lender, fee);
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets,,) = take(fee, 0, 0, 0, lender, borrowerOffer);
+        assertEq(buyerAssets, fee, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
+        assertEq(morphoV2.debtOf(id, borrower), units, "debtOf");
+    }
+
+    // fee>0, sell, seller assets
+    function testPriceZero_WithTradingFee_sell_sellerAssets() public {
+        morphoV2.setObligationTradingFee(id, 0, 1e12);
+        morphoV2.setObligationTradingFee(id, 1, 1e12);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 1e18;
+        collateralize(obligation, borrower, 1e18);
+        vm.expectRevert();
+        take(0, 1e18, 0, 0, lender, borrowerOffer);
+    }
+
+    // fee>0, sell, units
+    function testPriceZero_WithTradingFee_sell_units() public {
+        morphoV2.setObligationTradingFee(id, 0, 1e12);
+        morphoV2.setObligationTradingFee(id, 1, 1e12);
+        uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 units = 1e18;
+        uint256 shares = units.mulDivDown(initialShares + 1, initialUnits + 1);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 0;
+        borrowerOffer.obligationUnits = units;
+        uint256 expectedBuyerAssets = units.mulDivDown(fee, WAD);
+        deal(address(loanToken), lender, expectedBuyerAssets);
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets,,) = take(0, 0, units, 0, lender, borrowerOffer);
+        assertEq(buyerAssets, expectedBuyerAssets, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
+        assertEq(morphoV2.debtOf(id, borrower), units, "debtOf");
+    }
+
+    // fee>0, sell, shares
+    function testPriceZero_WithTradingFee_sell_shares() public {
+        morphoV2.setObligationTradingFee(id, 0, 1e12);
+        morphoV2.setObligationTradingFee(id, 1, 1e12);
+        uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 units = 1e18;
+        uint256 shares = units.mulDivDown(initialShares + 1, initialUnits + 1);
+        borrowerOffer.tick = 0;
+        borrowerOffer.assets = 0;
+        borrowerOffer.obligationShares = shares;
+        uint256 expectedUnits = shares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedBuyerAssets = expectedUnits.mulDivDown(fee, WAD);
+        deal(address(loanToken), lender, expectedBuyerAssets);
+        collateralize(obligation, borrower, expectedUnits);
+        (uint256 buyerAssets, uint256 sellerAssets,,) = take(0, 0, 0, shares, lender, borrowerOffer);
+        assertEq(buyerAssets, expectedBuyerAssets, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
+        assertEq(morphoV2.debtOf(id, borrower), expectedUnits, "debtOf");
     }
 }
 
@@ -1312,9 +1481,10 @@ contract BorrowCallback is ICallbacks {
         external
     {
         recordedData = data;
-        (address collateralToken, uint256 amount) = abi.decode(data, (address, uint256));
+        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
+        address collateralToken = obligation.collaterals[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
-        MorphoV2(msg.sender).supplyCollateral(obligation, collateralToken, amount, seller);
+        MorphoV2(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
     }
 
     function onBuy(
@@ -1327,7 +1497,7 @@ contract BorrowCallback is ICallbacks {
         bytes memory data
     ) external {}
 
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1355,5 +1525,6 @@ contract LendCallback is ICallbacks {
         uint256 obligationShares,
         bytes memory data
     ) external {}
-    function onLiquidate(Seizure[] memory seizures, address borrower, address liquidator, bytes memory data) external {}
+
+    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
