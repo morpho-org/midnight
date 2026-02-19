@@ -68,20 +68,22 @@ library UtilsLib {
         return uint128(x);
     }
 
-    /// @dev Returns the number of set bits in x < 2^256-1, 0 otherwise.
-    function countBits(uint256 x) internal pure returns (uint256) {
+    function countBits(uint128 x) internal pure returns (uint256) {
         unchecked {
-            x = x - ((x >> 1) & 0x5555555555555555555555555555555555555555555555555555555555555555);
-            x = (x & 0x3333333333333333333333333333333333333333333333333333333333333333)
-                + ((x >> 2) & 0x3333333333333333333333333333333333333333333333333333333333333333);
-            x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f;
-            return (x * 0x0101010101010101010101010101010101010101010101010101010101010101) >> 248;
+            x = x - ((x >> 1) & 0x55555555555555555555555555555555);
+            x = (x & 0x33333333333333333333333333333333) + ((x >> 2) & 0x33333333333333333333333333333333);
+            x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f;
+            return (x * 0x01010101010101010101010101010101) >> 120;
         }
     }
 
-    function msb(uint256 bitmap) internal pure returns (uint256 res) {
-        assembly {
-            res := sub(255, clz(bitmap))
+    function msb(uint256 bitmap) internal pure returns (uint256) {
+        // Temporary workaround for the Certora pipeline.
+        // TODO: restore the clz-based implementation once the pipeline issue is fixed.
+        for (uint256 i = 256; i > 0; i--) {
+            uint256 bit = i - 1;
+            if ((bitmap & (1 << bit)) != 0) return bit;
         }
+        return 0;
     }
 }

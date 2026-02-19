@@ -174,7 +174,7 @@ abstract contract BaseTest is Test {
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Obligation memory obligation) internal view returns (bytes32) {
+    function toId(Obligation memory obligation) internal view returns (bytes20) {
         return IdLib.toId(obligation, block.chainid, address(morphoV2));
     }
 

@@ -3,16 +3,16 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function totalShares(bytes32 id) external returns (uint256) envfree;
+    function totalUnits(bytes20 id) external returns (uint256) envfree;
+    function totalShares(bytes20 id) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
 
     // Summaries to avoid SMT solver timeout.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function tradingFee(bytes20, uint256) internal returns (uint256) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
-// strong invariant sharePriceBelowOne(bytes32 id)
+// strong invariant sharePriceBelowOne(bytes20 id)
 //     totalShares(id) >= totalUnits(id);

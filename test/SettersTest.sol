@@ -66,7 +66,7 @@ contract SettersTest is BaseTest {
             collaterals: new Collateral[](0),
             minCollatValue: 0
         });
-        bytes32 id = toId(obligation);
+        bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         morphoV2.setObligationTradingFee(id, 0, zeroSecondsFee);
@@ -86,7 +86,7 @@ contract SettersTest is BaseTest {
         assertEq(morphoV2.tradingFee(id, 1000 days), oneEightyDaysFee, "one thousand days trading fee");
     }
 
-    function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
+    function testSetTradingFeeOnlyFeeSetter(address rdm, bytes20 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("Only feeSetter");
@@ -108,11 +108,11 @@ contract SettersTest is BaseTest {
     // Default trading fee tests
 
     function testUnsetDefaultFeeReturnsZero() public view {
-        assertEq(morphoV2.tradingFee(bytes32(0), 0), 0, "unset default fee should be 0");
-        assertEq(morphoV2.tradingFee(bytes32(0), 1 days), 0, "unset default fee should be 0");
-        assertEq(morphoV2.tradingFee(bytes32(0), 7 days), 0, "unset default fee should be 0");
-        assertEq(morphoV2.tradingFee(bytes32(0), 30 days), 0, "unset default fee should be 0");
-        assertEq(morphoV2.tradingFee(bytes32(0), 90 days), 0, "unset default fee should be 0");
+        assertEq(morphoV2.tradingFee(bytes20(0), 0), 0, "unset default fee should be 0");
+        assertEq(morphoV2.tradingFee(bytes20(0), 1 days), 0, "unset default fee should be 0");
+        assertEq(morphoV2.tradingFee(bytes20(0), 7 days), 0, "unset default fee should be 0");
+        assertEq(morphoV2.tradingFee(bytes20(0), 30 days), 0, "unset default fee should be 0");
+        assertEq(morphoV2.tradingFee(bytes20(0), 90 days), 0, "unset default fee should be 0");
     }
 
     function testSetDefaultTradingFeeSuccess(
@@ -145,7 +145,7 @@ contract SettersTest is BaseTest {
             collaterals: new Collateral[](0),
             minCollatValue: 0
         });
-        bytes32 id = toId(obligation);
+        bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         assertEq(morphoV2.tradingFee(id, 0), postMaturityFee, "0 days default fee");
@@ -188,7 +188,7 @@ contract SettersTest is BaseTest {
             collaterals: new Collateral[](0),
             minCollatValue: 0
         });
-        bytes32 id = toId(obligation);
+        bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         // Test breakpoint 0: 0 days (post maturity)
@@ -232,7 +232,7 @@ contract SettersTest is BaseTest {
             collaterals: new Collateral[](0),
             minCollatValue: 0
         });
-        bytes32 id = toId(obligation);
+        bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
 
         // Test exact breakpoints
