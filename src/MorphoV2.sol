@@ -415,7 +415,7 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
         require(
-            collateralOf[id][onBehalf][collateralToken] <= maxCollateralPerUser[collateralToken],
+            collateralOf[id][onBehalf][collateralIndex] <= maxCollateralPerUser[collateralToken],
             "exceeds max collateral per user"
         );
 
