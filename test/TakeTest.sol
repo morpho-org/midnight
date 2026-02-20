@@ -17,7 +17,7 @@ contract TakeTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes32 internal id;
+    bytes20 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
     Offer internal otherLenderOffer;
@@ -794,7 +794,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -816,7 +816,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -888,7 +888,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -911,7 +911,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -983,7 +983,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -1006,7 +1006,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Obligation memory obligation2 = abi.decode(abi.encode(obligation), (Obligation));
         obligation2.maturity = obligation.maturity + 100;
-        bytes32 id2 = toId(obligation2);
+        bytes20 id2 = toId(obligation2);
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligationId = id2;
         deal(address(loanToken), lender, firstFill + secondFill);
@@ -1266,11 +1266,11 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         deal(address(loanToken), lender, assets);
         deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
-        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), 0);
+        assertEq(morphoV2.collateralOf(id, borrower, 0), 0);
 
         take(assets, 0, 0, 0, lender, borrowerOffer);
 
-        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
+        assertEq(morphoV2.collateralOf(id, borrower, 0), collateral);
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
     }
 
@@ -1298,7 +1298,7 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(morphoV2.collateralOf(id, borrower, obligation.collaterals[0].token), collateral);
+        assertEq(morphoV2.collateralOf(id, borrower, 0), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
@@ -1499,7 +1499,7 @@ contract BorrowCallback is ICallbacks {
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
         address collateralToken = obligation.collaterals[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
-        bytes32 id = IdLib.toId(obligation, block.chainid, msg.sender);
+        bytes20 id = IdLib.toId(obligation, block.chainid, msg.sender);
         MorphoV2(msg.sender).supplyCollateral(id, collateralIndex, amount, seller);
     }
 

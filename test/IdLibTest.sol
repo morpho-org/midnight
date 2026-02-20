@@ -27,8 +27,8 @@ contract IdLibTest is Test {
 
         vm.assume(!(sameLoanToken && sameMaturity && sameCollaterals && sameMinCollatValue));
 
-        bytes32 id1 = IdLib.toId(obligation1, chainid, morphoV2);
-        bytes32 id2 = IdLib.toId(obligation2, chainid, morphoV2);
+        bytes20 id1 = IdLib.toId(obligation1, chainid, morphoV2);
+        bytes20 id2 = IdLib.toId(obligation2, chainid, morphoV2);
         assertNotEq(id1, id2);
     }
 
@@ -39,8 +39,8 @@ contract IdLibTest is Test {
         address morphoV2
     ) public pure {
         vm.assume(chainid1 != chainid2);
-        bytes32 id1 = IdLib.toId(obligation, chainid1, morphoV2);
-        bytes32 id2 = IdLib.toId(obligation, chainid2, morphoV2);
+        bytes20 id1 = IdLib.toId(obligation, chainid1, morphoV2);
+        bytes20 id2 = IdLib.toId(obligation, chainid2, morphoV2);
         assertNotEq(id1, id2);
     }
 
@@ -51,8 +51,8 @@ contract IdLibTest is Test {
         address morphoV2Two
     ) public pure {
         vm.assume(morphoV2One != morphoV2Two);
-        bytes32 id1 = IdLib.toId(obligation, chainid, morphoV2One);
-        bytes32 id2 = IdLib.toId(obligation, chainid, morphoV2Two);
+        bytes20 id1 = IdLib.toId(obligation, chainid, morphoV2One);
+        bytes20 id2 = IdLib.toId(obligation, chainid, morphoV2Two);
         assertNotEq(id1, id2);
     }
 }

@@ -16,7 +16,7 @@ contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes32 internal id;
+    bytes20 internal id;
 
     function setUp() public override {
         super.setUp();
@@ -44,12 +44,12 @@ contract OtherFunctionsTest is BaseTest {
         deal(collateralToken, address(this), additionalCollateral);
         morphoV2.supplyCollateral(id, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
-        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, collateralToken);
+        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, 0);
 
         vm.prank(borrower);
         morphoV2.withdrawCollateral(id, 0, withdraw, borrower, borrower);
 
-        assertEq(morphoV2.collateralOf(id, borrower, collateralToken), initialCollateral - withdraw, "collateral of");
+        assertEq(morphoV2.collateralOf(id, borrower, 0), initialCollateral - withdraw, "collateral of");
         assertEq(
             ERC20(collateralToken).balanceOf(address(morphoV2)), initialCollateral - withdraw, "balance of morphoV2"
         );
@@ -66,7 +66,7 @@ contract OtherFunctionsTest is BaseTest {
         setupObligation(obligation, units);
         deal(collateralToken, address(this), additionalCollateral);
         morphoV2.supplyCollateral(id, 0, additionalCollateral, borrower);
-        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, collateralToken);
+        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, 0);
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
         vm.prank(borrower);
@@ -170,30 +170,18 @@ contract OtherFunctionsTest is BaseTest {
     function testCreateObligation(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes32 _id = morphoV2.createObligation(_obligation);
-        assertGt(address(uint160(uint256(_id))).code.length, 0, "obligation not created");
+        bytes20 _id = morphoV2.createObligation(_obligation);
+        assertGt(address(_id).code.length, 0, "obligation created");
         uint16[6] memory fees = morphoV2.fees(_id);
         for (uint256 i = 0; i < 6; i++) {
             assertEq(fees[i], morphoV2.defaultFees(_obligation.loanToken, i), "fees");
         }
     }
 
-    function testCreateObligationIdempotent(Obligation memory _obligation) public {
-        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
-        bytes32 _id = toId(_obligation);
-        assertEq(address(uint160(uint256(_id))).code.length, 0, "obligation created");
-        morphoV2.createObligation(_obligation);
-        assertGt(address(uint160(uint256(_id))).code.length, 0, "obligation not created");
-
-        morphoV2.setObligationTradingFee(_id, 0, 0.01e18);
-        morphoV2.createObligation(_obligation);
-        assertEq(morphoV2.fees(_id)[0], uint16(0.01e18 / 1e12), "custom fee erased");
-    }
-
-    function testIdToObligation(Obligation memory _obligation) public {
+    function testToObligation(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes32 _id = morphoV2.createObligation(_obligation);
+        bytes20 _id = morphoV2.createObligation(_obligation);
         Obligation memory obligationFromId = IdLib.toObligation(_id);
         assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
         assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
@@ -205,19 +193,27 @@ contract OtherFunctionsTest is BaseTest {
         }
     }
 
+    function testToId(Obligation memory _obligation) public view {
+        _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
+
+        bytes20 expected = toId(_obligation);
+        bytes20 actual = morphoV2.toId(_obligation);
+        assertEq(actual, expected, "toId mismatch");
+    }
+
     function testSstore2CodeStartsWithStop(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes32 _id = morphoV2.createObligation(_obligation);
-        address sstore2Address = address(uint160(uint256(_id)));
+        bytes20 _id = morphoV2.createObligation(_obligation);
+        address sstore2Address = address(_id);
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
-    function testIdToObligationRevertsIfNotCreated(bytes32 _id) public {
+    function testToObligationRevertsIfNotCreated(bytes20 _id) public {
         vm.expectRevert();
-        morphoV2.idToObligation(_id);
+        morphoV2.toObligation(_id);
     }
 
     function testShuffleSession(address user) public {
@@ -234,7 +230,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 collateralValue = collateral.mulDivDown(price, ORACLE_PRICE_SCALE);
         minCollatValue = bound(minCollatValue, collateralValue + 1, type(uint256).max);
         obligation.minCollatValue = minCollatValue;
-        bytes32 newId = morphoV2.createObligation(obligation);
+        bytes20 newId = morphoV2.createObligation(obligation);
 
         address collateralToken = obligation.collaterals[0].token;
         deal(collateralToken, address(this), collateral);
@@ -264,7 +260,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(remainingValue < initialValue);
         minCollatValue = bound(minCollatValue, remainingValue + 1, initialValue);
         obligation.minCollatValue = minCollatValue;
-        bytes32 newId = morphoV2.createObligation(obligation);
+        bytes20 newId = morphoV2.createObligation(obligation);
 
         address collateralToken = obligation.collaterals[0].token;
         deal(collateralToken, address(this), collateral);
@@ -286,7 +282,7 @@ contract OtherFunctionsTest is BaseTest {
         obligationWithRevertingOracle.maturity = block.timestamp + 100;
         obligationWithRevertingOracle.collaterals = collaterals;
 
-        bytes32 revertingId = morphoV2.createObligation(obligationWithRevertingOracle);
+        bytes20 revertingId = morphoV2.createObligation(obligationWithRevertingOracle);
 
         // Make the oracle revert.
         revertingOracle.stopOracle();
@@ -310,27 +306,19 @@ contract OtherFunctionsTest is BaseTest {
         obligationWithRevertingOracle.maturity = block.timestamp + 100;
         obligationWithRevertingOracle.collaterals = collaterals;
 
-        bytes32 revertingId = morphoV2.createObligation(obligationWithRevertingOracle);
+        bytes20 revertingId = morphoV2.createObligation(obligationWithRevertingOracle);
 
         deal(address(collateralToken1), address(this), collateral);
         morphoV2.supplyCollateral(revertingId, 0, collateral, borrower);
 
-        assertEq(
-            morphoV2.collateralOf(revertingId, borrower, address(collateralToken1)),
-            collateral,
-            "collateral should be set"
-        );
+        assertEq(morphoV2.collateralOf(revertingId, borrower, 0), collateral, "collateral should be set");
 
         revertingOracle.stopOracle();
 
         vm.prank(borrower);
         morphoV2.withdrawCollateral(revertingId, 0, collateral, borrower, borrower);
 
-        assertEq(
-            morphoV2.collateralOf(revertingId, borrower, address(collateralToken1)),
-            0,
-            "collateral should be 0 after withdrawal"
-        );
+        assertEq(morphoV2.collateralOf(revertingId, borrower, 0), 0, "collateral should be 0 after withdrawal");
     }
 
     // Bitmap tests.
@@ -367,7 +355,7 @@ contract OtherFunctionsTest is BaseTest {
     function testMaxCollateralsPerBorrower() public {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER + 1;
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
-        bytes32 _id = morphoV2.createObligation(_obligation);
+        bytes20 _id = morphoV2.createObligation(_obligation);
 
         for (uint256 i = 0; i < MAX_COLLATERALS_PER_BORROWER; i++) {
             address token = _obligation.collaterals[i].token;
@@ -387,7 +375,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
-        bytes32 _id = morphoV2.createObligation(_obligation);
+        bytes20 _id = morphoV2.createObligation(_obligation);
 
         address token = _obligation.collaterals[collateralIndex].token;
         deal(token, address(this), 1e18);
@@ -404,7 +392,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         k = bound(k, 1, numCollaterals);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
-        bytes32 _id = morphoV2.createObligation(_obligation);
+        bytes20 _id = morphoV2.createObligation(_obligation);
 
         for (uint256 i = 0; i < k; i++) {
             address token = _obligation.collaterals[i].token;
@@ -412,7 +400,7 @@ contract OtherFunctionsTest is BaseTest {
             ERC20(token).approve(address(morphoV2), 1e18);
             morphoV2.supplyCollateral(_id, i, 1e18, borrower);
         }
-        uint256 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        uint128 bitmap = morphoV2.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), k, "countBits should equal number of supplied collaterals");
         assertEq(UtilsLib.msb(bitmap), k - 1, "msb should equal number of supplied collaterals - 1");
     }
@@ -421,7 +409,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
-        bytes32 _id = morphoV2.createObligation(_obligation);
+        bytes20 _id = morphoV2.createObligation(_obligation);
 
         // Supply all collaterals.
         for (uint256 i = 0; i < numCollaterals; i++) {
@@ -436,7 +424,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         morphoV2.withdrawCollateral(_id, collateralIndex, 1e18, borrower, borrower);
 
-        uint256 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        uint128 bitmap = morphoV2.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
         assertEq(bitmap & (1 << collateralIndex), 0, "withdrawn collateral bit should be cleared");
     }

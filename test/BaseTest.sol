@@ -136,7 +136,7 @@ abstract contract BaseTest is Test {
         vm.prank(unluckyLender);
         loanToken.approve(address(morphoV2), type(uint256).max);
 
-        bytes32 _id = toId(obligation);
+        bytes20 _id = toId(obligation);
 
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligationId = _id;
@@ -169,7 +169,7 @@ abstract contract BaseTest is Test {
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Obligation memory obligation) internal view returns (bytes32) {
+    function toId(Obligation memory obligation) internal view returns (bytes20) {
         return IdLib.toId(obligation, block.chainid, address(morphoV2));
     }
 
