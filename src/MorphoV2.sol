@@ -196,6 +196,8 @@ contract MorphoV2 is IMorphoV2 {
                 offer.receiverIfMakerIsSeller
             );
 
+
+
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
@@ -224,6 +226,37 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
 
+        if (buyerCallback != address(0)) {
+            ICallbacks(buyerCallback)
+                .onBuy(
+                    offer.obligation,
+                    buyer,
+                    buyerAssets,
+                    sellerAssets,
+                    obligationUnits,
+                    obligationShares,
+                    buyerCallbackData
+                );
+        }
+
+        SafeTransferLib.safeTransferFrom(
+            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+
+        if (sellerCallback != address(0)) {
+            ICallbacks(sellerCallback)
+                .onSell(
+                    offer.obligation,
+                    seller,
+                    buyerAssets,
+                    sellerAssets,
+                    obligationUnits,
+                    obligationShares,
+                    sellerCallbackData
+                );
+        }
+        
         uint256 newConsumed;
         if (offer.assets > 0) {
             newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
@@ -277,36 +310,7 @@ contract MorphoV2 is IMorphoV2 {
             newConsumed
         );
 
-        if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback)
-                .onBuy(
-                    offer.obligation,
-                    buyer,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    buyerCallbackData
-                );
-        }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
-        );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
-
-        if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback)
-                .onSell(
-                    offer.obligation,
-                    seller,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    sellerCallbackData
-                );
-        }
 
         require(isHealthy(offer.obligation, id, seller), "Seller is unhealthy");
 
