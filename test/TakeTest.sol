@@ -393,7 +393,7 @@ contract TakeTest is BaseTest {
         obligationUnits = bound(obligationUnits, otherLenderUnits + 1, maxAssets);
         setupOtherUsers(obligation, otherLenderUnits);
         deal(address(loanToken), lender, obligationUnits);
-        
+
         vm.expectRevert(stdError.arithmeticError);
         take(0, 0, obligationUnits, 0, lender, otherLenderOffer);
 

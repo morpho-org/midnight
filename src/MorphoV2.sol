@@ -196,8 +196,6 @@ contract MorphoV2 is IMorphoV2 {
                 offer.receiverIfMakerIsSeller
             );
 
-
-
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
@@ -256,7 +254,7 @@ contract MorphoV2 is IMorphoV2 {
                     sellerCallbackData
                 );
         }
-        
+
         uint256 newConsumed;
         if (offer.assets > 0) {
             newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
@@ -309,8 +307,6 @@ contract MorphoV2 is IMorphoV2 {
             offer.group,
             newConsumed
         );
-
-
 
         require(isHealthy(offer.obligation, id, seller), "Seller is unhealthy");
 
