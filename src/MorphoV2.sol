@@ -224,6 +224,18 @@ contract MorphoV2 is IMorphoV2 {
             sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
         }
 
+        uint256 newConsumed;
+        if (offer.assets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            require(newConsumed <= offer.assets, "consumed");
+        } else if (offer.obligationUnits > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
+            require(newConsumed <= offer.obligationUnits, "consumed");
+        } else {
+            newConsumed = consumed[offer.maker][offer.group] += obligationShares;
+            require(newConsumed <= offer.obligationShares, "consumed");
+        }
+
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
                 .onBuy(
@@ -253,18 +265,6 @@ contract MorphoV2 is IMorphoV2 {
                     obligationShares,
                     sellerCallbackData
                 );
-        }
-
-        uint256 newConsumed;
-        if (offer.assets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
-            require(newConsumed <= offer.assets, "consumed");
-        } else if (offer.obligationUnits > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
-            require(newConsumed <= offer.obligationUnits, "consumed");
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] += obligationShares;
-            require(newConsumed <= offer.obligationShares, "consumed");
         }
 
         bool buyerIsLender = (borrowerState[id][buyer].debt == 0);
