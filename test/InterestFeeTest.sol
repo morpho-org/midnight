@@ -13,7 +13,7 @@ contract InterestFeeTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes32 internal id;
+    bytes20 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
     address internal feeRecipient = makeAddr("feeRecipient");

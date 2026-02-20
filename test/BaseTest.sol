@@ -8,8 +8,14 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TICK_RANGE} from "../src/libraries/TickLib.sol";
-import {WAD, ORACLE_PRICE_SCALE, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral, Seizure} from "../src/interfaces/IMorphoV2.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    MAX_COLLATERALS,
+    EIP712_DOMAIN_TYPEHASH,
+    ROOT_TYPEHASH
+} from "../src/libraries/ConstantsLib.sol";
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
 import {MorphoV2} from "../src/MorphoV2.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
@@ -75,7 +81,7 @@ abstract contract BaseTest is Test {
         uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(morphoV2), collateral);
-        morphoV2.supplyCollateral(obligation, address(obligation.collaterals[0].token), collateral, _borrower);
+        morphoV2.supplyCollateral(obligation, 0, collateral, _borrower);
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
@@ -140,14 +146,14 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.tick = TICK_RANGE;
 
         deal(obligation.collaterals[0].token, address(this), 135);
-        morphoV2.supplyCollateral(obligation, obligation.collaterals[0].token, 135, badBorrower);
+        morphoV2.supplyCollateral(obligation, 0, 135, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
         take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        morphoV2.liquidate(obligation, new Seizure[](0), badBorrower, "");
+        morphoV2.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         assertNotEq(
             morphoV2.totalUnits(toId(obligation)), morphoV2.totalShares(toId(obligation)), "total units != total shares"
@@ -162,7 +168,7 @@ abstract contract BaseTest is Test {
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Obligation memory obligation) internal view returns (bytes32) {
+    function toId(Obligation memory obligation) internal view returns (bytes20) {
         return IdLib.toId(obligation, block.chainid, address(morphoV2));
     }
 
@@ -227,8 +233,9 @@ abstract contract BaseTest is Test {
         pure
         returns (Obligation memory)
     {
-        Collateral[] memory collaterals = new Collateral[](obligation.collaterals.length);
-        for (uint256 i = 0; i < obligation.collaterals.length; i++) {
+        uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
+        Collateral[] memory collaterals = new Collateral[](len);
+        for (uint256 i = 0; i < len; i++) {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
         }
         collaterals = sortCollaterals(collaterals);

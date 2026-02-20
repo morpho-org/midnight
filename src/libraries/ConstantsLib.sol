@@ -12,3 +12,5 @@ uint256 constant TIME_TO_MAX_LIF = 15 minutes; // Time to reach MAX_LIF
 uint256 constant MAX_INTEREST_FEE = uint256(0.02e18) / uint256(365 days); // 2% per year
 bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
 bytes32 constant ROOT_TYPEHASH = keccak256("Root(bytes32 root)");
+uint256 constant MAX_COLLATERALS = 128;
+uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
