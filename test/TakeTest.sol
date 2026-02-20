@@ -392,7 +392,8 @@ contract TakeTest is BaseTest {
         otherLenderUnits = bound(otherLenderUnits, 1, maxAssets - 1);
         obligationUnits = bound(obligationUnits, otherLenderUnits + 1, maxAssets);
         setupOtherUsers(obligation, otherLenderUnits);
-
+        deal(address(loanToken), lender, obligationUnits);
+        
         vm.expectRevert(stdError.arithmeticError);
         take(0, 0, obligationUnits, 0, lender, otherLenderOffer);
 
@@ -557,6 +558,7 @@ contract TakeTest is BaseTest {
         otherUnits = bound(otherUnits, 1, maxAssets - 1);
         obligationUnits = bound(obligationUnits, otherUnits + 1, maxAssets);
         setupOtherUsers(obligation, otherUnits);
+        deal(address(loanToken), otherBorrower, obligationUnits);
 
         vm.expectRevert(stdError.arithmeticError);
         take(0, 0, obligationUnits, 0, borrower, otherBorrowerOffer);
@@ -752,7 +754,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         borrowerOffer.assets = offerAmount;
         borrowerOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerAmount);
+        deal(address(loanToken), lender, assets + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
 
         take(assets, 0, 0, 0, lender, borrowerOffer);
@@ -775,7 +777,7 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerAmount - assets);
         lenderOffer.assets = offerAmount;
         lenderOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerAmount);
+        deal(address(loanToken), lender, assets + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerAmount.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
 
         take(assets, 0, 0, 0, borrower, lenderOffer);
@@ -793,7 +795,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick)));
         collateralize(
             borrowerOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(borrowerOffer.tick))
@@ -814,7 +816,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick)));
         collateralize(
             lenderOffer2.obligation, borrower, secondFill.mulDivDown(WAD, TickLib.tickToPrice(lenderOffer.tick))
@@ -842,7 +844,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationUnits = offerObligationUnits;
         borrowerOffer.assets = 0;
         borrowerOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerObligationUnits);
+        deal(address(loanToken), lender, offerObligationUnits + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerObligationUnits);
 
         take(0, 0, obligationUnits, 0, lender, borrowerOffer);
@@ -866,7 +868,7 @@ contract TakeTest is BaseTest {
         lenderOffer.obligationUnits = offerObligationUnits;
         lenderOffer.assets = 0;
         lenderOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerObligationUnits);
+        deal(address(loanToken), lender, offerObligationUnits + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerObligationUnits);
 
         take(0, 0, obligationUnits, 0, borrower, lenderOffer);
@@ -885,7 +887,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
         collateralize(borrowerOffer2.obligation, borrower, secondFill);
 
@@ -905,7 +907,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
         collateralize(lenderOffer2.obligation, borrower, secondFill);
 
@@ -931,7 +933,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationShares = offerObligationShares;
         borrowerOffer.assets = 0;
         borrowerOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerObligationShares);
+        deal(address(loanToken), lender, offerObligationShares + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerObligationShares);
 
         take(0, 0, 0, obligationShares, lender, borrowerOffer);
@@ -955,7 +957,7 @@ contract TakeTest is BaseTest {
         lenderOffer.obligationShares = offerObligationShares;
         lenderOffer.assets = 0;
         lenderOffer.tick = TICK_RANGE;
-        deal(address(loanToken), lender, offerObligationShares);
+        deal(address(loanToken), lender, offerObligationShares + secondRevertingTake + secondPassingTake);
         collateralize(obligation, borrower, offerObligationShares);
 
         take(0, 0, 0, obligationShares, borrower, lenderOffer);
@@ -974,7 +976,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = TICK_RANGE;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
         collateralize(borrowerOffer2.obligation, borrower, secondFill);
 
@@ -994,7 +996,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = TICK_RANGE;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
         collateralize(lenderOffer2.obligation, borrower, secondFill);
 
