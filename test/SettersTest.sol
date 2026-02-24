@@ -112,10 +112,10 @@ contract SettersTest is BaseTest {
         morphoV2.setObligationContinuousFee(id, 0.01e18);
     }
 
-    function testContinuousFeeMaximum(uint256 continuousFee, bytes20 id) public {
-        continuousFee = bound(continuousFee, MAX_CONTINUOUS_FEE + 1, MAX_CONTINUOUS_FEE * 100);
+    function testContinuousFeeCannotIncrease(uint256 continuousFee, bytes20 id) public {
+        continuousFee = bound(continuousFee, 1, MAX_CONTINUOUS_FEE * 100);
 
-        vm.expectRevert("Continuous fee too high");
+        vm.expectRevert("Continuous fee can only decrease");
         morphoV2.setObligationContinuousFee(id, continuousFee);
     }
 

@@ -146,10 +146,10 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    /// @dev Overrides the continuous fee of a specific obligation.
+    /// @dev Overrides the continuous fee of a specific obligation. Can only decrease the fee.
     function setObligationContinuousFee(bytes20 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(newContinuousFee <= uint256(0.01e18) / uint256(365 days), "Continuous fee too high");
+        require(newContinuousFee <= obligationState[id].continuousFee, "Continuous fee can only decrease");
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
         obligationState[id].continuousFee = uint64(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
