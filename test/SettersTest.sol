@@ -63,10 +63,7 @@ contract SettersTest is BaseTest {
 
         // touch obligation with this loan token
         Obligation memory obligation = Obligation({
-            loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
-            collaterals: new Collateral[](0),
-            minCollatValue: 0
+            loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0), rcfThreshold: 0
         });
         bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
@@ -157,10 +154,7 @@ contract SettersTest is BaseTest {
 
         // touch obligation with this loan token
         Obligation memory obligation = Obligation({
-            loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
-            collaterals: new Collateral[](0),
-            minCollatValue: 0
+            loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0), rcfThreshold: 0
         });
         bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
@@ -200,10 +194,7 @@ contract SettersTest is BaseTest {
 
         // touch obligation with this loan token
         Obligation memory obligation = Obligation({
-            loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
-            collaterals: new Collateral[](0),
-            minCollatValue: 0
+            loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0), rcfThreshold: 0
         });
         bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);
@@ -244,10 +235,7 @@ contract SettersTest is BaseTest {
 
         // touch obligation with this loan token
         Obligation memory obligation = Obligation({
-            loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
-            collaterals: new Collateral[](0),
-            minCollatValue: 0
+            loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: new Collateral[](0), rcfThreshold: 0
         });
         bytes20 id = toId(obligation);
         morphoV2.touchObligation(obligation);

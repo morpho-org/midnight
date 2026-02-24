@@ -15,6 +15,7 @@ jobs:
       matrix:
         conf:
           - Hasher
+          - Liquidate
           - MorphoV2
           - SharePrice
           - Solvency
