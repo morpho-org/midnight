@@ -29,7 +29,7 @@ contract LiquidationTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.85e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.minCollatValue = 0;
+        obligation.rcfThreshold = 0;
 
         id = toId(obligation);
 
@@ -350,7 +350,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
 
         repaid = bound(repaid, maxR + 1, units);
-        vm.expectRevert("recovery close factor violated");
+        vm.expectRevert("recovery close factor conditions violated");
         morphoV2.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         repaid = bound(repaid, 1, maxR);
@@ -400,6 +400,59 @@ contract LiquidationTest is BaseTest {
         assertEq(morphoV2.debtOf(id, borrower), 0, "all remaining debt repaid");
     }
 
+    /// @dev When rcfThreshold > remaining debt after max repayment, full liquidation is allowed pre-maturity.
+    function testRcfThresholdAllowsFullLiquidation(uint256 units, uint256 liquidationOraclePrice, uint256 rcfThreshold)
+        public
+    {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPrice() * 1.01e18 / 1e18, ORACLE_PRICE_SCALE - 1);
+
+        // Compute remaining debt after max repayment from the input parameters.
+        uint256 lltv = obligation.collaterals[0].lltv;
+        uint256 collatAmount = units.mulDivUp(WAD, lltv);
+        uint256 _maxDebt = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
+        uint256 maxRepaid = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(lltv, WAD));
+        uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, MAX_LIF).zeroFloorSub(maxRepaid);
+        obligation.rcfThreshold = bound(rcfThreshold, remainingRepayable + 1, type(uint256).max);
+
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
+
+        // Full liquidation should succeed because remaining debt < rcfThreshold.
+        morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
+        assertEq(morphoV2.debtOf(toId(obligation), borrower), 0, "debt should be zero");
+    }
+
+    /// @dev When rcfThreshold <= remaining debt after max repayment, recovery close factor is enforced.
+    function testRcfThresholdEnforcesRecoveryCloseFactor(
+        uint256 units,
+        uint256 liquidationOraclePrice,
+        uint256 rcfThreshold
+    ) public {
+        units = bound(units, 100, MAX_TEST_AMOUNT);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPrice() * 1.01e18 / 1e18, ORACLE_PRICE_SCALE - 1);
+
+        // Compute remaining debt after max repayment from the input parameters.
+        uint256 lltv = obligation.collaterals[0].lltv;
+        uint256 collatAmount = units.mulDivUp(WAD, lltv);
+        uint256 _maxDebt = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
+        uint256 maxRepaid = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(lltv, WAD));
+        vm.assume(maxRepaid < units); // needed because of the round up.
+        uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, MAX_LIF).zeroFloorSub(maxRepaid);
+        obligation.rcfThreshold = bound(rcfThreshold, 0, remainingRepayable);
+
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
+
+        // Full liquidation should revert because remaining debt >= rcfThreshold.
+        vm.expectRevert("recovery close factor conditions violated");
+        morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
+    }
+
     /// @dev Recovery close factor applies at exact maturity but not one second after.
     function testRecoveryCloseFactorMaturityBoundary(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
@@ -410,7 +463,7 @@ contract LiquidationTest is BaseTest {
 
         // At exact maturity: recovery close factor applies.
         vm.warp(obligation.maturity);
-        vm.expectRevert("recovery close factor violated");
+        vm.expectRevert("recovery close factor conditions violated");
         morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
 
         // One second later: recovery close factor no longer applies.

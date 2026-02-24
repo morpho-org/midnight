@@ -34,6 +34,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Obligations' collaterals must be sorted by token address.
 contract MorphoV2 is IMorphoV2 {
     using UtilsLib for uint256;
+    using UtilsLib for uint128;
 
     /// STORAGE ///
 
@@ -366,23 +367,15 @@ contract MorphoV2 is IMorphoV2 {
         bytes20 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
-        uint256 newCollateralOf = uint256(collateralOf[id][onBehalf][collateralIndex]) + assets;
-        collateralOf[id][onBehalf][collateralIndex] = UtilsLib.toUint128(newCollateralOf);
+        uint256 oldCollateralOf = collateralOf[id][onBehalf][collateralIndex];
+        collateralOf[id][onBehalf][collateralIndex] = UtilsLib.toUint128(oldCollateralOf + assets);
 
-        if (newCollateralOf == assets && assets > 0) {
+        if (oldCollateralOf == 0 && assets > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
             uint128 newBitmap = borrowerState[id][onBehalf].activatedCollaterals | uint128(1 << collateralIndex);
             borrowerState[id][onBehalf].activatedCollaterals = newBitmap;
             require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, "too many collaterals per borrower");
         }
-
-        require(
-            newCollateralOf == 0
-                || newCollateralOf.mulDivDown(
-                        IOracle(obligation.collaterals[collateralIndex].oracle).price(), ORACLE_PRICE_SCALE
-                    ) >= obligation.minCollatValue,
-            "Below min collateral"
-        );
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
@@ -401,7 +394,7 @@ contract MorphoV2 is IMorphoV2 {
         bytes20 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
-        uint256 newCollateralOf = uint256(collateralOf[id][onBehalf][collateralIndex]) - assets;
+        uint256 newCollateralOf = collateralOf[id][onBehalf][collateralIndex] - assets;
         collateralOf[id][onBehalf][collateralIndex] = UtilsLib.toUint128(newCollateralOf);
 
         if (newCollateralOf == 0 && assets > 0) {
@@ -410,13 +403,6 @@ contract MorphoV2 is IMorphoV2 {
         }
 
         require(isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
-        require(
-            newCollateralOf == 0
-                || newCollateralOf.mulDivDown(
-                        IOracle(obligation.collaterals[collateralIndex].oracle).price(), ORACLE_PRICE_SCALE
-                    ) >= obligation.minCollatValue,
-            "Below min collateral"
-        );
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
@@ -425,9 +411,10 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
-    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor).
-    /// @dev In that case, we want debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is equivalent to
-    /// repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
+    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
+    /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
+    /// @dev Recovery close factor means that debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is
+    /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
     /// @dev Returns the seized assets and the repaid units.
@@ -485,8 +472,14 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
-                uint256 maxRepaid = (uint256(_state.debt) - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
-                require(repaidUnits <= maxRepaid, "recovery close factor violated");
+                uint256 maxRepaid = (_state.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                require(
+                    repaidUnits <= maxRepaid
+                        || collateralOf[id][borrower][collateralIndex].mulDivDown(
+                                liquidatedCollatPrice, ORACLE_PRICE_SCALE
+                            ).mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < obligation.rcfThreshold,
+                    "recovery close factor conditions violated"
+                );
             }
 
             collateralOf[id][borrower][collateralIndex] -= UtilsLib.toUint128(seizedAssets);
@@ -614,7 +607,7 @@ contract MorphoV2 is IMorphoV2 {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
-            maxDebt += uint256(collateralOf[id][borrower][i]).mulDivDown(price, ORACLE_PRICE_SCALE)
+            maxDebt += collateralOf[id][borrower][i].mulDivDown(price, ORACLE_PRICE_SCALE)
                 .mulDivDown(collateral.lltv, WAD);
             bitmap ^= (1 << i);
         }
