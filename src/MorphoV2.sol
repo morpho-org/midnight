@@ -55,7 +55,8 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Whether an address is authorized to manage positions on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
-    /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
+    /// @dev Default fees per loan token. Set when the obligation is created. Can be later changed (in both directions)
+    /// by the feeSetter.
     mapping(address loanToken => uint16[6]) public defaultFees;
 
     /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later decreased by the
