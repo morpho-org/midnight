@@ -28,7 +28,7 @@ contract OtherFunctionsTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.rcfThreshold = 0;
+        obligation.maxRepaidOffset = 0;
 
         id = toId(obligation);
     }
@@ -279,7 +279,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
         _obligation.collaterals = collaterals;
-        _obligation.rcfThreshold = 0;
+        _obligation.maxRepaidOffset = 0;
     }
 
     function testMaxCollaterals(uint256 numCollaterals) public {

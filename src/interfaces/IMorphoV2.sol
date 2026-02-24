@@ -7,9 +7,8 @@ struct Obligation {
     // Must be sorted by address.
     Collateral[] collaterals;
     uint256 maturity;
-    // The recovery close factor is deactivated for a collateral if the collateral's value is not enough to repay
-    // rcfThreshold, and if doing a max liquidation would lead to such a situation.
-    uint256 rcfThreshold;
+    // Additive offset that increases the max repaid amount during liquidation.
+    uint256 maxRepaidOffset;
 }
 
 struct Collateral {
