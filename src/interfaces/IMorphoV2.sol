@@ -47,7 +47,7 @@ struct BorrowerState {
 
 /// @dev Trading fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
 /// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits. Max fee is 1% (0.01e18).
-/// @dev Interest fee is stored divided by INTEREST_FEE_STEP (1e6) to fit in 16 bits. Max fee is 1% per year.
+/// @dev Continuous fee is stored as a per-second rate in WAD. Max fee is 1% per year.
 struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
@@ -55,7 +55,7 @@ struct ObligationState {
     bool created;
     uint56 lastUpdate;
     uint16[6] fees;
-    uint16 interestFee;
+    uint64 continuousFee;
 }
 
 interface IMorphoV2 {}

@@ -3,7 +3,9 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {MAX_FEE, MAX_INTEREST_FEE} from "../src/libraries/ConstantsLib.sol";
+import {MAX_FEE} from "../src/libraries/ConstantsLib.sol";
+
+uint256 constant MAX_CONTINUOUS_FEE = uint256(0.01e18) / uint256(365 days);
 import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
 
 contract SettersTest is BaseTest {
@@ -105,19 +107,19 @@ contract SettersTest is BaseTest {
         morphoV2.setTradingFeeRecipient(makeAddr("newRecipient"));
     }
 
-    function testSetInterestFeeOnlyFeeSetter(address notFeeSetter, bytes20 id) public {
+    function testSetContinuousFeeOnlyFeeSetter(address notFeeSetter, bytes20 id) public {
         vm.assume(notFeeSetter != address(this));
 
         vm.prank(notFeeSetter);
         vm.expectRevert("Only feeSetter");
-        morphoV2.setObligationInterestFee(id, 0.01e18);
+        morphoV2.setObligationContinuousFee(id, 0.01e18);
     }
 
-    function testInterestFeeMaximum(uint256 interestFee, bytes20 id) public {
-        interestFee = bound(interestFee, MAX_INTEREST_FEE + 1, MAX_INTEREST_FEE * 100);
+    function testContinuousFeeMaximum(uint256 continuousFee, bytes20 id) public {
+        continuousFee = bound(continuousFee, MAX_CONTINUOUS_FEE + 1, MAX_CONTINUOUS_FEE * 100);
 
-        vm.expectRevert("Interest fee too high");
-        morphoV2.setObligationInterestFee(id, interestFee);
+        vm.expectRevert("Continuous fee too high");
+        morphoV2.setObligationContinuousFee(id, continuousFee);
     }
 
     // Default trading fee tests

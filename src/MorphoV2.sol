@@ -10,15 +10,13 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     FEE_STEP,
-    INTEREST_FEE_STEP,
     MAX_FEE,
     MAX_LIF,
     TIME_TO_MAX_LIF,
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
-    MAX_INTEREST_FEE
+    ROOT_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -60,15 +58,15 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[6]) public defaultFees;
 
-    /// @dev Default interest fee per loan token. Set when the obligation is created. Can be later decreased by the
+    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later decreased by the
     /// feeSetter.
-    mapping(address loanToken => uint16) public defaultInterestFees;
+    mapping(address loanToken => uint64) public defaultContinuousFees;
 
     /// @dev Trading fee recipient.
     address public tradingFeeRecipient;
 
-    /// @dev Interest fee recipient.
-    address public interestFeeRecipient;
+    /// @dev Continuous fee recipient.
+    address public continuousFeeRecipient;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -116,10 +114,10 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetTradingFeeRecipient(recipient);
     }
 
-    function setInterestFeeRecipient(address recipient) external {
+    function setContinuousFeeRecipient(address recipient) external {
         require(msg.sender == owner, "Only owner");
-        interestFeeRecipient = recipient;
-        emit EventsLib.SetInterestFeeRecipient(recipient);
+        continuousFeeRecipient = recipient;
+        emit EventsLib.SetContinuousFeeRecipient(recipient);
     }
 
     /// FEE SETTER FUNCTIONS ///
@@ -146,23 +144,22 @@ contract MorphoV2 is IMorphoV2 {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    /// @dev Overrides the interest fee of a specific obligation.
-    function setObligationInterestFee(bytes20 id, uint256 newInterestFee) external {
+    /// @dev Overrides the continuous fee of a specific obligation.
+    function setObligationContinuousFee(bytes20 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
-        require(newInterestFee % INTEREST_FEE_STEP == 0, "fee should be a multiple of INTEREST_FEE_STEP");
-        // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        obligationState[id].interestFee = uint16(newInterestFee / INTEREST_FEE_STEP);
-        emit EventsLib.SetObligationInterestFee(id, newInterestFee);
+        require(newContinuousFee <= uint256(0.01e18) / uint256(365 days), "Continuous fee too high");
+        // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
+        obligationState[id].continuousFee = uint64(newContinuousFee);
+        emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
     }
 
     /// @dev Doesn't change the fee of already created obligations.
-    function setDefaultInterestFee(address loanToken, uint256 newInterestFee) external {
+    function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(newInterestFee <= MAX_INTEREST_FEE, "Interest fee too high");
-        // forge-lint: disable-next-line(unsafe-typecast) as newInterestFee is less than MAX_INTEREST_FEE
-        defaultInterestFees[loanToken] = uint16(newInterestFee / INTEREST_FEE_STEP);
-        emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
+        require(newContinuousFee <= uint256(0.01e18) / uint256(365 days), "Continuous fee too high");
+        // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
+        defaultContinuousFees[loanToken] = uint64(newContinuousFee);
+        emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
     /// ENTRY-POINTS ///
@@ -203,7 +200,7 @@ contract MorphoV2 is IMorphoV2 {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes20 id = touchObligation(offer.obligation);
-        accrueInterestFees(id);
+        accrueContinuousFees(id);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -362,7 +359,7 @@ contract MorphoV2 is IMorphoV2 {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
         bytes20 id = touchObligation(obligation);
-        accrueInterestFees(id);
+        accrueContinuousFees(id);
         ObligationState storage _obligationState = obligationState[id];
 
         if (obligationUnits > 0) {
@@ -574,13 +571,13 @@ contract MorphoV2 is IMorphoV2 {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    function accrueInterestFees(bytes20 id) internal {
-        if (borrowerState[id][interestFeeRecipient].debt != 0) return;
+    function accrueContinuousFees(bytes20 id) internal {
+        if (borrowerState[id][continuousFeeRecipient].debt != 0) return;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
-        uint256 fee = uint256(obligationState[id].interestFee) * INTEREST_FEE_STEP;
+        uint256 fee = obligationState[id].continuousFee;
         uint256 sharesToMint = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
         obligationState[id].totalShares += UtilsLib.toUint128(sharesToMint);
-        sharesOf[id][interestFeeRecipient] += sharesToMint;
+        sharesOf[id][continuousFeeRecipient] += sharesToMint;
         obligationState[id].lastUpdate = uint56(block.timestamp);
     }
 
@@ -599,7 +596,7 @@ contract MorphoV2 is IMorphoV2 {
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
-            obligationState[id].interestFee = defaultInterestFees[obligation.loanToken];
+            obligationState[id].continuousFee = defaultContinuousFees[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -652,8 +649,8 @@ contract MorphoV2 is IMorphoV2 {
         return obligationState[id].fees;
     }
 
-    function interestFee(bytes20 id) external view returns (uint16) {
-        return obligationState[id].interestFee;
+    function continuousFee(bytes20 id) external view returns (uint64) {
+        return obligationState[id].continuousFee;
     }
 
     function fees(bytes20 id) external view returns (uint16[6] memory) {
