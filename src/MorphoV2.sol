@@ -578,7 +578,7 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev Assumes that obligation and id match.
     function accrueInterestFees(Obligation memory obligation, bytes20 id) internal {
-        if (sharesOf[id][interestFeeRecipient] != 0) return;
+        if (borrowerState[id][interestFeeRecipient].debt != 0) return;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, block.timestamp);
         uint256 lastTimeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, obligationState[id].lastUpdate);
