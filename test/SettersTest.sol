@@ -110,14 +110,14 @@ contract SettersTest is BaseTest {
 
         vm.prank(notFeeSetter);
         vm.expectRevert("Only feeSetter");
-        morphoV2.setObligationInterestFee(id, 0, 0.01e18);
+        morphoV2.setObligationInterestFee(id, 0.01e18);
     }
 
     function testInterestFeeMaximum(uint256 interestFee, bytes20 id) public {
         interestFee = bound(interestFee, MAX_INTEREST_FEE + 1, MAX_INTEREST_FEE * 100);
 
         vm.expectRevert("Interest fee too high");
-        morphoV2.setObligationInterestFee(id, 0, interestFee);
+        morphoV2.setObligationInterestFee(id, interestFee);
     }
 
     // Default trading fee tests
