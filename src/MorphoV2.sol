@@ -636,21 +636,14 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes20 id, uint256 timeToMaturity) public view returns (uint256) {
         uint16[6] memory _fees = obligationState[id].fees;
-
-        if (timeToMaturity >= 180 days) return uint256(_fees[5]) * FEE_STEP;
-
-        // forgefmt: disable-start
-        (uint256 index, uint256 start, uint256 end) =
-            timeToMaturity < 1 days  ? (0, 0 days, 1 days) :
-            timeToMaturity < 7 days  ? (1, 1 days, 7 days) :
-            timeToMaturity < 30 days ? (2, 7 days, 30 days) :
-            timeToMaturity < 90 days ? (3, 30 days, 90 days) :
-                                       (4, 90 days, 180 days);
-        // forgefmt: disable-end
-
-        uint256 feeLower = uint256(_fees[index]) * FEE_STEP;
-        uint256 feeUpper = uint256(_fees[index + 1]) * FEE_STEP;
-
-        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+        if (timeToMaturity >= 180 days) {
+            return _fees[5] * FEE_STEP;
+        } else {
+            uint256[6] memory bp = [uint256(0), 1 days, 7 days, 30 days, 90 days, 180 days];
+            uint256 index;
+            while (timeToMaturity >= bp[index + 1]) index++;
+            return (_fees[index] * (bp[index + 1] - timeToMaturity) + _fees[index + 1] * (timeToMaturity - bp[index]))
+                * FEE_STEP / (bp[index + 1] - bp[index]);
+        }
     }
 }
