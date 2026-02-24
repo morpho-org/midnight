@@ -17,6 +17,7 @@ jobs:
           - Hasher
           - MorphoV2
           - SharePrice
+          - Solvency
 
     steps:
       - uses: actions/checkout@v4
