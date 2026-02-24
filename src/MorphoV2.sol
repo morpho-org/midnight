@@ -421,8 +421,8 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
     /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
     /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor).
-    /// @dev In that case, we want debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is equivalent to
-    /// repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
+    /// @dev In that case, we want debtOf - repaidUnits >= maxDebt - repaidUnits*LIF/limitMargin, which is equivalent to
+    /// repaidUnits <= (debtOf-maxDebt) / (1 - LIF/limitMargin).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to MAX_LIF at maturity +
     /// TIME_TO_MAX_LIF.
     /// @dev Returns the seized assets and the repaid units.
@@ -449,7 +449,7 @@ contract MorphoV2 is IMorphoV2 {
             uint256 price = IOracle(_collateral.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = collateralOf[id][borrower][i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(WAD, _collateral.limitMargin);
             repayableDebt += _collateralOf.mulDivUp(WAD, MAX_LIF).mulDivUp(price, ORACLE_PRICE_SCALE);
             bitmap ^= (1 << i);
         }
@@ -477,10 +477,10 @@ contract MorphoV2 is IMorphoV2 {
             }
 
             if (block.timestamp <= obligation.maturity) {
-                uint256 lltv = obligation.collaterals[collateralIndex].lltv;
+                uint256 limitMargin = obligation.collaterals[collateralIndex].limitMargin;
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
-                uint256 maxRepaid = (uint256(_state.debt) - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                uint256 maxRepaid = (uint256(_state.debt) - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(WAD, limitMargin));
                 require(repaidUnits <= maxRepaid, "recovery close factor violated");
             }
 
@@ -544,7 +544,7 @@ contract MorphoV2 is IMorphoV2 {
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
-                require(obligation.collaterals[i].lltv < WAD.mulDivDown(WAD, MAX_LIF), "lltv too high or LIF too high"); // temporary.
+                require(obligation.collaterals[i].limitMargin > MAX_LIF, "limitMargin too low"); // temporary.
                 previousCollateralToken = collateralToken;
             }
 
@@ -610,7 +610,7 @@ contract MorphoV2 is IMorphoV2 {
             Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
             maxDebt += uint256(collateralOf[id][borrower][i]).mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateral.lltv, WAD);
+                .mulDivDown(WAD, collateral.limitMargin);
             bitmap ^= (1 << i);
         }
         return maxDebt >= debt;

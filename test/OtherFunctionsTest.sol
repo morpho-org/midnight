@@ -24,9 +24,9 @@ contract OtherFunctionsTest is BaseTest {
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
+            .push(Collateral({token: address(collateralToken1), limitMargin: 1.25e18, oracle: address(oracle1)}));
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
+            .push(Collateral({token: address(collateralToken2), limitMargin: 1.25e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
         obligation.minCollatValue = 0;
 
@@ -190,7 +190,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_obligation.collaterals.length, obligationFromId.collaterals.length, "collaterals length");
         for (uint256 i = 0; i < obligationFromId.collaterals.length; i++) {
             assertEq(_obligation.collaterals[i].token, obligationFromId.collaterals[i].token, "collateral token");
-            assertEq(_obligation.collaterals[i].lltv, obligationFromId.collaterals[i].lltv, "lltv");
+            assertEq(_obligation.collaterals[i].limitMargin, obligationFromId.collaterals[i].limitMargin, "limitMargin");
             assertEq(_obligation.collaterals[i].oracle, obligationFromId.collaterals[i].oracle, "oracle");
         }
     }
@@ -275,7 +275,8 @@ contract OtherFunctionsTest is BaseTest {
     function testSupplyCollateralZeroDoesNotCallOracle() public {
         RevertingOracle revertingOracle = new RevertingOracle();
         Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(revertingOracle)});
+        collaterals[0] =
+            Collateral({token: address(collateralToken1), limitMargin: 1.25e18, oracle: address(revertingOracle)});
 
         Obligation memory obligationWithRevertingOracle;
         obligationWithRevertingOracle.loanToken = address(loanToken);
@@ -297,7 +298,8 @@ contract OtherFunctionsTest is BaseTest {
 
         RevertingOracle revertingOracle = new RevertingOracle();
         Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(revertingOracle)});
+        collaterals[0] =
+            Collateral({token: address(collateralToken1), limitMargin: 1.25e18, oracle: address(revertingOracle)});
 
         Obligation memory obligationWithRevertingOracle;
         obligationWithRevertingOracle.loanToken = address(loanToken);
@@ -325,7 +327,7 @@ contract OtherFunctionsTest is BaseTest {
         for (uint256 i = 0; i < numCollaterals; i++) {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
-            collaterals[i] = Collateral({token: address(token), lltv: 0.75e18, oracle: address(_oracle)});
+            collaterals[i] = Collateral({token: address(token), limitMargin: 1.25e18, oracle: address(_oracle)});
         }
         collaterals = sortCollaterals(collaterals);
         _obligation.loanToken = address(loanToken);

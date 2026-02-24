@@ -25,9 +25,9 @@ contract LiquidationTest is BaseTest {
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
+            .push(Collateral({token: address(collateralToken1), limitMargin: 1.5e18, oracle: address(oracle1)}));
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.85e18, oracle: address(oracle2)}));
+            .push(Collateral({token: address(collateralToken2), limitMargin: 1.25e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
         obligation.minCollatValue = 0;
 
@@ -347,7 +347,9 @@ contract LiquidationTest is BaseTest {
 
         (, uint256 _maxDebt) = _setupUnhealthy(units, liquidationOraclePrice);
 
-        uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
+        uint256 maxR =
+            (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(WAD, obligation.collaterals[0].limitMargin));
+        vm.assume(maxR < units);
 
         repaid = bound(repaid, maxR + 1, units);
         vm.expectRevert("recovery close factor violated");
@@ -363,14 +365,15 @@ contract LiquidationTest is BaseTest {
 
         (, uint256 _maxDebt) = _setupUnhealthy(units, liquidationOraclePrice);
 
-        uint256 maxR = (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
+        uint256 maxR =
+            (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(WAD, obligation.collaterals[0].limitMargin));
 
         morphoV2.liquidate(obligation, 0, 0, maxR, borrower, "");
 
         uint256 remainingCollateral = morphoV2.collateralOf(id, borrower, 0);
         uint256 remainingDebt = morphoV2.debtOf(id, borrower);
         uint256 newMaxDebt = remainingCollateral.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(obligation.collaterals[0].lltv, WAD);
+            .mulDivDown(WAD, obligation.collaterals[0].limitMargin);
         // After max repayment the position should be just healthy or almost healthy (within rounding tolerance).
         assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
     }
@@ -388,8 +391,8 @@ contract LiquidationTest is BaseTest {
 
         uint256 debtAfterBadDebt = repayableDebt;
 
-        uint256 maxR =
-            (debtAfterBadDebt - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[0].lltv, WAD));
+        uint256 maxR = (debtAfterBadDebt - _maxDebt)
+        .mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(WAD, obligation.collaterals[0].limitMargin));
 
         assertGe(maxR, debtAfterBadDebt, "maxRepaid should cover all remaining debt with bad debt");
 
@@ -402,8 +405,8 @@ contract LiquidationTest is BaseTest {
 
     /// @dev Recovery close factor applies at exact maturity but not one second after.
     function testRecoveryCloseFactorMaturityBoundary(uint256 units, uint256 liquidationOraclePrice) public {
-        units = bound(units, 100, MAX_TEST_AMOUNT);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPrice() * 1.01e18 / 1e18, ORACLE_PRICE_SCALE - 1);
+        units = bound(units, 1000, MAX_TEST_AMOUNT);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPrice() * 1.05e18 / 1e18, ORACLE_PRICE_SCALE - 1);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
@@ -420,15 +423,16 @@ contract LiquidationTest is BaseTest {
     }
 
     /// @dev Recovery close factor with two collaterals contributing to maxDebt.
-    /// Drops price of the lower-lltv collateral to make position unhealthy, then liquidates it.
+    /// Drops price of the higher-limitMargin collateral to make position unhealthy, then liquidates it.
     function testRecoveryCloseFactorMultipleCollaterals(uint256 units) public {
         units = bound(units, 100, MAX_TEST_AMOUNT);
 
-        uint256 lltv0 = obligation.collaterals[0].lltv;
-        uint256 lltv1 = obligation.collaterals[1].lltv;
+        uint256 lm0 = obligation.collaterals[0].limitMargin;
+        uint256 lm1 = obligation.collaterals[1].limitMargin;
 
         // Deposit enough for each collateral so position is healthy at par.
-        uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
+        // collatPerToken = units / (WAD/lm0 + WAD/lm1) = units * lm0 * lm1 / (WAD * (lm0 + lm1))
+        uint256 collatPerToken = units.mulDivUp(lm0, WAD).mulDivUp(lm1, lm0 + lm1) + 1;
         for (uint256 i = 0; i < 2; i++) {
             address token = obligation.collaterals[i].token;
             deal(token, address(this), collatPerToken);
@@ -438,22 +442,22 @@ contract LiquidationTest is BaseTest {
 
         setupObligation(obligation, units);
 
-        // Liquidate the collateral with lower lltv (bigger recovery spread).
-        uint256 liqIdx = lltv0 <= lltv1 ? 0 : 1;
+        // Liquidate the collateral with higher limitMargin (bigger recovery spread).
+        uint256 liqIdx = lm0 >= lm1 ? 0 : 1;
         uint256 otherIdx = 1 - liqIdx;
 
-        // Drop price of liquidated collateral. 0.9e36 is above critical price for lltv=0.75 (0.8625e36).
+        // Drop price of liquidated collateral. 0.9e36 is above critical price for limitMargin=1.25e18.
         uint256 droppedPrice = 0.9e36;
         Oracle(obligation.collaterals[liqIdx].oracle).setPrice(droppedPrice);
 
         uint256 liqCollat = morphoV2.collateralOf(id, borrower, liqIdx);
         uint256 otherCollat = morphoV2.collateralOf(id, borrower, otherIdx);
         uint256 _maxDebt = liqCollat.mulDivDown(droppedPrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(obligation.collaterals[liqIdx].lltv, WAD)
-        + otherCollat.mulDivDown(obligation.collaterals[otherIdx].lltv, WAD);
+            .mulDivDown(WAD, obligation.collaterals[liqIdx].limitMargin)
+        + otherCollat.mulDivDown(WAD, obligation.collaterals[otherIdx].limitMargin);
 
         uint256 maxR =
-            (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(obligation.collaterals[liqIdx].lltv, WAD));
+            (units - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(WAD, obligation.collaterals[liqIdx].limitMargin));
 
         morphoV2.liquidate(obligation, liqIdx, 0, maxR, borrower, "");
     }
@@ -463,7 +467,7 @@ contract LiquidationTest is BaseTest {
     /// forge-config: default.isolate = true
     function testGasLiquidateMultipleCollaterals() public {
         uint256 units = 1000e18;
-        uint256 collateralAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateralAmount = units.mulDivUp(obligation.collaterals[0].limitMargin, WAD);
 
         // Supply both collaterals.
         for (uint256 i = 0; i < 2; i++) {
@@ -508,8 +512,8 @@ contract LiquidationTest is BaseTest {
 
     /// @dev Minimum oracle price for collateral[0] such that there won't be bad debt.
     function badDebtPrice() internal view returns (uint256) {
-        uint256 lltv = obligation.collaterals[0].lltv;
-        return lltv.mulDivUp(MAX_LIF, WAD) * (ORACLE_PRICE_SCALE / WAD);
+        uint256 limitMargin = obligation.collaterals[0].limitMargin;
+        return MAX_LIF.mulDivUp(WAD, limitMargin) * (ORACLE_PRICE_SCALE / WAD);
     }
 
     function _setupUnhealthy(uint256 units, uint256 liquidationOraclePrice)
@@ -521,7 +525,7 @@ contract LiquidationTest is BaseTest {
         collatAmount = morphoV2.collateralOf(id, borrower, 0);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         _maxDebt = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(obligation.collaterals[0].lltv, WAD);
+            .mulDivDown(WAD, obligation.collaterals[0].limitMargin);
     }
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256 _repaidUnits, address, bytes memory data) public {

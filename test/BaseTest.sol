@@ -11,6 +11,7 @@ import {TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
+    MAX_LIF,
     MAX_COLLATERALS,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
@@ -78,7 +79,7 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = debt.mulDivUp(obligation.collaterals[0].limitMargin, WAD);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(morphoV2), collateral);
         morphoV2.supplyCollateral(obligation, 0, collateral, _borrower);
@@ -237,6 +238,8 @@ abstract contract BaseTest is Test {
         Collateral[] memory collaterals = new Collateral[](len);
         for (uint256 i = 0; i < len; i++) {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
+            collaterals[i].limitMargin = bound(obligation.collaterals[i].limitMargin, MAX_LIF + 1, type(uint256).max);
+            collaterals[i].oracle = obligation.collaterals[i].oracle;
         }
         collaterals = sortCollaterals(collaterals);
         obligation.collaterals = collaterals;
