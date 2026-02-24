@@ -46,6 +46,27 @@ contract LiquidationTest is BaseTest {
         morphoV2.liquidate(obligation, 2, 0, 0, borrower, "");
     }
 
+    function testLiquidateInactiveCollateralIndex(uint256 units) public {
+        units = bound(units, 10, MAX_TEST_AMOUNT);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(0);
+
+        assertEq(morphoV2.collateralOf(id, borrower, 1), 0);
+
+        vm.expectRevert();
+        morphoV2.liquidate(obligation, 1, 0, 1, borrower, "");
+
+        vm.expectRevert();
+        morphoV2.liquidate(obligation, 1, 1, 0, borrower, "");
+
+        uint256 collatBefore = morphoV2.collateralOf(id, borrower, 0);
+        morphoV2.liquidate(obligation, 1, 0, 0, borrower, "");
+        assertEq(morphoV2.debtOf(id, borrower), 0);
+        assertEq(morphoV2.collateralOf(id, borrower, 0), collatBefore);
+        assertEq(morphoV2.collateralOf(id, borrower, 1), 0);
+    }
+
     function testLiquidateHealthyPreMaturity(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_TEST_AMOUNT);
         liquidationOraclePrice = bound(liquidationOraclePrice, ORACLE_PRICE_SCALE, 10 * ORACLE_PRICE_SCALE);
