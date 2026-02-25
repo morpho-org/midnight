@@ -36,7 +36,7 @@ contract TakeTest is BaseTest {
         obligation.collaterals
             .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
         obligation.collaterals = sortCollaterals(obligation.collaterals);
-        obligation.minCollatValue = 0;
+        obligation.rcfThreshold = 0;
 
         id = toId(obligation);
 
@@ -178,10 +178,10 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
-        collateralize(obligation, borrower, obligationShares);
+        collateralize(obligation, borrower, expectedUnits);
         borrowerOffer.assets = expectedAssets + 1;
 
         take(0, 0, 0, obligationShares, lender, borrowerOffer);
@@ -201,10 +201,10 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
-        collateralize(obligation, borrower, obligationShares);
+        collateralize(obligation, borrower, expectedUnits);
         lenderOffer.assets = expectedAssets + 1;
 
         take(0, 0, 0, obligationShares, borrower, lenderOffer);
@@ -336,7 +336,7 @@ contract TakeTest is BaseTest {
         tick = bound(tick, 0, 600);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
@@ -365,7 +365,7 @@ contract TakeTest is BaseTest {
         tick = bound(tick, 0, 600);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         vm.assume(obligationShares <= maxAssets);
         otherLenderUnits = bound(otherLenderUnits, obligationShares, maxAssets);
@@ -573,10 +573,11 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
-        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
+        uint256 expectedShares = expectedUnits.mulDivUp(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
+        vm.assume(expectedShares <= otherLenderShares);
         otherLenderOffer.assets = buyerAssets;
         otherLenderOffer.tick = tick;
 
@@ -601,10 +602,11 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = buyerAssets.mulDivDown(WAD, price);
-        uint256 expectedShares = expectedUnits.mulDivDown(initialShares + 1, initialUnits + 1);
+        uint256 expectedShares = expectedUnits.mulDivUp(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, expectedUnits, max(expectedUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
+        vm.assume(expectedShares <= otherLenderShares);
         otherBorrowerOffer.assets = buyerAssets;
         otherBorrowerOffer.tick = tick;
 
@@ -629,10 +631,11 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
         vm.assume(price > 0.01 ether);
-        uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
+        uint256 expectedShares = obligationUnits.mulDivUp(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
+        vm.assume(expectedShares <= otherLenderShares);
         otherLenderOffer.assets = buyerAssets + 1;
         otherLenderOffer.tick = tick;
 
@@ -657,10 +660,11 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = obligationUnits.mulDivDown(price, WAD);
-        uint256 expectedShares = obligationUnits.mulDivDown(initialShares + 1, initialUnits + 1);
+        uint256 expectedShares = obligationUnits.mulDivUp(initialShares + 1, initialUnits + 1);
         existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherLenderShares = morphoV2.sharesOf(id, otherLender);
+        vm.assume(expectedShares <= otherLenderShares);
         otherBorrowerOffer.assets = buyerAssets + 1;
         otherBorrowerOffer.tick = tick;
 
@@ -1384,7 +1388,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationShares = shares;
         collateralize(obligation, borrower, units);
         (uint256 buyerAssets, uint256 sellerAssets,,) = take(0, 0, 0, shares, lender, borrowerOffer);
-        uint256 expectedUnits = shares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = shares.mulDivUp(initialUnits + 1, initialShares + 1);
         assertEq(buyerAssets, 0, "buyerAssets");
         assertEq(sellerAssets, 0, "sellerAssets");
         assertEq(morphoV2.sharesOf(id, lender), shares, "sharesOf");
@@ -1393,7 +1397,6 @@ contract TakeTest is BaseTest {
 
     // fee>0, buy, units
     function testPriceZero_WithTradingFee_buy_units() public {
-        morphoV2.setObligationTradingFee(id, 0, 1e12);
         morphoV2.setObligationTradingFee(id, 1, 1e12);
         lenderOffer.tick = 0;
         lenderOffer.assets = 0;
@@ -1405,7 +1408,6 @@ contract TakeTest is BaseTest {
 
     // fee>0, sell, buyer assets
     function testPriceZero_WithTradingFee_sell_buyerAssets() public {
-        morphoV2.setObligationTradingFee(id, 0, 1e12);
         morphoV2.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 units = 1e18;
@@ -1423,7 +1425,6 @@ contract TakeTest is BaseTest {
 
     // fee>0, sell, seller assets
     function testPriceZero_WithTradingFee_sell_sellerAssets() public {
-        morphoV2.setObligationTradingFee(id, 0, 1e12);
         morphoV2.setObligationTradingFee(id, 1, 1e12);
         borrowerOffer.tick = 0;
         borrowerOffer.assets = 1e18;
@@ -1434,7 +1435,6 @@ contract TakeTest is BaseTest {
 
     // fee>0, sell, units
     function testPriceZero_WithTradingFee_sell_units() public {
-        morphoV2.setObligationTradingFee(id, 0, 1e12);
         morphoV2.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 units = 1e18;
@@ -1454,7 +1454,6 @@ contract TakeTest is BaseTest {
 
     // fee>0, sell, shares
     function testPriceZero_WithTradingFee_sell_shares() public {
-        morphoV2.setObligationTradingFee(id, 0, 1e12);
         morphoV2.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = morphoV2.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 units = 1e18;
@@ -1462,7 +1461,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = 0;
         borrowerOffer.assets = 0;
         borrowerOffer.obligationShares = shares;
-        uint256 expectedUnits = shares.mulDivDown(initialUnits + 1, initialShares + 1);
+        uint256 expectedUnits = shares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedBuyerAssets = expectedUnits.mulDivDown(fee, WAD);
         deal(address(loanToken), lender, expectedBuyerAssets);
         collateralize(obligation, borrower, expectedUnits);
