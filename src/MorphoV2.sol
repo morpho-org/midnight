@@ -632,11 +632,13 @@ contract MorphoV2 is IMorphoV2 {
         if (timeToMaturity >= 180 days) {
             return _fees[5] * FEE_STEP;
         } else {
-            uint256[6] memory bp = [uint256(0), 1 days, 7 days, 30 days, 90 days, 180 days];
+            uint256[6] memory breakpoints = [uint256(0), 1 days, 7 days, 30 days, 90 days, 180 days];
             uint256 index;
-            while (timeToMaturity >= bp[index + 1]) index++;
-            return (_fees[index] * (bp[index + 1] - timeToMaturity) + _fees[index + 1] * (timeToMaturity - bp[index]))
-                * FEE_STEP / (bp[index + 1] - bp[index]);
+            while (timeToMaturity >= breakpoints[index + 1]) index++;
+            return (_fees[index]
+                    * (breakpoints[index + 1] - timeToMaturity)
+                    + _fees[index + 1]
+                    * (timeToMaturity - breakpoints[index])) * FEE_STEP / (breakpoints[index + 1] - breakpoints[index]);
         }
     }
 }
