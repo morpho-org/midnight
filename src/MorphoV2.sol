@@ -425,6 +425,7 @@ contract MorphoV2 is IMorphoV2 {
         ObligationState storage _obligationState = obligationState[id];
 
         uint256 maxDebt;
+        uint256 maxDebtOverestimated;
         uint256 liquidatedCollatPrice;
         BorrowerState storage _state = borrowerState[id][borrower];
         uint256 originalDebt = _state.debt;
@@ -438,6 +439,7 @@ contract MorphoV2 is IMorphoV2 {
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = collateralOf[id][borrower][i];
             maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            maxDebtOverestimated += _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(MAX_LIF, WAD);
             badDebt = badDebt.zeroFloorSub(_collateralOf.mulDivDown(WAD, MAX_LIF).mulDivDown(price, ORACLE_PRICE_SCALE));
             bitmap ^= (1 << i);
         }
@@ -466,7 +468,8 @@ contract MorphoV2 is IMorphoV2 {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
-                uint256 maxRepaid = _state.debt.zeroFloorSub(maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                uint256 maxRepaid =
+                    _state.debt.zeroFloorSub(maxDebtOverestimated).mulDivDown(WAD, WAD - lif.mulDivDown(lltv, WAD));
                 require(
                     repaidUnits <= maxRepaid
                         || collateralOf[id][borrower][collateralIndex].mulDivDown(
