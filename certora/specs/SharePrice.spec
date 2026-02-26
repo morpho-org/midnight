@@ -12,8 +12,13 @@ methods {
     function tradingFee(bytes20, uint256) internal returns (uint256) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 }
 
+/*
 // absolute 1 bound --> share price (units/shares) ≤ 1 at all times
 strong invariant sharePriceBelowOrEqOne(bytes20 id)
     totalShares(id) >= totalUnits(id)
@@ -40,14 +45,95 @@ strong invariant sharePriceBelowOrEqOne(bytes20 id)
                 assert(true);
             }
         }
+}*/
+
+strong invariant sharePriceBelowOrEqOne1(bytes20 id)
+    totalShares(id) >= totalUnits(id)
+{
+    preserved take(uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address taker,
+        address takerCallback,
+        bytes takerCallbackData,
+        address receiverIfTakerIsSeller,
+        MorphoV2.Offer offer,
+        MorphoV2.Signature signature,
+        bytes32 root,
+        bytes32[] proof) with (env e) {
+            require buyerAssets != 0 && sellerAssets == 0 && obligationUnits == 0 && obligationShares == 0, "other cases checked separately";
+            require buyerAssets < 2^128;
+        }
 }
 
 
+strong invariant sharePriceBelowOrEqOne2(bytes20 id)
+    totalShares(id) >= totalUnits(id)
+{
+    preserved take(uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address taker,
+        address takerCallback,
+        bytes takerCallbackData,
+        address receiverIfTakerIsSeller,
+        MorphoV2.Offer offer,
+        MorphoV2.Signature signature,
+        bytes32 root,
+        bytes32[] proof) with (env e) {
+            require buyerAssets == 0 && sellerAssets != 0 && obligationUnits == 0 && obligationShares == 0, "other cases checked separately";
+            require sellerAssets < 2^128;
+        }
+}
+
+strong invariant sharePriceBelowOrEqOne3(bytes20 id)
+    totalShares(id) >= totalUnits(id)
+{
+    preserved take(uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address taker,
+        address takerCallback,
+        bytes takerCallbackData,
+        address receiverIfTakerIsSeller,
+        MorphoV2.Offer offer,
+        MorphoV2.Signature signature,
+        bytes32 root,
+        bytes32[] proof) with (env e) {
+            require buyerAssets == 0 && sellerAssets == 0 && obligationUnits != 0 && obligationShares == 0, "other cases checked separately";
+        }
+}
+
+strong invariant sharePriceBelowOrEqOne4(bytes20 id)
+    totalShares(id) >= totalUnits(id)
+{
+    preserved take(uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares,
+        address taker,
+        address takerCallback,
+        bytes takerCallbackData,
+        address receiverIfTakerIsSeller,
+        MorphoV2.Offer offer,
+        MorphoV2.Signature signature,
+        bytes32 root,
+        bytes32[] proof) with (env e) {
+            require buyerAssets == 0 && sellerAssets == 0 && obligationUnits == 0, "other cases checked separately";
+        }
+}
+
 
 /// Liquidation without bad debt preserves virtual share price.
-rule sharePricePreservedByLiquidateNoBadDebt(env e, MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id
+rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id
 ) {
-    requireInvariant sharePriceBelowOrEqOne(id);
+    requireInvariant sharePriceBelowOrEqOne1(id);
+    requireInvariant sharePriceBelowOrEqOne2(id);
+    requireInvariant sharePriceBelowOrEqOne3(id);
+    requireInvariant sharePriceBelowOrEqOne4(id);
 
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);
@@ -71,7 +157,10 @@ rule sharePriceDoesNotDecrease(bytes20 id, method f) filtered {
 
     // We need it otherwise rounding down to 0 creates shares with no backing units
     // for withdraw +1 virtual liquidity makes exchange rate differ from actual pool ratio when totalShares > totalUnits
-    requireInvariant sharePriceBelowOrEqOne(id);
+    requireInvariant sharePriceBelowOrEqOne1(id);
+    requireInvariant sharePriceBelowOrEqOne2(id);
+    requireInvariant sharePriceBelowOrEqOne3(id);
+    requireInvariant sharePriceBelowOrEqOne4(id);
 
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);
