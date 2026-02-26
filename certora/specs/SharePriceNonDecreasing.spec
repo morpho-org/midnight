@@ -24,7 +24,7 @@ rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, MorphoV2.Obligation ob
     mathint sharesAfter = totalShares(id);
 
     // unitsAfter == unitsBefore <==> badDebt == 0 (no bad debt socialization occurred)
-    assert unitsAfter == unitsBefore => (unitsAfter + 1) * (sharesBefore + 1) >= (unitsBefore + 1) * (sharesAfter + 1), "liquidation without bad debt must not decrease virtual share price";
+    assert unitsAfter == unitsBefore => (unitsAfter + 1) * (sharesBefore + 1) >= (unitsBefore + 1) * (sharesAfter + 1);
 }
 
 
@@ -32,7 +32,8 @@ rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, MorphoV2.Obligation ob
 /// Virtual share price = (totalUnits+1)/(totalShares+1) monotonicity.
 rule sharePriceDoesNotDecrease(bytes20 id, method f) filtered {
     f -> f.selector != sig:multicall(bytes[]).selector
-      && f.selector != sig:liquidate(MorphoV2.Obligation, uint256, uint256, uint256, address, bytes).selector
+      && f.selector != sig:liquidate(MorphoV2.Obligation, uint256, uint256, uint256, address, bytes).selector 
+      && !f.isView
 } {
 
     // We need it otherwise rounding down to 0 creates shares with no backing units
@@ -52,13 +53,5 @@ rule sharePriceDoesNotDecrease(bytes20 id, method f) filtered {
     mathint unitsAfter = totalUnits(id);
     mathint sharesAfter = totalShares(id);
 
-    // new lenders + new borrowers (case 1) + shares unchanged (cases 2,3 of take) => virtual share price must not decrease
-        // NOTE: code uses mulDivDown in take's else-branch (obligationShares input), which cause this to fail for that case
-    assert sharesAfter >= sharesBefore =>
-        (unitsAfter + 1) * (sharesBefore + 1) >= (unitsBefore + 1) * (sharesAfter + 1);
-
-    // borrower exits + existing lender exits (case 4) => obligation shrinks   
-        // FINDING : we have a rounding error of sharesBefore due to ceil rounding up to sharesBefore, that's why we need to include it in the inequality
-    assert sharesAfter < sharesBefore =>
-        (unitsAfter + 1) * (sharesBefore + 1) + sharesBefore >= (unitsBefore + 1) * (sharesAfter + 1);
+    assert (unitsAfter + 1) * (sharesBefore + 1) >= (unitsBefore + 1) * (sharesAfter + 1);
 }

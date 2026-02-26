@@ -16,6 +16,10 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+
+    function isHealthy(MorphoV2.Obligation memory, bytes20, address) internal returns (bool) => NONDET;
+    
 }
 
 // Share/asset ratio is never above 1: totalShares >= totalUnits at all times.
