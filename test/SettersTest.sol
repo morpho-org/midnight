@@ -78,8 +78,41 @@ contract SettersTest is BaseTest {
     }
 
     function testSetTradingFeeInvalidIndex(bytes20 id) public {
-        vm.expectRevert();
+        vm.expectRevert("Invalid index");
         morphoV2.setObligationTradingFee(id, 7, 0);
+    }
+
+    function testSetDefaultTradingFeeInvalidIndex(address loanToken) public {
+        vm.expectRevert("Invalid index");
+        morphoV2.setDefaultTradingFee(loanToken, 7, 0);
+    }
+
+    function testSetObligationTradingFeeValueTooHigh(bytes20 id, uint256 feeTooHigh, uint256 index) public {
+        index = bound(index, 0, 6);
+        feeTooHigh = bound(feeTooHigh, morphoV2.maxTradingFee(index) + 1, 1e18);
+        vm.expectRevert("value too high");
+        morphoV2.setObligationTradingFee(id, index, feeTooHigh);
+    }
+
+    function testSetTradingFeeNotMultipleOfFeeStep(bytes20 id, uint256 index, uint256 fee) public {
+        index = bound(index, 0, 6);
+        fee = bound(fee, 1, morphoV2.maxTradingFee(index));
+        vm.assume(fee % 1e12 != 0);
+        vm.expectRevert("fee should be a multiple of FEE_STEP");
+        morphoV2.setObligationTradingFee(id, index, fee);
+    }
+
+    function testSetDefaultTradingFeeNotMultipleOfFeeStep(address loanToken, uint256 index, uint256 fee) public {
+        index = bound(index, 0, 6);
+        fee = bound(fee, 1, morphoV2.maxTradingFee(index));
+        vm.assume(fee % 1e12 != 0);
+        vm.expectRevert("fee should be a multiple of FEE_STEP");
+        morphoV2.setDefaultTradingFee(loanToken, index, fee);
+    }
+
+    function testSetObligationTradingFeeObligationNotCreated(bytes20 id) public {
+        vm.expectRevert("Obligation not created");
+        morphoV2.setObligationTradingFee(id, 0, 0);
     }
 
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes20 id) public {

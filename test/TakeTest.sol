@@ -1140,6 +1140,52 @@ contract TakeTest is BaseTest {
         take(100, 0, 0, 0, borrower, lenderOffer);
     }
 
+    function testTakeInconsistentInput(
+        uint256 buyerAssets,
+        uint256 sellerAssets,
+        uint256 obligationUnits,
+        uint256 obligationShares
+    ) public {
+        vm.assume(!UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares));
+        vm.expectRevert("inconsistent input");
+        take(buyerAssets, sellerAssets, obligationUnits, obligationShares, borrower, lenderOffer);
+    }
+
+    function testTakeInconsistentOfferInput(uint256 assets, uint256 obligationUnits, uint256 obligationShares) public {
+        vm.assume(!UtilsLib.atMostOneNonZero(assets, obligationUnits, obligationShares));
+        Offer memory badOffer = lenderOffer;
+        badOffer.assets = assets;
+        badOffer.obligationUnits = obligationUnits;
+        badOffer.obligationShares = obligationShares;
+        vm.expectRevert("inconsistent offer input");
+        take(0, 0, 0, 0, borrower, badOffer);
+    }
+
+    function testTakeOfferNotStarted(uint256 start) public {
+        start = bound(start, block.timestamp + 1, type(uint256).max);
+        Offer memory badOffer = lenderOffer;
+        badOffer.start = start;
+        vm.expectRevert("offer not started");
+        take(0, 0, 0, 0, borrower, badOffer);
+    }
+
+    function testTakeOfferExpired(uint256 elapsed) public {
+        elapsed = bound(elapsed, 1, type(uint64).max);
+        vm.warp(lenderOffer.expiry + elapsed);
+        vm.expectRevert("offer expired");
+        take(0, 0, 0, 0, borrower, lenderOffer);
+    }
+
+    function testTakeBuyerAndSellerSame(uint256 pkey) public {
+        pkey = bound(pkey, 1, type(uint128).max);
+        address taker = vm.addr(pkey);
+        privateKey[taker] = pkey;
+        lenderOffer.maker = taker;
+
+        vm.expectRevert("buyer and seller cannot be the same");
+        take(0, 0, 0, 0, taker, lenderOffer);
+    }
+
     // test tree / signatures.
 
     function testTakeWrongRoot() public {

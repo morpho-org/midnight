@@ -290,6 +290,29 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.touchObligation(_obligation);
     }
 
+    function testCollateralsNotSorted() public {
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        Collateral[] memory collaterals = new Collateral[](2);
+        collaterals[0] = Collateral({token: address(uint160(2)), lltv: 0.75e18, oracle: address(oracle1)});
+        collaterals[1] = Collateral({token: address(uint160(1)), lltv: 0.75e18, oracle: address(oracle2)});
+        _obligation.collaterals = collaterals;
+        vm.expectRevert("collaterals not sorted");
+        morphoV2.touchObligation(_obligation);
+    }
+
+    function testLltvTooHighOrLIFTooHigh() public {
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        Collateral[] memory collaterals = new Collateral[](1);
+        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 1e18, oracle: address(oracle1)});
+        _obligation.collaterals = collaterals;
+        vm.expectRevert("lltv too high or LIF too high");
+        morphoV2.touchObligation(_obligation);
+    }
+
     function testBelowExactMaxCollaterals(uint256 numCollaterals) public {
         numCollaterals = bound(numCollaterals, 1, MAX_COLLATERALS - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);

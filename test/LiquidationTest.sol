@@ -269,8 +269,8 @@ contract LiquidationTest is BaseTest {
         assertEq(morphoV2.totalShares(id), units, "total shares");
     }
 
-    // Check that if there is bad debt it is possible to repay almost all debt.
-    function testLiquidateWithBadDebtRepayAll(uint256 units, uint256 liquidationOraclePrice) public {
+    // Check that if there is bad debt it is possible to repay almost all debt and seize almost all collateral.
+    function testLiquidateWithBadDebtRepayMax(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_TEST_AMOUNT);
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown());
         collateralize(obligation, borrower, units);
@@ -282,6 +282,12 @@ contract LiquidationTest is BaseTest {
         morphoV2.liquidate(obligation, 0, 0, UtilsLib.min(maxRepaid, debtAfterBadDebt), borrower, "");
 
         assertApproxEqAbs(morphoV2.debtOf(id, borrower), 0, 1e3, "all remaining debt repaid");
+        assertApproxEqAbs(
+            morphoV2.collateralOf(id, borrower, 0).mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE),
+            0,
+            1e3,
+            "all remaining collateral seized"
+        );
     }
 
     // post maturity liquidation.
@@ -452,6 +458,60 @@ contract LiquidationTest is BaseTest {
         assertEq(morphoV2.debtOf(id, borrower), 0);
     }
 
+    /// @dev With RCF deactivated, liquidation can always end by fully repaying debt or fully seizing collateral.
+    function testLiquidateFullyRepayOrFullySeizeWhenRcfDeactivated(
+        uint256 units,
+        uint256 collateral1,
+        uint256 collateral2
+    ) public {
+        collateral1 = bound(collateral1, 1, MAX_TEST_AMOUNT);
+        collateral2 = bound(collateral2, 1, MAX_TEST_AMOUNT);
+
+        // Deactivate RCF.
+        obligation.rcfThreshold = type(uint256).max;
+        id = toId(obligation);
+
+        // Price is 1 initially, assume liquidatable but no bad debt.
+        uint256 maxDebt = collateral1.mulDivDown(obligation.collaterals[0].lltv, WAD)
+            + collateral2.mulDivDown(obligation.collaterals[1].lltv, WAD);
+        uint256 repayableDebt = collateral1.mulDivDown(WAD, MAX_LIF) + collateral2.mulDivDown(WAD, MAX_LIF);
+        units = bound(units, maxDebt, repayableDebt);
+        vm.assume(units > maxDebt);
+
+        // Write the debt first, supply collateral later, so that the activated collaterals are not overwritten.
+        uint256 mappingSlot = 1;
+        bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
+        bytes32 borrowerSlot = keccak256(abi.encode(borrower, intermediateSlot));
+        vm.store(address(morphoV2), borrowerSlot, bytes32(units));
+
+        assertEq(morphoV2.debtOf(id, borrower), units, "debt");
+
+        // Collateralize with both collaterals.
+        deal(obligation.collaterals[0].token, address(this), collateral1);
+        ERC20(obligation.collaterals[0].token).approve(address(morphoV2), collateral1);
+        morphoV2.supplyCollateral(obligation, 0, collateral1, borrower);
+
+        deal(obligation.collaterals[1].token, address(this), collateral2);
+        ERC20(obligation.collaterals[1].token).approve(address(morphoV2), collateral2);
+        morphoV2.supplyCollateral(obligation, 1, collateral2, borrower);
+
+        // Check that the position is unhealthy but has no bad debt.
+        // If it had bad debt, this can be taken into account separately.
+        assertEq(_badDebt(), 0, "no bad debt");
+        assertFalse(morphoV2.isHealthy(obligation, id, borrower), "position should be unhealthy");
+
+        uint256 collateralNeededToRepayAll = units.mulDivDown(MAX_LIF, WAD);
+        if (collateralNeededToRepayAll <= collateral1) {
+            morphoV2.liquidate(obligation, 0, 0, units, borrower, "");
+        } else {
+            morphoV2.liquidate(obligation, 0, collateral1, 0, borrower, "");
+        }
+
+        uint256 debtAfter = morphoV2.debtOf(id, borrower);
+        uint256 collateralAfter = morphoV2.collateralOf(id, borrower, 0);
+        assertTrue(debtAfter == 0 || collateralAfter == 0, "either debt repaid or collateral seized");
+    }
+
     /// @dev Recovery close factor with two collaterals contributing to maxDebt.
     /// Drops price of the lower-lltv collateral to make position unhealthy, then liquidates it.
     function testRecoveryCloseFactorMultipleCollaterals(uint256 units) public {
@@ -570,7 +630,7 @@ contract LiquidationTest is BaseTest {
         uint256 lltv = obligation.collaterals[0].lltv;
         uint256 collatAmount = units.mulDivUp(WAD, lltv);
         uint256 _maxDebt = collatAmount.mulDivDown(oraclePrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-        return debt.zeroFloorSub(_maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(lltv, WAD));
+        return (debt - _maxDebt).mulDivUp(WAD, WAD - MAX_LIF.mulDivUp(lltv, WAD));
     }
 
     function _setupUnhealthy(uint256 units, uint256 liquidationOraclePrice)
