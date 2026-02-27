@@ -40,9 +40,13 @@ function obligationIsCreated(MorphoV2.Obligation obligation) returns (bool) {
 invariant createdObligationsHaveSortedCollaterals(MorphoV2.Obligation obligation, uint256 i, uint256 j)
     obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
 
-// Show that a created obligation do not have address(0) collaterals.
+// Show that a created obligation does not have address(0) collaterals.
 invariant createdObligationsHaveNonZeroCollaterals(MorphoV2.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
+
+// Show that a created obligation has at least one collateral.
+invariant createdObligationsHaveAtLeastOneCollateral(MorphoV2.Obligation obligation)
+    obligationIsCreated(obligation) => obligation.collaterals.length > 0;
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes20 id) {

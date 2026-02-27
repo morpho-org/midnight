@@ -313,6 +313,15 @@ contract OtherFunctionsTest is BaseTest {
         morphoV2.touchObligation(_obligation);
     }
 
+    function testNoCollateral() public {
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+
+        vm.expectRevert("no collateral");
+        morphoV2.touchObligation(_obligation);
+    }
+
     function testBelowExactMaxCollaterals(uint256 numCollaterals) public {
         numCollaterals = bound(numCollaterals, 1, MAX_COLLATERALS - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
