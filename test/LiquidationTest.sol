@@ -136,7 +136,7 @@ contract LiquidationTest is BaseTest {
         assertEq(repaidUnits, repaid, "repaid units");
         assertEq(
             seizedAssets,
-            repaid.mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice).mulDivDown(MAX_LIF, WAD),
+            repaid.mulDivDown(MAX_LIF, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice),
             "seized assets"
         );
 
@@ -154,7 +154,7 @@ contract LiquidationTest is BaseTest {
             seized,
             0,
             UtilsLib.min(
-                units.mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice).mulDivDown(MAX_LIF, WAD), initialCollateral
+                units.mulDivDown(MAX_LIF, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice), initialCollateral
             )
         );
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
@@ -164,7 +164,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(
             repaidUnits,
-            seized.mulDivUp(WAD, MAX_LIF).mulDivUp(liquidationOraclePrice, ORACLE_PRICE_SCALE),
+            seized.mulDivUp(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, MAX_LIF),
             "repaid units"
         );
         assertEq(seizedAssets, seized, "seized assets");
@@ -315,7 +315,7 @@ contract LiquidationTest is BaseTest {
         assertEq(morphoV2.debtOf(id, borrower), units - repaid, "debt");
         assertEq(
             morphoV2.collateralOf(id, borrower, 0),
-            initialCollateral - repaid.mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice).mulDivDown(MAX_LIF, WAD),
+            initialCollateral - repaid.mulDivDown(MAX_LIF, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice),
             "collateral"
         );
     }
@@ -344,7 +344,7 @@ contract LiquidationTest is BaseTest {
         assertEq(morphoV2.debtOf(id, borrower), units - repaid, "debt");
         assertEq(
             morphoV2.collateralOf(id, borrower, 0),
-            initialCollateral - repaid.mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice).mulDivDown(lif, WAD),
+            initialCollateral - repaid.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice),
             "collateral"
         );
     }
