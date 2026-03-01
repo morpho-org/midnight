@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TICK_RANGE} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
@@ -52,7 +52,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 100);
 
-        morphoV2.setContinuousFeeRecipient(feeRecipient);
+        midnight.setContinuousFeeRecipient(feeRecipient);
     }
 
     function testContinuousFeeAccrualBasic(uint256 initialShares, uint256 fee, uint256 timeElapsed) public {
@@ -62,21 +62,21 @@ contract ContinuousFeeTest is BaseTest {
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
         // Set default continuous fee BEFORE creating the obligation
-        morphoV2.setDefaultContinuousFee(address(loanToken), fee);
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesBefore = morphoV2.totalShares(id);
-        uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
-        uint256 lastUpdateBefore = morphoV2.lastUpdate(id);
+        uint256 totalSharesBefore = midnight.totalShares(id);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
+        uint256 lastUpdateBefore = midnight.lastUpdate(id);
 
         vm.warp(block.timestamp + timeElapsed);
         take(0, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesAfter = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter = morphoV2.sharesOf(id, feeRecipient);
-        uint256 lastUpdateAfter = morphoV2.lastUpdate(id);
+        uint256 totalSharesAfter = midnight.totalShares(id);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
+        uint256 lastUpdateAfter = midnight.lastUpdate(id);
 
         uint256 expectedSharesMinted = (totalSharesBefore * timeElapsed).mulDivDown(fee, WAD);
 
@@ -96,14 +96,14 @@ contract ContinuousFeeTest is BaseTest {
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesBefore = morphoV2.totalShares(id);
-        uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesBefore = midnight.totalShares(id);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
 
         vm.warp(block.timestamp + timeElapsed);
         take(0, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesAfter = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesAfter = midnight.totalShares(id);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
 
         assertEq(totalSharesAfter, totalSharesBefore, "total shares should not change with zero fee");
         assertEq(recipientSharesAfter, recipientSharesBefore, "recipient shares should not change with zero fee");
@@ -114,18 +114,18 @@ contract ContinuousFeeTest is BaseTest {
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
 
         // Set default continuous fee BEFORE creating the obligation
-        morphoV2.setDefaultContinuousFee(address(loanToken), fee);
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesBefore = morphoV2.totalShares(id);
-        uint256 recipientSharesBefore = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesBefore = midnight.totalShares(id);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
 
         take(0, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesAfter = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesAfter = midnight.totalShares(id);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
 
         assertEq(totalSharesAfter, totalSharesBefore, "total shares should not change with zero elapsed time");
         assertEq(
@@ -138,20 +138,20 @@ contract ContinuousFeeTest is BaseTest {
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
 
         // Set default continuous fee BEFORE creating the obligation
-        morphoV2.setDefaultContinuousFee(address(loanToken), fee);
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
         take(initialShares, 0, 0, 0, borrower, lenderOffer);
 
-        uint256 totalSharesInitial = morphoV2.totalShares(id);
-        uint256 recipientSharesInitial = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesInitial = midnight.totalShares(id);
+        uint256 recipientSharesInitial = midnight.sharesOf(id, feeRecipient);
 
         // First accrual
         vm.warp(block.timestamp + 1 days);
         uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(fee, WAD);
         take(0, 0, 0, 0, borrower, lenderOffer);
-        uint256 totalSharesAfter1 = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter1 = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesAfter1 = midnight.totalShares(id);
+        uint256 recipientSharesAfter1 = midnight.sharesOf(id, feeRecipient);
 
         assertEq(totalSharesAfter1, totalSharesInitial + expectedShares1, "first accrual should match expected");
         assertEq(
@@ -162,8 +162,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + 7 days);
         uint256 expectedShares2 = (totalSharesAfter1 * 7 days).mulDivDown(fee, WAD);
         take(0, 0, 0, 0, borrower, lenderOffer);
-        uint256 totalSharesAfter2 = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter2 = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesAfter2 = midnight.totalShares(id);
+        uint256 recipientSharesAfter2 = midnight.sharesOf(id, feeRecipient);
 
         assertEq(totalSharesAfter2, totalSharesAfter1 + expectedShares2, "second accrual should match expected");
         assertEq(
@@ -174,8 +174,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + 30 days);
         uint256 expectedShares3 = (totalSharesAfter2 * 30 days).mulDivDown(fee, WAD);
         take(0, 0, 0, 0, borrower, lenderOffer);
-        uint256 totalSharesAfter3 = morphoV2.totalShares(id);
-        uint256 recipientSharesAfter3 = morphoV2.sharesOf(id, feeRecipient);
+        uint256 totalSharesAfter3 = midnight.totalShares(id);
+        uint256 recipientSharesAfter3 = midnight.sharesOf(id, feeRecipient);
 
         assertEq(totalSharesAfter3, totalSharesAfter2 + expectedShares3, "third accrual should match expected");
         assertEq(

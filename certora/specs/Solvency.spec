@@ -10,11 +10,11 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
 
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
-    function IdLib.toId(MorphoV2.Obligation memory obligation, uint256 chainId, address morphoV2) internal returns (bytes20) => CVL_toId(obligation, chainId, morphoV2);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes20) => CVL_toId(obligation, chainId, midnight);
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
+    function _.onLiquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
@@ -60,9 +60,9 @@ ghost mapping(bytes20 => mapping(uint128 => address)) collateralToken;
 
 ghost hash(address, uint256, uint256, address) returns bytes20;
 
-function CVL_toId(MorphoV2.Obligation obligation, uint256 chainId, address morphoV2) returns bytes20 {
+function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes20 {
     // Deterministically derive the obligation id.
-    bytes20 id = hash(obligation.loanToken, obligation.maturity, chainId, morphoV2);
+    bytes20 id = hash(obligation.loanToken, obligation.maturity, chainId, midnight);
 
     // Assume the obligation id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
@@ -132,7 +132,7 @@ strong invariant tokenBalanceCorrect(address token)
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
         }
-        preserved take(uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+        preserved take(uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
             require taker != currentContract, "no trading with contract";
             require offer.maker != currentContract, "no trading with contract";
         }
