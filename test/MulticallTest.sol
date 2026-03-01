@@ -7,27 +7,27 @@ import {BaseTest} from "./BaseTest.sol";
 contract MulticallTest is BaseTest {
     function testMulticallSuccess() public {
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeCall(morphoV2.setFeeSetter, (makeAddr("newFeeSetter")));
-        data[1] = abi.encodeCall(morphoV2.setOwner, (makeAddr("newOwner")));
+        data[0] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
+        data[1] = abi.encodeCall(midnight.setOwner, (makeAddr("newOwner")));
 
-        vm.prank(morphoV2.owner());
-        morphoV2.multicall(data);
+        vm.prank(midnight.owner());
+        midnight.multicall(data);
 
-        assertEq(morphoV2.owner(), makeAddr("newOwner"), "wrong owner");
-        assertEq(morphoV2.feeSetter(), makeAddr("newFeeSetter"), "wrong fee setter");
+        assertEq(midnight.owner(), makeAddr("newOwner"), "wrong owner");
+        assertEq(midnight.feeSetter(), makeAddr("newFeeSetter"), "wrong fee setter");
     }
 
     function testMulticallFailing() public {
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeCall(morphoV2.setOwner, (makeAddr("newOwner")));
-        data[1] = abi.encodeCall(morphoV2.setFeeSetter, (makeAddr("newFeeSetter")));
+        data[0] = abi.encodeCall(midnight.setOwner, (makeAddr("newOwner")));
+        data[1] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
 
-        vm.prank(morphoV2.owner());
+        vm.prank(midnight.owner());
         vm.expectRevert("Only owner");
-        morphoV2.multicall(data);
+        midnight.multicall(data);
     }
 
     function testMulticallEmpty() public {
-        morphoV2.multicall(new bytes[](0));
+        midnight.multicall(new bytes[](0));
     }
 }

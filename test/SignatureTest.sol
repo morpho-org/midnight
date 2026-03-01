@@ -2,12 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Signature} from "../src/interfaces/IMorphoV2.sol";
-import {MorphoV2} from "../src/MorphoV2.sol";
+import {Signature} from "../src/interfaces/IMidnight.sol";
+import {Midnight} from "../src/Midnight.sol";
 import {ROOT_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 import {Test} from "../lib/forge-std/src/Test.sol";
 
-contract SignatureTest is Test, MorphoV2 {
+contract SignatureTest is Test, Midnight {
     function testSigner(bytes32 root, uint256 privateKey) public view {
         privateKey = boundPrivateKey(privateKey);
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));

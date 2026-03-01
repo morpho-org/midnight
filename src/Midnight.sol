@@ -19,20 +19,28 @@ import {
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
-    IMorphoV2,
+    IMidnight,
     Obligation,
     Offer,
     Signature,
     Collateral,
     BorrowerState,
     ObligationState
-} from "./interfaces/IMorphoV2.sol";
+} from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
-contract MorphoV2 is IMorphoV2 {
+///
+/// TRADING FEES
+/// @dev The trading fee is computed using piecewise linear interpolation between breakpoints.
+/// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
+/// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
+/// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
+/// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits.
+/// @dev Max trading fee is defined per index (see maxTradingFee function).
+contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
 
@@ -64,7 +72,7 @@ contract MorphoV2 is IMorphoV2 {
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
-    mapping(address loanToken => uint16[6]) public defaultFees;
+    mapping(address loanToken => uint16[7]) public defaultFees;
 
     address public tradingFeeRecipient;
 
@@ -111,9 +119,10 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Overrides the fee of a specific obligation.
     function setObligationTradingFee(bytes20 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(index <= 5, "Invalid index");
+        require(index <= 6, "Invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
+        require(obligationState[id].created, "Obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
         obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
@@ -122,7 +131,7 @@ contract MorphoV2 is IMorphoV2 {
     /// @dev Doesn't change the fee of already created obligations.
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
-        require(index <= 5, "Invalid index");
+        require(index <= 6, "Invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
@@ -469,26 +478,25 @@ contract MorphoV2 is IMorphoV2 {
         bytes20 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
-        uint256 repayableDebt;
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
         BorrowerState storage _state = borrowerState[id][borrower];
+        uint256 originalDebt = _state.debt;
+        uint256 badDebt = originalDebt;
         uint256 bitmap = _state.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
             uint256 price = IOracle(_collateral.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 _collateralOf = collateralOf[id][borrower][i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
-            repayableDebt += _collateralOf.mulDivUp(WAD, MAX_LIF).mulDivUp(price, ORACLE_PRICE_SCALE);
+            uint256 collateralQuoted = collateralOf[id][borrower][i].mulDivDown(price, ORACLE_PRICE_SCALE);
+            maxDebt += collateralQuoted.mulDivDown(_collateral.lltv, WAD);
+            badDebt = badDebt.zeroFloorSub(collateralQuoted.mulDivDown(WAD, MAX_LIF));
             bitmap ^= (1 << i);
         }
 
-        uint256 originalDebt = _state.debt;
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
-        uint256 badDebt = originalDebt.zeroFloorSub(repayableDebt);
         if (badDebt > 0) {
             _state.debt -= UtilsLib.toUint128(badDebt);
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
@@ -502,15 +510,16 @@ contract MorphoV2 is IMorphoV2 {
                 );
 
             if (seizedAssets > 0) {
-                repaidUnits = seizedAssets.mulDivUp(WAD, lif).mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE);
+                repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
-                seizedAssets = repaidUnits.mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice).mulDivDown(lif, WAD);
+                seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
+                // Note that debt >= Σ collateralQuoted * 1 / lif >= Σ collateralQuoted * lltv = maxDebt.
                 uint256 maxRepaid = (_state.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
                 require(
                     repaidUnits <= maxRepaid
@@ -631,7 +640,7 @@ contract MorphoV2 is IMorphoV2 {
         return obligationState[id].withdrawable;
     }
 
-    function fees(bytes20 id) external view returns (uint16[6] memory) {
+    function fees(bytes20 id) external view returns (uint16[7] memory) {
         return obligationState[id].fees;
     }
 
@@ -667,22 +676,23 @@ contract MorphoV2 is IMorphoV2 {
 
     /// @dev 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
     function maxTradingFee(uint256 index) public pure returns (uint256) {
-        return [0.000014e18, 0.000014e18, 0.000098e18, 0.000417e18, 0.00125e18, 0.0025e18][index];
+        return [0.000014e18, 0.000014e18, 0.000098e18, 0.000417e18, 0.00125e18, 0.0025e18, 0.005e18][index];
     }
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes20 id, uint256 timeToMaturity) public view returns (uint256) {
-        uint16[6] memory _fees = obligationState[id].fees;
+        uint16[7] memory _fees = obligationState[id].fees;
 
-        if (timeToMaturity >= 180 days) return _fees[5] * FEE_STEP;
+        if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 index, uint256 start, uint256 end) =
-            timeToMaturity < 1 days  ? (0, 0 days, 1 days) :
-            timeToMaturity < 7 days  ? (1, 1 days, 7 days) :
-            timeToMaturity < 30 days ? (2, 7 days, 30 days) :
-            timeToMaturity < 90 days ? (3, 30 days, 90 days) :
-                                       (4, 90 days, 180 days);
+            timeToMaturity < 1 days   ? (0, 0 days, 1 days) :
+            timeToMaturity < 7 days   ? (1, 1 days, 7 days) :
+            timeToMaturity < 30 days  ? (2, 7 days, 30 days) :
+            timeToMaturity < 90 days  ? (3, 30 days, 90 days) :
+            timeToMaturity < 180 days ? (4, 90 days, 180 days) :
+                                        (5, 180 days, 360 days);
         // forgefmt: disable-end
 
         uint256 feeLower = _fees[index] * FEE_STEP;

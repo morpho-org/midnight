@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {Obligation} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation} from "../src/interfaces/IMidnight.sol";
 
 // toObligation is tested in OtherFunctionsTest.sol, to test actual implementation (avoid introducing mocks).
 contract IdLibTest is Test {
@@ -11,7 +11,7 @@ contract IdLibTest is Test {
         Obligation memory obligation1,
         Obligation memory obligation2,
         uint256 chainid,
-        address morphoV2
+        address midnight
     ) public pure {
         bool sameLoanToken = obligation1.loanToken == obligation2.loanToken;
         bool sameMaturity = obligation1.maturity == obligation2.maturity;
@@ -27,8 +27,8 @@ contract IdLibTest is Test {
 
         vm.assume(!(sameLoanToken && sameMaturity && sameCollaterals && sameRcfThreshold));
 
-        bytes20 id1 = IdLib.toId(obligation1, chainid, morphoV2);
-        bytes20 id2 = IdLib.toId(obligation2, chainid, morphoV2);
+        bytes20 id1 = IdLib.toId(obligation1, chainid, midnight);
+        bytes20 id2 = IdLib.toId(obligation2, chainid, midnight);
         assertNotEq(id1, id2);
     }
 
@@ -36,23 +36,23 @@ contract IdLibTest is Test {
         Obligation memory obligation,
         uint256 chainid1,
         uint256 chainid2,
-        address morphoV2
+        address midnight
     ) public pure {
         vm.assume(chainid1 != chainid2);
-        bytes20 id1 = IdLib.toId(obligation, chainid1, morphoV2);
-        bytes20 id2 = IdLib.toId(obligation, chainid2, morphoV2);
+        bytes20 id1 = IdLib.toId(obligation, chainid1, midnight);
+        bytes20 id2 = IdLib.toId(obligation, chainid2, midnight);
         assertNotEq(id1, id2);
     }
 
-    function testToIdIsInjectiveInMorphoV2(
+    function testToIdIsInjectiveInMidnight(
         Obligation memory obligation,
         uint256 chainid,
-        address morphoV2One,
-        address morphoV2Two
+        address midnightOne,
+        address midnightTwo
     ) public pure {
-        vm.assume(morphoV2One != morphoV2Two);
-        bytes20 id1 = IdLib.toId(obligation, chainid, morphoV2One);
-        bytes20 id2 = IdLib.toId(obligation, chainid, morphoV2Two);
+        vm.assume(midnightOne != midnightTwo);
+        bytes20 id1 = IdLib.toId(obligation, chainid, midnightOne);
+        bytes20 id2 = IdLib.toId(obligation, chainid, midnightTwo);
         assertNotEq(id1, id2);
     }
 }
