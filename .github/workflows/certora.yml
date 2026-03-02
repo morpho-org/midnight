@@ -26,11 +26,8 @@ jobs:
       - uses: actions/setup-python@v5
       - name: Install certora
         run: pip install certora-cli
-      - name: Install solc
-        run: |
-          wget https://github.com/ethereum/solidity/releases/download/v0.8.31/solc-static-linux
-          chmod +x solc-static-linux
-          sudo mv solc-static-linux /usr/local/bin/solc-0.8.31
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
       - name: Verify ${{ matrix.conf }}
         run: certoraRun certora/confs/${{ matrix.conf }}.conf
         env:
