@@ -14,17 +14,17 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         amountStored = amount;
         dataStored = data;
 
-        deal(address(loanToken), address(morphoV2), amount);
-        morphoV2.flashLoan(address(loanToken), amount, address(this), data);
+        deal(address(loanToken), address(midnight), amount);
+        midnight.flashLoan(address(loanToken), amount, address(this), data);
 
         assertEq(loanToken.balanceOf(address(this)), 0, "balanceOf");
-        assertEq(loanToken.balanceOf(address(morphoV2)), amount, "balanceOf");
+        assertEq(loanToken.balanceOf(address(midnight)), amount, "balanceOf");
     }
 
     function onFlashLoan(address token, uint256 amount, bytes memory data) external {
         assertEq(token, address(loanToken), "wrong token");
         assertEq(amount, amountStored, "wrong amount");
         assertEq(data, dataStored, "wrong data");
-        ERC20(token).approve(address(morphoV2), amount);
+        ERC20(token).approve(address(midnight), amount);
     }
 }

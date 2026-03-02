@@ -47,6 +47,11 @@ library UtilsLib {
         return (x * y + (d - 1)) / d;
     }
 
+    /// @dev Returns (`x` * `y`) / `d` rounded up or down.
+    function mulDiv(uint256 x, uint256 y, uint256 d, bool roundDown) internal pure returns (uint256) {
+        return roundDown ? mulDivDown(x, y, d) : mulDivUp(x, y, d);
+    }
+
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
     /// @dev Hash sorts the inputs lexicographically.
     function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
