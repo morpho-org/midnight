@@ -1,4 +1,14 @@
-# V2
+# Morpho Midnight
+
+Morpho Midnight is a fixed-rate lending protocol based on zero-coupon obligations.
+
+## Whitepaper
+
+Coming soon...
+
+## Developers
+
+Compilation, testing and formatting are done with [forge](https://book.getfoundry.sh/getting-started/installation).
 
 ## Licences
 

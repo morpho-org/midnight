@@ -54,4 +54,4 @@ struct ObligationState {
     uint16[7] fees;
 }
 
-interface IMorphoV2 {}
+interface IMidnight {}

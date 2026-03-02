@@ -17,7 +17,7 @@ jobs:
           - CreatedObligations
           - Hasher
           - Liquidate
-          - MorphoV2
+          - Midnight
           - SharePrice
           - Solvency
 
