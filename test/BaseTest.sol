@@ -15,8 +15,8 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMorphoV2.sol";
-import {MorphoV2} from "../src/MorphoV2.sol";
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = 1e36;
 
@@ -25,7 +25,7 @@ abstract contract BaseTest is Test {
 
     mapping(address => uint256) internal privateKey;
 
-    MorphoV2 internal morphoV2;
+    Midnight internal midnight;
     ERC20 internal loanToken;
     ERC20 internal collateralToken1;
     ERC20 internal collateralToken2;
@@ -38,9 +38,9 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public virtual {
-        morphoV2 = new MorphoV2();
+        midnight = new Midnight();
 
-        morphoV2.setFeeSetter(address(this));
+        midnight.setFeeSetter(address(this));
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -60,19 +60,19 @@ abstract contract BaseTest is Test {
         oracle2 = new Oracle();
 
         vm.prank(lender);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
         vm.prank(otherLender);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
         vm.prank(borrower);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
         vm.prank(otherBorrower);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
         vm.prank(liquidator);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
 
-        loanToken.approve(address(morphoV2), type(uint256).max);
-        collateralToken1.approve(address(morphoV2), type(uint256).max);
-        collateralToken2.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
+        collateralToken1.approve(address(midnight), type(uint256).max);
+        collateralToken2.approve(address(midnight), type(uint256).max);
     }
 
     // helpers.
@@ -80,8 +80,8 @@ abstract contract BaseTest is Test {
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
         uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
-        collateralToken1.approve(address(morphoV2), collateral);
-        morphoV2.supplyCollateral(obligation, 0, collateral, _borrower);
+        collateralToken1.approve(address(midnight), collateral);
+        midnight.supplyCollateral(obligation, 0, collateral, _borrower);
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
@@ -96,7 +96,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return morphoV2.take(
+        return midnight.take(
             buyerAssets,
             sellerAssets,
             obligationUnits,
@@ -133,7 +133,7 @@ abstract contract BaseTest is Test {
         privateKey[badBorrower] = badBorrowerPrivateKey;
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
-        loanToken.approve(address(morphoV2), type(uint256).max);
+        loanToken.approve(address(midnight), type(uint256).max);
 
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligation = obligation;
@@ -146,30 +146,30 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.tick = TICK_RANGE;
 
         deal(obligation.collaterals[0].token, address(this), 135);
-        morphoV2.supplyCollateral(obligation, 0, 135, badBorrower);
+        midnight.supplyCollateral(obligation, 0, 135, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
         take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        morphoV2.liquidate(obligation, 0, 0, 0, badBorrower, "");
+        midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         assertNotEq(
-            morphoV2.totalUnits(toId(obligation)), morphoV2.totalShares(toId(obligation)), "total units != total shares"
+            midnight.totalUnits(toId(obligation)), midnight.totalShares(toId(obligation)), "total units != total shares"
         );
 
         // then empty the market (borrow side only).
-        deal(address(loanToken), address(this), morphoV2.debtOf(toId(obligation), badBorrower));
-        morphoV2.repay(obligation, morphoV2.debtOf(toId(obligation), badBorrower), badBorrower);
-        assertEq(morphoV2.debtOf(toId(obligation), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
+        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower);
+        assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
     function toId(Obligation memory obligation) internal view returns (bytes20) {
-        return IdLib.toId(obligation, block.chainid, address(morphoV2));
+        return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -192,7 +192,7 @@ abstract contract BaseTest is Test {
     }
 
     function domainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(morphoV2)));
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(midnight)));
     }
 
     function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
@@ -257,7 +257,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.tick = TICK_RANGE;
 
         vm.prank(lender);
-        morphoV2.take(
+        midnight.take(
             0,
             0,
             obligationUnits,

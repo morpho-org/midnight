@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {Obligation, Collateral} from "../src/interfaces/IMorphoV2.sol";
+import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -42,16 +42,16 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         deal(collateralToken, address(this), additionalCollateral);
-        morphoV2.supplyCollateral(obligation, 0, additionalCollateral, borrower);
+        midnight.supplyCollateral(obligation, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
-        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, 0);
+        uint256 initialCollateral = midnight.collateralOf(id, borrower, 0);
 
         vm.prank(borrower);
-        morphoV2.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
+        midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
 
-        assertEq(morphoV2.collateralOf(id, borrower, 0), initialCollateral - withdraw, "collateral of");
+        assertEq(midnight.collateralOf(id, borrower, 0), initialCollateral - withdraw, "collateral of");
         assertEq(
-            ERC20(collateralToken).balanceOf(address(morphoV2)), initialCollateral - withdraw, "balance of morphoV2"
+            ERC20(collateralToken).balanceOf(address(midnight)), initialCollateral - withdraw, "balance of midnight"
         );
         assertEq(ERC20(collateralToken).balanceOf(borrower), withdraw, "balance of borrower");
     }
@@ -65,13 +65,13 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         deal(collateralToken, address(this), additionalCollateral);
-        morphoV2.supplyCollateral(obligation, 0, additionalCollateral, borrower);
-        uint256 initialCollateral = morphoV2.collateralOf(id, borrower, 0);
+        midnight.supplyCollateral(obligation, 0, additionalCollateral, borrower);
+        uint256 initialCollateral = midnight.collateralOf(id, borrower, 0);
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
         vm.prank(borrower);
         vm.expectRevert("Unhealthy borrower");
-        morphoV2.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
+        midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
     }
 
     function testRepay(uint256 units, uint256 repaid) public {
@@ -84,11 +84,11 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        morphoV2.repay(obligation, repaid, borrower);
+        midnight.repay(obligation, repaid, borrower);
 
-        assertEq(morphoV2.debtOf(id, borrower), units - repaid);
-        assertEq(morphoV2.withdrawable(id), repaid);
-        assertEq(loanToken.balanceOf(address(morphoV2)), repaid);
+        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.withdrawable(id), repaid);
+        assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
@@ -96,7 +96,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(units > 0 && shares > 0);
         vm.prank(lender);
         vm.expectRevert("INCONSISTENT_INPUT");
-        morphoV2.withdraw(obligation, units, shares, lender, lender);
+        midnight.withdraw(obligation, units, shares, lender, lender);
     }
 
     function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
@@ -106,12 +106,12 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.prank(lender);
         (uint256 returnedObligationUnits, uint256 returnedShares) =
-            morphoV2.withdraw(obligation, withdraw, 0, lender, lender);
+            midnight.withdraw(obligation, withdraw, 0, lender, lender);
 
-        assertEq(morphoV2.sharesOf(id, lender), units - withdraw, "obligationSharesOf");
-        assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
-        assertEq(morphoV2.totalShares(id), units - withdraw, "totalShares");
-        assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
+        assertEq(midnight.sharesOf(id, lender), units - withdraw, "obligationSharesOf");
+        assertEq(midnight.withdrawable(id), 0, "withdrawable");
+        assertEq(midnight.totalShares(id), units - withdraw, "totalShares");
+        assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
         assertEq(returnedObligationUnits, withdraw, "returned obligation units");
         assertEq(returnedShares, withdraw, "returned shares");
@@ -125,11 +125,11 @@ contract OtherFunctionsTest is BaseTest {
         // TODO: sharesPrice != 1
         vm.prank(lender);
         (uint256 returnedObligationUnits, uint256 returnedShares) =
-            morphoV2.withdraw(obligation, 0, shares, lender, lender);
+            midnight.withdraw(obligation, 0, shares, lender, lender);
 
-        assertEq(morphoV2.sharesOf(id, lender), units - shares, "obligationSharesOf");
-        assertEq(morphoV2.withdrawable(id), 0, "withdrawable");
-        assertEq(loanToken.balanceOf(address(morphoV2)), 0, "balance of morphoV2");
+        assertEq(midnight.sharesOf(id, lender), units - shares, "obligationSharesOf");
+        assertEq(midnight.withdrawable(id), 0, "withdrawable");
+        assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
         assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
         assertEq(returnedObligationUnits, shares, "returned obligation units");
         assertEq(returnedShares, shares, "returned shares");
@@ -142,7 +142,7 @@ contract OtherFunctionsTest is BaseTest {
         address receiver = makeAddr("receiver");
 
         vm.prank(lender);
-        morphoV2.withdraw(obligation, withdraw, 0, lender, receiver);
+        midnight.withdraw(obligation, withdraw, 0, lender, receiver);
 
         assertEq(loanToken.balanceOf(lender), 0, "balance of lender");
         assertEq(loanToken.balanceOf(receiver), withdraw, "balance of receiver");
@@ -154,10 +154,10 @@ contract OtherFunctionsTest is BaseTest {
         address collateralToken = obligation.collaterals[0].token;
         address receiver = makeAddr("receiver");
         deal(collateralToken, address(this), supply);
-        ERC20(collateralToken).approve(address(morphoV2), supply);
-        morphoV2.supplyCollateral(obligation, 0, supply, address(this));
+        ERC20(collateralToken).approve(address(midnight), supply);
+        midnight.supplyCollateral(obligation, 0, supply, address(this));
 
-        morphoV2.withdrawCollateral(obligation, 0, withdraw, address(this), receiver);
+        midnight.withdrawCollateral(obligation, 0, withdraw, address(this), receiver);
 
         assertEq(ERC20(collateralToken).balanceOf(address(this)), 0, "balance of this");
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
@@ -165,25 +165,25 @@ contract OtherFunctionsTest is BaseTest {
 
     function testConsume(address user, bytes32 group, uint256 amount) public {
         vm.prank(user);
-        morphoV2.consume(group, amount);
-        assertEq(morphoV2.consumed(user, group), amount, "consumed");
+        midnight.consume(group, amount);
+        assertEq(midnight.consumed(user, group), amount, "consumed");
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes20 _id = morphoV2.touchObligation(_obligation);
-        assertEq(morphoV2.obligationCreated(_id), true, "obligation created");
-        uint16[7] memory fees = morphoV2.fees(_id);
+        bytes20 _id = midnight.touchObligation(_obligation);
+        assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        uint16[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
-            assertEq(fees[i], morphoV2.defaultFees(_obligation.loanToken, i), "fees");
+            assertEq(fees[i], midnight.defaultFees(_obligation.loanToken, i), "fees");
         }
     }
 
     function testToObligation(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes20 _id = morphoV2.touchObligation(_obligation);
+        bytes20 _id = midnight.touchObligation(_obligation);
         Obligation memory obligationFromId = IdLib.toObligation(_id);
         assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
         assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
@@ -199,19 +199,19 @@ contract OtherFunctionsTest is BaseTest {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 expected = toId(_obligation);
-        bytes20 actual = morphoV2.toId(_obligation);
+        bytes20 actual = midnight.toId(_obligation);
         assertEq(actual, expected, "toId mismatch");
     }
 
     function testToObligationRevertsIfNotCreated(bytes20 _id) public {
         vm.expectRevert();
-        morphoV2.toObligation(_id);
+        midnight.toObligation(_id);
     }
 
     function testSstore2CodeStartsWithStop(Obligation memory _obligation) public {
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
-        bytes20 _id = morphoV2.touchObligation(_obligation);
+        bytes20 _id = midnight.touchObligation(_obligation);
         address sstore2Address = address(_id);
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
@@ -220,8 +220,8 @@ contract OtherFunctionsTest is BaseTest {
 
     function testShuffleSession(address user) public {
         vm.prank(user);
-        morphoV2.shuffleSession();
-        assertEq(morphoV2.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
+        midnight.shuffleSession();
+        assertEq(midnight.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
     function testSupplyCollateralDoesNotCallOracle(uint256 collateral) public {
@@ -239,7 +239,7 @@ contract OtherFunctionsTest is BaseTest {
         revertingOracle.stopOracle();
 
         deal(address(collateralToken1), address(this), collateral);
-        morphoV2.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
     }
 
     function testWithdrawCollateralToZeroDoesNotCallOracle(uint256 collateral) public {
@@ -255,15 +255,15 @@ contract OtherFunctionsTest is BaseTest {
         obligationWithRevertingOracle.collaterals = collaterals;
 
         deal(address(collateralToken1), address(this), collateral);
-        morphoV2.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
 
         bytes20 _id = toId(obligationWithRevertingOracle);
-        assertEq(morphoV2.collateralOf(_id, borrower, 0), collateral, "collateral should be set");
+        assertEq(midnight.collateralOf(_id, borrower, 0), collateral, "collateral should be set");
 
         revertingOracle.stopOracle();
 
         vm.prank(borrower);
-        morphoV2.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
+        midnight.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
     }
 
     // Bitmap tests.
@@ -287,7 +287,7 @@ contract OtherFunctionsTest is BaseTest {
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
 
         vm.expectRevert("too many collaterals");
-        morphoV2.touchObligation(_obligation);
+        midnight.touchObligation(_obligation);
     }
 
     function testCollateralsNotSorted() public {
@@ -299,7 +299,7 @@ contract OtherFunctionsTest is BaseTest {
         collaterals[1] = Collateral({token: address(uint160(1)), lltv: 0.75e18, oracle: address(oracle2)});
         _obligation.collaterals = collaterals;
         vm.expectRevert("collaterals not sorted");
-        morphoV2.touchObligation(_obligation);
+        midnight.touchObligation(_obligation);
     }
 
     function testLltvTooHighOrLIFTooHigh() public {
@@ -310,14 +310,14 @@ contract OtherFunctionsTest is BaseTest {
         collaterals[0] = Collateral({token: address(collateralToken1), lltv: 1e18, oracle: address(oracle1)});
         _obligation.collaterals = collaterals;
         vm.expectRevert("lltv too high or LIF too high");
-        morphoV2.touchObligation(_obligation);
+        midnight.touchObligation(_obligation);
     }
 
     function testBelowExactMaxCollaterals(uint256 numCollaterals) public {
         numCollaterals = bound(numCollaterals, 1, MAX_COLLATERALS - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
 
-        morphoV2.touchObligation(_obligation);
+        midnight.touchObligation(_obligation);
     }
 
     function testMaxCollateralsPerBorrower() public {
@@ -327,15 +327,15 @@ contract OtherFunctionsTest is BaseTest {
         for (uint256 i = 0; i < MAX_COLLATERALS_PER_BORROWER; i++) {
             address token = _obligation.collaterals[i].token;
             deal(token, address(this), 1e18);
-            ERC20(token).approve(address(morphoV2), 1e18);
-            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+            ERC20(token).approve(address(midnight), 1e18);
+            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
         }
 
         address lastToken = _obligation.collaterals[numCollaterals - 1].token;
         deal(lastToken, address(this), 1e18);
-        ERC20(lastToken).approve(address(morphoV2), 1e18);
+        ERC20(lastToken).approve(address(midnight), 1e18);
         vm.expectRevert("too many collaterals per borrower");
-        morphoV2.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
+        midnight.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
     }
 
     function testBitmapCtzSingleCollateral(uint256 collateralIndex) public {
@@ -345,10 +345,10 @@ contract OtherFunctionsTest is BaseTest {
 
         address token = _obligation.collaterals[collateralIndex].token;
         deal(token, address(this), 1e18);
-        ERC20(token).approve(address(morphoV2), 1e18);
-        morphoV2.supplyCollateral(_obligation, collateralIndex, 1e18, borrower);
+        ERC20(token).approve(address(midnight), 1e18);
+        midnight.supplyCollateral(_obligation, collateralIndex, 1e18, borrower);
 
-        uint128 bitmap = morphoV2.activatedCollaterals(toId(_obligation), borrower);
+        uint128 bitmap = midnight.activatedCollaterals(toId(_obligation), borrower);
 
         assertEq(bitmap, 1 << collateralIndex, "bitmap should have only bit at collateralIndex");
         assertEq(UtilsLib.msb(bitmap), collateralIndex, "msb should equal collateralIndex");
@@ -362,12 +362,12 @@ contract OtherFunctionsTest is BaseTest {
         for (uint256 i = 0; i < k; i++) {
             address token = _obligation.collaterals[i].token;
             deal(token, address(this), 1e18);
-            ERC20(token).approve(address(morphoV2), 1e18);
-            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+            ERC20(token).approve(address(midnight), 1e18);
+            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
         }
 
         bytes20 _id = toId(_obligation);
-        uint128 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), k, "countBits should equal number of supplied collaterals");
         assertEq(UtilsLib.msb(bitmap), k - 1, "msb should equal number of supplied collaterals - 1");
     }
@@ -381,18 +381,18 @@ contract OtherFunctionsTest is BaseTest {
         for (uint256 i = 0; i < numCollaterals; i++) {
             address token = _obligation.collaterals[i].token;
             deal(token, address(this), 1e18);
-            ERC20(token).approve(address(morphoV2), 1e18);
-            morphoV2.supplyCollateral(_obligation, i, 1e18, borrower);
+            ERC20(token).approve(address(midnight), 1e18);
+            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
         }
 
         bytes20 _id = toId(_obligation);
-        assertEq(UtilsLib.countBits(morphoV2.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
+        assertEq(UtilsLib.countBits(midnight.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
 
         // Withdraw one collateral fully.
         vm.prank(borrower);
-        morphoV2.withdrawCollateral(_obligation, collateralIndex, 1e18, borrower, borrower);
+        midnight.withdrawCollateral(_obligation, collateralIndex, 1e18, borrower, borrower);
 
-        uint128 bitmap = morphoV2.activatedCollaterals(_id, borrower);
+        uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
         assertEq(bitmap & (1 << collateralIndex), 0, "withdrawn collateral bit should be cleared");
     }
