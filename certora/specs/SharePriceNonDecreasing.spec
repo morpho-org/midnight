@@ -2,18 +2,12 @@
 
 import "SharePriceBelowOne.spec";
 
-use invariant sharePriceBelowOrEqOne1;
-use invariant sharePriceBelowOrEqOne2;
-use invariant sharePriceBelowOrEqOne3;
-use invariant sharePriceBelowOrEqOne4;
+use invariant sharePriceBelowOrEqOne;
 
 /// Liquidation without bad debt preserves virtual share price.
-rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id
+rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id
 ) {
-    requireInvariant sharePriceBelowOrEqOne1(id);
-    requireInvariant sharePriceBelowOrEqOne2(id);
-    requireInvariant sharePriceBelowOrEqOne3(id);
-    requireInvariant sharePriceBelowOrEqOne4(id);
+    requireInvariant sharePriceBelowOrEqOne(id);
 
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);
@@ -32,16 +26,13 @@ rule sharePriceDoesNotDecreaseByLiquidateNoBadDebt(env e, MorphoV2.Obligation ob
 /// Virtual share price = (totalUnits+1)/(totalShares+1) monotonicity.
 rule sharePriceDoesNotDecrease(bytes20 id, method f) filtered {
     f -> f.selector != sig:multicall(bytes[]).selector
-      && f.selector != sig:liquidate(MorphoV2.Obligation, uint256, uint256, uint256, address, bytes).selector 
+      && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector 
       && !f.isView
 } {
 
     // We need it otherwise rounding down to 0 creates shares with no backing units
     // for withdraw +1 virtual liquidity makes exchange rate differ from actual pool ratio when totalShares > totalUnits
-    requireInvariant sharePriceBelowOrEqOne1(id);
-    requireInvariant sharePriceBelowOrEqOne2(id);
-    requireInvariant sharePriceBelowOrEqOne3(id);
-    requireInvariant sharePriceBelowOrEqOne4(id);
+    requireInvariant sharePriceBelowOrEqOne(id);
 
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);

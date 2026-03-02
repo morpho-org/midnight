@@ -18,87 +18,11 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
 
-    function isHealthy(MorphoV2.Obligation memory, bytes20, address) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes20, address) internal returns (bool) => NONDET;
     
 }
 
 // Share/asset ratio is never above 1: totalShares >= totalUnits at all times.
 
-strong invariant sharePriceBelowOrEqOne1(bytes20 id)
-    totalShares(id) >= totalUnits(id)
-{
-    preserved take(uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        address taker,
-        address takerCallback,
-        bytes takerCallbackData,
-        address receiverIfTakerIsSeller,
-        MorphoV2.Offer offer,
-        MorphoV2.Signature signature,
-        bytes32 root,
-        bytes32[] proof) with (env e) {
-            require buyerAssets != 0 && sellerAssets == 0 && obligationUnits == 0 && obligationShares == 0, "other cases checked separately";
-            require buyerAssets < 2^128;
-        }
-}
-
-
-strong invariant sharePriceBelowOrEqOne2(bytes20 id)
-    totalShares(id) >= totalUnits(id)
-{
-    preserved take(uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        address taker,
-        address takerCallback,
-        bytes takerCallbackData,
-        address receiverIfTakerIsSeller,
-        MorphoV2.Offer offer,
-        MorphoV2.Signature signature,
-        bytes32 root,
-        bytes32[] proof) with (env e) {
-            require buyerAssets == 0 && sellerAssets != 0 && obligationUnits == 0 && obligationShares == 0, "other cases checked separately";
-            require sellerAssets < 2^128;
-        }
-}
-
-strong invariant sharePriceBelowOrEqOne3(bytes20 id)
-    totalShares(id) >= totalUnits(id)
-{
-    preserved take(uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        address taker,
-        address takerCallback,
-        bytes takerCallbackData,
-        address receiverIfTakerIsSeller,
-        MorphoV2.Offer offer,
-        MorphoV2.Signature signature,
-        bytes32 root,
-        bytes32[] proof) with (env e) {
-            require buyerAssets == 0 && sellerAssets == 0 && obligationUnits != 0 && obligationShares == 0, "other cases checked separately";
-        }
-}
-
-strong invariant sharePriceBelowOrEqOne4(bytes20 id)
-    totalShares(id) >= totalUnits(id)
-{
-    preserved take(uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        address taker,
-        address takerCallback,
-        bytes takerCallbackData,
-        address receiverIfTakerIsSeller,
-        MorphoV2.Offer offer,
-        MorphoV2.Signature signature,
-        bytes32 root,
-        bytes32[] proof) with (env e) {
-            require buyerAssets == 0 && sellerAssets == 0 && obligationUnits == 0, "other cases checked separately";
-        }
-}
+strong invariant sharePriceBelowOrEqOne(bytes20 id)
+    totalShares(id) >= totalUnits(id);
