@@ -14,9 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         conf:
+          - CreatedObligations
           - Hasher
-          - MorphoV2
+          - Liquidate
+          - Midnight
           - SharePrice
+          - Solvency
 
     steps:
       - uses: actions/checkout@v4

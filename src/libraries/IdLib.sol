@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation} from "../interfaces/IMorphoV2.sol";
+import {Obligation} from "../interfaces/IMidnight.sol";
 
 library IdLib {
     /// @dev Used as a prefix to some data, to give a creation code that deploys the data as runtime bytecode.
@@ -20,10 +20,10 @@ library IdLib {
     /// f3        RETURN          []                 mem[0:len] is returned
     bytes constant SSTORE2_PREFIX = hex"600b380380600b5f395ff3";
 
-    function toId(Obligation memory obligation, uint256 chainId, address morphoV2) internal pure returns (bytes20) {
+    function toId(Obligation memory obligation, uint256 chainId, address midnight) internal pure returns (bytes20) {
         bytes32 create2Hash = keccak256(
             abi.encodePacked(
-                uint8(0xff), morphoV2, chainId, keccak256(abi.encodePacked(SSTORE2_PREFIX, abi.encode(obligation)))
+                uint8(0xff), midnight, chainId, keccak256(abi.encodePacked(SSTORE2_PREFIX, abi.encode(obligation)))
             )
         );
         // forge-lint: disable-next-line(unsafe-typecast) unsafe casting made on purpose.

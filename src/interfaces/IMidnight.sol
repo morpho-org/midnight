@@ -7,8 +7,9 @@ struct Obligation {
     // Must be sorted by address.
     Collateral[] collaterals;
     uint256 maturity;
-    // Minimum collateral value (quoted in loan token) to be left on supply & withdraw collateral.
-    uint256 minCollatValue;
+    // The recovery close factor is deactivated for a collateral if the liquidation could leave a collateral value that
+    // would not be enough to repay rcfThreshold units.
+    uint256 rcfThreshold;
 }
 
 struct Collateral {
@@ -45,14 +46,12 @@ struct BorrowerState {
     uint128 activatedCollaterals;
 }
 
-/// @dev Fee indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d TTM buckets.
-/// @dev Fees are stored divided by FEE_STEP (1e12) to fit in 16 bits. Max fee is 1% (0.01e18).
 struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
     uint256 withdrawable;
     bool created;
-    uint16[6] fees;
+    uint16[7] fees;
 }
 
-interface IMorphoV2 {}
+interface IMidnight {}

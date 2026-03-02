@@ -11,7 +11,7 @@ methods {
     function debtOf(bytes20 id, address user) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
-    function IdLib.toId(MorphoV2.Obligation memory, uint256, address) internal returns (bytes20) => NONDET;
+    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes20) => NONDET;
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
 }
@@ -40,7 +40,7 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return res;
 }
 
-rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
@@ -65,7 +65,7 @@ rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets
     assert buyerAssets == 0 && sellerAssets == 0 && obligationUnits == 0 && obligationShares == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && obligationUnitsOutput == 0 && obligationSharesOutput == 0;
 }
 
-rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     uint256 buyerAssetsOutput;
@@ -80,7 +80,7 @@ rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint2
     assert offer.obligationShares == 0 || consumed(offer.maker, offer.group) == consumedBefore + obligationSharesOutput;
 }
 
-rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, MorphoV2.Offer offer, MorphoV2.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     uint256 buyerAssetsOutput;
@@ -95,7 +95,7 @@ rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 
     assert offer.obligationShares == 0 || obligationSharesOutput <= offer.obligationShares - consumedBefore;
 }
 
-rule liquidateInputOutputConsistency(env e, MorphoV2.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
 
