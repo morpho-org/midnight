@@ -7,8 +7,8 @@ methods {
 
     function _.price() external => PER_CALLEE_CONSTANT;
 
-    function _.onBuy(MorphoV2.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(MorphoV2.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
@@ -19,7 +19,7 @@ rule takeOnlySellerBecomesBorrower(
     env e, uint256 buyerAssets, uint256 sellerAssets,
     uint256 obligationUnits, uint256 obligationShares, address taker,
     address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller,
-    MorphoV2.Offer offer, MorphoV2.Signature signature,
+    Midnight.Offer offer, Midnight.Signature signature,
     bytes32 root, bytes32[] proof,
     bytes20 id, address user
 ) {
