@@ -37,7 +37,6 @@ rule fullyConsumedOfferRevertsOnNonTrivialTake(
 ) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    // weird require due to rounding down to 0 in take
     require (offer.obligationUnits > 0 && consumedBefore >= offer.obligationUnits && obligationShares > 0)
          || (offer.obligationShares > 0 && consumedBefore >= offer.obligationShares && obligationShares > 0);
 
