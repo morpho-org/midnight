@@ -9,7 +9,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER} from "../src/libraries/ConstantsLib.sol";
+import {MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER, WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
@@ -318,14 +318,15 @@ contract OtherFunctionsTest is BaseTest {
         midnight.touchObligation(_obligation);
     }
 
-    function testLltvTooHighOrLIFTooHigh() public {
+    function testLltvTooHigh(uint256 lltv) public {
+        lltv = bound(lltv, WAD + 1, type(uint256).max);
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
         Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 1e18, oracle: address(oracle1)});
+        collaterals[0] = Collateral({token: address(collateralToken1), lltv: lltv, oracle: address(oracle1)});
         _obligation.collaterals = collaterals;
-        vm.expectRevert("lltv too high or LIF too high");
+        vm.expectRevert("lltv too high");
         midnight.touchObligation(_obligation);
     }
 
