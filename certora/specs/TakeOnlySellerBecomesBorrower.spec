@@ -16,8 +16,7 @@ methods {
 
 /// In take, only the seller can newly become a borrower; the buyer can only reduce debt.
 rule takeOnlySellerBecomesBorrower(
-    env e, uint256 buyerAssets, uint256 sellerAssets,
-    uint256 obligationUnits, uint256 obligationShares, address taker,
+    env e, uint256 obligationShares, address taker,
     address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller,
     Midnight.Offer offer, Midnight.Signature signature,
     bytes32 root, bytes32[] proof,
@@ -28,7 +27,7 @@ rule takeOnlySellerBecomesBorrower(
 
     uint256 debtBefore = debtOf(id, user);
 
-    take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+    take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
     uint256 debtAfter = debtOf(id, user);
 
