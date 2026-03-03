@@ -9,8 +9,12 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER} from "../src/libraries/ConstantsLib.sol";
+import {MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER, WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+
+// Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
+// To keep total collateral within uint128, we cap amounts at type(uint128).max / 3.
+uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 3;
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
@@ -36,8 +40,8 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawCollateralWithBorrowHealthy(uint256 additionalCollateral, uint256 withdraw, uint256 units)
         public
     {
-        units = bound(units, 0, MAX_TEST_AMOUNT);
-        additionalCollateral = bound(additionalCollateral, 0, MAX_TEST_AMOUNT);
+        units = bound(units, 0, MAX_UNITS);
+        additionalCollateral = bound(additionalCollateral, 0, MAX_UNITS);
         address collateralToken = obligation.collaterals[0].token;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -59,8 +63,8 @@ contract OtherFunctionsTest is BaseTest {
     function testWithdrawCollateralWithBorrowUnhealthy(uint256 additionalCollateral, uint256 withdraw, uint256 units)
         public
     {
-        units = bound(units, 1, MAX_TEST_AMOUNT);
-        additionalCollateral = bound(additionalCollateral, 0, MAX_TEST_AMOUNT);
+        units = bound(units, 1, MAX_UNITS);
+        additionalCollateral = bound(additionalCollateral, 0, MAX_UNITS);
         address collateralToken = obligation.collaterals[0].token;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -76,7 +80,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testRepay(uint256 units, uint256 repaid) public {
         // Note that if this changes the values when the input is in the bounds, it will break withdraw tests.
-        units = bound(units, 0, MAX_TEST_AMOUNT);
+        units = bound(units, 0, MAX_UNITS);
         repaid = bound(repaid, 0, units);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -100,7 +104,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT);
+        units = bound(units, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
 
@@ -118,7 +122,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawWithShares(uint256 units, uint256 shares) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT);
+        units = bound(units, 1, MAX_UNITS);
         shares = bound(shares, 1, units);
         testRepay(units, shares);
 
@@ -136,7 +140,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawToReceiver(uint256 units, uint256 withdraw) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT);
+        units = bound(units, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
         address receiver = makeAddr("receiver");
@@ -149,7 +153,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testWithdrawCollateralToReceiver(uint256 supply, uint256 withdraw) public {
-        supply = bound(supply, 1, MAX_TEST_AMOUNT);
+        supply = bound(supply, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, supply);
         address collateralToken = obligation.collaterals[0].token;
         address receiver = makeAddr("receiver");
@@ -170,6 +174,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -181,6 +186,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testToObligation(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -209,6 +215,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSstore2CodeStartsWithStop(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -282,6 +289,15 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.rcfThreshold = 0;
     }
 
+    function testZeroCollaterals() public {
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        _obligation.collaterals = new Collateral[](0);
+        vm.expectRevert("no collaterals");
+        midnight.touchObligation(_obligation);
+    }
+
     function testMaxCollaterals(uint256 numCollaterals) public {
         numCollaterals = bound(numCollaterals, MAX_COLLATERALS + 1, 1000);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
@@ -302,14 +318,15 @@ contract OtherFunctionsTest is BaseTest {
         midnight.touchObligation(_obligation);
     }
 
-    function testLltvTooHighOrLIFTooHigh() public {
+    function testLltvTooHigh(uint256 lltv) public {
+        lltv = bound(lltv, WAD + 1, type(uint256).max);
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
         Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({token: address(collateralToken1), lltv: 1e18, oracle: address(oracle1)});
+        collaterals[0] = Collateral({token: address(collateralToken1), lltv: lltv, oracle: address(oracle1)});
         _obligation.collaterals = collaterals;
-        vm.expectRevert("lltv too high or LIF too high");
+        vm.expectRevert("lltv too high");
         midnight.touchObligation(_obligation);
     }
 

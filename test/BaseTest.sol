@@ -18,7 +18,7 @@ import {
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 
-uint256 constant MAX_TEST_AMOUNT = 1e36;
+uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -78,7 +78,9 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 oraclePrice = Oracle(obligation.collaterals[0].oracle).price();
+        uint256 collateral =
+            debt.mulDivUp(WAD, obligation.collaterals[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(midnight), collateral);
         midnight.supplyCollateral(obligation, 0, collateral, _borrower);
