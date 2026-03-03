@@ -10,10 +10,11 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     FEE_STEP,
-    LIQUIDATION_CURSOR,
     TIME_TO_MAX_LIF,
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
+    LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
@@ -54,7 +55,7 @@ contract Midnight is IMidnight {
     mapping(bytes20 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes20 id => ObligationState) public obligationState;
 
-    /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
+    /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same obligationShares, obligationUnits, and
     /// loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
@@ -100,24 +101,24 @@ contract Midnight is IMidnight {
     /// ADMIN FUNCTIONS ///
 
     function setOwner(address newOwner) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == owner, "only owner");
         owner = newOwner;
         emit EventsLib.SetOwner(newOwner);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == owner, "only owner");
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     /// @dev Overrides the fee of a specific obligation.
     function setObligationTradingFee(bytes20 id, uint256 index, uint256 newTradingFee) external {
-        require(msg.sender == feeSetter, "Only feeSetter");
-        require(index <= 6, "Invalid index");
+        require(msg.sender == feeSetter, "only fee setter");
+        require(index <= 6, "invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
-        require(obligationState[id].created, "Obligation not created");
+        require(obligationState[id].created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
         obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
@@ -125,8 +126,8 @@ contract Midnight is IMidnight {
 
     /// @dev Doesn't change the fee of already created obligations.
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
-        require(msg.sender == feeSetter, "Only feeSetter");
-        require(index <= 6, "Invalid index");
+        require(msg.sender == feeSetter, "only fee setter");
+        require(index <= 6, "invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
@@ -135,7 +136,7 @@ contract Midnight is IMidnight {
     }
 
     function setTradingFeeRecipient(address feeRecipient) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == owner, "only owner");
         tradingFeeRecipient = feeRecipient;
         emit EventsLib.SetTradingFeeRecipient(feeRecipient);
     }
@@ -161,7 +162,7 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256, uint256) {
-        require(taker == msg.sender || isAuthorized[taker][msg.sender], "UNAUTHORIZED");
+        require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
@@ -211,8 +212,9 @@ contract Midnight is IMidnight {
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
         // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
         // used to discriminate, as the remaining two cases do not change total units and total shares.
-        uint256 obligationUnits =
-            obligationShares.mulDiv(_obligationState.totalUnits + 1, _obligationState.totalShares + 1, !buyerIsLender);
+        uint256 obligationUnits = buyerIsLender
+            ? obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1)
+            : obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         uint256 buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
         uint256 sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
 
@@ -295,7 +297,7 @@ contract Midnight is IMidnight {
                 );
         }
 
-        require(isHealthy(offer.obligation, id, seller), "Seller is unhealthy");
+        require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, obligationUnits, obligationShares);
     }
@@ -308,8 +310,8 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external returns (uint256, uint256) {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
-        require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "INCONSISTENT_INPUT");
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes20 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
@@ -371,7 +373,7 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "UNAUTHORIZED");
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes20 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
@@ -383,7 +385,7 @@ contract Midnight is IMidnight {
             borrowerState[id][onBehalf].activatedCollaterals &= ~uint128(1 << collateralIndex);
         }
 
-        require(isHealthy(obligation, id, onBehalf), "Unhealthy borrower");
+        require(isHealthy(obligation, id, onBehalf), "unhealthy borrower");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
@@ -408,7 +410,7 @@ contract Midnight is IMidnight {
         address borrower,
         bytes calldata data
     ) external returns (uint256, uint256) {
-        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "INCONSISTENT_INPUT");
+        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes20 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
@@ -425,7 +427,7 @@ contract Midnight is IMidnight {
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 collateralQuoted = collateralOf[id][borrower][i].mulDivDown(price, ORACLE_PRICE_SCALE);
             maxDebt += collateralQuoted.mulDivDown(_collateral.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(collateralQuoted.mulDivDown(WAD, maxLif(_collateral.lltv)));
+            badDebt = badDebt.zeroFloorSub(collateralQuoted.mulDivDown(WAD, _collateral.maxLif));
             bitmap ^= (1 << i);
         }
 
@@ -437,7 +439,7 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = maxLif(obligation.collaterals[collateralIndex].lltv);
+            uint256 _maxLif = obligation.collaterals[collateralIndex].maxLif;
             uint256 lif = originalDebt > maxDebt
                 ? _maxLif
                 : UtilsLib.min(
@@ -465,8 +467,9 @@ contract Midnight is IMidnight {
                 );
             }
 
-            collateralOf[id][borrower][collateralIndex] -= UtilsLib.toUint128(seizedAssets);
-            if (collateralOf[id][borrower][collateralIndex] == 0 && seizedAssets > 0) {
+            uint128 newCollateralOf = collateralOf[id][borrower][collateralIndex] - UtilsLib.toUint128(seizedAssets);
+            collateralOf[id][borrower][collateralIndex] = newCollateralOf;
+            if (newCollateralOf == 0 && seizedAssets > 0) {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
@@ -526,7 +529,13 @@ contract Midnight is IMidnight {
             for (uint256 i = 0; i < obligation.collaterals.length; i++) {
                 address collateralToken = obligation.collaterals[i].token;
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
-                require(obligation.collaterals[i].lltv <= WAD, "lltv too high");
+                uint256 lltv = obligation.collaterals[i].lltv;
+                require(lltv <= WAD, "lltv too high");
+                require(
+                    obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
+                        || obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
+                    "invalid maxLif"
+                );
                 previousCollateralToken = collateralToken;
             }
 
@@ -540,10 +549,6 @@ contract Midnight is IMidnight {
     }
 
     /// VIEW FUNCTIONS ///
-
-    function maxLif(uint256 lltv) public pure returns (uint256) {
-        return WAD.mulDivDown(WAD, WAD - LIQUIDATION_CURSOR.mulDivDown(WAD - lltv, WAD));
-    }
 
     function toId(Obligation memory obligation) public view returns (bytes20) {
         return IdLib.toId(obligation, block.chainid, address(this));
@@ -612,6 +617,10 @@ contract Midnight is IMidnight {
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
+        return WAD.mulDivDown(WAD, WAD - cursor.mulDivDown(WAD - lltv, WAD));
     }
 
     /// @dev 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
