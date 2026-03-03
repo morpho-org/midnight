@@ -132,7 +132,7 @@ strong invariant tokenBalanceCorrect(address token)
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
         }
-        preserved take(uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+        preserved take(uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
             require taker != currentContract, "no trading with contract";
             require offer.maker != currentContract, "no trading with contract";
         }

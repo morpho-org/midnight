@@ -52,8 +52,8 @@ contract Midnight is IMidnight {
     mapping(bytes20 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared accross multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same assets, obligationUnits,
-    /// obligationShares and loan token.
+    /// @dev To work as expected, all offers in a same group should have the same obligationShares, obligationUnits, and
+    /// loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
     /// @dev Offers should have the current session to be valid.
@@ -145,10 +145,9 @@ contract Midnight is IMidnight {
     /// position at the end.
     /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
+    /// @dev All sellerAssets are reachable with the obligationShares input, and all buyerAssets are reachable only if
+    /// buyerPrice <= WAD.
     function take(
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
         uint256 obligationShares,
         address taker,
         address takerCallback,
@@ -160,17 +159,10 @@ contract Midnight is IMidnight {
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "UNAUTHORIZED");
-        require(
-            UtilsLib.atMostOneNonZero(buyerAssets, sellerAssets, obligationUnits, obligationShares),
-            "inconsistent input"
-        );
-        require(
-            UtilsLib.atMostOneNonZero(offer.assets, offer.obligationUnits, offer.obligationShares),
-            "inconsistent offer input"
-        );
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
+        require(UtilsLib.atMostOneNonZero(offer.obligationUnits, offer.obligationShares), "INCONSISTENT_INPUT");
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
@@ -213,40 +205,16 @@ contract Midnight is IMidnight {
 
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
-        // To ensure that the share price does not decrease, shares should be rounded down (units should be rounded up)
-        // when buyerIsLender & sellerIsBorrower, and rounded up (units should be rounded down) when !buyerIsLender &
-        // !sellerIsBorrower. The variable buyerIsLender is used to discriminate between the two cases.
-        if (buyerAssets > 0) {
-            obligationUnits = buyerAssets.mulDivDown(WAD, buyerPrice);
-            sellerAssets = buyerAssets.mulDivDown(sellerPrice, buyerPrice);
-            obligationShares = obligationUnits.mulDiv(
-                _obligationState.totalShares + 1, _obligationState.totalUnits + 1, buyerIsLender
-            );
-        } else if (sellerAssets > 0) {
-            obligationUnits = sellerAssets.mulDivDown(WAD, sellerPrice);
-            buyerAssets = sellerAssets.mulDivDown(buyerPrice, sellerPrice);
-            obligationShares = obligationUnits.mulDiv(
-                _obligationState.totalShares + 1, _obligationState.totalUnits + 1, buyerIsLender
-            );
-        } else if (obligationUnits > 0) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-            obligationShares = obligationUnits.mulDiv(
-                _obligationState.totalShares + 1, _obligationState.totalUnits + 1, buyerIsLender
-            );
-        } else {
-            obligationUnits = obligationShares.mulDiv(
-                _obligationState.totalUnits + 1, _obligationState.totalShares + 1, !buyerIsLender
-            );
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
-        }
+        // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
+        // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
+        // used to discriminate, as the remaining two cases do not change total units and total shares.
+        uint256 obligationUnits =
+            obligationShares.mulDiv(_obligationState.totalUnits + 1, _obligationState.totalShares + 1, !buyerIsLender);
+        uint256 buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
+        uint256 sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
 
         uint256 newConsumed;
-        if (offer.assets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
-            require(newConsumed <= offer.assets, "consumed");
-        } else if (offer.obligationUnits > 0) {
+        if (offer.obligationUnits > 0) {
             newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
             require(newConsumed <= offer.obligationUnits, "consumed");
         } else {
