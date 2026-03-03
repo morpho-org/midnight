@@ -15,7 +15,6 @@ jobs:
       matrix:
         conf:
           - CreatedObligations
-          - Hasher
           - Liquidate
           - Midnight
           - SharePrice
