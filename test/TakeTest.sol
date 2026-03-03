@@ -22,7 +22,9 @@ contract TakeTest is BaseTest {
     Offer internal otherLenderOffer;
     Offer internal otherBorrowerOffer;
 
-    uint256 internal maxAssets = 1e33; // to refine.
+    // Bad debt creates a ~3.4x shares/units ratio, and price conversion can amplify by up to 100x (price > 0.01 ether).
+    // Collateral = units / lltv adds another ~1.33x. Combined: 3.4 * 100 * 1.33 ≈ 400.
+    uint256 internal maxAssets = type(uint128).max / 400;
     uint256 internal initialUnits;
     uint256 internal initialShares;
 
