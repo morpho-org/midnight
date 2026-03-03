@@ -30,8 +30,7 @@ filtered { f -> !f.isView } {
 
 /// A fully-consumed offer always reverts when the take input is non-zero in the offer's consumption dimension.
 rule fullyConsumedOfferRevertsOnNonTrivialTake(
-    env e, uint256 buyerAssets, uint256 sellerAssets,
-    uint256 obligationUnits, uint256 obligationShares, address taker,
+    env e, uint256 obligationShares, address taker,
     address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller,
     Midnight.Offer offer, Midnight.Signature signature, bytes32 root,
     bytes32[] proof
@@ -39,11 +38,10 @@ rule fullyConsumedOfferRevertsOnNonTrivialTake(
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     // weird require due to rounding down to 0 in take
-    require (offer.assets > 0 && consumedBefore >= offer.assets && (offer.buy ? buyerAssets > 0 : sellerAssets > 0))
-         || (offer.obligationUnits > 0 && consumedBefore >= offer.obligationUnits && obligationUnits > 0)
-         || (offer.obligationShares > 0 && consumedBefore >= offer.obligationShares  && obligationShares > 0);
+    require (offer.obligationUnits > 0 && consumedBefore >= offer.obligationUnits && obligationShares > 0)
+         || (offer.obligationShares > 0 && consumedBefore >= offer.obligationShares && obligationShares > 0);
 
-    take@withrevert(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+    take@withrevert(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
     assert lastReverted;
 }
