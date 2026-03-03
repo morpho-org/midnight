@@ -170,6 +170,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -181,6 +182,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testToObligation(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -209,6 +211,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSstore2CodeStartsWithStop(Obligation memory _obligation) public {
+        vm.assume(_obligation.collaterals.length > 0);
         _obligation = sortedAndUniqueCollateralsInObligation(_obligation);
 
         bytes20 _id = midnight.touchObligation(_obligation);
@@ -280,6 +283,15 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.maturity = block.timestamp + 100;
         _obligation.collaterals = collaterals;
         _obligation.rcfThreshold = 0;
+    }
+
+    function testZeroCollaterals() public {
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        _obligation.collaterals = new Collateral[](0);
+        vm.expectRevert("no collaterals");
+        midnight.touchObligation(_obligation);
     }
 
     function testMaxCollaterals(uint256 numCollaterals) public {
