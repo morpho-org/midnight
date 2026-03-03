@@ -4,6 +4,9 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
+    function totalUnits(bytes20 id) external returns (uint256) envfree;
+    function totalShares(bytes20 id) external returns (uint256) envfree;
+    function toId(Midnight.Obligation obligation) external returns (bytes20);
 
     function _.price() external => PER_CALLEE_CONSTANT;
 
@@ -37,8 +40,15 @@ rule fullyConsumedOfferRevertsOnNonTrivialTake(
 ) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
+    bytes20 id = toId(e, offer.obligation);
+    uint256 _totalUnits = totalUnits(id);
+    uint256 _totalShares = totalShares(id);
+
     require (offer.obligationUnits > 0 && consumedBefore >= offer.obligationUnits && obligationShares > 0)
          || (offer.obligationShares > 0 && consumedBefore >= offer.obligationShares && obligationShares > 0);
+
+    // When consumption is units-based, prevent rounding down to 0
+    require offer.obligationUnits > 0 => to_mathint(obligationShares) * (to_mathint(_totalUnits) + 1) >= to_mathint(_totalShares) + 1;
 
     take@withrevert(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
