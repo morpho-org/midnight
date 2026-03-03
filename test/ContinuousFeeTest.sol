@@ -37,7 +37,7 @@ contract ContinuousFeeTest is BaseTest {
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.assets = type(uint256).max;
+        lenderOffer.obligationShares = type(uint256).max;
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 365 days;
         lenderOffer.tick = TICK_RANGE;
@@ -45,7 +45,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
-        borrowerOffer.assets = type(uint256).max;
+        borrowerOffer.obligationShares = type(uint256).max;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp + 365 days;
         borrowerOffer.tick = TICK_RANGE;
@@ -65,14 +65,14 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
-        take(initialShares, 0, 0, 0, borrower, lenderOffer);
+        take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
         uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
         uint256 lastUpdateBefore = midnight.lastUpdate(id);
 
         vm.warp(block.timestamp + timeElapsed);
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
         uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
@@ -94,13 +94,13 @@ contract ContinuousFeeTest is BaseTest {
 
         // No default fee set, so fee is 0
         collateralize(obligation, borrower, initialShares);
-        take(initialShares, 0, 0, 0, borrower, lenderOffer);
+        take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
         uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
 
         vm.warp(block.timestamp + timeElapsed);
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
         uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
@@ -117,12 +117,12 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
-        take(initialShares, 0, 0, 0, borrower, lenderOffer);
+        take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
         uint256 recipientSharesBefore = midnight.sharesOf(id, feeRecipient);
 
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
         uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
@@ -141,7 +141,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setDefaultContinuousFee(address(loanToken), fee);
 
         collateralize(obligation, borrower, initialShares);
-        take(initialShares, 0, 0, 0, borrower, lenderOffer);
+        take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesInitial = midnight.totalShares(id);
         uint256 recipientSharesInitial = midnight.sharesOf(id, feeRecipient);
@@ -149,7 +149,7 @@ contract ContinuousFeeTest is BaseTest {
         // First accrual
         vm.warp(block.timestamp + 1 days);
         uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(fee, WAD);
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
         uint256 totalSharesAfter1 = midnight.totalShares(id);
         uint256 recipientSharesAfter1 = midnight.sharesOf(id, feeRecipient);
 
@@ -161,7 +161,7 @@ contract ContinuousFeeTest is BaseTest {
         // Second accrual (7 days later)
         vm.warp(block.timestamp + 7 days);
         uint256 expectedShares2 = (totalSharesAfter1 * 7 days).mulDivDown(fee, WAD);
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
         uint256 totalSharesAfter2 = midnight.totalShares(id);
         uint256 recipientSharesAfter2 = midnight.sharesOf(id, feeRecipient);
 
@@ -173,7 +173,7 @@ contract ContinuousFeeTest is BaseTest {
         // Third accrual (30 days later)
         vm.warp(block.timestamp + 30 days);
         uint256 expectedShares3 = (totalSharesAfter2 * 30 days).mulDivDown(fee, WAD);
-        take(0, 0, 0, 0, borrower, lenderOffer);
+        take(0, borrower, lenderOffer);
         uint256 totalSharesAfter3 = midnight.totalShares(id);
         uint256 recipientSharesAfter3 = midnight.sharesOf(id, feeRecipient);
 
