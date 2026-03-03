@@ -7,7 +7,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
@@ -85,47 +85,38 @@ abstract contract BaseTest is Test {
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
-    function take(
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 obligationUnits,
-        uint256 obligationShares,
-        address taker,
-        Offer memory offer
-    ) internal returns (uint256, uint256, uint256, uint256) {
+    function take(uint256 obligationShares, address taker, Offer memory offer)
+        internal
+        returns (uint256, uint256, uint256, uint256)
+    {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
         return midnight.take(
-            buyerAssets,
-            sellerAssets,
-            obligationUnits,
-            obligationShares,
-            taker,
-            address(0),
-            hex"",
-            taker,
-            offer,
-            sig([offer]),
-            root([offer]),
-            proof([offer])
+            obligationShares, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer])
         );
     }
 
-    function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
-        deal(address(loanToken), otherLender, units); // assets = units because price is 1.
+    function setupOtherUsers(Obligation memory obligation, uint256 shares) internal {
+        bytes20 _id = toId(obligation);
+        uint256 totalUnits = midnight.totalUnits(_id);
+        uint256 totalShares = midnight.totalShares(_id);
+        uint256 units = shares.mulDivUp(totalUnits + 1, totalShares + 1);
+        uint256 price = TickLib.tickToPrice(TICK_RANGE);
+        uint256 assets = units.mulDivUp(price, WAD);
+        deal(address(loanToken), otherLender, assets);
 
         Offer memory lenderOffer;
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.assets = units;
+        lenderOffer.obligationShares = shares;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = TICK_RANGE;
 
         collateralize(obligation, otherBorrower, units);
-        take(0, 0, units, 0, otherBorrower, lenderOffer);
+        take(shares, otherBorrower, lenderOffer);
     }
 
     function createBadDebt(Obligation memory obligation) internal {
@@ -140,7 +131,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
-        badBorrowerOffer.assets = 100;
+        badBorrowerOffer.obligationShares = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.tick = TICK_RANGE;
@@ -150,7 +141,7 @@ abstract contract BaseTest is Test {
 
         deal(address(loanToken), unluckyLender, 100);
 
-        take(100, 0, 0, 0, unluckyLender, badBorrowerOffer);
+        take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
@@ -243,25 +234,22 @@ abstract contract BaseTest is Test {
         return obligation;
     }
 
-    function setupObligation(Obligation memory obligation, uint256 obligationUnits) internal {
-        deal(address(loanToken), lender, obligationUnits);
+    function setupObligation(Obligation memory obligation, uint256 obligationShares) internal {
+        deal(address(loanToken), lender, obligationShares); // at tick TICK_RANGE, price is 1.
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.assets = obligationUnits;
+        borrowerOffer.obligationShares = obligationShares;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = TICK_RANGE;
 
         vm.prank(lender);
         midnight.take(
-            0,
-            0,
-            obligationUnits,
-            0,
+            obligationShares,
             lender,
             address(0),
             hex"",

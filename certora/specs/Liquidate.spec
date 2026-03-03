@@ -5,7 +5,7 @@ methods {
 
     function isHealthy(Midnight.Obligation obligation, bytes20 id, address borrower) external returns (bool) envfree;
 
-    function _.price() external => CVL_price(calledContract) expect uint256;
+    function _.price() external => CVL_price(calledContract) expect(uint256);
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes20) => CVL_toId(obligation, chainId, midnight);
     function UtilsLib.msb(uint256 bitmap) internal returns (uint256) => CVL_msb(bitmap);
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
@@ -17,6 +17,7 @@ methods {
 // IdLib summary: remember the last id returned by toId.
 
 persistent ghost bytes20 lastId;
+
 function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes20 {
     // non-deterministic id
     bytes20 id;
@@ -27,7 +28,9 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 // UtilsLib summaries: msb, mulDivDown, and mulDivUp are deterministic
 
 ghost CVL_msb(uint256) returns uint256;
+
 ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
+
 ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 
 // Oracle summary: we assume the price does not change during the execution of a transaction.
