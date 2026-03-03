@@ -12,13 +12,14 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
+    LIQUIDATION_CURSOR_LOW,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 
-uint256 constant MAX_TEST_AMOUNT = 1e36;
+uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -84,7 +85,9 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 oraclePrice = Oracle(obligation.collaterals[0].oracle).price();
+        uint256 collateral =
+            debt.mulDivUp(WAD, obligation.collaterals[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
         deal(address(obligation.collaterals[0].token), address(this), collateral);
         collateralToken1.approve(address(midnight), collateral);
         midnight.supplyCollateral(obligation, 0, collateral, _borrower);
@@ -174,7 +177,7 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return keccak256(UtilsLib.sort(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1]))));
+        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -223,17 +226,15 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
-    // Returns an obligation with sorted, non-zero and unique collaterals (done by adding the index to the hash of the
-    // token).
-    function sortedAndUniqueCollateralsInObligation(Obligation memory obligation)
-        internal
-        pure
-        returns (Obligation memory)
-    {
+    /// @dev Returns an obligation with sorted, unique collaterals and valid lltv/maxLif.
+    function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
         uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
         Collateral[] memory collaterals = new Collateral[](len);
         for (uint256 i = 0; i < len; i++) {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
+            uint256 lltv = obligation.collaterals[i].lltv > WAD ? WAD : obligation.collaterals[i].lltv;
+            collaterals[i].lltv = lltv;
+            collaterals[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
         collaterals = sortCollaterals(collaterals);
         obligation.collaterals = collaterals;
@@ -277,5 +278,9 @@ abstract contract BaseTest is Test {
 
     function absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a - b : b - a;
+    }
+
+    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
+        return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
     }
 }
