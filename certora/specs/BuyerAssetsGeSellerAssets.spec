@@ -17,7 +17,7 @@ methods {
 /// buyerAssets >= sellerAssets.
 rule buyerAssetsGeSellerAssets(
     env e,
-    uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares,
+    uint256 obligationShares,
     address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller,
     Midnight.Offer offer, Midnight.Signature signature,
     bytes32 root, bytes32[] proof
@@ -28,7 +28,7 @@ rule buyerAssetsGeSellerAssets(
     uint256 obligationUnitsOut;
     uint256 obligationSharesOut;
 
-    buyerAssetsOut, sellerAssetsOut, obligationUnitsOut, obligationSharesOut = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares,taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller,offer, signature, root, proof);
+    buyerAssetsOut, sellerAssetsOut, obligationUnitsOut, obligationSharesOut = take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
     assert buyerAssetsOut >= sellerAssetsOut;
 }
