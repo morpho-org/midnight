@@ -21,6 +21,7 @@ contract IdLibTest is Test {
             for (uint256 i = 0; i < obligation1.collaterals.length; i++) {
                 if (obligation1.collaterals[i].token != obligation2.collaterals[i].token) sameCollaterals = false;
                 if (obligation1.collaterals[i].lltv != obligation2.collaterals[i].lltv) sameCollaterals = false;
+                if (obligation1.collaterals[i].maxLif != obligation2.collaterals[i].maxLif) sameCollaterals = false;
                 if (obligation1.collaterals[i].oracle != obligation2.collaterals[i].oracle) sameCollaterals = false;
             }
         }

@@ -23,7 +23,7 @@ contract MulticallTest is BaseTest {
         data[1] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
 
         vm.prank(midnight.owner());
-        vm.expectRevert("Only owner");
+        vm.expectRevert("only owner");
         midnight.multicall(data);
     }
 
