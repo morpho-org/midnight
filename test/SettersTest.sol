@@ -140,12 +140,9 @@ contract SettersTest is BaseTest {
 
     // Default trading fee tests
 
-    function testUnsetDefaultFeeReturnsZero() public view {
-        assertEq(midnight.tradingFee(bytes20(0), 0), 0, "unset default fee should be 0");
-        assertEq(midnight.tradingFee(bytes20(0), 1 days), 0, "unset default fee should be 0");
-        assertEq(midnight.tradingFee(bytes20(0), 7 days), 0, "unset default fee should be 0");
-        assertEq(midnight.tradingFee(bytes20(0), 30 days), 0, "unset default fee should be 0");
-        assertEq(midnight.tradingFee(bytes20(0), 90 days), 0, "unset default fee should be 0");
+    function testTradingFeeRevertsWhenNotCreated() public {
+        vm.expectRevert("not created");
+        midnight.tradingFee(bytes20(0), 0);
     }
 
     function testSetDefaultTradingFeeSuccess(

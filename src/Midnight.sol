@@ -619,7 +619,7 @@ contract Midnight is IMidnight {
         return tentativeSigner;
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
+    function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
         return WAD.mulDivDown(WAD, WAD - cursor.mulDivDown(WAD - lltv, WAD));
     }
 
@@ -630,6 +630,8 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes20 id, uint256 timeToMaturity) public view returns (uint256) {
+        require(obligationState[id].created, "not created");
+
         uint16[7] memory _fees = obligationState[id].fees;
 
         if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
