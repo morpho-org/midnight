@@ -77,4 +77,10 @@ library UtilsLib {
         }
         return 0;
     }
+
+    function negativePart(int256 x) internal pure returns (uint256 res) {
+        assembly {
+            res := mul(shr(255, x), sub(0, x))
+        }
+    }
 }

@@ -8,7 +8,6 @@ methods {
     function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
-    function Midnight.totalShares(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
@@ -66,13 +65,13 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
-rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 obligationUnits, uint256 shares, address onBehalf, address receiver) {
-    Midnight.withdraw(e, obligation, obligationUnits, shares, onBehalf, receiver);
+rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) {
+    Midnight.withdraw(e, obligation, obligationUnits, onBehalf, receiver);
     assert obligationIsCreated(obligation);
 }
 
@@ -102,7 +101,6 @@ invariant obligationStateIsEmptyIfNotCreated(bytes32 id)
 
 function obligationStateIsEmpty(bytes32 id) returns (bool) {
     if (Midnight.totalUnits(id) != 0) return false;
-    if (Midnight.totalShares(id) != 0) return false;
     if (Midnight.withdrawable(id) != 0) return false;
 
     uint16[7] fees = Midnight.fees(id);

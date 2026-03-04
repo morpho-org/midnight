@@ -18,7 +18,6 @@ jobs:
           - ExactMath
           - Liquidate
           - Midnight
-          - SharePrice
           - Solvency
 
     steps:

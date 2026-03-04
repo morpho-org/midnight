@@ -11,7 +11,6 @@ interface ICallbacks {
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationUnits,
-        uint256 obligationShares,
         bytes memory data
     ) external;
     function onSell(
@@ -20,7 +19,6 @@ interface ICallbacks {
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationUnits,
-        uint256 obligationShares,
         bytes memory data
     ) external;
     function onLiquidate(

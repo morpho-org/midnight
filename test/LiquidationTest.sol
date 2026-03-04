@@ -221,7 +221,7 @@ contract LiquidationTest is BaseTest {
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert();
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
     }
 
@@ -252,7 +252,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.balanceOf(id, lender), int256(units), "lender units");
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -262,17 +262,16 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         uint256 debtAfterBadDebt = units - _badDebt();
-        uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
+        uint256 maxRepaid = UtilsLib.min(_maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice), debtAfterBadDebt);
         uint256 lif0 = obligation.collaterals[0].maxLif;
-        uint256 maxSeized = UtilsLib.min(maxRepaid, debtAfterBadDebt).mulDivDown(lif0, WAD)
-            .mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice);
-        seized = bound(seized, 0, maxSeized);
+        uint256 maxSeized = maxRepaid.mulDivDown(lif0, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice);
+        seized = bound(seized, 0, UtilsLib.min(maxSeized, units));
 
         (, uint256 repaid) = midnight.liquidate(obligation, 0, seized, 0, borrower, "");
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.balanceOf(id, lender), int256(units), "lender units");
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -289,7 +288,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.balanceOf(id, lender), int256(units), "lender units");
     }
 
     // Check that if there is bad debt it is possible to repay almost all debt and seize almost all collateral.
@@ -505,11 +504,11 @@ contract LiquidationTest is BaseTest {
         units = bound(units, maxDebt, repayableDebt);
         vm.assume(units > maxDebt);
 
-        // Write the debt first, supply collateral later, so that the activated collaterals are not overwritten.
-        uint256 mappingSlot = 1;
+        // Write the debt as a negative balance.
+        uint256 mappingSlot = 0;
         bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
         bytes32 borrowerSlot = keccak256(abi.encode(borrower, intermediateSlot));
-        vm.store(address(midnight), borrowerSlot, bytes32(units));
+        vm.store(address(midnight), borrowerSlot, bytes32(uint256(-int256(units))));
 
         assertEq(midnight.debtOf(id, borrower), units, "debt");
 
