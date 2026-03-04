@@ -18,10 +18,15 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes20) => summaryToId(obligation);
 }
+
+definition WAD() returns uint256 = 10 ^ 18;
 
 // Since the toId function returns a truncated hash, we need to rehash the obligation to ensure injectivity.
 persistent ghost mapping(bytes32 => bytes20) rehash {
@@ -47,6 +52,10 @@ invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation
 // Show that a created obligation do not have address(0) collaterals.
 invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
+
+// Show that a created obligation has lltv <= WAD.
+invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
+    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes20 id) {
