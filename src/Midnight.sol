@@ -58,7 +58,7 @@ contract Midnight is IMidnight {
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same obligationShares, obligationUnits, and
     /// loan token.
-    mapping(address user => mapping(bytes32 group => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 group => uint128)) public consumed;
 
     /// @dev Offers should have the current session to be valid.
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
@@ -218,14 +218,15 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
         uint256 sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
 
-        uint256 newConsumed;
+        uint128 newConsumed;
         if (offer.obligationUnits > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
+            newConsumed = UtilsLib.toUint128(consumed[offer.maker][offer.group] + obligationUnits);
             require(newConsumed <= offer.obligationUnits, "consumed");
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += obligationShares;
+            newConsumed = UtilsLib.toUint128(consumed[offer.maker][offer.group] + obligationShares);
             require(newConsumed <= offer.obligationShares, "consumed");
         }
+        consumed[offer.maker][offer.group] = newConsumed;
 
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
@@ -491,7 +492,7 @@ contract Midnight is IMidnight {
     }
 
     function consume(bytes32 group, uint256 amount) external {
-        consumed[msg.sender][group] += amount;
+        consumed[msg.sender][group] = UtilsLib.toUint128(consumed[msg.sender][group] + amount);
 
         emit EventsLib.Consume(msg.sender, group, amount);
     }
