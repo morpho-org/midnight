@@ -13,7 +13,7 @@ contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
     Offer internal offer;
 
     uint256 internal initialUnits;
@@ -78,7 +78,7 @@ contract TakeAmountsTest is BaseTest {
     function _createPosition(uint256 positionUnits) internal returns (uint256 currentUnits, uint256 currentShares) {
         deal(address(loanToken), lender, type(uint128).max);
         collateralize(obligation, borrower, positionUnits);
-        uint256 positionShares = TakeAmountsLib.unitsToShares(positionUnits, initialUnits, initialShares, true);
+        uint256 positionShares = TakeAmountsLib.unitsToShares(midnight, id, borrower, offer, positionUnits);
         offer.maker = borrower;
         offer.tick = 1;
         take(positionShares, lender, offer);
@@ -96,7 +96,7 @@ contract TakeAmountsTest is BaseTest {
         targetUnits = bound(targetUnits, 1, 1e30);
         tick = bound(tick, 1, TICK_RANGE);
 
-        uint256 shares = TakeAmountsLib.unitsToShares(targetUnits, initialUnits, initialShares, true);
+        uint256 shares = TakeAmountsLib.unitsToShares(midnight, id, lender, offer, targetUnits);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, targetUnits);
         offer.maker = borrower;
@@ -114,13 +114,11 @@ contract TakeAmountsTest is BaseTest {
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
-        uint256 buyerPrice = TickLib.tickToPrice(tick) + tradingFee;
-        uint256 shares =
-            TakeAmountsLib.buyerAssetsToShares(targetBuyerAssets, initialUnits, initialShares, buyerPrice, true);
+        offer.tick = tick;
+        uint256 shares = TakeAmountsLib.buyerAssetsToShares(midnight, id, lender, offer, targetBuyerAssets);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, shares.mulDivUp(initialUnits + 1, initialShares + 1));
         offer.maker = borrower;
-        offer.tick = tick;
 
         (uint256 buyerAssets,,,) = take(shares, lender, offer);
 
@@ -134,13 +132,11 @@ contract TakeAmountsTest is BaseTest {
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 1, TICK_RANGE);
 
-        uint256 sellerPrice = TickLib.tickToPrice(tick);
-        uint256 shares =
-            TakeAmountsLib.sellerAssetsToShares(targetSellerAssets, initialUnits, initialShares, sellerPrice, true);
+        offer.tick = tick;
+        uint256 shares = TakeAmountsLib.sellerAssetsToShares(midnight, id, lender, offer, targetSellerAssets);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, shares.mulDivUp(initialUnits + 1, initialShares + 1));
         offer.maker = borrower;
-        offer.tick = tick;
 
         (, uint256 sellerAssets,,) = take(shares, lender, offer);
 
@@ -154,9 +150,9 @@ contract TakeAmountsTest is BaseTest {
         targetUnits = bound(targetUnits, 1, 1e30);
         tick = bound(tick, 1, TICK_RANGE);
 
-        (uint256 currentUnits, uint256 currentShares) = _createPosition(2 * targetUnits);
+        _createPosition(2 * targetUnits);
 
-        uint256 shares = TakeAmountsLib.unitsToShares(targetUnits, currentUnits, currentShares, false);
+        uint256 shares = TakeAmountsLib.unitsToShares(midnight, id, borrower, offer, targetUnits);
         deal(address(loanToken), borrower, type(uint256).max);
         offer.maker = lender;
         offer.tick = tick;
@@ -173,14 +169,12 @@ contract TakeAmountsTest is BaseTest {
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
-        (uint256 currentUnits, uint256 currentShares) = _createPosition(1e36);
+        _createPosition(1e36);
 
-        uint256 buyerPrice = TickLib.tickToPrice(tick) + tradingFee;
-        uint256 shares =
-            TakeAmountsLib.buyerAssetsToShares(targetBuyerAssets, currentUnits, currentShares, buyerPrice, false);
-        deal(address(loanToken), borrower, type(uint256).max);
         offer.maker = lender;
         offer.tick = tick;
+        uint256 shares = TakeAmountsLib.buyerAssetsToShares(midnight, id, borrower, offer, targetBuyerAssets);
+        deal(address(loanToken), borrower, type(uint256).max);
 
         (uint256 buyerAssets,,,) = take(shares, borrower, offer);
 
@@ -197,14 +191,12 @@ contract TakeAmountsTest is BaseTest {
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 1, TICK_RANGE);
 
-        (uint256 currentUnits, uint256 currentShares) = _createPosition(1e36);
+        _createPosition(1e36);
 
-        uint256 sellerPrice = TickLib.tickToPrice(tick);
-        uint256 shares =
-            TakeAmountsLib.sellerAssetsToShares(targetSellerAssets, currentUnits, currentShares, sellerPrice, false);
-        deal(address(loanToken), borrower, type(uint256).max);
         offer.maker = lender;
         offer.tick = tick;
+        uint256 shares = TakeAmountsLib.sellerAssetsToShares(midnight, id, borrower, offer, targetSellerAssets);
+        deal(address(loanToken), borrower, type(uint256).max);
 
         (, uint256 sellerAssets,,) = take(shares, borrower, offer);
 
@@ -220,7 +212,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 buyerPrice = TickLib.tickToPrice(TICK_RANGE) + tradingFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
 
-        uint256 shares = TakeAmountsLib.unitsToShares(targetUnits, initialUnits, initialShares, true);
+        uint256 shares = TakeAmountsLib.unitsToShares(midnight, id, lender, offer, targetUnits);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, shares.mulDivUp(initialUnits + 1, initialShares + 1));
         offer.maker = borrower;
@@ -237,12 +229,12 @@ contract TakeAmountsTest is BaseTest {
         uint256 tradingFee = _setFees(fee0, fee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
-        (uint256 currentUnits, uint256 currentShares) = _createPosition(1e36);
+        _createPosition(1e36);
 
         uint256 buyerPrice = TickLib.tickToPrice(TICK_RANGE) + tradingFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
 
-        uint256 shares = TakeAmountsLib.unitsToShares(targetUnits, currentUnits, currentShares, false);
+        uint256 shares = TakeAmountsLib.unitsToShares(midnight, id, borrower, offer, targetUnits);
         deal(address(loanToken), borrower, type(uint256).max);
         offer.maker = lender;
         offer.tick = TICK_RANGE;

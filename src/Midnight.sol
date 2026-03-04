@@ -50,10 +50,10 @@ contract Midnight is IMidnight {
 
     /// STORAGE ///
 
-    mapping(bytes20 id => mapping(address user => uint256)) public sharesOf;
-    mapping(bytes20 id => mapping(address user => BorrowerState)) public borrowerState;
-    mapping(bytes20 id => mapping(address user => uint128[128])) public collateralOf;
-    mapping(bytes20 id => ObligationState) public obligationState;
+    mapping(bytes32 id => mapping(address user => uint256)) public sharesOf;
+    mapping(bytes32 id => mapping(address user => BorrowerState)) public borrowerState;
+    mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
+    mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
     /// @dev To work as expected, all offers in a same group should have the same obligationShares, obligationUnits, and
@@ -113,7 +113,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Overrides the fee of a specific obligation.
-    function setObligationTradingFee(bytes20 id, uint256 index, uint256 newTradingFee) external {
+    function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
@@ -170,7 +170,7 @@ contract Midnight is IMidnight {
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        bytes20 id = touchObligation(offer.obligation);
+        bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -312,7 +312,7 @@ contract Midnight is IMidnight {
     ) external returns (uint256, uint256) {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
-        bytes20 id = touchObligation(obligation);
+        bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
         if (obligationUnits > 0) {
@@ -334,7 +334,7 @@ contract Midnight is IMidnight {
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
-        bytes20 id = touchObligation(obligation);
+        bytes32 id = touchObligation(obligation);
 
         borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
@@ -344,10 +344,12 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
     }
 
+    /// @dev This function checks authorization to prevent activated collateral poisoning.
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
         external
     {
-        bytes20 id = touchObligation(obligation);
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
         uint256 oldCollateralOf = collateralOf[id][onBehalf][collateralIndex];
@@ -374,7 +376,7 @@ contract Midnight is IMidnight {
         address receiver
     ) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
-        bytes20 id = touchObligation(obligation);
+        bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
         uint256 newCollateralOf = collateralOf[id][onBehalf][collateralIndex] - assets;
@@ -411,7 +413,7 @@ contract Midnight is IMidnight {
         bytes calldata data
     ) external returns (uint256, uint256) {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
-        bytes20 id = touchObligation(obligation);
+        bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
         uint256 maxDebt;
@@ -520,8 +522,8 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
-    function touchObligation(Obligation memory obligation) public returns (bytes20) {
-        bytes20 id = IdLib.toId(obligation, block.chainid, address(this));
+    function touchObligation(Obligation memory obligation) public returns (bytes32) {
+        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
         if (!obligationState[id].created) {
             require(obligation.collaterals.length > 0, "no collaterals");
             require(obligation.collaterals.length <= MAX_COLLATERALS, "too many collaterals");
@@ -550,48 +552,49 @@ contract Midnight is IMidnight {
 
     /// VIEW FUNCTIONS ///
 
-    function toId(Obligation memory obligation) public view returns (bytes20) {
+    function toId(Obligation memory obligation) public view returns (bytes32) {
         return IdLib.toId(obligation, block.chainid, address(this));
     }
 
-    /// @dev For valid ids of touched obligations, returns the corresponding obligation.
-    /// @dev Reverts if the code cannot be abi-decoded as an obligation.
-    /// @dev If the id given is not the result of toId, the returned obligation is arbitrary.
-    function toObligation(bytes20 id) public view returns (Obligation memory) {
-        return IdLib.toObligation(id);
+    /// @dev Returns the obligation corresponding to the given id.
+    /// @dev Reverts if the id is not a valid id of a touched obligation.
+    function toObligation(bytes32 id) public view returns (Obligation memory) {
+        require(obligationState[id].created, "not created");
+        address create2Address = address(uint160(uint256(id)));
+        return abi.decode(create2Address.code, (Obligation));
     }
 
-    function debtOf(bytes20 id, address user) external view returns (uint256) {
+    function debtOf(bytes32 id, address user) external view returns (uint256) {
         return borrowerState[id][user].debt;
     }
 
-    function activatedCollaterals(bytes20 id, address user) external view returns (uint128) {
+    function activatedCollaterals(bytes32 id, address user) external view returns (uint128) {
         return borrowerState[id][user].activatedCollaterals;
     }
 
-    function totalUnits(bytes20 id) external view returns (uint256) {
+    function totalUnits(bytes32 id) external view returns (uint256) {
         return obligationState[id].totalUnits;
     }
 
-    function totalShares(bytes20 id) external view returns (uint256) {
+    function totalShares(bytes32 id) external view returns (uint256) {
         return obligationState[id].totalShares;
     }
 
-    function obligationCreated(bytes20 id) external view returns (bool) {
+    function obligationCreated(bytes32 id) external view returns (bool) {
         return obligationState[id].created;
     }
 
-    function withdrawable(bytes20 id) external view returns (uint256) {
+    function withdrawable(bytes32 id) external view returns (uint256) {
         return obligationState[id].withdrawable;
     }
 
-    function fees(bytes20 id) external view returns (uint16[7] memory) {
+    function fees(bytes32 id) external view returns (uint16[7] memory) {
         return obligationState[id].fees;
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
-    function isHealthy(Obligation memory obligation, bytes20 id, address borrower) public view returns (bool) {
+    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
         uint256 debt = _borrowerState.debt;
         uint256 maxDebt;
@@ -619,7 +622,7 @@ contract Midnight is IMidnight {
         return tentativeSigner;
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
+    function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
         return WAD.mulDivDown(WAD, WAD - cursor.mulDivDown(WAD - lltv, WAD));
     }
 
@@ -629,7 +632,9 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
-    function tradingFee(bytes20 id, uint256 timeToMaturity) public view returns (uint256) {
+    function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+        require(obligationState[id].created, "not created");
+
         uint16[7] memory _fees = obligationState[id].fees;
 
         if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
