@@ -18,22 +18,22 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
 
-    function isHealthy(Midnight.Obligation memory, bytes20, address) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
 // Check the ratio of units over shares is below or equal to 1.
-strong invariant sharePriceBelowOrEqOne(bytes20 id)
+strong invariant sharePriceBelowOrEqOne(bytes32 id)
     totalShares(id) >= totalUnits(id);
 
 /// Liquidation does not change the total shares.
-rule liquidateDoesNotChangeShares(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id) {
+rule liquidateDoesNotChangeShares(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
     mathint sharesBefore = totalShares(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert totalShares(id) == sharesBefore;
 }
 
 /// Liquidation does not increase the total units.
-rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes20 id) {
+rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
     mathint unitsBefore = totalUnits(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert totalUnits(id) <= unitsBefore;
@@ -41,7 +41,7 @@ rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint25
 
 /// Virtual share price = (totalUnits+1)/(totalShares+1) monotonicity.
 /// Liquidation is excluded: it can decrease the share price via bad debt socialization but covered above.
-rule sharePriceDoesNotDecrease(bytes20 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
+rule sharePriceDoesNotDecrease(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);
 
