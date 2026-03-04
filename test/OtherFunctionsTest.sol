@@ -181,7 +181,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testConsume(address user, bytes32 group, uint256 amount) public {
+    function testConsume(address user, bytes32 group, uint128 amount) public {
         vm.prank(user);
         midnight.consume(group, amount);
         assertEq(midnight.consumed(user, group), amount, "consumed");

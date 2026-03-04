@@ -6,7 +6,7 @@ methods {
     function withdrawable(bytes20 id) external returns (uint256) envfree;
     function totalUnits(bytes20 id) external returns (uint256) envfree;
     function totalShares(bytes20 id) external returns (uint256) envfree;
-    function consumed(address user, bytes32 group) external returns (uint256) envfree;
+    function consumed(address user, bytes32 group) external returns (uint128) envfree;
     function sharesOf(bytes20 id, address owner) external returns (uint256) envfree;
     function debtOf(bytes20 id, address user) external returns (uint256) envfree;
 
