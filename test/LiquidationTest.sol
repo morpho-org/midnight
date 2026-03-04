@@ -20,7 +20,7 @@ contract LiquidationTest is BaseTest {
     using UtilsLib for uint128;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
 
     uint256 internal recordedRepaidUnits;
     bytes internal recordedData;
@@ -514,6 +514,10 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "debt");
 
         // Collateralize with both collaterals.
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(this), true);
+
         deal(obligation.collaterals[0].token, address(this), collateral1);
         ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral1);
         midnight.supplyCollateral(obligation, 0, collateral1, borrower);
@@ -546,6 +550,9 @@ contract LiquidationTest is BaseTest {
 
         uint256 lltv0 = obligation.collaterals[0].lltv;
         uint256 lltv1 = obligation.collaterals[1].lltv;
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(this), true);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -584,6 +591,9 @@ contract LiquidationTest is BaseTest {
     function testGasLiquidateMultipleCollaterals() public {
         uint256 units = 1000e18;
         uint256 collateralAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(this), true);
 
         // Supply both collaterals.
         for (uint256 i = 0; i < 2; i++) {
