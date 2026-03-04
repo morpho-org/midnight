@@ -16,13 +16,15 @@ contract TakeTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
     Offer internal otherLenderOffer;
     Offer internal otherBorrowerOffer;
 
-    uint256 internal maxAssets = 1e33; // to refine.
+    // Bad debt creates a ~3.4x shares/units ratio, and price conversion can amplify by up to 100x (price > 0.01 ether).
+    // Collateral = units / lltv adds another ~1.33x. Combined: 3.4 * 100 * 1.33 ≈ 400.
+    uint256 internal maxAssets = type(uint128).max / 400;
     uint256 internal initialUnits;
     uint256 internal initialShares;
 
@@ -32,9 +34,23 @@ contract TakeTest is BaseTest {
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle1)
+                })
+            );
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
+            .push(
+                Collateral({
+                    token: address(collateralToken2),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle2)
+                })
+            );
         obligation.collaterals = sortCollaterals(obligation.collaterals);
         obligation.rcfThreshold = 0;
 
@@ -476,7 +492,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("Seller is unhealthy");
+        vm.expectRevert("seller is unhealthy");
         take(shares, lender, borrowerOffer);
     }
 
@@ -491,7 +507,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("Seller is unhealthy");
+        vm.expectRevert("seller is unhealthy");
         take(shares, borrower, lenderOffer);
     }
 
@@ -626,6 +642,9 @@ contract TakeTest is BaseTest {
         deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
         assertEq(midnight.collateralOf(id, borrower, 0), 0);
 
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrowerOffer.callback, true);
+
         take(shares, lender, borrowerOffer);
 
         assertEq(midnight.collateralOf(id, borrower, 0), collateral);
@@ -642,6 +661,9 @@ contract TakeTest is BaseTest {
         address callback = address(new BorrowCallback());
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         deal(obligation.collaterals[0].token, callback, collateral);
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(callback, true);
 
         vm.prank(borrower);
         midnight.take(
@@ -769,7 +791,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         // Convert target units to shares (the taker still specifies shares).
-        uint256 obligationShares = targetUnits.mulDiv(initialShares + 1, initialUnits + 1, true);
+        uint256 obligationShares = targetUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
@@ -792,7 +814,7 @@ contract TakeTest is BaseTest {
         tick = bound(tick, 0, TICK_RANGE);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
-        uint256 obligationShares = targetUnits.mulDiv(initialShares + 1, initialUnits + 1, true);
+        uint256 obligationShares = targetUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);

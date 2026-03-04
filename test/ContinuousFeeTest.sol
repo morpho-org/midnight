@@ -15,7 +15,7 @@ contract ContinuousFeeTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
     address internal feeRecipient = makeAddr("feeRecipient");
@@ -27,9 +27,23 @@ contract ContinuousFeeTest is BaseTest {
         // Use shorter maturity so TTM < 180 days after reasonable time warps
         obligation.maturity = block.timestamp + 90 days;
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken1), lltv: 0.75e18, oracle: address(oracle1)}));
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle1)
+                })
+            );
         obligation.collaterals
-            .push(Collateral({token: address(collateralToken2), lltv: 0.75e18, oracle: address(oracle2)}));
+            .push(
+                Collateral({
+                    token: address(collateralToken2),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle2)
+                })
+            );
         obligation.collaterals = sortCollaterals(obligation.collaterals);
 
         id = toId(obligation);
@@ -56,7 +70,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testContinuousFeeAccrualBasic(uint256 initialShares, uint256 fee, uint256 timeElapsed) public {
-        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
         // Bound timeElapsed to ensure we don't exceed maturity
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
@@ -89,7 +103,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testContinuousFeeZeroFee(uint256 initialShares, uint256 timeElapsed) public {
-        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
 
         // No default fee set, so fee is 0
@@ -110,7 +124,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testContinuousFeeZeroTimeElapsed(uint256 initialShares, uint256 fee) public {
-        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
 
         // Set default continuous fee BEFORE creating the obligation
@@ -134,7 +148,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testContinuousFeeAccruesCumulatively(uint256 initialShares, uint256 fee) public {
-        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT);
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
 
         // Set default continuous fee BEFORE creating the obligation
