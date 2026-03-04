@@ -10,17 +10,17 @@ library EventsLib {
 
     event SetOwner(address indexed owner);
     event SetFeeSetter(address indexed feeSetter);
-    event SetObligationTradingFee(bytes20 indexed id_, uint256 indexed index, uint256 newTradingFee);
+    event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
     event SetTradingFeeRecipient(address indexed feeRecipient);
     event SetMaxTotalUnits(address indexed loanToken, uint128 maxTotalUnits);
     event SetMaxTakeableAssets(address indexed loanToken, uint256 maxTakeableAssets);
     event SetMaxCollateralPerUser(address indexed collateralToken, uint256 maxCollateralPerUser);
 
-    event ObligationCreated(bytes20 indexed id_, Obligation obligation);
+    event ObligationCreated(bytes32 indexed id_, Obligation obligation);
     event Take(
         address caller,
-        bytes20 indexed id_,
+        bytes32 indexed id_,
         address indexed maker,
         address indexed taker,
         bool offerIsBuy,
@@ -36,20 +36,20 @@ library EventsLib {
     );
     event Withdraw(
         address caller,
-        bytes20 indexed id_,
+        bytes32 indexed id_,
         uint256 obligationUnits,
         uint256 shares,
         address indexed onBehalf,
         address indexed receiver
     );
-    event Repay(address indexed caller, bytes20 indexed id_, uint256 obligationUnits, address indexed onBehalf);
+    event Repay(address indexed caller, bytes32 indexed id_, uint256 obligationUnits, address indexed onBehalf);
     event SupplyCollateral(
-        address caller, bytes20 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf
+        address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf
     );
 
     event WithdrawCollateral(
         address caller,
-        bytes20 indexed id_,
+        bytes32 indexed id_,
         address indexed collateral,
         uint256 assets,
         address indexed onBehalf,
@@ -58,7 +58,7 @@ library EventsLib {
 
     event Liquidate(
         address indexed caller,
-        bytes20 indexed id_,
+        bytes32 indexed id_,
         uint256 collateralIndex,
         uint256 seizedAssets,
         uint256 repaidUnits,

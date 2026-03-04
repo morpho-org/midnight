@@ -10,7 +10,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
 
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes20) => CVL_toId(obligation, chainId, midnight);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
@@ -53,16 +53,16 @@ ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 // IdLib summaries.
 
 // Mapping from obligation id to its loan token.
-ghost mapping(bytes20 => address) loantoken;
+ghost mapping(bytes32 => address) loantoken;
 
 // Mapping from obligation id and collateral index to the corresponding collateral token.
-ghost mapping(bytes20 => mapping(uint128 => address)) collateralToken;
+ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
-ghost hash(address, uint256, uint256, address) returns bytes20;
+ghost hash(address, uint256, uint256, address) returns bytes32;
 
-function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes20 {
+function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
     // Deterministically derive the obligation id.
-    bytes20 id = hash(obligation.loanToken, obligation.maturity, chainId, midnight);
+    bytes32 id = hash(obligation.loanToken, obligation.maturity, chainId, midnight);
 
     // Assume the obligation id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
@@ -90,35 +90,35 @@ function CVL_flashLoanEnd(address token, uint256 amount) {
 
 // Define collateral sum and withdrawable sum.
 
-definition collateralSum(address token) returns mathint = usum bytes20 id, address owner. collateralOfMirror[id][owner][token];
+definition collateralSum(address token) returns mathint = usum bytes32 id, address owner. collateralOfMirror[id][owner][token];
 
-ghost mapping(bytes20 => mapping(address => mapping(address => mathint))) collateralOfMirror {
-    init_state axiom (forall bytes20 id. forall address owner. forall address token. collateralOfMirror[id][owner][token] == 0);
+ghost mapping(bytes32 => mapping(address => mapping(address => mathint))) collateralOfMirror {
+    init_state axiom (forall bytes32 id. forall address owner. forall address token. collateralOfMirror[id][owner][token] == 0);
     init_state axiom (forall address token. collateralSum(token) == 0);
 }
 
 // Safe require as obligations limit the number of collaterals.
-hook Sload uint128 value collateralOf[KEY bytes20 id][KEY address owner][INDEX uint256 collateralIndex] {
+hook Sload uint128 value collateralOf[KEY bytes32 id][KEY address owner][INDEX uint256 collateralIndex] {
     require value == collateralOfMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]], "ghost mirror";
 }
 
 // Safe require as obligations limit the number of collaterals.
-hook Sstore collateralOf[KEY bytes20 id][KEY address owner][INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
+hook Sstore collateralOf[KEY bytes32 id][KEY address owner][INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
     collateralOfMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
 }
 
-definition withdrawableSum(address token) returns mathint = usum bytes20 id. withdrawableMirror[id][token];
+definition withdrawableSum(address token) returns mathint = usum bytes32 id. withdrawableMirror[id][token];
 
-ghost mapping(bytes20 => mapping(address => mathint)) withdrawableMirror {
-    init_state axiom (forall bytes20 id. forall address token. withdrawableMirror[id][token] == 0);
+ghost mapping(bytes32 => mapping(address => mathint)) withdrawableMirror {
+    init_state axiom (forall bytes32 id. forall address token. withdrawableMirror[id][token] == 0);
     init_state axiom (forall address token. withdrawableSum(token) == 0);
 }
 
-hook Sload uint256 value obligationState[KEY bytes20 id].withdrawable {
+hook Sload uint256 value obligationState[KEY bytes32 id].withdrawable {
     require value == withdrawableMirror[id][loantoken[id]], "ghost mirror";
 }
 
-hook Sstore obligationState[KEY bytes20 id].withdrawable uint256 newWithdrawable (uint256 oldWithdrawable) {
+hook Sstore obligationState[KEY bytes32 id].withdrawable uint256 newWithdrawable (uint256 oldWithdrawable) {
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 

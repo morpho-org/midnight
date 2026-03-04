@@ -15,7 +15,7 @@ contract BundlerTest is BaseTest {
     TakeBundler internal takeBundler;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
     Offer[] internal offers;
 
     function setUp() public override {

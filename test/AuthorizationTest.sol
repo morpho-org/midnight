@@ -12,7 +12,7 @@ contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
 
     function setUp() public override {
         super.setUp();
@@ -73,8 +73,11 @@ contract AuthorizationTest is BaseTest {
         address collateralToken = obligation.collaterals[0].token;
 
         midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
-        deal(collateralToken, address(this), collateralAmount);
+        deal(collateralToken, user, collateralAmount);
+        vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
+
+        vm.prank(user);
         midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
         // Attacker tries to withdraw user's collateral
@@ -114,19 +117,48 @@ contract AuthorizationTest is BaseTest {
         address collateralToken = obligation.collaterals[0].token;
 
         midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
-        deal(collateralToken, address(this), collateralAmount);
-        ERC20(collateralToken).approve(address(midnight), collateralAmount);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
         // User authorizes operator
         vm.prank(user);
         midnight.setIsAuthorized(operator, true);
+
+        deal(collateralToken, user, collateralAmount);
+
+        vm.prank(user);
+        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+
+        vm.prank(user);
+        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
         // Operator can withdraw on behalf of user
         vm.prank(operator);
         midnight.withdrawCollateral(obligation, 0, collateralAmount, user, operator);
 
         assertEq(ERC20(collateralToken).balanceOf(operator), collateralAmount);
+    }
+
+    function testSupplyCollateralUnauthorized() public {
+        uint256 collateralAmount = 1000;
+        address user = makeAddr("user");
+        address operator = makeAddr("operator");
+        address collateralToken = obligation.collaterals[0].token;
+
+        deal(collateralToken, operator, collateralAmount);
+        vm.prank(operator);
+        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+
+        vm.prank(operator);
+        vm.expectRevert("unauthorized");
+        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+
+        // User authorizes operator
+        vm.prank(user);
+        midnight.setIsAuthorized(operator, true);
+
+        vm.prank(operator);
+        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+
+        assertEq(midnight.collateralOf(id, user, 0), collateralAmount);
     }
 
     function testWithdrawSelf() public {
