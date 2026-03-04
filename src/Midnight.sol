@@ -201,12 +201,6 @@ contract Midnight is IMidnight {
                 offer.receiverIfMakerIsSeller
             );
 
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
-
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
@@ -217,20 +211,25 @@ contract Midnight is IMidnight {
         uint256 unitsUp = obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         uint256 obligationUnits = buyerIsLender ? unitsUp : unitsDown;
 
+        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 buyerAssets;
         uint256 sellerAssets;
         if (offer.buy && buyerIsLender) {
-            buyerAssets = unitsDown.mulDivDown(buyerPrice, WAD);
-            sellerAssets = unitsDown.mulDivDown(sellerPrice, WAD);
+            buyerAssets = unitsDown.mulDivDown(offerPrice, WAD);
         } else if (offer.buy && !buyerIsLender) {
-            buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-            sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+            buyerAssets = obligationUnits.mulDivDown(offerPrice, WAD);
         } else if (!offer.buy && sellerIsBorrower) {
-            sellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
-            buyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
+            sellerAssets = obligationUnits.mulDivUp(offerPrice, WAD);
         } else {
-            sellerAssets = unitsUp.mulDivUp(sellerPrice, WAD);
-            buyerAssets = unitsUp.mulDivUp(buyerPrice, WAD);
+            sellerAssets = unitsUp.mulDivUp(offerPrice, WAD);
+        }
+
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 tradingFeeAmount = obligationUnits.mulDivUp(tradingFee(id, timeToMaturity), WAD);
+        if (offer.buy) {
+            sellerAssets = buyerAssets - tradingFeeAmount;
+        } else {
+            buyerAssets = sellerAssets + tradingFeeAmount;
         }
 
         uint256 newConsumed;
