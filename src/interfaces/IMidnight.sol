@@ -44,9 +44,15 @@ struct Signature {
 struct ObligationState {
     uint128 totalUnits;
     uint256 withdrawable;
-    uint256 lossIndex;
+    uint128 lossScale;
+    uint32 lossShifts;
     bool created;
     uint16[7] fees;
+}
+
+struct Loss {
+    uint128 scale;
+    uint32 shifts;
 }
 
 interface IMidnight {}

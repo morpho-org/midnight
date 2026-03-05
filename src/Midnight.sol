@@ -19,7 +19,7 @@ import {
     ROOT_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMidnight, Obligation, Offer, Signature, Collateral, ObligationState} from "./interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, Signature, Collateral, ObligationState, Loss} from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
@@ -43,7 +43,7 @@ contract Midnight is IMidnight {
     /// STORAGE ///
 
     mapping(bytes32 id => mapping(address user => int256)) public balanceOf;
-    mapping(bytes32 id => mapping(address user => uint256)) public userLossIndex;
+    mapping(bytes32 id => mapping(address user => Loss)) public loss;
     mapping(bytes32 id => mapping(address user => uint128)) public activatedCollaterals;
     mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
@@ -385,8 +385,13 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-line(unsafe-typecast)
             balanceOf[id][borrower] += int256(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            _obligationState.lossIndex =
-                WAD - (WAD - _obligationState.lossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits);
+            uint256 rawScale = _obligationState.lossScale.mulDivUp(oldTotalUnits + 1, oldTotalUnits - badDebt + 1);
+            // 64 bit shifts needed to get a 128 bit loss scale
+            uint32 newShifts =
+                rawScale > (uint256(type(uint128).max) << 64) ? 2 : (rawScale > type(uint128).max ? 1 : 0);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            _obligationState.lossScale = uint128(((rawScale - 1) >> (64 * newShifts)) + 1);
+            _obligationState.lossShifts += newShifts;
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
@@ -498,6 +503,7 @@ contract Midnight is IMidnight {
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
+            obligationState[id].lossScale = uint128(1 << 64);
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -505,16 +511,22 @@ contract Midnight is IMidnight {
         return id;
     }
 
-    function slash(bytes32 id, address user) public {
-        uint256 _userLossIndex = userLossIndex[id][user];
-        uint256 lossIndex = obligationState[id].lossIndex;
-        if (_userLossIndex != lossIndex) {
+    /// INTERNAL FUNCTIONS ///
+
+    function slash(bytes32 id, address user) internal {
+        Loss memory _loss = loss[id][user];
+        ObligationState memory _obligationState = obligationState[id];
+        if (_loss.scale != _obligationState.lossScale || _loss.shifts != _obligationState.lossShifts) {
             int256 balance = balanceOf[id][user];
             if (balance > 0) {
-                // forge-lint: disable-next-line(unsafe-typecast)
-                balanceOf[id][user] = int256(uint256(balance).mulDivDown(WAD - lossIndex, WAD - _userLossIndex));
+                uint32 shifts = _obligationState.lossShifts - _loss.shifts;
+                // forge-lint: disable-start(unsafe-typecast)
+                balanceOf[id][user] =
+                    int256(uint256(balance).mulDivDown(_loss.scale, _obligationState.lossScale) >> (64 * shifts));
+                // forge-lint: disable-end
             }
-            userLossIndex[id][user] = lossIndex;
+            loss[id][user].scale = _obligationState.lossScale;
+            loss[id][user].shifts = _obligationState.lossShifts;
         }
     }
 
@@ -532,15 +544,18 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Obligation));
     }
 
-    function balanceOfAfterSlashing(bytes32 id, address user) public view returns (int256) {
+    function balanceOfAfterLoss(bytes32 id, address user) public view returns (int256) {
+        Loss memory _loss = loss[id][user];
+        ObligationState memory _obligationState = obligationState[id];
         int256 balance = balanceOf[id][user];
-        uint256 _userLossIndex = userLossIndex[id][user];
-        uint256 lossIndex = obligationState[id].lossIndex;
-        if (balance > 0 && _userLossIndex != lossIndex) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            return int256(uint256(balance).mulDivDown(WAD - lossIndex, WAD - _userLossIndex));
+        if (balance > 0 && (_loss.scale != _obligationState.lossScale || _loss.shifts != _obligationState.lossShifts)) {
+            uint32 shifts = _obligationState.lossShifts - _loss.shifts;
+            // forge-lint: disable-start(unsafe-typecast)
+            return int256(uint256(balance).mulDivDown(_loss.scale, _obligationState.lossScale) >> (64 * shifts));
+            // forge-lint: disable-end
+        } else {
+            return balance;
         }
-        return balance;
     }
 
     function debtOf(bytes32 id, address user) public view returns (uint256) {
