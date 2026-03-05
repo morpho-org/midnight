@@ -125,7 +125,7 @@ contract OtherFunctionsTest is BaseTest {
         testRepay(units, withdraw);
 
         vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) =
+        (uint256 returnedObligationUnits,, uint256 returnedShares) =
             midnight.withdraw(obligation, withdraw, 0, lender, lender);
 
         assertEq(midnight.sharesOf(id, lender), units - withdraw, "obligationSharesOf");
@@ -144,7 +144,7 @@ contract OtherFunctionsTest is BaseTest {
 
         // TODO: sharesPrice != 1
         vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) =
+        (uint256 returnedObligationUnits,, uint256 returnedShares) =
             midnight.withdraw(obligation, 0, shares, lender, lender);
 
         assertEq(midnight.sharesOf(id, lender), units - shares, "obligationSharesOf");

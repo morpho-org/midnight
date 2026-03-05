@@ -845,9 +845,17 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, uint256, bytes memory data)
-        external
-    {
+    function onSell(
+        Obligation memory obligation,
+        address seller,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external {
         recordedData = data;
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
         address collateralToken = obligation.collaterals[collateralIndex].token;
@@ -862,6 +870,8 @@ contract BorrowCallback is ICallbacks {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
+        uint256,
+        uint256,
         bytes memory data
     ) external {}
 
@@ -878,6 +888,8 @@ contract LendCallback is ICallbacks {
         uint256,
         uint256,
         uint256,
+        uint256,
+        uint256,
         bytes memory data
     ) external {
         recordedData = data;
@@ -891,6 +903,8 @@ contract LendCallback is ICallbacks {
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
+        uint256,
+        uint256,
         bytes memory data
     ) external {}
 

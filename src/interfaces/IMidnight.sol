@@ -46,12 +46,18 @@ struct BorrowerState {
     uint128 activatedCollaterals;
 }
 
+struct PositionFeeData {
+    uint128 weightedSize;
+    uint128 weightedAssets;
+}
+
 struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
     uint256 withdrawable;
     bool created;
     uint16[7] fees;
+    uint16 interestFee;
 }
 
 interface IMidnight {}

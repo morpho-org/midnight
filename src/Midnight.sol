@@ -10,6 +10,7 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     FEE_STEP,
+    INTEREST_FEE_STEP,
     TIME_TO_MAX_LIF,
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -26,7 +27,8 @@ import {
     Signature,
     Collateral,
     BorrowerState,
-    ObligationState
+    ObligationState,
+    PositionFeeData
 } from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
@@ -67,10 +69,18 @@ contract Midnight is IMidnight {
     /// @dev Whether an address is authorized to manage positions on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
-    /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
+    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later updated by the
+    /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
 
-    address public tradingFeeRecipient;
+    /// @dev Default interest fee per loan token. Set when the obligation is created. Can be later updated by the
+    /// feeSetter.
+    mapping(address loanToken => uint16) public defaultInterestFee;
+
+    address public feeRecipient;
+
+    mapping(bytes32 id => mapping(address user => PositionFeeData)) public lenderFeeState;
+    mapping(bytes32 id => mapping(address user => PositionFeeData)) public borrowerFeeState;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -135,10 +145,29 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    function setTradingFeeRecipient(address feeRecipient) external {
+    function setFeeRecipient(address newFeeRecipient) external {
         require(msg.sender == owner, "only owner");
-        tradingFeeRecipient = feeRecipient;
-        emit EventsLib.SetTradingFeeRecipient(feeRecipient);
+        feeRecipient = newFeeRecipient;
+        emit EventsLib.SetFeeRecipient(newFeeRecipient);
+    }
+
+    function setObligationInterestFee(bytes32 id, uint256 newInterestFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        require(newInterestFee <= WAD, "interest fee too high");
+        require(newInterestFee % INTEREST_FEE_STEP == 0, "interest fee must be a multiple of INTEREST_FEE_STEP");
+        require(obligationState[id].created, "obligation not created");
+        // forge-lint: disable-next-item(unsafe-typecast) newInterestFee <= WAD
+        obligationState[id].interestFee = uint16(newInterestFee / INTEREST_FEE_STEP);
+        emit EventsLib.SetObligationInterestFee(id, newInterestFee);
+    }
+
+    function setDefaultInterestFee(address loanToken, uint256 newInterestFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        require(newInterestFee <= WAD, "interest fee too high");
+        require(newInterestFee % INTEREST_FEE_STEP == 0, "interest fee must be a multiple of INTEREST_FEE_STEP");
+        // forge-lint: disable-next-item(unsafe-typecast) newInterestFee <= WAD
+        defaultInterestFee[loanToken] = uint16(newInterestFee / INTEREST_FEE_STEP);
+        emit EventsLib.SetDefaultInterestFee(loanToken, newInterestFee);
     }
 
     /// ENTRY-POINTS ///
@@ -227,24 +256,38 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.obligationShares, "consumed");
         }
 
-        if (buyerIsLender && sellerIsBorrower) {
-            // Lender enters + borrower enters.
+        uint256 buyerInterestFee;
+        uint256 sellerInterestFee;
+        uint256 _interestFee = _obligationState.interestFee;
+
+        if (buyerIsLender) {
+            lenderFeeState[id][buyer].weightedSize += UtilsLib.toUint128(_interestFee * obligationShares);
+            lenderFeeState[id][buyer].weightedAssets += UtilsLib.toUint128(_interestFee * buyerAssets);
             sharesOf[id][buyer] += obligationShares;
+        } else if (obligationUnits > 0) {
+            (uint128 clearedWeightedDebt, uint128 clearedWeightedRevenue) =
+                _clearFee(borrowerFeeState[id][buyer], obligationUnits, borrowerState[id][buyer].debt);
+            buyerInterestFee = uint256(clearedWeightedRevenue)
+                .zeroFloorSub(buyerAssets.mulDivDown(clearedWeightedDebt, obligationUnits)) / (WAD / INTEREST_FEE_STEP);
+            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
+        }
+
+        if (sellerIsBorrower) {
+            borrowerFeeState[id][seller].weightedSize += UtilsLib.toUint128(_interestFee * obligationUnits);
+            borrowerFeeState[id][seller].weightedAssets += UtilsLib.toUint128(_interestFee * sellerAssets);
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
+        } else if (obligationShares > 0) {
+            (uint128 clearedWeightedShares, uint128 clearedWeightedCost) =
+                _clearFee(lenderFeeState[id][seller], obligationShares, sharesOf[id][seller]);
+            sellerInterestFee = sellerAssets.mulDivDown(clearedWeightedShares, obligationShares)
+                .zeroFloorSub(clearedWeightedCost) / (WAD / INTEREST_FEE_STEP);
+            sharesOf[id][seller] -= obligationShares;
+        }
+
+        if (buyerIsLender && sellerIsBorrower) {
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
-        } else if (buyerIsLender && !sellerIsBorrower) {
-            // Lender enters + lender exits.
-            sharesOf[id][buyer] += obligationShares;
-            sharesOf[id][seller] -= obligationShares;
-        } else if (!buyerIsLender && sellerIsBorrower) {
-            // Borrower exits + borrower enters.
-            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
-            borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
-        } else {
-            // Borrower exits + lender exits.
-            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
-            sharesOf[id][seller] -= obligationShares;
+        } else if (!buyerIsLender && !sellerIsBorrower) {
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
         }
@@ -275,14 +318,19 @@ contract Midnight is IMidnight {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
+                    sellerInterestFee,
+                    buyerInterestFee,
                     buyerCallbackData
                 );
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken,
+            buyer,
+            feeRecipient,
+            buyerAssets - sellerAssets + buyerInterestFee + sellerInterestFee
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets - sellerInterestFee);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
@@ -293,6 +341,8 @@ contract Midnight is IMidnight {
                     sellerAssets,
                     obligationUnits,
                     obligationShares,
+                    sellerInterestFee,
+                    buyerInterestFee,
                     sellerCallbackData
                 );
         }
@@ -309,7 +359,7 @@ contract Midnight is IMidnight {
         uint256 shares,
         address onBehalf,
         address receiver
-    ) external returns (uint256, uint256) {
+    ) external returns (uint256, uint256, uint256) {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
@@ -321,20 +371,33 @@ contract Midnight is IMidnight {
             obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         }
 
-        sharesOf[id][onBehalf] -= shares;
+        uint256 _interestFee;
+        if (shares > 0) {
+            (uint128 clearedWeightedShares, uint128 clearedWeightedCost) =
+                _clearFee(lenderFeeState[id][onBehalf], shares, sharesOf[id][onBehalf]);
+            _interestFee = obligationUnits.mulDivDown(clearedWeightedShares, shares).zeroFloorSub(clearedWeightedCost)
+                / (WAD / INTEREST_FEE_STEP);
+            sharesOf[id][onBehalf] -= shares;
+        }
         _obligationState.withdrawable -= obligationUnits;
         _obligationState.totalShares -= UtilsLib.toUint128(shares);
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits - _interestFee);
+        SafeTransferLib.safeTransfer(obligation.loanToken, feeRecipient, _interestFee);
 
-        return (obligationUnits, shares);
+        return (obligationUnits, _interestFee, shares);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
         bytes32 id = touchObligation(obligation);
+
+        uint256 debt = borrowerState[id][onBehalf].debt;
+        if (debt > 0) {
+            _clearFee(borrowerFeeState[id][onBehalf], obligationUnits, debt);
+        }
 
         borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
@@ -479,6 +542,10 @@ contract Midnight is IMidnight {
             _state.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
+        if (originalDebt > 0) {
+            _clearFee(borrowerFeeState[id][borrower], badDebt + repaidUnits, originalDebt);
+        }
+
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
 
         SafeTransferLib.safeTransfer(obligation.collaterals[collateralIndex].token, msg.sender, seizedAssets);
@@ -546,6 +613,7 @@ contract Midnight is IMidnight {
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
+            obligationState[id].interestFee = defaultInterestFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -595,6 +663,26 @@ contract Midnight is IMidnight {
         return obligationState[id].fees;
     }
 
+    function interestFee(bytes32 id) external view returns (uint16) {
+        return obligationState[id].interestFee;
+    }
+
+    function feeWeightedShares(bytes32 id, address user) external view returns (uint128) {
+        return lenderFeeState[id][user].weightedSize;
+    }
+
+    function feeWeightedCost(bytes32 id, address user) external view returns (uint128) {
+        return lenderFeeState[id][user].weightedAssets;
+    }
+
+    function feeWeightedDebt(bytes32 id, address user) external view returns (uint128) {
+        return borrowerFeeState[id][user].weightedSize;
+    }
+
+    function feeWeightedRevenue(bytes32 id, address user) external view returns (uint128) {
+        return borrowerFeeState[id][user].weightedAssets;
+    }
+
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
@@ -623,6 +711,17 @@ contract Midnight is IMidnight {
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    /// @dev Clears fee-weighted data proportionally. Returns the cleared components.
+    function _clearFee(PositionFeeData storage data, uint256 exitSize, uint256 totalSize)
+        internal
+        returns (uint128 clearedWeightedSize, uint128 clearedWeightedAssets)
+    {
+        clearedWeightedSize = UtilsLib.toUint128(uint256(data.weightedSize).mulDivDown(exitSize, totalSize));
+        clearedWeightedAssets = UtilsLib.toUint128(uint256(data.weightedAssets).mulDivDown(exitSize, totalSize));
+        data.weightedSize -= clearedWeightedSize;
+        data.weightedAssets -= clearedWeightedAssets;
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
