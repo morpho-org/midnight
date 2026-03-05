@@ -176,7 +176,8 @@ contract Midnight is IMidnight {
         require(offer.session == session[offer.maker], "invalid session");
         bytes20 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
-
+        uint256 _totalUnits = _obligationState.totalUnits;
+        uint256 _totalShares = _obligationState.totalShares;
         (
             address buyer,
             address buyerCallback,
@@ -253,6 +254,13 @@ contract Midnight is IMidnight {
                     obligationShares,
                     buyerCallbackData
                 );
+
+            uint256 newTradingFee = tradingFee(id, timeToMaturity);
+            require(
+                _totalUnits == _obligationState.totalUnits && _totalShares == _obligationState.totalShares
+                    && _tradingFee == newTradingFee,
+                "inconsistent obligation state"
+            );
         }
 
         SafeTransferLib.safeTransferFrom(
@@ -271,6 +279,12 @@ contract Midnight is IMidnight {
                     obligationShares,
                     sellerCallbackData
                 );
+            uint256 newTradingFee = tradingFee(id, timeToMaturity);
+            require(
+                _totalUnits == _obligationState.totalUnits && _totalShares == _obligationState.totalShares
+                    && _tradingFee == newTradingFee,
+                "inconsistent obligation state"
+            );
         }
 
         uint256 newConsumed;
