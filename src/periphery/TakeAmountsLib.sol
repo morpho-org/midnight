@@ -13,7 +13,7 @@ library TakeAmountsLib {
     // Forward: units = shares.mulDivUp/Down(totalUnits + 1, totalShares + 1) depending on buyerIsLender.
     // When buyerIsLender (forward rounds up): inverse rounds down.
     // When !buyerIsLender (forward rounds down): inverse rounds up.
-    function unitsToShares(Midnight midnight, bytes20 id, address taker, Offer memory offer, uint256 targetUnits)
+    function unitsToShares(Midnight midnight, bytes32 id, address taker, Offer memory offer, uint256 targetUnits)
         internal
         view
         returns (uint256)
@@ -29,7 +29,7 @@ library TakeAmountsLib {
     /// @dev Should not be used if buyerPrice > WAD, because not all buyerAssets are reachable then.
     function buyerAssetsToShares(
         Midnight midnight,
-        bytes20 id,
+        bytes32 id,
         address taker,
         Offer memory offer,
         uint256 targetBuyerAssets
@@ -45,7 +45,7 @@ library TakeAmountsLib {
     // Forward: sellerAssets = units.mulDivDown(sellerPrice, WAD).
     function sellerAssetsToShares(
         Midnight midnight,
-        bytes20 id,
+        bytes32 id,
         address taker,
         Offer memory offer,
         uint256 targetSellerAssets
