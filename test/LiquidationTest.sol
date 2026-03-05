@@ -646,7 +646,6 @@ contract LiquidationTest is BaseTest {
         return badDebt;
     }
 
-    /// @dev A price below which the position will create bad debt.
     function badDebtPrice() internal view returns (uint256) {
         return obligation.collaterals[0].lltv * obligation.collaterals[0].maxLif;
     }
