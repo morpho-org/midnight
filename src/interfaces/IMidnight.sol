@@ -49,7 +49,6 @@ struct ObligationState {
     uint56 lastUpdate;
     uint16[7] fees;
     uint64 continuousFee;
-    uint256 accruedFees;
 }
 
 interface IMidnight {}

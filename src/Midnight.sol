@@ -44,6 +44,7 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => int256)) public balanceOf;
     mapping(bytes32 id => mapping(address user => uint256)) public userLossIndex;
+    mapping(bytes32 id => mapping(address user => uint56)) public userLastUpdate;
     mapping(bytes32 id => mapping(address user => uint128)) public activatedCollaterals;
     mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
@@ -196,7 +197,8 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        accrueFees(id);
+        accrueFees(id, offer.maker);
+        accrueFees(id, taker);
         slash(id, offer.maker);
         slash(id, taker);
         ObligationState storage _obligationState = obligationState[id];
@@ -300,7 +302,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        accrueFees(id);
+        accrueFees(id, onBehalf);
         slash(id, onBehalf);
 
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -318,6 +320,8 @@ contract Midnight is IMidnight {
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
         bytes32 id = touchObligation(obligation);
+        accrueFees(id, onBehalf);
+        slash(id, onBehalf);
 
         // forge-lint: disable-next-line(unsafe-typecast)
         balanceOf[id][onBehalf] += int256(obligationUnits);
@@ -362,6 +366,8 @@ contract Midnight is IMidnight {
     ) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
+        accrueFees(id, onBehalf);
+        slash(id, onBehalf);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
         uint256 newCollateralOf = collateralOf[id][onBehalf][collateralIndex] - assets;
@@ -399,6 +405,8 @@ contract Midnight is IMidnight {
     ) external returns (uint256, uint256) {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes32 id = touchObligation(obligation);
+        accrueFees(id, borrower);
+        slash(id, borrower);
         ObligationState storage _obligationState = obligationState[id];
 
         uint256 maxDebt;
@@ -543,18 +551,26 @@ contract Midnight is IMidnight {
         return id;
     }
 
-    function accrueFees(bytes32 id) public {
-        ObligationState storage os = obligationState[id];
-        uint256 elapsed = block.timestamp - os.lastUpdate;
+    function accrueFees(bytes32 id, address user) public {
+        ObligationState storage _obligationState = obligationState[id];
+        uint256 elapsed = block.timestamp - userLastUpdate[id][user];
         if (elapsed > 0) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            os.lastUpdate = uint56(block.timestamp);
+            userLastUpdate[id][user] = uint56(block.timestamp);
 
-            uint256 fee = os.continuousFee;
+            uint256 fee = _obligationState.continuousFee;
             if (fee > 0) {
-                uint256 feeFraction = elapsed * fee;
-                os.lossIndex = WAD - (WAD - os.lossIndex).mulDivDown(WAD, WAD + feeFraction);
-                os.accruedFees += (uint256(os.totalUnits) + os.withdrawable).mulDivDown(feeFraction, WAD + feeFraction);
+                int256 balance = balanceOf[id][user];
+                if (balance < 0) {
+                    uint256 feeFraction = elapsed * fee;
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    uint256 feeAmount = uint256(-balance).mulDivUp(feeFraction, WAD);
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    balanceOf[id][user] = balance - int256(feeAmount);
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    balanceOf[id][continuousFeeRecipient] += int256(feeAmount);
+                    _obligationState.totalUnits += UtilsLib.toUint128(feeAmount);
+                }
             }
         }
     }
@@ -570,17 +586,6 @@ contract Midnight is IMidnight {
             }
             userLossIndex[id][user] = lossIndex;
         }
-    }
-
-    function claimFees(Obligation memory obligation, uint256 amount, address receiver) external {
-        require(msg.sender == continuousFeeRecipient, "unauthorized");
-        bytes32 id = touchObligation(obligation);
-        accrueFees(id);
-        obligationState[id].accruedFees -= amount;
-        obligationState[id].withdrawable -= amount;
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, amount);
-
-        emit EventsLib.ClaimFees(msg.sender, id, amount, receiver);
     }
 
     /// VIEW FUNCTIONS ///
@@ -623,10 +628,6 @@ contract Midnight is IMidnight {
 
     function continuousFee(bytes32 id) external view returns (uint64) {
         return obligationState[id].continuousFee;
-    }
-
-    function accruedFees(bytes32 id) external view returns (uint256) {
-        return obligationState[id].accruedFees;
     }
 
     function fees(bytes32 id) external view returns (uint16[7] memory) {

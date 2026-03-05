@@ -80,23 +80,29 @@ contract ContinuousFeeTest is BaseTest {
         take(initialUnits, borrower, lenderOffer);
 
         int256 lenderBalanceBefore = midnight.balanceOf(id, lender);
-        uint256 lastUpdateBefore = midnight.lastUpdate(id);
+        uint256 borrowerDebtBefore = midnight.debtOf(id, borrower);
+        uint256 borrowerLastUpdateBefore = midnight.userLastUpdate(id, borrower);
 
         vm.warp(block.timestamp + timeElapsed);
-        // Trigger accrueFees via a zero-amount take.
-        take(0, borrower, lenderOffer);
+        // Trigger accrueFees and slash directly.
+        midnight.accrueFees(id, lender);
+        midnight.accrueFees(id, borrower);
+        midnight.slash(id, lender);
+        midnight.slash(id, borrower);
 
         int256 lenderBalanceAfter = midnight.balanceOf(id, lender);
-        uint256 accruedFeesAfter = midnight.accruedFees(id);
-        uint256 lastUpdateAfter = midnight.lastUpdate(id);
+        uint256 borrowerDebtAfter = midnight.debtOf(id, borrower);
+        int256 feeRecipientBalanceAfter = midnight.balanceOf(id, feeRecipient);
+        uint256 borrowerLastUpdateAfter = midnight.userLastUpdate(id, borrower);
 
-        assertLt(lenderBalanceAfter, lenderBalanceBefore, "lender balance should decrease from fee");
-        assertGt(accruedFeesAfter, 0, "accruedFees should accrue");
-        assertEq(lastUpdateAfter, block.timestamp, "lastUpdate should be current timestamp");
-        assertGt(lastUpdateAfter, lastUpdateBefore, "lastUpdate should have advanced");
+        assertEq(lenderBalanceAfter, lenderBalanceBefore, "lender balance should not change from fee");
+        assertGt(borrowerDebtAfter, borrowerDebtBefore, "borrower debt should increase from fee");
+        assertGt(feeRecipientBalanceAfter, 0, "fee recipient should accrue balance");
+        assertEq(borrowerLastUpdateAfter, block.timestamp, "userLastUpdate should be current timestamp");
+        assertGt(borrowerLastUpdateAfter, borrowerLastUpdateBefore, "userLastUpdate should have advanced");
     }
 
-    function testClaimFeesFull(uint256 initialUnits, uint256 fee, uint256 timeElapsed) public {
+    function testFeeRecipientWithdraw(uint256 initialUnits, uint256 fee, uint256 timeElapsed) public {
         initialUnits = bound(initialUnits, 1e18, MAX_TEST_AMOUNT / 2);
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
         timeElapsed = bound(timeElapsed, 1 hours, 89 days);
@@ -106,68 +112,34 @@ contract ContinuousFeeTest is BaseTest {
         collateralize(obligation, borrower, initialUnits);
         take(initialUnits, borrower, lenderOffer);
 
-        // Borrower repays to create withdrawable liquidity.
-        vm.startPrank(borrower);
-        loanToken.approve(address(midnight), type(uint256).max);
-        deal(address(loanToken), borrower, initialUnits);
-        midnight.repay(obligation, initialUnits, borrower);
-        vm.stopPrank();
-
+        // Warp time so fees accrue on outstanding debt.
         vm.warp(block.timestamp + timeElapsed);
 
-        // Trigger fee accrual.
-        midnight.accrueFees(id);
+        // Trigger fee accrual to know the debt with fees.
+        midnight.accrueFees(id, borrower);
 
-        uint256 accruedFees = midnight.accruedFees(id);
-        assertGt(accruedFees, 0, "fees should have accrued");
+        uint256 totalDebt = midnight.debtOf(id, borrower);
+        uint256 feeRecipientBalance = uint256(midnight.balanceOf(id, feeRecipient));
+        assertGt(feeRecipientBalance, 0, "fee recipient should have balance");
 
-        address receiver = makeAddr("receiver");
-        uint256 receiverBalanceBefore = loanToken.balanceOf(receiver);
-
-        vm.prank(feeRecipient);
-        midnight.claimFees(obligation, accruedFees, receiver);
-
-        assertEq(midnight.accruedFees(id), 0, "accruedFees should be zero after full claim");
-        assertEq(loanToken.balanceOf(receiver) - receiverBalanceBefore, accruedFees, "receiver should get claimed fees");
-    }
-
-    function testClaimFeesRevertsExceedsProtocolFees(uint256 initialUnits, uint256 fee, uint256 timeElapsed) public {
-        initialUnits = bound(initialUnits, 1e18, MAX_TEST_AMOUNT / 2);
-        fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
-        timeElapsed = bound(timeElapsed, 1 hours, 89 days);
-
-        midnight.setDefaultContinuousFee(address(loanToken), fee);
-
-        collateralize(obligation, borrower, initialUnits);
-        take(initialUnits, borrower, lenderOffer);
-
-        // Borrower repays to create withdrawable liquidity.
+        // Borrower repays full debt (including accrued fees) to create withdrawable liquidity.
         vm.startPrank(borrower);
         loanToken.approve(address(midnight), type(uint256).max);
-        deal(address(loanToken), borrower, initialUnits * 2);
-        midnight.repay(obligation, initialUnits, borrower);
+        deal(address(loanToken), borrower, totalDebt);
+        midnight.repay(obligation, totalDebt, borrower);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + timeElapsed);
-        midnight.accrueFees(id);
+        uint256 receiverBalanceBefore = loanToken.balanceOf(feeRecipient);
 
-        uint256 accruedFees = midnight.accruedFees(id);
-
+        // Fee recipient withdraws their balance.
         vm.prank(feeRecipient);
-        vm.expectRevert();
-        midnight.claimFees(obligation, accruedFees + 1, makeAddr("receiver"));
-    }
+        midnight.withdraw(obligation, feeRecipientBalance, feeRecipient, feeRecipient);
 
-    function testClaimFeesRevertsUnauthorized() public {
-        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
-
-        collateralize(obligation, borrower, 1e18);
-        take(1e18, borrower, lenderOffer);
-
-        vm.warp(block.timestamp + 1 days);
-
-        vm.prank(makeAddr("randomUser"));
-        vm.expectRevert("unauthorized");
-        midnight.claimFees(obligation, 1, makeAddr("receiver"));
+        assertEq(midnight.balanceOf(id, feeRecipient), 0, "fee recipient balance should be zero after withdraw");
+        assertEq(
+            loanToken.balanceOf(feeRecipient) - receiverBalanceBefore,
+            feeRecipientBalance,
+            "fee recipient should receive tokens"
+        );
     }
 }
