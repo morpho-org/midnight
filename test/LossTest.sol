@@ -46,22 +46,22 @@ contract LossTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
+        uint256 totalBefore = midnight.totalUnits(id);
         oracle1.setPrice(oraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        uint256 badDebt = totalBefore - midnight.totalUnits(id);
 
         uint256 debt = midnight.debtOf(id, borrower);
         deal(address(loanToken), borrower, debt);
         vm.prank(borrower);
         midnight.repay(obligation, debt, borrower);
 
-        int256 expected = _expectedBalance(id, lender, units);
-
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
-        assertEq(midnight.balanceOf(id, lender), expected);
+        assertApproxEqAbs(midnight.balanceOf(id, lender), int256(units - badDebt), (units >> 64) + 2);
 
-        uint256 toWithdraw = uint256(expected);
+        uint256 toWithdraw = uint256(midnight.balanceOf(id, lender));
         uint256 balBefore = loanToken.balanceOf(lender);
         vm.prank(lender);
         midnight.withdraw(obligation, toWithdraw, lender, lender);
@@ -75,14 +75,16 @@ contract LossTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
+        uint256 totalBefore = midnight.totalUnits(id);
         oracle1.setPrice(oraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        uint256 badDebt = totalBefore - midnight.totalUnits(id);
 
         assertEq(midnight.balanceOf(id, lender), int256(units), "raw balance unchanged");
-
-        int256 expected = _expectedBalance(id, lender, units);
-        assertEq(midnight.balanceOfAfterLoss(id, lender), expected, "view reflects loss");
+        assertApproxEqAbs(
+            midnight.balanceOfAfterLoss(id, lender), int256(units - badDebt), (units >> 64) + 2, "view reflects loss"
+        );
     }
 
     function testBalanceOfAfterLossMatchesApplyLoss(uint256 units, uint256 oraclePrice) public {
@@ -91,16 +93,19 @@ contract LossTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
+        uint256 totalBefore = midnight.totalUnits(id);
         oracle1.setPrice(oraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        uint256 badDebt = totalBefore - midnight.totalUnits(id);
 
-        int256 expected = midnight.balanceOfAfterLoss(id, lender);
+        int256 viewBalance = midnight.balanceOfAfterLoss(id, lender);
 
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
 
-        assertEq(midnight.balanceOf(id, lender), expected);
+        assertEq(midnight.balanceOf(id, lender), viewBalance);
+        assertApproxEqAbs(viewBalance, int256(units - badDebt), (units >> 64) + 2);
     }
 
     function testLossToZero(uint256 units) public {
@@ -125,13 +130,15 @@ contract LossTest is BaseTest {
         setupObligation(obligation, units);
         setupOtherUsers(obligation, units);
 
+        uint256 totalBefore = midnight.totalUnits(id);
         oracle1.setPrice(oraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        uint256 totalAfter = midnight.totalUnits(id);
 
-        int256 expected = _expectedBalance(id, lender, units);
-        assertEq(midnight.balanceOfAfterLoss(id, lender), expected);
-        assertEq(midnight.balanceOfAfterLoss(id, otherLender), expected);
+        int256 expected = int256(units * totalAfter / totalBefore);
+        assertApproxEqAbs(midnight.balanceOfAfterLoss(id, lender), expected, (units >> 64) + 2);
+        assertApproxEqAbs(midnight.balanceOfAfterLoss(id, otherLender), expected, (units >> 64) + 2);
     }
 
     function testNewLenderAfterLoss(uint256 units, uint256 newUnits) public {
@@ -188,12 +195,11 @@ contract LossTest is BaseTest {
         assertEq(shifts1, 3);
         assertEq(midnight.totalUnits(id), 0);
 
-        int256 expectedLender = _expectedBalance(id, lender, units);
-        assertEq(midnight.balanceOfAfterLoss(id, lender), expectedLender);
+        assertEq(midnight.balanceOfAfterLoss(id, lender), 0);
 
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
-        assertEq(midnight.balanceOf(id, lender), expectedLender);
+        assertEq(midnight.balanceOf(id, lender), 0);
     }
 
     function testTwoLendersWithDifferentEntryPointsGetDifferentLosses() public {
@@ -210,19 +216,58 @@ contract LossTest is BaseTest {
         (,,, uint32 oblShifts,) = midnight.obligationState(id);
         assertEq(oblShifts, 2);
 
-        int256 expectedLender = _expectedBalance(id, lender, units);
-        assertEq(midnight.balanceOfAfterLoss(id, lender), expectedLender);
-
-        int256 expectedLender1 = _expectedBalance(id, lender1, units);
-        assertEq(midnight.balanceOfAfterLoss(id, lender1), expectedLender1);
+        assertEq(midnight.balanceOfAfterLoss(id, lender), 0);
+        assertEq(midnight.balanceOfAfterLoss(id, lender1), 0);
 
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
-        assertEq(midnight.balanceOf(id, lender), expectedLender);
+        assertEq(midnight.balanceOf(id, lender), 0);
 
         vm.prank(lender1);
         midnight.withdraw(obligation, 0, lender1, lender1);
-        assertEq(midnight.balanceOf(id, lender1), expectedLender1);
+        assertEq(midnight.balanceOf(id, lender1), 0);
+    }
+
+    function testLossCorrectAfterManyShifts(uint256 oraclePrice) public {
+        uint256 badDebtThreshold = obligation.collaterals[0].lltv * obligation.collaterals[0].maxLif;
+        oraclePrice = bound(oraclePrice, 1, badDebtThreshold * 99 / 100);
+        uint256 units = 1e20;
+
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        liquidateAllDebt(borrower);
+        uint256 collateral = midnight.collateralOf(id, borrower, 0);
+        if (collateral > 0) {
+            vm.prank(borrower);
+            midnight.withdrawCollateral(obligation, 0, collateral, borrower, borrower);
+        }
+
+        for (uint256 i = 0; i < 9; i++) {
+            _createPosition(units);
+            liquidateAllDebt(borrower);
+            collateral = midnight.collateralOf(id, borrower, 0);
+            if (collateral > 0) {
+                vm.prank(borrower);
+                midnight.withdrawCollateral(obligation, 0, collateral, borrower, borrower);
+            }
+        }
+
+        (,,, uint32 shifts,) = midnight.obligationState(id);
+        assertEq(shifts, 10);
+
+        address newLender = _createPosition(units);
+        uint256 totalBefore = midnight.totalUnits(id);
+
+        oracle1.setPrice(oraclePrice);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        oracle1.setPrice(ORACLE_PRICE_SCALE);
+
+        uint256 badDebt = totalBefore - midnight.totalUnits(id);
+        assertGt(badDebt, 0);
+
+        vm.prank(newLender);
+        midnight.withdraw(obligation, 0, newLender, newLender);
+        assertApproxEqAbs(midnight.balanceOf(id, newLender), int256(units - badDebt), (units >> 64) + 2);
     }
 
     function liquidateAllDebt(address _borrower) internal {
@@ -230,13 +275,6 @@ contract LossTest is BaseTest {
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
         midnight.liquidate(obligation, 0, 0, 0, _borrower, "");
         oracle1.setPrice(ORACLE_PRICE_SCALE);
-    }
-
-    function _expectedBalance(bytes32 _id, address user, uint256 balance) internal view returns (int256) {
-        (uint128 userScale, uint32 userShifts) = midnight.loss(_id, user);
-        (,, uint128 oblScale, uint32 oblShifts,) = midnight.obligationState(_id);
-        uint32 shifts = oblShifts - userShifts;
-        return int256(balance.mulDivDown(userScale, oblScale) >> (64 * shifts));
     }
 
     function _createPosition(uint256 units) internal returns (address _lender) {
