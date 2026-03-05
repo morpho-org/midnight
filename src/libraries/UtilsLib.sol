@@ -68,13 +68,9 @@ library UtilsLib {
         }
     }
 
-    function msb(uint256 bitmap) internal pure returns (uint256) {
-        // Temporary workaround for the Certora pipeline.
-        // TODO: restore the clz-based implementation once the pipeline issue is fixed.
-        for (uint256 i = 256; i > 0; i--) {
-            uint256 bit = i - 1;
-            if ((bitmap & (1 << bit)) != 0) return bit;
+    function msb(uint256 bitmap) internal pure returns (uint256 res) {
+        assembly {
+            res := sub(255, clz(bitmap))
         }
-        return 0;
     }
 }

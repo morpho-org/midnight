@@ -530,10 +530,13 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    function consume(bytes32 group, uint256 amount) external {
-        consumed[msg.sender][group] += amount;
+    /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
+    function setConsumed(bytes32 group, uint256 amount) external {
+        require(amount >= consumed[msg.sender][group], "consumed");
 
-        emit EventsLib.Consume(msg.sender, group, amount);
+        consumed[msg.sender][group] = amount;
+
+        emit EventsLib.SetConsumed(msg.sender, group, amount);
     }
 
     /// @dev TODO: is it safe enough?
