@@ -196,6 +196,7 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
+        accrueFees(id);
         slash(id, offer.maker);
         slash(id, taker);
         ObligationState storage _obligationState = obligationState[id];
@@ -298,8 +299,8 @@ contract Midnight is IMidnight {
     {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
-        accrueContinuousFees(id);
         ObligationState storage _obligationState = obligationState[id];
+        accrueFees(id);
         slash(id, onBehalf);
 
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -510,19 +511,6 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    function accrueContinuousFees(bytes32 id) internal {
-        if (borrowerState[id][continuousFeeRecipient].debt != 0) return;
-        uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
-        uint256 fee = obligationState[id].continuousFee;
-        uint256 sharesToMint = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
-        uint256 newTotalShares = obligationState[id].totalShares + sharesToMint;
-        if (newTotalShares > type(uint128).max) return;
-        // forge-lint: disable-next-line(unsafe-typecast) as newTotalShares <= type(uint128).max
-        obligationState[id].totalShares = uint128(newTotalShares);
-        sharesOf[id][continuousFeeRecipient] += sharesToMint;
-        obligationState[id].lastUpdate = uint56(block.timestamp);
-    }
-
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
@@ -546,11 +534,29 @@ contract Midnight is IMidnight {
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
             obligationState[id].continuousFee = defaultContinuousFees[obligation.loanToken];
+            // forge-lint: disable-next-line(unsafe-typecast)
+            obligationState[id].lastUpdate = uint56(block.timestamp);
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
         return id;
+    }
+
+    function accrueFees(bytes32 id) public {
+        ObligationState storage os = obligationState[id];
+        uint256 elapsed = block.timestamp - os.lastUpdate;
+        if (elapsed > 0) {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            os.lastUpdate = uint56(block.timestamp);
+
+            uint256 fee = os.continuousFee;
+            if (fee > 0) {
+                uint256 feeFraction = elapsed * fee;
+                os.lossIndex = WAD - (WAD - os.lossIndex).mulDivDown(WAD, WAD + feeFraction);
+                os.accruedFees += (uint256(os.totalUnits) + os.withdrawable).mulDivDown(feeFraction, WAD + feeFraction);
+            }
+        }
     }
 
     function slash(bytes32 id, address user) public {
@@ -566,6 +572,17 @@ contract Midnight is IMidnight {
         }
     }
 
+    function claimFees(Obligation memory obligation, uint256 amount, address receiver) external {
+        require(msg.sender == continuousFeeRecipient, "unauthorized");
+        bytes32 id = touchObligation(obligation);
+        accrueFees(id);
+        obligationState[id].accruedFees -= amount;
+        obligationState[id].withdrawable -= amount;
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, amount);
+
+        emit EventsLib.ClaimFees(msg.sender, id, amount, receiver);
+    }
+
     /// VIEW FUNCTIONS ///
 
     function toId(Obligation memory obligation) public view returns (bytes32) {
@@ -578,17 +595,6 @@ contract Midnight is IMidnight {
         require(obligationState[id].created, "not created");
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Obligation));
-    }
-
-    function balanceOfAfterSlashing(bytes32 id, address user) public view returns (int256) {
-        int256 balance = balanceOf[id][user];
-        uint256 _userLossIndex = userLossIndex[id][user];
-        uint256 lossIndex = obligationState[id].lossIndex;
-        if (balance > 0 && _userLossIndex != lossIndex) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            return int256(uint256(balance).mulDivDown(WAD - lossIndex, WAD - _userLossIndex));
-        }
-        return balance;
     }
 
     function debtOf(bytes32 id, address user) public view returns (uint256) {
@@ -617,6 +623,10 @@ contract Midnight is IMidnight {
 
     function continuousFee(bytes32 id) external view returns (uint64) {
         return obligationState[id].continuousFee;
+    }
+
+    function accruedFees(bytes32 id) external view returns (uint256) {
+        return obligationState[id].accruedFees;
     }
 
     function fees(bytes32 id) external view returns (uint16[7] memory) {
