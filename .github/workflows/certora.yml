@@ -14,13 +14,13 @@ jobs:
       fail-fast: false
       matrix:
         conf:
+          - BuyerAssetsGeSellerAssets
           - CreatedObligations
           - ExactMath
           - Liquidate
           - Midnight
           - SharePrice
           - Solvency
-          - BuyerAssetsGeSellerAssets
 
     steps:
       - uses: actions/checkout@v4
