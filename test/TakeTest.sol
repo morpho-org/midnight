@@ -362,6 +362,25 @@ contract TakeTest is BaseTest {
         take(secondPassingTake, borrower, lenderOffer);
     }
 
+    function testConsumeOverflowSharesInput() public {
+        vm.prank(borrower);
+        midnight.setConsumed(borrowerOffer.group, type(uint256).max);
+
+        vm.expectRevert("consumed");
+        take(1, lender, borrowerOffer);
+    }
+
+    function testConsumeOverflowUnitsInput() public {
+        borrowerOffer.obligationUnits = type(uint256).max;
+        borrowerOffer.obligationShares = 0;
+
+        vm.prank(borrower);
+        midnight.setConsumed(borrowerOffer.group, type(uint256).max);
+
+        vm.expectRevert("consumed");
+        take(1, lender, borrowerOffer);
+    }
+
     function testBuyGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
