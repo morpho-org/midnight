@@ -183,10 +183,35 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testConsume(address user, bytes32 group, uint256 amount) public {
+    function testSetConsumed(address user, bytes32 group, uint256 amount) public {
         vm.prank(user);
-        midnight.consume(group, amount);
+        midnight.setConsumed(group, amount);
         assertEq(midnight.consumed(user, group), amount, "consumed");
+    }
+
+    function testSetConsumedIncreasing(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
+        amount0 = bound(amount0, 0, type(uint256).max - 1);
+        amount1 = bound(amount1, amount0, type(uint256).max);
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount0);
+        assertEq(midnight.consumed(user, group), amount0, "consumed 0");
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount1);
+        assertEq(midnight.consumed(user, group), amount1, "consumed 1");
+    }
+
+    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
+        amount0 = bound(amount0, 1, type(uint256).max);
+        amount1 = bound(amount1, 0, amount0 - 1);
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount0);
+
+        vm.prank(user);
+        vm.expectRevert("consumed");
+        midnight.setConsumed(group, amount1);
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
