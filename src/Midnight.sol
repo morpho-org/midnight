@@ -221,11 +221,17 @@ contract Midnight is IMidnight {
         uint256 newConsumed;
         if (offer.obligationUnits > 0) {
             uint256 oldConsumed = consumed[offer.maker][offer.group];
-            require(oldConsumed <= offer.obligationUnits.zeroFloorSub(obligationUnits), "consumed");
+            require(
+                obligationUnits <= offer.obligationUnits && oldConsumed <= offer.obligationUnits - obligationUnits,
+                "consumed"
+            );
             consumed[offer.maker][offer.group] = oldConsumed + obligationUnits;
         } else {
             uint256 oldConsumed = consumed[offer.maker][offer.group];
-            require(oldConsumed <= offer.obligationShares.zeroFloorSub(obligationShares), "consumed");
+            require(
+                obligationShares <= offer.obligationShares && oldConsumed <= offer.obligationShares - obligationShares,
+                "consumed"
+            );
             consumed[offer.maker][offer.group] = oldConsumed + obligationShares;
         }
 
