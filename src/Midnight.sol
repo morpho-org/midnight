@@ -516,7 +516,7 @@ contract Midnight is IMidnight {
 
     function setIsAuthorized(address authorized, bool newIsAuthorized) external {
         isAuthorized[msg.sender][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized);
+        emit EventsLib.SetIsAuthorized(msg.sender, msg.sender, authorized, newIsAuthorized);
     }
 
     function setIsAuthorizedWithSig(Authorization memory authorization, Signature memory signature) external {
@@ -529,7 +529,9 @@ contract Midnight is IMidnight {
         require(signatory != address(0) && signatory == authorization.authorizer, "invalid signature");
 
         isAuthorized[authorization.authorizer][authorization.authorized] = authorization.isAuthorized;
-        emit EventsLib.SetIsAuthorized(authorization.authorizer, authorization.authorized, authorization.isAuthorized);
+        emit EventsLib.SetIsAuthorized(
+            msg.sender, authorization.authorizer, authorization.authorized, authorization.isAuthorized
+        );
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
