@@ -42,6 +42,11 @@ ghost CVL_price(address) returns uint256;
 rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
     bool isHealthyBefore = isHealthy(obligation, id, borrower);
+
+    // Assume no time elapsed so that accrueContinuousFee does not change debt between the isHealthy query and liquidate.
+    _, _, uint48 lastUpdate = borrowerState(id, borrower);
+    require e.block.timestamp == require_uint256(lastUpdate);
+
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     // it's okay to check only after the call that the prover chose the correct id.

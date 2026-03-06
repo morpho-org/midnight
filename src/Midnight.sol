@@ -589,6 +589,7 @@ contract Midnight is IMidnight {
     /// @dev Accrues continuous fee on a borrower's debt: fee = debt * continuousFee * elapsed / WAD.
     /// @dev Increases the borrower's debt and mints corresponding shares to the feeRecipient.
     function accrueContinuousFee(bytes32 id, address borrower) public {
+        require(obligationState[id].created, "obligation not created");
         ObligationState storage _obligationState = obligationState[id];
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
 
