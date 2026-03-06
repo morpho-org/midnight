@@ -427,9 +427,11 @@ contract Midnight is IMidnight {
             Collateral memory _collateral = obligation.collaterals[i];
             uint256 price = IOracle(_collateral.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 collateralQuoted = collateralOf[id][borrower][i].mulDivDown(price, ORACLE_PRICE_SCALE);
-            maxDebt += collateralQuoted.mulDivDown(_collateral.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(collateralQuoted.mulDivDown(WAD, _collateral.maxLif));
+            uint256 _collateralOf = collateralOf[id][borrower][i];
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            badDebt = badDebt.zeroFloorSub(
+                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
+            );
             bitmap ^= (1 << i);
         }
 
@@ -458,7 +460,7 @@ contract Midnight is IMidnight {
                 uint256 lltv = obligation.collaterals[collateralIndex].lltv;
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
-                // Note that debt >= Σ collateralQuoted * 1 / lif >= Σ collateralQuoted * lltv = maxDebt.
+                // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = (_state.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
                 require(
                     repaidUnits <= maxRepaid
@@ -492,10 +494,13 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    function consume(bytes32 group, uint256 amount) external {
-        consumed[msg.sender][group] += amount;
+    /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
+    function setConsumed(bytes32 group, uint256 amount) external {
+        require(amount >= consumed[msg.sender][group], "consumed");
 
-        emit EventsLib.Consume(msg.sender, group, amount);
+        consumed[msg.sender][group] = amount;
+
+        emit EventsLib.SetConsumed(msg.sender, group, amount);
     }
 
     /// @dev TODO: is it safe enough?

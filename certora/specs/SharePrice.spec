@@ -8,7 +8,6 @@ methods {
 
     function _.price() external => NONDET;
 
-    // Summaries to avoid SMT solver timeout.
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -17,6 +16,8 @@ methods {
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+
+    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }

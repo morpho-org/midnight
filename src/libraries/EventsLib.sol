@@ -63,7 +63,7 @@ library EventsLib {
         uint256 badDebt
     );
 
-    event Consume(address indexed user, bytes32 indexed group, uint256 amount);
+    event SetConsumed(address indexed user, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed user, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);
 

@@ -142,7 +142,7 @@ contract LiquidationTest is BaseTest {
     function testLiquidateObligationUnitsInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         uint256 initialCollateral = midnight.collateralOf(id, borrower, 0);
@@ -165,7 +165,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateCollateralInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         uint256 initialCollateral = midnight.collateralOf(id, borrower, 0);
@@ -199,7 +199,7 @@ contract LiquidationTest is BaseTest {
     {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
         vm.assume(data.length > 0);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -215,7 +215,7 @@ contract LiquidationTest is BaseTest {
     function testCannotRepayMoreThanDebt(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS - 1);
         repaid = bound(repaid, units + 1, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
@@ -227,7 +227,7 @@ contract LiquidationTest is BaseTest {
 
     function testCannotSeizeMoreThanCollateral(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
@@ -238,11 +238,29 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(obligation, 0, seized, 0, borrower, "");
     }
 
+    function testBadDebtPriceDownGivesBadDebt(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
+
+        assertGt(_badDebt(), 0, "should have bad debt at badDebtPriceDown");
+    }
+
+    function testBadDebtPriceDownIsMaximal(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units) + 1);
+
+        assertEq(_badDebt(), 0, "should have no bad debt at badDebtPriceDown");
+    }
+
     // Test bad debt.
 
     function testRealizeOnlyBadDebt(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
-        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown());
+        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
@@ -257,16 +275,12 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
-        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown());
+        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
+        seized = bound(seized, 0, midnight.collateralOf(id, borrower, 0));
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         uint256 debtAfterBadDebt = units - _badDebt();
-        uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
-        uint256 lif0 = obligation.collaterals[0].maxLif;
-        uint256 maxSeized = UtilsLib.min(maxRepaid, debtAfterBadDebt).mulDivDown(lif0, WAD)
-            .mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice);
-        seized = bound(seized, 0, maxSeized);
 
         (, uint256 repaid) = midnight.liquidate(obligation, 0, seized, 0, borrower, "");
 
@@ -277,13 +291,16 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
-        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown());
+        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         uint256 debtAfterBadDebt = units - _badDebt();
         uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
-        repaid = bound(repaid, 0, UtilsLib.min(maxRepaid, debtAfterBadDebt));
+        uint256 lif0 = obligation.collaterals[0].maxLif;
+        uint256 maxRepaidFromCollat = midnight.collateralOf(id, borrower, 0)
+            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, lif0);
+        repaid = bound(repaid, 0, UtilsLib.min(UtilsLib.min(maxRepaid, debtAfterBadDebt), maxRepaidFromCollat));
 
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
 
@@ -292,24 +309,22 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalShares(id), units, "total shares");
     }
 
-    // Check that if there is bad debt it is possible to repay almost all debt and seize almost all collateral.
-    function testLiquidateWithBadDebtRepayMax(uint256 units, uint256 liquidationOraclePrice) public {
+    // Check that if there is bad debt it is possible to seize almost all collateral.
+    function testLiquidateWithBadDebtSeizeMax(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown());
+        liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
-        uint256 debtAfterBadDebt = units - _badDebt();
-        uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
 
-        midnight.liquidate(obligation, 0, 0, UtilsLib.min(maxRepaid, debtAfterBadDebt), borrower, "");
+        midnight.liquidate(obligation, 0, midnight.collateralOf(id, borrower, 0), 0, borrower, "");
 
-        assertApproxEqAbs(midnight.debtOf(id, borrower), 0, 1e3, "all remaining debt repaid");
+        assertApproxEqAbs(midnight.debtOf(id, borrower), 0, 1e3, "almost all remaining debt repaid");
         assertApproxEqAbs(
             midnight.collateralOf(id, borrower, 0).mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE),
             0,
             1e3,
-            "all remaining collateral seized"
+            "almost all collateral seized"
         );
     }
 
@@ -327,7 +342,7 @@ contract LiquidationTest is BaseTest {
 
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF + delay);
 
@@ -378,7 +393,7 @@ contract LiquidationTest is BaseTest {
 
     function testMaxRepaid(uint256 units, uint256 liquidationOraclePrice, uint256 repaid) public {
         units = bound(units, 100, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE - 1);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE - 1);
 
         _setupUnhealthy(units, liquidationOraclePrice);
 
@@ -394,7 +409,7 @@ contract LiquidationTest is BaseTest {
 
     function testMaxRepaidMeansRecovery(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 100, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE - 1);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
 
         _setupUnhealthy(units, liquidationOraclePrice);
 
@@ -415,7 +430,7 @@ contract LiquidationTest is BaseTest {
         public
     {
         units = bound(units, 100, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE - 1);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
 
         // Compute remaining debt after max repayment from the input parameters.
         uint256 lltv = obligation.collaterals[0].lltv;
@@ -442,7 +457,7 @@ contract LiquidationTest is BaseTest {
         uint256 rcfThreshold
     ) public {
         units = bound(units, 100, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE - 1);
+        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE - 1);
 
         // Compute remaining debt after max repayment from the input parameters.
         uint256 lltv = obligation.collaterals[0].lltv;
@@ -465,7 +480,7 @@ contract LiquidationTest is BaseTest {
     /// @dev Recovery close factor applies at exact maturity but not one second after.
     function testRecoveryCloseFactorMaturityBoundary(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 100, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceUp(units), ORACLE_PRICE_SCALE - 1);
+        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
@@ -644,23 +659,29 @@ contract LiquidationTest is BaseTest {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
             uint256 price = IOracle(_collateral.oracle).price();
-            uint256 collateralQuoted = midnight.collateralOf(id, borrower, i).mulDivDown(price, ORACLE_PRICE_SCALE);
-            badDebt = badDebt.zeroFloorSub(collateralQuoted.mulDivDown(WAD, _collateral.maxLif));
+            badDebt = badDebt.zeroFloorSub(
+                midnight.collateralOf(id, borrower, i).mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, _collateral.maxLif)
+            );
             bitmap ^= (1 << i);
         }
         return badDebt;
     }
 
     /// @dev A price below which the position will create bad debt.
-    function badDebtPriceDown() internal view returns (uint256) {
-        return obligation.collaterals[0].lltv * obligation.collaterals[0].maxLif;
+    function badDebtPriceDown(uint256 units) internal view returns (uint256) {
+        uint256 lltv = obligation.collaterals[0].lltv;
+        uint256 maxLif = obligation.collaterals[0].maxLif;
+        uint256 collateral = units.mulDivUp(WAD, lltv);
+        return (units - 1).mulDivDown(maxLif, WAD).mulDivDown(ORACLE_PRICE_SCALE, collateral);
     }
 
-    /// @dev A price above which the position will not create bad debt.
-    function badDebtPriceUp(uint256 units) internal view returns (uint256) {
+    /// @dev A price above which full repayment does not exceed available collateral.
+    function fullRepaymentPrice(uint256 units) internal view returns (uint256) {
         uint256 lltv = obligation.collaterals[0].lltv;
+        uint256 maxLif = obligation.collaterals[0].maxLif;
         uint256 collateral = units.mulDivUp(WAD, lltv);
-        return units.mulDivUp(obligation.collaterals[0].maxLif, WAD).mulDivUp(ORACLE_PRICE_SCALE, collateral);
+        return units.mulDivUp(maxLif, WAD).mulDivUp(ORACLE_PRICE_SCALE, collateral);
     }
 
     function _maxRepaid(uint256 units, uint256 debt, uint256 oraclePrice) internal view returns (uint256) {
