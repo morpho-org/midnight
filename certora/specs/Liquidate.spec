@@ -4,6 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
+    function borrowerState(bytes32 id, address borrower) external returns (uint128, uint128, uint48) envfree;
 
     function _.price() external => CVL_price(calledContract) expect(uint256);
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);

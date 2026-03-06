@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
@@ -265,5 +266,80 @@ contract SettersTest is BaseTest {
         // Test beyond 360 days
         assertEq(midnight.tradingFee(id, 365 days), fee6, "365 days");
         assertEq(midnight.tradingFee(id, 1000 days), fee6, "1000 days");
+    }
+
+    // --- setDefaultContinuousFee ---
+
+    function testSetDefaultContinuousFee(uint256 fee) public {
+        vm.expectEmit(true, true, true, true);
+        emit EventsLib.SetDefaultContinuousFee(address(loanToken), fee);
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
+        assertEq(midnight.defaultContinuousFee(address(loanToken)), fee);
+    }
+
+    function testSetDefaultContinuousFeeOnlyFeeSetter(address caller) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert("only fee setter");
+        midnight.setDefaultContinuousFee(address(loanToken), 0);
+    }
+
+    // --- setContinuousFee ---
+
+    function testSetContinuousFeeDecrease() public {
+        uint256 continuousFee = 0.01e18;
+        midnight.setDefaultContinuousFee(address(loanToken), continuousFee);
+
+        Collateral[] memory collaterals = new Collateral[](1);
+        collaterals[0] = Collateral({
+            token: address(collateralToken1), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+        });
+        Obligation memory obligation = Obligation({
+            loanToken: address(loanToken), maturity: block.timestamp + 1 days, collaterals: collaterals, rcfThreshold: 0
+        });
+        bytes32 id = toId(obligation);
+        midnight.touchObligation(obligation);
+
+        (,,,, uint256 storedFee) = midnight.obligationState(id);
+        assertEq(storedFee, continuousFee);
+
+        uint256 newFee = continuousFee / 2;
+        vm.expectEmit(true, true, true, true);
+        emit EventsLib.SetContinuousFee(id, newFee);
+        midnight.setContinuousFee(id, newFee);
+        (,,,, uint256 updatedFee) = midnight.obligationState(id);
+        assertEq(updatedFee, newFee);
+    }
+
+    function testSetContinuousFeeCannotIncrease() public {
+        uint256 continuousFee = 0.01e18;
+        midnight.setDefaultContinuousFee(address(loanToken), continuousFee);
+
+        Collateral[] memory collaterals = new Collateral[](1);
+        collaterals[0] = Collateral({
+            token: address(collateralToken1), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+        });
+        Obligation memory obligation = Obligation({
+            loanToken: address(loanToken), maturity: block.timestamp + 1 days, collaterals: collaterals, rcfThreshold: 0
+        });
+        bytes32 id = toId(obligation);
+        midnight.touchObligation(obligation);
+
+        vm.expectRevert("can only decrease");
+        midnight.setContinuousFee(id, continuousFee + 1);
+    }
+
+    function testSetContinuousFeeOnlyFeeSetter(address caller) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert("only fee setter");
+        midnight.setContinuousFee(bytes32(0), 0);
+    }
+
+    function testSetContinuousFeeNotCreated(bytes32 fakeId) public {
+        (,,, bool created,) = midnight.obligationState(fakeId);
+        vm.assume(!created);
+        vm.expectRevert("obligation not created");
+        midnight.setContinuousFee(fakeId, 0);
     }
 }
