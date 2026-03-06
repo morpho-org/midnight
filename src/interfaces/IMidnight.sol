@@ -41,6 +41,14 @@ struct Signature {
     bytes32 s;
 }
 
+struct Authorization {
+    address authorizer;
+    address authorized;
+    bool isAuthorized;
+    uint256 nonce;
+    uint256 deadline;
+}
+
 struct BorrowerState {
     uint128 debt;
     uint128 activatedCollaterals;

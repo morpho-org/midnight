@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Collateral, Authorization, Signature} from "../src/interfaces/IMidnight.sol";
+import {AUTHORIZATION_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 
 contract SettersTest is BaseTest {
     function testInitialOwner() public view {
@@ -198,6 +199,72 @@ contract SettersTest is BaseTest {
         vm.prank(rdm);
         vm.expectRevert("only fee setter");
         midnight.setDefaultTradingFee(loanToken, 0, 0);
+    }
+
+    // setIsAuthorizedWithSig tests
+
+    function _authorizationSig(Authorization memory authorization, uint256 _privateKey)
+        internal
+        view
+        returns (Signature memory)
+    {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                AUTHORIZATION_TYPEHASH,
+                authorization.authorizer,
+                authorization.authorized,
+                authorization.isAuthorized,
+                authorization.nonce,
+                authorization.deadline
+            )
+        );
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+        Signature memory signature;
+        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, digest);
+        return signature;
+    }
+
+    function testSetIsAuthorizedWithSig() public {
+        Authorization memory authorization = Authorization({
+            authorizer: borrower, authorized: lender, isAuthorized: true, nonce: 0, deadline: block.timestamp + 1 days
+        });
+        Signature memory signature = _authorizationSig(authorization, privateKey[borrower]);
+
+        midnight.setIsAuthorizedWithSig(authorization, signature);
+
+        assertTrue(midnight.isAuthorized(borrower, lender));
+        assertEq(midnight.nonce(borrower), 1);
+    }
+
+    function testSetIsAuthorizedWithSigExpired() public {
+        Authorization memory authorization = Authorization({
+            authorizer: borrower, authorized: lender, isAuthorized: true, nonce: 0, deadline: block.timestamp - 1
+        });
+        Signature memory signature = _authorizationSig(authorization, privateKey[borrower]);
+
+        vm.expectRevert("signature expired");
+        midnight.setIsAuthorizedWithSig(authorization, signature);
+    }
+
+    function testSetIsAuthorizedWithSigInvalidNonce() public {
+        Authorization memory authorization = Authorization({
+            authorizer: borrower, authorized: lender, isAuthorized: true, nonce: 1, deadline: block.timestamp + 1 days
+        });
+        Signature memory signature = _authorizationSig(authorization, privateKey[borrower]);
+
+        vm.expectRevert("invalid nonce");
+        midnight.setIsAuthorizedWithSig(authorization, signature);
+    }
+
+    function testSetIsAuthorizedWithSigInvalidSignature() public {
+        Authorization memory authorization = Authorization({
+            authorizer: borrower, authorized: lender, isAuthorized: true, nonce: 0, deadline: block.timestamp + 1 days
+        });
+        // Sign with wrong key
+        Signature memory signature = _authorizationSig(authorization, privateKey[lender]);
+
+        vm.expectRevert("invalid signature");
+        midnight.setIsAuthorizedWithSig(authorization, signature);
     }
 
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {

@@ -16,7 +16,8 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    AUTHORIZATION_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -24,6 +25,7 @@ import {
     Obligation,
     Offer,
     Signature,
+    Authorization,
     Collateral,
     BorrowerState,
     ObligationState
@@ -66,6 +68,9 @@ contract Midnight is IMidnight {
 
     /// @dev Whether an address is authorized to manage positions on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
+
+    /// @dev Nonce per authorizer for signature-based authorization.
+    mapping(address authorizer => uint256) public nonce;
 
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
@@ -512,6 +517,19 @@ contract Midnight is IMidnight {
     function setIsAuthorized(address authorized, bool newIsAuthorized) external {
         isAuthorized[msg.sender][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized);
+    }
+
+    function setIsAuthorizedWithSig(Authorization memory authorization, Signature memory signature) external {
+        require(block.timestamp <= authorization.deadline, "signature expired");
+        require(authorization.nonce == nonce[authorization.authorizer]++, "invalid nonce");
+
+        bytes32 structHash = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signatory != address(0) && signatory == authorization.authorizer, "invalid signature");
+
+        isAuthorized[authorization.authorizer][authorization.authorized] = authorization.isAuthorized;
+        emit EventsLib.SetIsAuthorized(authorization.authorizer, authorization.authorized, authorization.isAuthorized);
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
