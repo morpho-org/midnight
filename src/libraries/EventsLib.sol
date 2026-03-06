@@ -12,7 +12,9 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
-    event SetTradingFeeRecipient(address indexed feeRecipient);
+    event SetFeeRecipient(address indexed feeRecipient);
+    event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
+    event SetContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
 
     event ObligationCreated(bytes32 indexed id_, Obligation obligation);
     event Take(
@@ -63,6 +65,7 @@ library EventsLib {
         uint256 badDebt
     );
 
+    event AccrueContinuousFee(bytes32 indexed id_, uint256 fee);
     event SetConsumed(address indexed user, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed user, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);

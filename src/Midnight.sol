@@ -44,6 +44,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits.
 /// @dev Max trading fee is defined per index (see maxTradingFee function).
+///
+/// CONTINUOUS FEE
+/// @dev Borrower debt grows continuously at the obligation's continuousFee (per-second, WAD-based), settable by
+/// feeSetter.
+/// @dev Interest is accrued per-borrower before each interaction, increasing their debt.
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
@@ -70,7 +75,9 @@ contract Midnight is IMidnight {
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later decreased by the feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
 
-    address public tradingFeeRecipient;
+    mapping(address loanToken => uint256) public defaultContinuousFee;
+
+    address public feeRecipient;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -112,6 +119,12 @@ contract Midnight is IMidnight {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
+    function setFeeRecipient(address newFeeRecipient) external {
+        require(msg.sender == owner, "only owner");
+        feeRecipient = newFeeRecipient;
+        emit EventsLib.SetFeeRecipient(newFeeRecipient);
+    }
+
     /// @dev Overrides the fee of a specific obligation.
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "only fee setter");
@@ -135,10 +148,19 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    function setTradingFeeRecipient(address feeRecipient) external {
-        require(msg.sender == owner, "only owner");
-        tradingFeeRecipient = feeRecipient;
-        emit EventsLib.SetTradingFeeRecipient(feeRecipient);
+    function setContinuousFee(bytes32 id, uint256 newContinuousFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        require(obligationState[id].created, "obligation not created");
+        require(newContinuousFee <= obligationState[id].continuousFee, "can only decrease");
+        obligationState[id].continuousFee = newContinuousFee;
+        emit EventsLib.SetContinuousFee(id, newContinuousFee);
+    }
+
+    /// @dev Doesn't change the continuous fee of already created obligations.
+    function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        defaultContinuousFee[loanToken] = newContinuousFee;
+        emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
     /// ENTRY-POINTS ///
@@ -200,6 +222,10 @@ contract Midnight is IMidnight {
                 offer.callbackData,
                 offer.receiverIfMakerIsSeller
             );
+
+        // Accrue interest for any party that has debt before modifying positions.
+        accrueContinuousFee(id, buyer);
+        accrueContinuousFee(id, seller);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -279,9 +305,7 @@ contract Midnight is IMidnight {
                 );
         }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
-        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -336,6 +360,8 @@ contract Midnight is IMidnight {
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
         bytes32 id = touchObligation(obligation);
 
+        accrueContinuousFee(id, onBehalf);
+
         borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
 
@@ -379,6 +405,8 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
+        accrueContinuousFee(id, onBehalf);
+
         uint256 newCollateralOf = collateralOf[id][onBehalf][collateralIndex] - assets;
         collateralOf[id][onBehalf][collateralIndex] = UtilsLib.toUint128(newCollateralOf);
 
@@ -415,6 +443,8 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+
+        accrueContinuousFee(id, borrower);
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
@@ -546,11 +576,37 @@ contract Midnight is IMidnight {
 
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
+            obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
         return id;
+    }
+
+    /// CONTINUOUS FEE ACCRUAL ///
+
+    /// @dev Accrues continuous fee on a borrower's debt: fee = debt * continuousFee * elapsed / WAD.
+    /// @dev Increases the borrower's debt and mints corresponding shares to the feeRecipient.
+    function accrueContinuousFee(bytes32 id, address borrower) public {
+        ObligationState storage _obligationState = obligationState[id];
+        BorrowerState storage _borrowerState = borrowerState[id][borrower];
+
+        uint256 fee = _borrowerState.debt
+            .mulDivDown(_obligationState.continuousFee * (block.timestamp - _borrowerState.lastUpdate), WAD);
+        uint256 feeShares = fee.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
+
+        if (fee > 0) {
+            _borrowerState.debt += UtilsLib.toUint128(fee);
+            _obligationState.totalUnits += UtilsLib.toUint128(fee);
+            _obligationState.totalShares += UtilsLib.toUint128(feeShares);
+            sharesOf[id][feeRecipient] += feeShares;
+        }
+
+        // forge-lint: disable-next-item(unsafe-typecast) as block.timestamp fits in uint48
+        _borrowerState.lastUpdate = uint48(block.timestamp);
+
+        emit EventsLib.AccrueContinuousFee(id, fee);
     }
 
     /// VIEW FUNCTIONS ///
@@ -567,6 +623,7 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Obligation));
     }
 
+    /// @dev Returns the borrower's debt (last accrued, does not include pending unaccrued interest).
     function debtOf(bytes32 id, address user) external view returns (uint256) {
         return borrowerState[id][user].debt;
     }
