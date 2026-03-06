@@ -593,8 +593,10 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
 
-        uint256 fee = _borrowerState.debt
-            .mulDivDown(_obligationState.continuousFee * (block.timestamp - _borrowerState.lastUpdate), WAD);
+        uint256 fee = borrowerState[id][feeRecipient].debt > 0
+            ? 0
+            : _borrowerState.debt
+                .mulDivDown(_obligationState.continuousFee * (block.timestamp - _borrowerState.lastUpdate), WAD);
         uint256 feeShares = fee.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
 
         if (fee > 0) {

@@ -44,7 +44,10 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
     bool isHealthyBefore = isHealthy(obligation, id, borrower);
 
     // Assume no time elapsed so that accrueContinuousFee does not change debt between the isHealthy query and liquidate.
-    _, _, uint48 lastUpdate = borrowerState(id, borrower);
+    uint128 debt;
+    uint128 activatedCollaterals;
+    uint48 lastUpdate;
+    debt, activatedCollaterals, lastUpdate = borrowerState(id, borrower);
     require e.block.timestamp == require_uint256(lastUpdate);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
