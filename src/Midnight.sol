@@ -257,7 +257,7 @@ contract Midnight is IMidnight {
         BorrowerState storage _sellerState = borrowerState[id][seller];
 
         if (buyerIsLender && sellerIsBorrower) {
-            // Lender enters, Borrower enters.
+            // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
             _sellerState.pendingFee += uint128(
                 _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
@@ -266,11 +266,11 @@ contract Midnight is IMidnight {
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
         } else if (buyerIsLender && !sellerIsBorrower) {
-            // Lender enters, Lender exits.
+            // Lender enters + lender exits.
             sharesOf[id][buyer] += obligationShares;
             sharesOf[id][seller] -= obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
-            // Borrower exits, Borrower enters.
+            // Borrower exits + borrower enters.
             _buyerState.pendingFee -= uint128(_buyerState.pendingFee.mulDivDown(obligationUnits, _buyerState.debt));
             _buyerState.debt -= UtilsLib.toUint128(obligationUnits);
             _sellerState.pendingFee += uint128(
@@ -278,7 +278,7 @@ contract Midnight is IMidnight {
             );
             _sellerState.debt += UtilsLib.toUint128(obligationUnits);
         } else {
-            // Borrower exits, Lender exits.
+            // Borrower exits + lender exits.
             _buyerState.pendingFee -= uint128(_buyerState.pendingFee.mulDivDown(obligationUnits, _buyerState.debt));
             _buyerState.debt -= UtilsLib.toUint128(obligationUnits);
             sharesOf[id][seller] -= obligationShares;
@@ -483,6 +483,7 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
+            _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(badDebt, _state.debt));
             _state.debt -= UtilsLib.toUint128(badDebt);
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
@@ -522,12 +523,9 @@ contract Midnight is IMidnight {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
+            _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(repaidUnits, _state.debt));
             _obligationState.withdrawable += repaidUnits;
             _state.debt -= UtilsLib.toUint128(repaidUnits);
-        }
-
-        if (originalDebt > 0) {
-            _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(badDebt + repaidUnits, originalDebt));
         }
 
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
