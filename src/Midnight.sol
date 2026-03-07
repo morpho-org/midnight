@@ -196,6 +196,8 @@ contract Midnight is IMidnight {
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
+        accrueContinuousFee(id, taker, offer.obligation.maturity);
+        accrueContinuousFee(id, offer.maker, offer.obligation.maturity);
 
         (
             address buyer,
@@ -251,37 +253,35 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.obligationShares, "consumed");
         }
 
-        if (buyerIsLender) {
-            // Lender enters.
-            sharesOf[id][buyer] += obligationShares;
-        } else {
-            // Borrower exits.
-            accrueContinuousFee(id, buyer, offer.obligation.maturity);
-            BorrowerState storage _state = borrowerState[id][buyer];
-            _state.remainingContinuousFee -= uint128(
-                _state.remainingContinuousFee.mulDivDown(obligationUnits, _state.debt)
-            );
-            _state.debt -= UtilsLib.toUint128(obligationUnits);
-        }
-
-        if (sellerIsBorrower) {
-            // Borrower enters.
-            accrueContinuousFee(id, seller, offer.obligation.maturity);
-            if (obligationUnits > 0) {
-                borrowerState[id][seller].remainingContinuousFee += uint128(
-                    _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
-                );
-                borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
-            }
-        } else {
-            // Lender exits.
-            sharesOf[id][seller] -= obligationShares;
-        }
+        BorrowerState storage _buyerState = borrowerState[id][buyer];
+        BorrowerState storage _sellerState = borrowerState[id][seller];
 
         if (buyerIsLender && sellerIsBorrower) {
+            // Lender enters, Borrower enters.
+            sharesOf[id][buyer] += obligationShares;
+            _sellerState.pendingFee += uint128(
+                _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
+            );
+            _sellerState.debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
-        } else if (!buyerIsLender && !sellerIsBorrower) {
+        } else if (buyerIsLender && !sellerIsBorrower) {
+            // Lender enters, Lender exits.
+            sharesOf[id][buyer] += obligationShares;
+            sharesOf[id][seller] -= obligationShares;
+        } else if (!buyerIsLender && sellerIsBorrower) {
+            // Borrower exits, Borrower enters.
+            _buyerState.pendingFee -= uint128(_buyerState.pendingFee.mulDivDown(obligationUnits, _buyerState.debt));
+            _buyerState.debt -= UtilsLib.toUint128(obligationUnits);
+            _sellerState.pendingFee += uint128(
+                _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
+            );
+            _sellerState.debt += UtilsLib.toUint128(obligationUnits);
+        } else {
+            // Borrower exits, Lender exits.
+            _buyerState.pendingFee -= uint128(_buyerState.pendingFee.mulDivDown(obligationUnits, _buyerState.debt));
+            _buyerState.debt -= UtilsLib.toUint128(obligationUnits);
+            sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
         }
@@ -375,9 +375,7 @@ contract Midnight is IMidnight {
 
         BorrowerState storage _repayState = borrowerState[id][onBehalf];
         if (_repayState.debt > 0) {
-            _repayState.remainingContinuousFee -= uint128(
-                _repayState.remainingContinuousFee.mulDivDown(obligationUnits, _repayState.debt)
-            );
+            _repayState.pendingFee -= uint128(_repayState.pendingFee.mulDivDown(obligationUnits, _repayState.debt));
         }
         _repayState.debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
@@ -529,9 +527,7 @@ contract Midnight is IMidnight {
         }
 
         if (originalDebt > 0) {
-            _state.remainingContinuousFee -= uint128(
-                _state.remainingContinuousFee.mulDivDown(badDebt + repaidUnits, originalDebt)
-            );
+            _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(badDebt + repaidUnits, originalDebt));
         }
 
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
@@ -655,8 +651,8 @@ contract Midnight is IMidnight {
         return obligationState[id].continuousFee;
     }
 
-    function remainingContinuousFee(bytes32 id, address user) external view returns (uint128) {
-        return borrowerState[id][user].remainingContinuousFee;
+    function pendingFee(bytes32 id, address user) external view returns (uint128) {
+        return borrowerState[id][user].pendingFee;
     }
 
     function lastContinuousFeeAccrual(bytes32 id, address user) external view returns (uint48) {
@@ -695,7 +691,7 @@ contract Midnight is IMidnight {
 
     function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal {
         BorrowerState storage _state = borrowerState[id][borrower];
-        uint128 remaining = _state.remainingContinuousFee;
+        uint128 remaining = _state.pendingFee;
 
         if (remaining > 0 && _state.lastContinuousFeeAccrual > 0) {
             uint128 feeUnits;
@@ -710,7 +706,7 @@ contract Midnight is IMidnight {
                 ObligationState storage _obligationState = obligationState[id];
                 uint256 feeShares =
                     feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
-                _state.remainingContinuousFee -= feeUnits;
+                _state.pendingFee -= feeUnits;
                 _state.debt += feeUnits;
                 _obligationState.totalUnits += feeUnits;
                 if (feeShares > 0) {
