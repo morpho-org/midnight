@@ -103,7 +103,7 @@ contract TakeTest is BaseTest {
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 expectedAssets = expectedUnits.mulDivUp(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, expectedUnits);
 
@@ -125,7 +125,7 @@ contract TakeTest is BaseTest {
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 expectedAssets = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1).mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, expectedUnits);
 
@@ -148,7 +148,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 buyerAssets = expectedUnits.mulDivUp(price, WAD);
         otherLenderShares = bound(otherLenderShares, obligationShares, max(obligationShares, maxAssets));
         setupOtherUsers(obligation, otherLenderShares);
         uint256 actualOtherLenderShares = midnight.sharesOf(id, otherLender);
@@ -170,8 +170,7 @@ contract TakeTest is BaseTest {
         tick = bound(tick, 0, 600);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
-        uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 buyerAssets = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1).mulDivDown(price, WAD);
         otherLenderShares = bound(otherLenderShares, obligationShares, max(obligationShares, maxAssets));
         setupOtherUsers(obligation, otherLenderShares);
         uint256 actualOtherLenderShares = midnight.sharesOf(id, otherLender);
@@ -211,6 +210,12 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, obligationShares);
         borrowerOffer.obligationShares = type(uint256).max;
         borrowerOffer.tick = tick;
+        uint256 price = TickLib.tickToPrice(tick);
+        deal(
+            address(loanToken),
+            otherBorrower,
+            obligationShares.mulDivUp(midnight.totalUnits(id) + 1, midnight.totalShares(id) + 1).mulDivUp(price, WAD)
+        );
 
         take(obligationShares, otherBorrower, borrowerOffer);
 
@@ -259,16 +264,19 @@ contract TakeTest is BaseTest {
         tick = bound(tick, 0, TICK_RANGE);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
-        uint256 expectedUnits = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1);
-        uint256 buyerAssets = expectedUnits.mulDivDown(price, WAD);
         existingShares = bound(existingShares, obligationShares, max(obligationShares, maxAssets));
         setupOtherUsers(obligation, existingShares);
+        uint256 expectedUnits = obligationShares.mulDivDown(midnight.totalUnits(id) + 1, midnight.totalShares(id) + 1);
+        uint256 buyerAssets =
+            obligationShares.mulDivUp(midnight.totalUnits(id) + 1, midnight.totalShares(id) + 1).mulDivUp(price, WAD);
         uint256 otherLenderSharesVal = midnight.sharesOf(id, otherLender);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
 
         otherLenderOffer.obligationShares = type(uint256).max;
         otherLenderOffer.tick = tick;
+        deal(address(loanToken), otherBorrower, buyerAssets);
 
+        uint256 otherLenderBalanceBefore = loanToken.balanceOf(otherLender);
         take(obligationShares, otherBorrower, otherLenderOffer);
 
         assertApproxEqAbs(
@@ -281,7 +289,7 @@ contract TakeTest is BaseTest {
         assertApproxEqAbs(
             midnight.totalShares(id), initialShares + otherLenderSharesVal - obligationShares, 1, "total shares"
         );
-        assertApproxEqAbs(loanToken.balanceOf(otherLender), buyerAssets, 1, "otherLender balance");
+        assertEq(loanToken.balanceOf(otherLender) - otherLenderBalanceBefore, buyerAssets, "otherLender balance");
     }
 
     function testSell4(uint256 obligationShares, uint256 tick, uint256 existingShares) public {
@@ -299,6 +307,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.obligationShares = type(uint256).max;
         otherBorrowerOffer.tick = tick;
 
+        uint256 otherLenderBalanceBefore = loanToken.balanceOf(otherLender);
         take(obligationShares, otherLender, otherBorrowerOffer);
 
         assertApproxEqAbs(
@@ -311,7 +320,9 @@ contract TakeTest is BaseTest {
         assertApproxEqAbs(
             midnight.totalShares(id), initialShares + otherLenderSharesVal - obligationShares, 1, "total shares"
         );
-        assertApproxEqAbs(loanToken.balanceOf(otherLender), buyerAssets, 1, "otherLender balance");
+        assertApproxEqAbs(
+            loanToken.balanceOf(otherLender) - otherLenderBalanceBefore, buyerAssets, 1, "otherLender balance"
+        );
     }
 
     // group tests.
@@ -419,7 +430,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = tick2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
-        deal(address(loanToken), address(this), units.mulDivDown(price1, WAD));
+        deal(address(loanToken), address(this), units.mulDivUp(price1, WAD));
         collateralize(obligation, borrower, units);
 
         take(shares, address(this), borrowerOffer);
@@ -446,6 +457,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = tick2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
+        deal(address(loanToken), address(this), units.mulDivUp(price1, WAD));
         collateralize(obligation, borrower, units);
         collateralize(obligation, address(this), units);
 
@@ -489,7 +501,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationShares = shares;
         borrowerOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
-        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
         vm.expectRevert("seller is unhealthy");
@@ -638,7 +650,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.obligationShares = shares;
         borrowerOffer.tick = TICK_RANGE;
         uint256 price = TickLib.tickToPrice(TICK_RANGE);
-        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
         assertEq(midnight.collateralOf(id, borrower, 0), 0);
 
@@ -703,7 +715,7 @@ contract TakeTest is BaseTest {
         shares = bound(shares, 0, maxAssets);
         uint256 units = shares.mulDivUp(initialUnits + 1, initialShares + 1);
         uint256 price = TickLib.tickToPrice(TICK_RANGE);
-        uint256 assets = units.mulDivDown(price, WAD);
+        uint256 assets = units.mulDivUp(price, WAD);
         (address _otherLender,) = makeAddrAndKey("otherLender");
         vm.prank(_otherLender);
         loanToken.approve(address(midnight), assets);
@@ -773,7 +785,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = 0;
         borrowerOffer.obligationShares = shares;
         uint256 expectedUnits = shares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 expectedBuyerAssets = expectedUnits.mulDivDown(fee, WAD);
+        uint256 expectedBuyerAssets = expectedUnits.mulDivUp(fee, WAD);
         deal(address(loanToken), lender, expectedBuyerAssets);
         collateralize(obligation, borrower, expectedUnits);
         (uint256 buyerAssets, uint256 sellerAssets,,) = take(shares, lender, borrowerOffer);
@@ -793,7 +805,7 @@ contract TakeTest is BaseTest {
         // Convert target units to shares (the taker still specifies shares).
         uint256 obligationShares = targetUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 expectedAssets = expectedUnits.mulDivUp(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, expectedUnits);
 
@@ -816,7 +828,7 @@ contract TakeTest is BaseTest {
         vm.assume(price > 0.01 ether);
         uint256 obligationShares = targetUnits.mulDivDown(initialShares + 1, initialUnits + 1);
         uint256 expectedUnits = obligationShares.mulDivUp(initialUnits + 1, initialShares + 1);
-        uint256 expectedAssets = expectedUnits.mulDivDown(price, WAD);
+        uint256 expectedAssets = obligationShares.mulDivDown(initialUnits + 1, initialShares + 1).mulDivDown(price, WAD);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, expectedUnits);
 
