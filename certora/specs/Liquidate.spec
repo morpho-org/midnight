@@ -42,15 +42,14 @@ ghost CVL_price(address) returns uint256;
 
 rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
+    // The fee accrual inside liquidate can increase the borrower's debt, making a healthy borrower unhealthy.
+    // Require that the fee was already accrued at this timestamp so isHealthyBefore reflects the post-accrual state.
+    require lastContinuousFeeAccrual(id, borrower) == require_uint48(e.block.timestamp), "fee already accrued";
     bool isHealthyBefore = isHealthy(obligation, id, borrower);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     // it's okay to check only after the call that the prover chose the correct id.
     require id == lastId, "id should be derived from obligation";
-
-    // The fee accrual inside liquidate can increase the borrower's debt, making a healthy borrower unhealthy.
-    // Require that the fee was already accrued at this timestamp so isHealthyBefore reflects the post-accrual state.
-    require lastContinuousFeeAccrual(id, borrower) == require_uint48(e.block.timestamp), "fee already accrued";
 
     assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
 }
