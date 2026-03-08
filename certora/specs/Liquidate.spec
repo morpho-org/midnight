@@ -4,6 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
+    function lastContinuousFeeAccrual(bytes32 id, address user) external returns (uint48) envfree;
 
     function _.price() external => CVL_price(calledContract) expect(uint256);
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
@@ -46,6 +47,10 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
 
     // it's okay to check only after the call that the prover chose the correct id.
     require id == lastId, "id should be derived from obligation";
+
+    // The fee accrual inside liquidate can increase the borrower's debt, making a healthy borrower unhealthy.
+    // Require that the fee was already accrued at this timestamp so isHealthyBefore reflects the post-accrual state.
+    require lastContinuousFeeAccrual(id, borrower) == require_uint48(e.block.timestamp), "fee already accrued";
 
     assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
 }

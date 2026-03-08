@@ -707,7 +707,7 @@ contract Midnight is IMidnight {
                 _state.pendingFee -= feeUnits;
                 _state.debt += feeUnits;
                 _obligationState.totalUnits += feeUnits;
-                if (feeShares > 0) {
+                if (feeShares > 0 && borrowerState[id][feeRecipient].debt == 0) {
                     sharesOf[id][feeRecipient] += feeShares;
                     _obligationState.totalShares += UtilsLib.toUint128(feeShares);
                 }
