@@ -259,7 +259,7 @@ contract Midnight is IMidnight {
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
-            _sellerState.pendingFee += uint128(
+            _sellerState.pendingFee += UtilsLib.toUint128(
                 _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
             );
             _sellerState.debt += UtilsLib.toUint128(obligationUnits);
@@ -271,9 +271,11 @@ contract Midnight is IMidnight {
             sharesOf[id][seller] -= obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
+            // TODO: why forge lint is not triggered here.
+            // forge-lint: disable-next-item(unsafe-typecast) as pendingFee * obligationUnits / debt <= pendingFee.
             _buyerState.pendingFee -= uint128(_buyerState.pendingFee.mulDivDown(obligationUnits, _buyerState.debt));
             _buyerState.debt -= UtilsLib.toUint128(obligationUnits);
-            _sellerState.pendingFee += uint128(
+            _sellerState.pendingFee += UtilsLib.toUint128(
                 _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
             );
             _sellerState.debt += UtilsLib.toUint128(obligationUnits);
