@@ -43,6 +43,11 @@ contract UtilsLibTest is Test {
         this.mulDivDown(x, y, 0);
     }
 
+    function testMulDivDownZeroZeroReverts(uint256 x) public {
+        vm.expectRevert(stdError.divisionError);
+        this.mulDivDown(x, 0, 0);
+    }
+
     function testMulDivDownOverflow(uint256 x, uint256 y, uint256 d) public {
         x = bound(x, 2, type(uint256).max);
         y = bound(y, type(uint256).max / x + 1, type(uint256).max);

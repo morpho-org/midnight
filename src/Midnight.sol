@@ -525,7 +525,8 @@ contract Midnight is IMidnight {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
-            _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(repaidUnits, _state.debt));
+            // TODO: why forge lint is not triggered here.
+            if (_state.debt > 0) _state.pendingFee -= uint128(_state.pendingFee.mulDivDown(repaidUnits, _state.debt));
             _obligationState.withdrawable += repaidUnits;
             _state.debt -= UtilsLib.toUint128(repaidUnits);
         }
