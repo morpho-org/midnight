@@ -114,7 +114,7 @@ contract TakeBundler {
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.buyerAssetsToShares(
-                        midnight, id, taker, take.offer, targetBuyerAssets - totalFilledBuyerAssets
+                        midnight, id, take.offer, targetBuyerAssets - totalFilledBuyerAssets
                     ),
                     take.obligationShares
                 ),
@@ -155,7 +155,7 @@ contract TakeBundler {
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.sellerAssetsToShares(
-                        midnight, id, taker, take.offer, targetSellerAssets - totalFilledSellerAssets
+                        midnight, id, take.offer, targetSellerAssets - totalFilledSellerAssets
                     ),
                     take.obligationShares
                 ),
