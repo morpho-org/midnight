@@ -75,11 +75,8 @@ contract Midnight is IMidnight {
     /// feeSetter.
     mapping(address loanToken => uint64) public defaultContinuousFees;
 
-    /// @dev Trading fee recipient.
-    address public tradingFeeRecipient;
-
-    /// @dev Continuous fee recipient.
-    address public continuousFeeRecipient;
+    /// @dev Fee recipient.
+    address public feeRecipient;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -121,16 +118,10 @@ contract Midnight is IMidnight {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
-    function setTradingFeeRecipient(address recipient) external {
+    function setFeeRecipient(address recipient) external {
         require(msg.sender == owner, "only owner");
-        tradingFeeRecipient = recipient;
-        emit EventsLib.SetTradingFeeRecipient(recipient);
-    }
-
-    function setContinuousFeeRecipient(address recipient) external {
-        require(msg.sender == owner, "only owner");
-        continuousFeeRecipient = recipient;
-        emit EventsLib.SetContinuousFeeRecipient(recipient);
+        feeRecipient = recipient;
+        emit EventsLib.SetFeeRecipient(recipient);
     }
 
     /// FEE SETTER FUNCTIONS ///
@@ -316,9 +307,7 @@ contract Midnight is IMidnight {
                 );
         }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
-        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -565,7 +554,7 @@ contract Midnight is IMidnight {
     }
 
     function accrueContinuousFees(bytes32 id) internal {
-        if (borrowerState[id][continuousFeeRecipient].debt != 0) return;
+        if (borrowerState[id][feeRecipient].debt != 0) return;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
         uint256 fee = obligationState[id].continuousFee;
         uint256 sharesToMint = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
@@ -573,7 +562,7 @@ contract Midnight is IMidnight {
         if (newTotalShares > type(uint128).max) return;
         // forge-lint: disable-next-line(unsafe-typecast) as newTotalShares <= type(uint128).max
         obligationState[id].totalShares = uint128(newTotalShares);
-        sharesOf[id][continuousFeeRecipient] += sharesToMint;
+        sharesOf[id][feeRecipient] += sharesToMint;
         obligationState[id].lastUpdate = uint56(block.timestamp);
     }
 

@@ -66,7 +66,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 100);
 
-        midnight.setContinuousFeeRecipient(feeRecipient);
+        midnight.setFeeRecipient(feeRecipient);
     }
 
     function testContinuousFeeAccrualBasic(uint256 initialShares, uint256 fee, uint256 timeElapsed) public {
