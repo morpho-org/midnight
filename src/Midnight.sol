@@ -695,13 +695,10 @@ contract Midnight is IMidnight {
         uint128 remaining = _state.pendingFee;
 
         if (remaining > 0 && _state.lastContinuousFeeAccrual > 0) {
-            uint128 feeUnits;
-            if (block.timestamp >= maturity) {
-                feeUnits = remaining;
-            } else {
-                uint256 elapsed = block.timestamp - _state.lastContinuousFeeAccrual;
-                feeUnits = uint128(remaining.mulDivDown(elapsed, maturity - _state.lastContinuousFeeAccrual));
-            }
+            uint256 elapsed = block.timestamp - _state.lastContinuousFeeAccrual;
+            uint256 total = UtilsLib.zeroFloorSub(maturity, _state.lastContinuousFeeAccrual);
+            uint128 feeUnits =
+                elapsed == 0 ? 0 : uint128(elapsed >= total ? remaining : remaining.mulDivDown(elapsed, total));
 
             if (feeUnits > 0) {
                 _state.pendingFee -= feeUnits;

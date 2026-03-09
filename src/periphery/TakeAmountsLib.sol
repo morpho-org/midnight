@@ -58,13 +58,9 @@ library TakeAmountsLib {
         uint256 lastAccrual = midnight.lastContinuousFeeAccrual(id, user);
 
         if (remaining > 0 && lastAccrual > 0) {
-            uint256 feeUnits;
-            if (block.timestamp >= maturity) {
-                feeUnits = remaining;
-            } else {
-                uint256 elapsed = block.timestamp - lastAccrual;
-                feeUnits = remaining.mulDivDown(elapsed, maturity - lastAccrual);
-            }
+            uint256 elapsed = block.timestamp - lastAccrual;
+            uint256 total = UtilsLib.zeroFloorSub(maturity, lastAccrual);
+            uint256 feeUnits = elapsed == 0 ? 0 : elapsed >= total ? remaining : remaining.mulDivDown(elapsed, total);
 
             if (feeUnits > 0 && feeRecipientIsLender) {
                 uint256 feeShares = feeUnits.mulDivDown(totalShares + 1, totalUnits + 1);
