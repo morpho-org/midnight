@@ -690,6 +690,8 @@ contract Midnight is IMidnight {
         return tentativeSigner;
     }
 
+    /// @dev When feeRecipient has active debt, fee units are discarded: pendingFee decreases and accrual time advances,
+    /// but borrower debt does not increase. This is intentional to avoid reverting.
     function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal {
         BorrowerState storage _state = borrowerState[id][borrower];
         uint128 remaining = _state.pendingFee;
