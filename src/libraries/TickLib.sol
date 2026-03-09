@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.024692612590371501e18; // ln(1 + 0.025)
-uint256 constant TICK_RANGE = 990;
+uint256 constant MAX_TICK = 990;
 
 library TickLib {
     using TickLib for uint256;
@@ -35,11 +35,11 @@ library TickLib {
     }
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
-        require(tick <= TICK_RANGE, "tick out of range");
+        require(tick <= MAX_TICK, "tick out of range");
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
-                    .divHalfDownUnchecked(1e18 + wExp(LN_ONE_PLUS_DELTA * (int256(TICK_RANGE / 2) - int256(tick))))
+                    .divHalfDownUnchecked(1e18 + wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick))))
                     .divHalfDownUnchecked(1e13) * 1e13;
         }
     }
@@ -48,7 +48,7 @@ library TickLib {
     function priceToTick(uint256 price) internal pure returns (uint256) {
         require(price <= 1e18, "Price is greater than one");
         uint256 low = 0;
-        uint256 high = TICK_RANGE;
+        uint256 high = MAX_TICK;
         while (low != high) {
             unchecked {
                 uint256 mid = (low + high) / 2;
