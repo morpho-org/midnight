@@ -307,9 +307,7 @@ contract ContinuousFeeTest is BaseTest {
         if (debtAfterAccrual > 0 && totalRemoved > 0) {
             uint256 expectedRemaining =
                 remainingAfterAccrual - remainingAfterAccrual.mulDivDown(totalRemoved, debtAfterAccrual);
-            assertApproxEqAbs(
-                midnight.pendingFee(id, borrower), expectedRemaining, 1, "remaining after liquidation"
-            );
+            assertApproxEqAbs(midnight.pendingFee(id, borrower), expectedRemaining, 1, "remaining after liquidation");
         }
     }
 
