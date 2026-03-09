@@ -531,7 +531,7 @@ contract LiquidationTest is BaseTest {
         // Collateralize with both collaterals.
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         deal(obligation.collaterals[0].token, address(this), collateral1);
         ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral1);
@@ -567,7 +567,7 @@ contract LiquidationTest is BaseTest {
         uint256 lltv1 = obligation.collaterals[1].lltv;
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -608,7 +608,7 @@ contract LiquidationTest is BaseTest {
         uint256 collateralAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Supply both collaterals.
         for (uint256 i = 0; i < 2; i++) {

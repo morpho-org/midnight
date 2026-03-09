@@ -48,7 +48,7 @@ contract OtherFunctionsTest is BaseTest {
         obligation.rcfThreshold = 0;
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         id = toId(obligation);
     }
@@ -185,7 +185,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testSetConsumed(address user, bytes32 group, uint256 amount) public {
         vm.prank(user);
-        midnight.setConsumed(group, amount);
+        midnight.setConsumed(group, amount, user);
         assertEq(midnight.consumed(user, group), amount, "consumed");
     }
 
@@ -194,11 +194,11 @@ contract OtherFunctionsTest is BaseTest {
         amount1 = bound(amount1, amount0, type(uint256).max);
 
         vm.prank(user);
-        midnight.setConsumed(group, amount0);
+        midnight.setConsumed(group, amount0, user);
         assertEq(midnight.consumed(user, group), amount0, "consumed 0");
 
         vm.prank(user);
-        midnight.setConsumed(group, amount1);
+        midnight.setConsumed(group, amount1, user);
         assertEq(midnight.consumed(user, group), amount1, "consumed 1");
     }
 
@@ -207,11 +207,11 @@ contract OtherFunctionsTest is BaseTest {
         amount1 = bound(amount1, 0, amount0 - 1);
 
         vm.prank(user);
-        midnight.setConsumed(group, amount0);
+        midnight.setConsumed(group, amount0, user);
 
         vm.prank(user);
         vm.expectRevert("consumed");
-        midnight.setConsumed(group, amount1);
+        midnight.setConsumed(group, amount1, user);
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
@@ -269,7 +269,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testShuffleSession(address user) public {
         vm.prank(user);
-        midnight.shuffleSession();
+        midnight.shuffleSession(user);
         assertEq(midnight.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
