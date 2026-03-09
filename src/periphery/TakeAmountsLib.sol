@@ -20,9 +20,60 @@ library TakeAmountsLib {
     {
         address buyer = offer.buy ? offer.maker : taker;
         bool buyerIsLender = midnight.debtOf(id, buyer) == 0;
+        (uint256 adjustedTotalUnits, uint256 adjustedTotalShares) =
+            _totalsAfterFeeAccrual(midnight, id, taker, offer.maker, offer.obligation.maturity);
         return buyerIsLender
-            ? targetUnits.mulDivDown(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1)
-            : targetUnits.mulDivUp(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
+            ? targetUnits.mulDivDown(adjustedTotalShares + 1, adjustedTotalUnits + 1)
+            : targetUnits.mulDivUp(adjustedTotalShares + 1, adjustedTotalUnits + 1);
+    }
+
+    /// @dev Simulates accrueContinuousFee for both taker and maker (in that order, matching take()),
+    /// returning the adjusted totalUnits and totalShares.
+    function _totalsAfterFeeAccrual(Midnight midnight, bytes32 id, address taker, address maker, uint256 maturity)
+        private
+        view
+        returns (uint256 totalUnits, uint256 totalShares)
+    {
+        totalUnits = midnight.totalUnits(id);
+        totalShares = midnight.totalShares(id);
+        address _feeRecipient = midnight.feeRecipient();
+        bool feeRecipientIsLender = midnight.debtOf(id, _feeRecipient) == 0;
+
+        (totalUnits, totalShares) =
+            _simulateAccrual(midnight, id, taker, maturity, totalUnits, totalShares, feeRecipientIsLender);
+        (totalUnits, totalShares) =
+            _simulateAccrual(midnight, id, maker, maturity, totalUnits, totalShares, feeRecipientIsLender);
+    }
+
+    function _simulateAccrual(
+        Midnight midnight,
+        bytes32 id,
+        address user,
+        uint256 maturity,
+        uint256 totalUnits,
+        uint256 totalShares,
+        bool feeRecipientIsLender
+    ) private view returns (uint256, uint256) {
+        uint256 remaining = midnight.pendingFee(id, user);
+        uint256 lastAccrual = midnight.lastContinuousFeeAccrual(id, user);
+
+        if (remaining > 0 && lastAccrual > 0) {
+            uint256 feeUnits;
+            if (block.timestamp >= maturity) {
+                feeUnits = remaining;
+            } else {
+                uint256 elapsed = block.timestamp - lastAccrual;
+                feeUnits = remaining.mulDivDown(elapsed, maturity - lastAccrual);
+            }
+
+            if (feeUnits > 0 && feeRecipientIsLender) {
+                uint256 feeShares = feeUnits.mulDivDown(totalShares + 1, totalUnits + 1);
+                totalUnits += feeUnits;
+                totalShares += feeShares;
+            }
+        }
+
+        return (totalUnits, totalShares);
     }
 
     // Forward: buyerAssets = units.mulDivDown(buyerPrice, WAD).
