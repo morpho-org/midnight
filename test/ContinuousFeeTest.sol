@@ -60,7 +60,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 expectedFeeShares = expectedFee.mulDivDown(totalSharesBefore + 1, totalUnitsBefore + 1);
 
         vm.expectEmit(true, true, true, true);
-        emit EventsLib.AccrueContinuousFee(id, expectedFee);
+        emit EventsLib.AccrueContinuousFee(id, borrower, expectedFee);
         midnight.accrueContinuousFee(id, borrower);
 
         assertEq(midnight.debtOf(id, borrower), debtBefore + expectedFee, "debt should increase by fee");

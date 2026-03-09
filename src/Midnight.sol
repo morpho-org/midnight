@@ -588,6 +588,7 @@ contract Midnight is IMidnight {
 
     /// @dev Accrues continuous fee on a borrower's debt: fee = debt * continuousFee * elapsed / WAD.
     /// @dev Increases the borrower's debt and mints corresponding shares to the feeRecipient.
+    /// @dev Skipped if the feeRecipient has debt.
     function accrueContinuousFee(bytes32 id, address borrower) public {
         require(obligationState[id].created, "obligation not created");
         ObligationState storage _obligationState = obligationState[id];
@@ -609,7 +610,7 @@ contract Midnight is IMidnight {
         // forge-lint: disable-next-item(unsafe-typecast) as block.timestamp fits in uint48
         _borrowerState.lastUpdate = uint48(block.timestamp);
 
-        emit EventsLib.AccrueContinuousFee(id, fee);
+        emit EventsLib.AccrueContinuousFee(id, borrower, fee);
     }
 
     /// VIEW FUNCTIONS ///

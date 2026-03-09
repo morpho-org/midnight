@@ -65,7 +65,7 @@ library EventsLib {
         uint256 badDebt
     );
 
-    event AccrueContinuousFee(bytes32 indexed id_, uint256 fee);
+    event AccrueContinuousFee(bytes32 indexed id_, address indexed borrower, uint256 fee);
     event SetConsumed(address indexed user, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed user, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);
