@@ -63,9 +63,11 @@ library EventsLib {
         uint256 badDebt
     );
 
-    event SetConsumed(address indexed user, bytes32 indexed group, uint256 amount);
-    event ShuffleSession(address indexed user, bytes32 session);
+    event SetConsumed(address indexed caller, address indexed onBehalf, bytes32 indexed group, uint256 amount);
+    event ShuffleSession(address indexed caller, address indexed onBehalf, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);
 
-    event SetIsAuthorized(address indexed authorizer, address indexed authorized, bool newIsAuthorized);
+    event SetIsAuthorized(
+        address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized
+    );
 }

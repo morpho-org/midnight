@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -59,14 +59,14 @@ contract BundlerTest is BaseTest {
         offers[0].maker = lender;
         offers[0].obligation = obligation;
         offers[0].expiry = block.timestamp + 200;
-        offers[0].tick = TICK_RANGE;
+        offers[0].tick = MAX_TICK;
 
         offers.push();
         offers[1].buy = true;
         offers[1].maker = lender;
         offers[1].obligation = obligation;
         offers[1].expiry = block.timestamp + 200;
-        offers[1].tick = TICK_RANGE;
+        offers[1].tick = MAX_TICK;
         offers[1].group = bytes32(uint256(1));
 
         deal(address(loanToken), lender, type(uint256).max);
@@ -74,10 +74,10 @@ contract BundlerTest is BaseTest {
 
     function _authorizeBundler() internal {
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(takeBundler), true);
+        midnight.setIsAuthorized(borrower, address(takeBundler), true);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
     }
 
     function testUnauthorizedShares() public {
@@ -185,7 +185,7 @@ contract BundlerTest is BaseTest {
         offers[0].obligationShares = offerShares0;
         offers[1].obligationShares = offerShares1;
 
-        uint256 price = TickLib.tickToPrice(TICK_RANGE);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         uint256 fromOffer0 = UtilsLib.min(units, offerShares0);
 
@@ -230,7 +230,7 @@ contract BundlerTest is BaseTest {
         offers[0].obligationShares = offerShares0;
         offers[1].obligationShares = offerShares1;
 
-        uint256 price = TickLib.tickToPrice(TICK_RANGE);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchObligation(obligation);
         uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 units = targetSellerAssets.mulDivUp(WAD, price - _tradingFee);
