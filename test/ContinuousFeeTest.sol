@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
@@ -54,7 +54,7 @@ contract ContinuousFeeTest is BaseTest {
         lenderOffer.obligationShares = type(uint256).max;
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 365 days;
-        lenderOffer.tick = TICK_RANGE;
+        lenderOffer.tick = MAX_TICK;
 
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
@@ -62,7 +62,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowerOffer.obligationShares = type(uint256).max;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp + 365 days;
-        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.tick = MAX_TICK;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 100);
 
