@@ -24,5 +24,4 @@ methods {
 
 // Check the ratio of units over shares is below or equal to 1.
 strong invariant sharePriceBelowOrEqOneTake(bytes32 id)
-    totalShares(id) >= totalUnits(id)
-    filtered { f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector }
+    totalShares(id) >= totalUnits(id);
