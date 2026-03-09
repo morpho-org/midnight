@@ -22,7 +22,6 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-
 // Check the ratio of units over shares is below or equal to 1.
 strong invariant sharePriceBelowOrEqOneTake(bytes32 id)
     totalShares(id) >= totalUnits(id)
