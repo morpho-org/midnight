@@ -30,10 +30,11 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 
 ghost CVL_msb(uint256) returns uint256;
 
+ghost CVL_mulDivDown_ghost(uint256, uint256, uint256) returns uint256;
+
 function CVL_mulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (a == 0 || b == 0) return 0;
-    uint256 result;
-    return result;
+    return CVL_mulDivDown_ghost(a, b, d);
 }
 
 ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
