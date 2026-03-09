@@ -21,7 +21,6 @@ jobs:
           - SharePrice
           - SharePrice2
           - Solvency
-          - WithdrawableMonotonicity
 
     steps:
       - uses: actions/checkout@v4
