@@ -148,6 +148,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
+    /// @dev Does not settle borrowers first, so the new rate applies retroactively since each borrower's `lastUpdate`.
     function setContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(obligationState[id].created, "obligation not created");
