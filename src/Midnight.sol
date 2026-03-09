@@ -704,15 +704,15 @@ contract Midnight is IMidnight {
             }
 
             if (feeUnits > 0) {
-                ObligationState storage _obligationState = obligationState[id];
-                uint256 feeShares =
-                    feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
                 _state.pendingFee -= feeUnits;
-                _state.debt += feeUnits;
-                _obligationState.totalUnits += feeUnits;
-                _obligationState.totalShares += UtilsLib.toUint128(feeShares);
                 if (borrowerState[id][feeRecipient].debt == 0) {
+                    ObligationState storage _obligationState = obligationState[id];
+                    uint256 feeShares =
+                        feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
+                    _state.debt += feeUnits;
+                    _obligationState.totalUnits += feeUnits;
                     sharesOf[id][feeRecipient] += feeShares;
+                    _obligationState.totalShares += UtilsLib.toUint128(feeShares);
                 }
             }
         }
