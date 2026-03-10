@@ -64,7 +64,7 @@ contract Midnight is IMidnight {
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
 
-    /// @dev Whether an address is authorized to manage positions on behalf of another address.
+    /// @dev Whether an address is authorized to act on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later overridden by the feeSetter.
