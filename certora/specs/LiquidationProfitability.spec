@@ -12,12 +12,6 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// ASSUMPTIONS ///
-
-// price does not change during a transaction.
-// mulDivDown/Up() fulfill the axioms defined here (the base axioms are proved in MulDiv.spec).
-// The floor bound, ceil upper bound, floor ratio, and ceil ratio axioms should also be proved in MulDiv.spec.
-
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -86,15 +80,11 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(summaryMulDivUpM(a, b, d));
 }
 
-/// RULES ///
-
-/// Liquidation is profitable (repaidUnits input):
-/// seized >= floor(repaid * ORACLE_PRICE_SCALE / price), i.e. at most 1 collateral unit lost to rounding.
+/// Liquidation is profitable (repaidUnits input)
 rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require obligation.collaterals[collateralIndex].lltv <= WAD();
     require repaidUnits > 0;
-    require data.length == 0;
 
     uint256 seizedResult;
     uint256 repaidResult;
@@ -105,13 +95,11 @@ rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, 
     assert (to_mathint(seizedResult) + 1) * price > to_mathint(repaidResult) * ORACLE_PRICE_SCALE(), "repaidUnits case: profitable up to floor rounding";
 }
 
-/// Liquidation is profitable (seizedAssets input):
-/// repaid <= ceil(seized * price / ORACLE_PRICE_SCALE), i.e. at most 1 loan unit extra due to rounding.
+/// Liquidation is profitable (seizedAssets input)
 rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require obligation.collaterals[collateralIndex].lltv <= WAD();
     require seizedAssets > 0;
-    require data.length == 0;
 
     uint256 seizedResult;
     uint256 repaidResult;
