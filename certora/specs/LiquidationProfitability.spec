@@ -21,6 +21,7 @@ methods {
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;
+
 definition ORACLE_PRICE_SCALE() returns mathint = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
@@ -89,14 +90,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// Liquidation is profitable (repaidUnits input):
 /// seized >= floor(repaid * ORACLE_PRICE_SCALE / price), i.e. at most 1 collateral unit lost to rounding.
-rule liquidationIsProfitable_repaidUnits(
-    env e,
-    Midnight.Obligation obligation,
-    uint256 collateralIndex,
-    uint256 repaidUnits,
-    address borrower,
-    bytes data
-) {
+rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require obligation.collaterals[collateralIndex].lltv <= WAD();
     require repaidUnits > 0;
@@ -104,7 +98,7 @@ rule liquidationIsProfitable_repaidUnits(
 
     uint256 seizedResult;
     uint256 repaidResult;
-    (seizedResult, repaidResult) = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
@@ -113,14 +107,7 @@ rule liquidationIsProfitable_repaidUnits(
 
 /// Liquidation is profitable (seizedAssets input):
 /// repaid <= ceil(seized * price / ORACLE_PRICE_SCALE), i.e. at most 1 loan unit extra due to rounding.
-rule liquidationIsProfitable_seizedAssets(
-    env e,
-    Midnight.Obligation obligation,
-    uint256 collateralIndex,
-    uint256 seizedAssets,
-    address borrower,
-    bytes data
-) {
+rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require obligation.collaterals[collateralIndex].lltv <= WAD();
     require seizedAssets > 0;
@@ -128,7 +115,7 @@ rule liquidationIsProfitable_seizedAssets(
 
     uint256 seizedResult;
     uint256 repaidResult;
-    (seizedResult, repaidResult) = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
