@@ -386,7 +386,7 @@ contract Midnight is IMidnight {
             balanceOf[id][borrower] += int256(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
             _obligationState.lossIndex =
-                WAD - (WAD - _obligationState.lossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits);
+                (WAD + _obligationState.lossIndex).mulDivUp(oldTotalUnits + 1, oldTotalUnits - badDebt + 1) - WAD;
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
@@ -512,7 +512,7 @@ contract Midnight is IMidnight {
             int256 balance = balanceOf[id][user];
             if (balance > 0) {
                 // forge-lint: disable-next-line(unsafe-typecast)
-                balanceOf[id][user] = int256(uint256(balance).mulDivDown(WAD - lossIndex, WAD - _userLossIndex));
+                balanceOf[id][user] = int256(uint256(balance).mulDivDown(WAD + _userLossIndex, WAD + lossIndex));
             }
             userLossIndex[id][user] = lossIndex;
         }
@@ -538,7 +538,7 @@ contract Midnight is IMidnight {
         uint256 lossIndex = obligationState[id].lossIndex;
         if (balance > 0 && _userLossIndex != lossIndex) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            return int256(uint256(balance).mulDivDown(WAD - lossIndex, WAD - _userLossIndex));
+            return int256(uint256(balance).mulDivDown(WAD + _userLossIndex, WAD + lossIndex));
         }
         return balance;
     }
