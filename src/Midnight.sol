@@ -234,7 +234,7 @@ contract Midnight is IMidnight {
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
 
-        bool buyerIsLender = borrowerState[id][buyer].totalDebt == 0;
+        bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
         // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
@@ -258,7 +258,7 @@ contract Midnight is IMidnight {
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
-            borrowerState[id][seller].totalDebt += UtilsLib.toUint128(obligationUnits);
+            borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
         } else if (buyerIsLender && !sellerIsBorrower) {
@@ -267,16 +267,11 @@ contract Midnight is IMidnight {
             sharesOf[id][seller] -= obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
-            borrowerState[id][buyer].totalDebt -= UtilsLib.toUint128(obligationUnits);
-            borrowerState[id][buyer].feeDebt =
-                UtilsLib.toUint128(UtilsLib.min(borrowerState[id][buyer].feeDebt, borrowerState[id][buyer].totalDebt));
-
-            borrowerState[id][seller].totalDebt += UtilsLib.toUint128(obligationUnits);
+            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
+            borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
         } else {
             // Borrower exits + lender exits.
-            borrowerState[id][buyer].totalDebt -= UtilsLib.toUint128(obligationUnits);
-            borrowerState[id][buyer].feeDebt =
-                UtilsLib.toUint128(UtilsLib.min(borrowerState[id][buyer].feeDebt, borrowerState[id][buyer].totalDebt));
+            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
             sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
@@ -370,10 +365,7 @@ contract Midnight is IMidnight {
 
         accrueContinuousFee(id, onBehalf);
 
-        borrowerState[id][onBehalf].totalDebt -= UtilsLib.toUint128(obligationUnits);
-        borrowerState[id][onBehalf].feeDebt = UtilsLib.toUint128(
-            UtilsLib.min(borrowerState[id][onBehalf].feeDebt, borrowerState[id][onBehalf].totalDebt)
-        );
+        borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
@@ -460,7 +452,7 @@ contract Midnight is IMidnight {
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
         BorrowerState storage _state = borrowerState[id][borrower];
-        uint256 originalDebt = _state.totalDebt;
+        uint256 originalDebt = _state.debt;
         uint256 badDebt = originalDebt;
         uint256 bitmap = _state.activatedCollaterals;
         while (bitmap != 0) {
@@ -479,8 +471,7 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
-            _state.totalDebt -= UtilsLib.toUint128(badDebt);
-            _state.feeDebt = UtilsLib.toUint128(UtilsLib.min(_state.feeDebt, _state.totalDebt));
+            _state.debt -= UtilsLib.toUint128(badDebt);
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
@@ -503,7 +494,7 @@ contract Midnight is IMidnight {
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
                 // Note that debt >= maxDebt in this branch.
-                uint256 maxRepaid = (_state.totalDebt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                uint256 maxRepaid = (_state.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
                 require(
                     repaidUnits <= maxRepaid
                         || collateralOf[id][borrower][collateralIndex].mulDivDown(
@@ -520,8 +511,7 @@ contract Midnight is IMidnight {
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
             _obligationState.withdrawable += repaidUnits;
-            _state.totalDebt -= UtilsLib.toUint128(repaidUnits);
-            _state.feeDebt = UtilsLib.toUint128(UtilsLib.min(_state.feeDebt, _state.totalDebt));
+            _state.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
         emit EventsLib.Liquidate(msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt);
@@ -612,15 +602,15 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
 
-        uint256 fee = borrowerState[id][feeRecipient].totalDebt > 0
+        uint256 fee = borrowerState[id][feeRecipient].debt > 0
             ? 0
-            : (_borrowerState.totalDebt - _borrowerState.feeDebt)
+            : (_borrowerState.debt.zeroFloorSub(_borrowerState.feeDebt))
             .mulDivDown(_obligationState.continuousFee * (block.timestamp - _borrowerState.lastUpdate), WAD);
         uint256 feeShares = fee.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
 
         if (fee > 0) {
             _borrowerState.feeDebt += UtilsLib.toUint128(fee);
-            _borrowerState.totalDebt += UtilsLib.toUint128(fee);
+            _borrowerState.debt += UtilsLib.toUint128(fee);
             _obligationState.totalUnits += UtilsLib.toUint128(fee);
             _obligationState.totalShares += UtilsLib.toUint128(feeShares);
             sharesOf[id][feeRecipient] += feeShares;
@@ -648,7 +638,7 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the borrower's debt (last accrued, does not include pending unaccrued interest).
     function debtOf(bytes32 id, address user) external view returns (uint256) {
-        return borrowerState[id][user].totalDebt;
+        return borrowerState[id][user].debt;
     }
 
     function activatedCollaterals(bytes32 id, address user) external view returns (uint128) {
@@ -679,7 +669,7 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
-        uint256 debt = _borrowerState.totalDebt;
+        uint256 debt = _borrowerState.debt;
         uint256 maxDebt;
         uint256 bitmap = _borrowerState.activatedCollaterals;
         while (maxDebt < debt && bitmap != 0) {
