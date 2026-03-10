@@ -604,12 +604,12 @@ contract Midnight is IMidnight {
 
         uint256 fee = borrowerState[id][feeRecipient].debt > 0
             ? 0
-            : (_borrowerState.debt.zeroFloorSub(_borrowerState.feeDebt))
+            : (_borrowerState.debt.zeroFloorSub(_borrowerState.accruedFee))
             .mulDivDown(_obligationState.continuousFee * (block.timestamp - _borrowerState.lastUpdate), WAD);
         uint256 feeShares = fee.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
 
         if (fee > 0) {
-            _borrowerState.feeDebt += UtilsLib.toUint128(fee);
+            _borrowerState.accruedFee += UtilsLib.toUint128(fee);
             _borrowerState.debt += UtilsLib.toUint128(fee);
             _obligationState.totalUnits += UtilsLib.toUint128(fee);
             _obligationState.totalShares += UtilsLib.toUint128(feeShares);

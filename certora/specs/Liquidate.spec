@@ -4,7 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
-    function borrowerState(bytes32 id, address borrower) external returns (uint128, uint128, uint48) envfree;
+    function borrowerState(bytes32 id, address borrower) external returns (uint128, uint128, uint128, uint48) envfree;
 
     function _.price() external => CVL_price(calledContract) expect(uint256);
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
@@ -51,9 +51,10 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
 
     // Assume no time elapsed so that accrueContinuousFee does not change debt between the isHealthy query and liquidate.
     uint128 debt;
+    uint128 accruedFee;
     uint128 activatedCollaterals;
     uint48 lastUpdate;
-    debt, activatedCollaterals, lastUpdate = borrowerState(id, borrower);
+    debt, feeDebt, activatedCollaterals, lastUpdate = borrowerState(id, borrower);
     require e.block.timestamp == require_uint256(lastUpdate);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
