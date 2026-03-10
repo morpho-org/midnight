@@ -567,7 +567,7 @@ contract Midnight is IMidnight {
         uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
         uint256 _continuousFee = obligationState[id].continuousFee;
-        if (borrowerState[id][feeRecipient].debt == 0 && elapsed > 0 && _continuousFee > 0) {
+        if (elapsed > 0 && _continuousFee > 0 && borrowerState[id][feeRecipient].debt == 0) {
             feeShares = obligationState[id].totalShares
                 .mulDivDown(WAD.mulDivDown(WAD, WAD - _continuousFee * elapsed) - WAD, WAD);
             obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
