@@ -66,10 +66,10 @@ contract Midnight is IMidnight {
     /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
 
-    /// @dev Whether an address is authorized to manage positions on behalf of another address.
+    /// @dev Whether an address is authorized to act on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
-    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later updated by the
+    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overriden by the
     /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
 
@@ -236,11 +236,12 @@ contract Midnight is IMidnight {
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
         // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
         // used to discriminate, as the remaining two cases do not change total units and total shares.
-        uint256 obligationUnits = buyerIsLender
-            ? obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1)
-            : obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        uint256 buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-        uint256 sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        uint256 unitsDown =
+            obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 unitsUp = obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 obligationUnits = buyerIsLender ? unitsUp : unitsDown;
+        uint256 buyerAssets = offer.buy ? unitsDown.mulDivDown(buyerPrice, WAD) : unitsUp.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets = offer.buy ? unitsDown.mulDivDown(sellerPrice, WAD) : unitsUp.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed;
         if (offer.obligationUnits > 0) {
@@ -369,6 +370,7 @@ contract Midnight is IMidnight {
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
         accrueContinuousFee(id, onBehalf);
@@ -441,7 +443,7 @@ contract Midnight is IMidnight {
     /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
     /// TIME_TO_MAX_LIF.
-    /// @dev Liquidations non zero amounts revert if LLTV = 1.
+    /// @dev Liquidating non zero amounts reverts if LLTV = 1.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
@@ -536,25 +538,28 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
-    function setConsumed(bytes32 group, uint256 amount) external {
-        require(amount >= consumed[msg.sender][group], "consumed");
+    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        require(amount >= consumed[onBehalf][group], "consumed");
 
-        consumed[msg.sender][group] = amount;
+        consumed[onBehalf][group] = amount;
 
-        emit EventsLib.SetConsumed(msg.sender, group, amount);
+        emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
     }
 
     /// @dev TODO: is it safe enough?
-    function shuffleSession() external {
-        bytes32 newSession = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
-        session[msg.sender] = newSession;
+    function shuffleSession(address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        bytes32 newSession = keccak256(abi.encode(session[onBehalf], blockhash(block.number - 1)));
+        session[onBehalf] = newSession;
 
-        emit EventsLib.ShuffleSession(msg.sender, newSession);
+        emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
-    function setIsAuthorized(address authorized, bool newIsAuthorized) external {
-        isAuthorized[msg.sender][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized);
+    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        isAuthorized[onBehalf][authorized] = newIsAuthorized;
+        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
