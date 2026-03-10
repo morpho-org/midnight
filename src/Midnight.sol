@@ -153,6 +153,7 @@ contract Midnight is IMidnight {
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newContinuousFee <= obligationState[id].continuousFee, "Continuous fee can only decrease");
+        require(obligationState[id].created, "obligation not created");
         accrueContinuousFees(id);
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
         obligationState[id].continuousFee = uint64(newContinuousFee);
