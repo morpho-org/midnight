@@ -54,7 +54,7 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
     uint128 accruedFee;
     uint128 activatedCollaterals;
     uint48 lastUpdate;
-    debt, feeDebt, activatedCollaterals, lastUpdate = borrowerState(id, borrower);
+    debt, accruedFee, activatedCollaterals, lastUpdate = borrowerState(id, borrower);
     require e.block.timestamp == require_uint256(lastUpdate);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
