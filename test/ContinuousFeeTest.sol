@@ -92,7 +92,8 @@ contract ContinuousFeeTest is BaseTest {
         uint256 recipientSharesAfter = midnight.sharesOf(id, feeRecipient);
         uint256 lastUpdateAfter = midnight.lastUpdate(id);
 
-        uint256 expectedSharesMinted = (totalSharesBefore * timeElapsed).mulDivDown(fee, WAD);
+        uint256 expectedSharesMinted =
+            totalSharesBefore.mulDivDown(WAD.mulDivDown(WAD, WAD - fee * timeElapsed) - WAD, WAD);
 
         assertEq(totalSharesAfter, totalSharesBefore + expectedSharesMinted, "total shares should increase");
         assertEq(
@@ -162,7 +163,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // First accrual
         vm.warp(block.timestamp + 1 days);
-        uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(fee, WAD);
+        uint256 expectedShares1 = totalSharesInitial.mulDivDown(WAD.mulDivDown(WAD, WAD - fee * 1 days) - WAD, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter1 = midnight.totalShares(id);
         uint256 recipientSharesAfter1 = midnight.sharesOf(id, feeRecipient);
@@ -174,7 +175,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Second accrual (7 days later)
         vm.warp(block.timestamp + 7 days);
-        uint256 expectedShares2 = (totalSharesAfter1 * 7 days).mulDivDown(fee, WAD);
+        uint256 expectedShares2 = totalSharesAfter1.mulDivDown(WAD.mulDivDown(WAD, WAD - fee * 7 days) - WAD, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter2 = midnight.totalShares(id);
         uint256 recipientSharesAfter2 = midnight.sharesOf(id, feeRecipient);
@@ -186,7 +187,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Third accrual (30 days later)
         vm.warp(block.timestamp + 30 days);
-        uint256 expectedShares3 = (totalSharesAfter2 * 30 days).mulDivDown(fee, WAD);
+        uint256 expectedShares3 = totalSharesAfter2.mulDivDown(WAD.mulDivDown(WAD, WAD - fee * 30 days) - WAD, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter3 = midnight.totalShares(id);
         uint256 recipientSharesAfter3 = midnight.sharesOf(id, feeRecipient);
