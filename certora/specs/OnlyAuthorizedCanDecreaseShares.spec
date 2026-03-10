@@ -5,7 +5,6 @@ methods {
 
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address user) external returns (uint256) envfree;
-    function feeRecipient() external returns (address) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     function _.price() external => NONDET;
@@ -28,7 +27,6 @@ rule onlyAuthorizedCanDecreaseSharesExceptTake(env e, method f, bytes32 id, addr
 /// In take, the caller must be authorized by the taker and only the seller's shares can decrease.
 /// Assumes no reentrancy: the onBuy/onSell callbacks could re-enter take (or another function) and decrease a different user's shares.
 rule takeOnlyAuthorizedSellerSharesDecrease(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
-    require user != feeRecipient();
     address seller = offer.buy ? taker : offer.maker;
     address buyer = offer.buy ? offer.maker : taker;
     bool takerUnauthorized = e.msg.sender != taker && !isAuthorized(taker, e.msg.sender);
