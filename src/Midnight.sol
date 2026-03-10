@@ -559,6 +559,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
+    /// @dev Fees are not accrued if the fee recipient has outstanding debt in this obligation.
     function accrueContinuousFees(bytes32 id) internal {
         uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
