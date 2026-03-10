@@ -59,9 +59,9 @@ rule onlyAuthorizedCanChangeDebtExceptTakeAndLiquidate(env e, method f, calldata
 rule liquidateCanChangeDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id, address user) {
     bool borrowerIsLiquidatable = !isHealthy(e, obligation, id, borrower) || e.block.timestamp > obligation.maturity;
 
-    uint256 debtBefore = debtOf(id, borrower);
+    uint256 debtBefore = debtOf(id, user);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    uint256 debtAfter = debtOf(id, borrower);
+    uint256 debtAfter = debtOf(id, user);
 
     assert borrowerIsLiquidatable;
     assert user == borrower => debtAfter <= debtBefore;
