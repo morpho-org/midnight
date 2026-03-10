@@ -9,6 +9,8 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function feeEscrow(address recipient) external returns (address) envfree;
+    function feeRecipient() external returns (address) envfree;
 
     function _.price() external => NONDET;
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -105,7 +107,7 @@ strong invariant notBorrowerAndLender(bytes32 id, address user)
     sharesOf(id, user) == 0 || debtOf(id, user) == 0
     {
         preserved {
-            require user != 0xFee;
+            require user != feeEscrow(feeRecipient());
         }
     }
 

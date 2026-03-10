@@ -15,7 +15,6 @@ import {
     MAX_COLLATERALS_PER_BORROWER,
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
-    FEE_ESCROW,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
@@ -119,12 +118,17 @@ contract Midnight is IMidnight {
     }
 
     // @dev Does not crystallize accrued fees before switching; elapsed fees will be minted to the new recipient.
+    // @dev The fee escrow address is derived from the fee recipient, so rotating the recipient invalidates all prior
+    // delegates on the old escrow. Old shares remain accessible to the old recipient.
     function setFeeRecipient(address newFeeRecipient) external {
         require(msg.sender == owner, "only owner");
-        isAuthorized[FEE_ESCROW][feeRecipient] = false;
-        isAuthorized[FEE_ESCROW][newFeeRecipient] = true;
+        isAuthorized[feeEscrow(newFeeRecipient)][newFeeRecipient] = true;
         feeRecipient = newFeeRecipient;
         emit EventsLib.SetFeeRecipient(newFeeRecipient);
+    }
+
+    function feeEscrow(address recipient) public pure returns (address) {
+        return address(uint160(uint256(keccak256(abi.encode(recipient)))));
     }
 
     /// FEE SETTER FUNCTIONS ///
@@ -569,7 +573,7 @@ contract Midnight is IMidnight {
             uint256 fee = obligationState[id].continuousFee;
             feeShares = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
             obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
-            sharesOf[id][FEE_ESCROW] += UtilsLib.toUint128(feeShares);
+            sharesOf[id][feeEscrow(feeRecipient)] += UtilsLib.toUint128(feeShares);
             obligationState[id].lastUpdate = uint56(block.timestamp);
         }
         emit EventsLib.AccrueContinuousFees(id, feeRecipient, feeShares);

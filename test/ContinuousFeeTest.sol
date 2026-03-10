@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, FEE_ESCROW} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
@@ -82,14 +82,14 @@ contract ContinuousFeeTest is BaseTest {
         take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
-        uint256 recipientSharesBefore = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
         uint256 lastUpdateBefore = midnight.lastUpdate(id);
 
         vm.warp(block.timestamp + timeElapsed);
         take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
-        uint256 recipientSharesAfter = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
         uint256 lastUpdateAfter = midnight.lastUpdate(id);
 
         uint256 expectedSharesMinted = (totalSharesBefore * timeElapsed).mulDivDown(fee, WAD);
@@ -111,13 +111,13 @@ contract ContinuousFeeTest is BaseTest {
         take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
-        uint256 recipientSharesBefore = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         vm.warp(block.timestamp + timeElapsed);
         take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
-        uint256 recipientSharesAfter = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         assertEq(totalSharesAfter, totalSharesBefore, "total shares should not change with zero fee");
         assertEq(recipientSharesAfter, recipientSharesBefore, "recipient shares should not change with zero fee");
@@ -134,12 +134,12 @@ contract ContinuousFeeTest is BaseTest {
         take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesBefore = midnight.totalShares(id);
-        uint256 recipientSharesBefore = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesBefore = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         take(0, borrower, lenderOffer);
 
         uint256 totalSharesAfter = midnight.totalShares(id);
-        uint256 recipientSharesAfter = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         assertEq(totalSharesAfter, totalSharesBefore, "total shares should not change with zero elapsed time");
         assertEq(
@@ -158,14 +158,14 @@ contract ContinuousFeeTest is BaseTest {
         take(initialShares, borrower, lenderOffer);
 
         uint256 totalSharesInitial = midnight.totalShares(id);
-        uint256 recipientSharesInitial = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesInitial = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         // First accrual
         vm.warp(block.timestamp + 1 days);
         uint256 expectedShares1 = (totalSharesInitial * 1 days).mulDivDown(fee, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter1 = midnight.totalShares(id);
-        uint256 recipientSharesAfter1 = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter1 = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         assertEq(totalSharesAfter1, totalSharesInitial + expectedShares1, "first accrual should match expected");
         assertEq(
@@ -177,7 +177,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 expectedShares2 = (totalSharesAfter1 * 7 days).mulDivDown(fee, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter2 = midnight.totalShares(id);
-        uint256 recipientSharesAfter2 = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter2 = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         assertEq(totalSharesAfter2, totalSharesAfter1 + expectedShares2, "second accrual should match expected");
         assertEq(
@@ -189,7 +189,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 expectedShares3 = (totalSharesAfter2 * 30 days).mulDivDown(fee, WAD);
         take(0, borrower, lenderOffer);
         uint256 totalSharesAfter3 = midnight.totalShares(id);
-        uint256 recipientSharesAfter3 = midnight.sharesOf(id, FEE_ESCROW);
+        uint256 recipientSharesAfter3 = midnight.sharesOf(id, midnight.feeEscrow(feeRecipient));
 
         assertEq(totalSharesAfter3, totalSharesAfter2 + expectedShares3, "third accrual should match expected");
         assertEq(
