@@ -102,7 +102,8 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 /// INVARIANTS ///
 
 strong invariant notBorrowerAndLender(bytes32 id, address user)
-    sharesOf(id, user) == 0 || debtOf(id, user) == 0;
+    sharesOf(id, user) == 0 || debtOf(id, user) == 0
+    { preserved { require user != 0xFee; } }
 
 strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     totalUnits(id) == sumDebtOf[id] + withdrawable(id);

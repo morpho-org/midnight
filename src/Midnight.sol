@@ -15,6 +15,7 @@ import {
     MAX_COLLATERALS_PER_BORROWER,
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
+    FEE_ESCROW,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "./libraries/ConstantsLib.sol";
@@ -118,10 +119,12 @@ contract Midnight is IMidnight {
     }
 
     // @dev Does not crystallize accrued fees before switching; elapsed fees will be minted to the new recipient.
-    function setFeeRecipient(address recipient) external {
+    function setFeeRecipient(address newFeeRecipient) external {
         require(msg.sender == owner, "only owner");
-        feeRecipient = recipient;
-        emit EventsLib.SetFeeRecipient(recipient);
+        isAuthorized[FEE_ESCROW][feeRecipient] = false;
+        isAuthorized[FEE_ESCROW][newFeeRecipient] = true;
+        feeRecipient = newFeeRecipient;
+        emit EventsLib.SetFeeRecipient(newFeeRecipient);
     }
 
     /// FEE SETTER FUNCTIONS ///
@@ -562,11 +565,11 @@ contract Midnight is IMidnight {
     function accrueContinuousFees(bytes32 id) internal {
         uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
-        if (elapsed > 0 && borrowerState[id][feeRecipient].debt == 0) {
+        if (elapsed > 0) {
             uint256 fee = obligationState[id].continuousFee;
             feeShares = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
             obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
-            sharesOf[id][feeRecipient] += UtilsLib.toUint128(feeShares);
+            sharesOf[id][FEE_ESCROW] += UtilsLib.toUint128(feeShares);
             obligationState[id].lastUpdate = uint56(block.timestamp);
         }
         emit EventsLib.AccrueContinuousFees(id, feeRecipient, feeShares);
