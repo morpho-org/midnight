@@ -117,6 +117,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
+    // @dev Does not crystallize accrued fees before switching; elapsed fees will be minted to the new recipient.
     function setFeeRecipient(address recipient) external {
         require(msg.sender == owner, "only owner");
         feeRecipient = recipient;
@@ -152,6 +153,7 @@ contract Midnight is IMidnight {
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newContinuousFee <= obligationState[id].continuousFee, "Continuous fee can only decrease");
+        accrueContinuousFees(id);
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
         obligationState[id].continuousFee = uint64(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
@@ -567,6 +569,7 @@ contract Midnight is IMidnight {
         obligationState[id].totalShares = uint128(newTotalShares);
         sharesOf[id][feeRecipient] += sharesToMint;
         obligationState[id].lastUpdate = uint56(block.timestamp);
+        emit EventsLib.AccrueContinuousFees(id, feeRecipient, sharesToMint);
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
