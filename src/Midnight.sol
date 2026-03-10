@@ -119,6 +119,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
+    /// @dev Does not settle borrowers first, so the new recipient receives fees for the entire unaccrued interval.
     function setFeeRecipient(address newFeeRecipient) external {
         require(msg.sender == owner, "only owner");
         feeRecipient = newFeeRecipient;
