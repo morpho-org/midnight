@@ -560,17 +560,16 @@ contract Midnight is IMidnight {
     }
 
     function accrueContinuousFees(bytes32 id) internal {
-        if (borrowerState[id][feeRecipient].debt != 0) return;
+        uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
-        uint256 fee = obligationState[id].continuousFee;
-        uint256 sharesToMint = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
-        uint256 newTotalShares = obligationState[id].totalShares + sharesToMint;
-        if (newTotalShares > type(uint128).max) return;
-        // forge-lint: disable-next-line(unsafe-typecast) as newTotalShares <= type(uint128).max
-        obligationState[id].totalShares = uint128(newTotalShares);
-        sharesOf[id][feeRecipient] += sharesToMint;
-        obligationState[id].lastUpdate = uint56(block.timestamp);
-        emit EventsLib.AccrueContinuousFees(id, feeRecipient, sharesToMint);
+        if (elapsed > 0 && borrowerState[id][feeRecipient].debt == 0) {
+            uint256 fee = obligationState[id].continuousFee;
+            feeShares = (obligationState[id].totalShares * elapsed).mulDivDown(fee, WAD);
+            obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
+            sharesOf[id][feeRecipient] += UtilsLib.toUint128(feeShares);
+            obligationState[id].lastUpdate = uint56(block.timestamp);
+        }
+        emit EventsLib.AccrueContinuousFees(id, feeRecipient, feeShares);
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
