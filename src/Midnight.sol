@@ -560,13 +560,14 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Fees are not accrued if the fee recipient has outstanding debt in this obligation.
+    /// @dev We want sharePrice' = sharePrice * (1 - f*t), so totalShares' = totalShares / (1 - f*t). So feeShares =
+    /// totalShares * (1/(1 - f*t) - 1).
+    /// @dev Obligations' time to maturity must not exceed 100 years.
     function accrueContinuousFees(bytes32 id) internal {
         uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
         uint256 _continuousFee = obligationState[id].continuousFee;
         if (borrowerState[id][feeRecipient].debt == 0 && elapsed > 0 && _continuousFee > 0) {
-            // we want sharePrice' = sharePrice * (1 - f*t), so totalShares' = totalShares / (1 - f*t).
-            // so feeShares = totalShares * (1/(1 - f*t) - 1).
             feeShares = obligationState[id].totalShares
                 .mulDivDown(WAD.mulDivDown(WAD, WAD - _continuousFee * elapsed) - WAD, WAD);
             obligationState[id].totalShares += UtilsLib.toUint128(feeShares);

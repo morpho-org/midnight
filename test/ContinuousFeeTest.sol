@@ -148,6 +148,38 @@ contract ContinuousFeeTest is BaseTest {
         );
     }
 
+    /// @dev More frequent accruals should mint fewer fee shares (compounding favors depositors).
+    function testCompoundingDirection(uint256 initialShares, uint256 fee) public {
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
+        fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
+
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
+
+        collateralize(obligation, borrower, initialShares);
+        take(initialShares, borrower, lenderOffer);
+
+        uint256 snap = vm.snapshot();
+
+        // Path A: accrue once over 30 days.
+        vm.warp(block.timestamp + 30 days);
+        take(0, borrower, lenderOffer);
+        uint256 totalSharesOneShot = midnight.totalShares(id);
+
+        vm.revertTo(snap);
+
+        // Path B: accrue in 3 steps (10 days each).
+        vm.warp(block.timestamp + 10 days);
+        take(0, borrower, lenderOffer);
+        vm.warp(block.timestamp + 10 days);
+        take(0, borrower, lenderOffer);
+        vm.warp(block.timestamp + 10 days);
+        take(0, borrower, lenderOffer);
+        uint256 totalSharesFrequent = midnight.totalShares(id);
+
+        // More interactions => fewer fee shares minted => depositors keep more.
+        assertLt(totalSharesFrequent, totalSharesOneShot, "frequent accrual should mint fewer fee shares");
+    }
+
     function testContinuousFeeAccruesCumulatively(uint256 initialShares, uint256 fee) public {
         initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
         fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
