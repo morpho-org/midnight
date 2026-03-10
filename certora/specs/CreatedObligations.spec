@@ -7,11 +7,12 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
     function _.price() external => NONDET;
 
-    function Midnight.totalUnits(bytes20) external returns (uint256) envfree;
-    function Midnight.totalShares(bytes20) external returns (uint256) envfree;
-    function Midnight.withdrawable(bytes20) external returns (uint256) envfree;
-    function Midnight.fees(bytes20) external returns (uint16[7]) envfree;
-    function Midnight.obligationCreated(bytes20) external returns (bool) envfree;
+    function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
+    function Midnight.totalShares(bytes32) external returns (uint256) envfree;
+    function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
+    function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
+    function Midnight.sharesOf(bytes32, address) external returns (uint256) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -23,18 +24,13 @@ methods {
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes20) => summaryToId(obligation);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-// Since the toId function returns a truncated hash, we need to rehash the obligation to ensure injectivity.
-persistent ghost mapping(bytes32 => bytes20) rehash {
-    axiom forall bytes32 h1. forall bytes32 h2. h1 != h2 => rehash[h1] != rehash[h2];
-}
-
-function summaryToId(Midnight.Obligation obligation) returns (bytes20) {
-    return rehash[Utils.hashObligation(obligation)];
+function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
+    return Utils.hashObligation(obligation);
 }
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
@@ -58,7 +54,7 @@ invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obl
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
-rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes20 id) {
+rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
     require Midnight.obligationCreated(id), "Assume that the obligation is created";
     f(e, args);
     assert Midnight.obligationCreated(id);
@@ -102,22 +98,18 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that an obligation state is empty if it is not created.
-invariant obligationStateIsEmptyIfNotCreated(bytes20 id)
-    !Midnight.obligationCreated(id) => obligationStateIsEmpty(id);
+invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-function obligationStateIsEmpty(bytes20 id) returns (bool) {
-    if (Midnight.totalUnits(id) != 0) return false;
-    if (Midnight.totalShares(id) != 0) return false;
-    if (Midnight.withdrawable(id) != 0) return false;
+definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.totalShares(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
 
+function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
-    if (fees[0] != 0) return false;
-    if (fees[1] != 0) return false;
-    if (fees[2] != 0) return false;
-    if (fees[3] != 0) return false;
-    if (fees[4] != 0) return false;
-    if (fees[5] != 0) return false;
-    if (fees[6] != 0) return false;
-
-    return true;
+    return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
+
+definition userHasNoDebt(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].debt == 0;
+
+definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].activatedCollaterals == 0;
+
+definition userHasNoCollateral(bytes32 id, address user) returns bool = forall uint256 collateralIndex. collateralIndex < 128 => currentContract.collateralOf[id][user][collateralIndex] == 0;

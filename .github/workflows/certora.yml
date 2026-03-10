@@ -14,10 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         conf:
+          - Consume
           - CreatedObligations
           - ExactMath
           - Liquidate
           - Midnight
+          - OnlyAuthorizedCanDecreaseShares
           - SharePrice
           - Solvency
 

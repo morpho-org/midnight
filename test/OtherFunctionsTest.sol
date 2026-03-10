@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IdLib} from "../src/libraries/IdLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 
 import {ERC20} from "./helpers/ERC20.sol";
@@ -20,7 +19,7 @@ contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
 
     Obligation internal obligation;
-    bytes20 internal id;
+    bytes32 internal id;
 
     function setUp() public override {
         super.setUp();
@@ -47,6 +46,9 @@ contract OtherFunctionsTest is BaseTest {
             );
         obligation.collaterals = sortCollaterals(obligation.collaterals);
         obligation.rcfThreshold = 0;
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         id = toId(obligation);
     }
@@ -181,17 +183,42 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testConsume(address user, bytes32 group, uint256 amount) public {
+    function testSetConsumed(address user, bytes32 group, uint256 amount) public {
         vm.prank(user);
-        midnight.consume(group, amount);
+        midnight.setConsumed(group, amount, user);
         assertEq(midnight.consumed(user, group), amount, "consumed");
+    }
+
+    function testSetConsumedIncreasing(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
+        amount0 = bound(amount0, 0, type(uint256).max - 1);
+        amount1 = bound(amount1, amount0, type(uint256).max);
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount0, user);
+        assertEq(midnight.consumed(user, group), amount0, "consumed 0");
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount1, user);
+        assertEq(midnight.consumed(user, group), amount1, "consumed 1");
+    }
+
+    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
+        amount0 = bound(amount0, 1, type(uint256).max);
+        amount1 = bound(amount1, 0, amount0 - 1);
+
+        vm.prank(user);
+        midnight.setConsumed(group, amount0, user);
+
+        vm.prank(user);
+        vm.expectRevert("consumed");
+        midnight.setConsumed(group, amount1, user);
     }
 
     function testTouchObligation(Obligation memory _obligation) public {
         vm.assume(_obligation.collaterals.length > 0);
         _obligation = validObligation(_obligation);
 
-        bytes20 _id = midnight.touchObligation(_obligation);
+        bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
         uint16[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
@@ -203,8 +230,8 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(_obligation.collaterals.length > 0);
         _obligation = validObligation(_obligation);
 
-        bytes20 _id = midnight.touchObligation(_obligation);
-        Obligation memory obligationFromId = IdLib.toObligation(_id);
+        bytes32 _id = midnight.touchObligation(_obligation);
+        Obligation memory obligationFromId = midnight.toObligation(_id);
         assertEq(_obligation.loanToken, obligationFromId.loanToken, "loanToken");
         assertEq(_obligation.maturity, obligationFromId.maturity, "maturity");
         assertEq(_obligation.collaterals.length, obligationFromId.collaterals.length, "collaterals length");
@@ -219,12 +246,12 @@ contract OtherFunctionsTest is BaseTest {
     function testToId(Obligation memory _obligation) public view {
         _obligation = validObligation(_obligation);
 
-        bytes20 expected = toId(_obligation);
-        bytes20 actual = midnight.toId(_obligation);
+        bytes32 expected = toId(_obligation);
+        bytes32 actual = midnight.toId(_obligation);
         assertEq(actual, expected, "toId mismatch");
     }
 
-    function testToObligationRevertsIfNotCreated(bytes20 _id) public {
+    function testToObligationRevertsIfNotCreated(bytes32 _id) public {
         vm.expectRevert();
         midnight.toObligation(_id);
     }
@@ -233,8 +260,8 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(_obligation.collaterals.length > 0);
         _obligation = validObligation(_obligation);
 
-        bytes20 _id = midnight.touchObligation(_obligation);
-        address sstore2Address = address(_id);
+        bytes32 _id = midnight.touchObligation(_obligation);
+        address sstore2Address = address(uint160(uint256(_id)));
 
         assertGt(sstore2Address.code.length, 0, "code should exist");
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
@@ -242,7 +269,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testShuffleSession(address user) public {
         vm.prank(user);
-        midnight.shuffleSession();
+        midnight.shuffleSession(user);
         assertEq(midnight.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
     }
 
@@ -289,7 +316,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(collateralToken1), address(this), collateral);
         midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
 
-        bytes20 _id = toId(obligationWithRevertingOracle);
+        bytes32 _id = toId(obligationWithRevertingOracle);
         assertEq(midnight.collateralOf(_id, borrower, 0), collateral, "collateral should be set");
 
         revertingOracle.stopOracle();
@@ -416,7 +443,7 @@ contract OtherFunctionsTest is BaseTest {
             midnight.supplyCollateral(_obligation, i, 1e18, borrower);
         }
 
-        bytes20 _id = toId(_obligation);
+        bytes32 _id = toId(_obligation);
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), k, "countBits should equal number of supplied collaterals");
         assertEq(UtilsLib.msb(bitmap), k - 1, "msb should equal number of supplied collaterals - 1");
@@ -435,7 +462,7 @@ contract OtherFunctionsTest is BaseTest {
             midnight.supplyCollateral(_obligation, i, 1e18, borrower);
         }
 
-        bytes20 _id = toId(_obligation);
+        bytes32 _id = toId(_obligation);
         assertEq(UtilsLib.countBits(midnight.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
 
         // Withdraw one collateral fully.
