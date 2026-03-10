@@ -563,9 +563,9 @@ contract Midnight is IMidnight {
     function accrueContinuousFees(bytes32 id) internal {
         uint256 feeShares;
         uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
-        uint256 continuousFee = obligationState[id].continuousFee;
-        if (borrowerState[id][feeRecipient].debt == 0 && elapsed > 0 && continuousFee > 0) {
-            feeShares = (obligationState[id].totalShares * elapsed).mulDivDown(continuousFee, WAD);
+        uint256 _continuousFee = obligationState[id].continuousFee;
+        if (borrowerState[id][feeRecipient].debt == 0 && elapsed > 0 && _continuousFee > 0) {
+            feeShares = (obligationState[id].totalShares * elapsed).mulDivDown(_continuousFee, WAD);
             obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
             sharesOf[id][feeRecipient] += UtilsLib.toUint128(feeShares);
         }
