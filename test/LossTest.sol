@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF, LIQUIDATION_CURSOR_LOW} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
@@ -171,7 +171,7 @@ contract LossTest is BaseTest {
         newBorrowerOffer.obligationUnits = newUnits;
         newBorrowerOffer.start = block.timestamp;
         newBorrowerOffer.expiry = block.timestamp + 200;
-        newBorrowerOffer.tick = TICK_RANGE;
+        newBorrowerOffer.tick = MAX_TICK;
 
         take(newUnits, newLender, newBorrowerOffer);
 
@@ -291,7 +291,7 @@ contract LossTest is BaseTest {
         offer.obligationUnits = units;
         offer.start = block.timestamp;
         offer.expiry = block.timestamp + 200;
-        offer.tick = TICK_RANGE;
+        offer.tick = MAX_TICK;
         offer.group = bytes32(_nonce);
 
         take(units, _lender, offer);
