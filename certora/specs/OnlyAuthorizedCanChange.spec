@@ -7,7 +7,8 @@ methods {
     function sharesOf(bytes32 id, address user) external returns (uint256) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
-    function _.price() external => NONDET;
+    // Assume that the price is constant, so that isHealthy is deterministic. This is sound for the given rules because the price is used at most once per collateral.
+    function _.price() external => PER_CALLEE_CONSTANT;
 }
 
 /// SHARES CHANGE RULES ///
@@ -54,12 +55,15 @@ rule onlyAuthorizedCanChangeDebtExceptTakeAndLiquidate(env e, method f, calldata
     assert userIsAuthorized || debtAfter == debtBefore;
 }
 
-/// In liquidate, users can have their debt decreased.
+/// In liquidate, only liquidatable users can have their debt decreased.
 rule liquidateCanChangeDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id, address user) {
+    bool borrowerIsLiquidatable = !isHealthy(e, obligation, id, borrower) || e.block.timestamp > obligation.maturity;
+
     uint256 debtBefore = debtOf(id, borrower);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     uint256 debtAfter = debtOf(id, borrower);
 
+    assert borrowerIsLiquidatable;
     assert user == borrower => debtAfter <= debtBefore;
     assert user != borrower => debtAfter == debtBefore;
 }
