@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 uint256 constant MAX_AMOUNT = type(uint128).max;
@@ -35,7 +35,7 @@ contract MaxAmountsTest is BaseTest {
         id = toId(obligation);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
     }
 
     function testMaxAmountIsUint128Max() public pure {
@@ -48,7 +48,7 @@ contract MaxAmountsTest is BaseTest {
         deal(address(loanToken), lender, amount);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Set a very high oracle price so a small collateral amount is sufficient.
         // With price = ORACLE_PRICE_SCALE * 1e36, 1 collateral token = 1e36 loan tokens.
@@ -66,7 +66,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.obligationUnits = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 200;
-        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.tick = MAX_TICK;
 
         take(amount, lender, borrowerOffer);
 
@@ -92,7 +92,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.obligationUnits = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 200;
-        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.tick = MAX_TICK;
 
         vm.expectRevert("uint256 overflows uint128");
         take(amount, lender, borrowerOffer);
@@ -105,7 +105,7 @@ contract MaxAmountsTest is BaseTest {
         collateralToken1.approve(address(midnight), amount);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         midnight.supplyCollateral(obligation, 0, amount, borrower);
 
@@ -119,7 +119,7 @@ contract MaxAmountsTest is BaseTest {
         collateralToken1.approve(address(midnight), amount);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         vm.expectRevert("uint256 overflows uint128");
         midnight.supplyCollateral(obligation, 0, amount, borrower);

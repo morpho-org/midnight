@@ -7,7 +7,7 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
@@ -105,7 +105,7 @@ abstract contract BaseTest is Test {
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
-        uint256 price = TickLib.tickToPrice(TICK_RANGE);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         deal(address(loanToken), otherLender, assets);
 
@@ -116,7 +116,7 @@ abstract contract BaseTest is Test {
         lenderOffer.obligationUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
-        lenderOffer.tick = TICK_RANGE;
+        lenderOffer.tick = MAX_TICK;
 
         collateralize(obligation, otherBorrower, units);
         take(units, otherBorrower, lenderOffer);
@@ -137,16 +137,16 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.obligationUnits = 100;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
-        badBorrowerOffer.tick = TICK_RANGE;
+        badBorrowerOffer.tick = MAX_TICK;
 
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
 
         deal(obligation.collaterals[0].token, address(this), 135);
         midnight.supplyCollateral(obligation, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(address(this), false);
+        midnight.setIsAuthorized(badBorrower, address(this), false);
 
         deal(address(loanToken), unluckyLender, 100);
 
@@ -156,6 +156,8 @@ abstract contract BaseTest is Test {
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         // then empty the market (borrow side only).
+        vm.prank(badBorrower);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
         midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower);
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
@@ -238,7 +240,7 @@ abstract contract BaseTest is Test {
     }
 
     function setupObligation(Obligation memory obligation, uint256 obligationUnits) internal {
-        deal(address(loanToken), lender, obligationUnits); // at tick TICK_RANGE, price is 1.
+        deal(address(loanToken), lender, obligationUnits); // at tick MAX_TICK, price is 1.
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;
@@ -248,7 +250,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.obligationUnits = obligationUnits;
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
-        borrowerOffer.tick = TICK_RANGE;
+        borrowerOffer.tick = MAX_TICK;
 
         vm.prank(lender);
         midnight.take(
