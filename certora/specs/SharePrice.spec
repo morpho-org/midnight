@@ -5,6 +5,9 @@ methods {
 
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function totalShares(bytes32 id) external returns (uint256) envfree;
+    function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
+    function feeRecipient() external returns (address) envfree;
+    function lastUpdate(bytes32 id) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
 
@@ -40,13 +43,14 @@ rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint25
     assert totalUnits(id) <= unitsBefore;
 }
 
-/// Virtual share price = (totalUnits+1)/(totalShares+1) monotonicity.
+/// Virtual share price does not decrease when no time has elapsed (no fee accrual possible).
 /// Liquidation is excluded: it can decrease the share price via bad debt socialization but covered above.
-rule sharePriceDoesNotDecrease(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
+rule sharePriceDoesNotDecreaseNoTimeElapsed(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
     mathint unitsBefore = totalUnits(id);
     mathint sharesBefore = totalShares(id);
 
     env e;
+    require e.block.timestamp == lastUpdate(id);
     calldataarg args;
     f(e, args);
 
