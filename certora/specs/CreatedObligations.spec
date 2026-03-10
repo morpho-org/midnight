@@ -11,8 +11,11 @@ methods {
     function Midnight.totalShares(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.continuousFee(bytes32) external returns (uint64) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.sharesOf(bytes32, address) external returns (uint256) envfree;
+    function Midnight.remainingContinuousFee(bytes32, address) external returns (uint128) envfree;
+    function Midnight.lastContinuousFeeAccrual(bytes32, address) external returns (uint48) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -101,7 +104,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.totalShares(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
+definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.totalShares(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && userHasNoCollateral(id, user);
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
@@ -111,5 +114,9 @@ function noFeesAreSet(bytes32 id) returns (bool) {
 definition userHasNoDebt(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].debt == 0;
 
 definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].activatedCollaterals == 0;
+
+definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = Midnight.remainingContinuousFee(id, user) == 0;
+
+definition userHasNoLastContinuousFeeAccrual(bytes32 id, address user) returns bool = Midnight.lastContinuousFeeAccrual(id, user) == 0;
 
 definition userHasNoCollateral(bytes32 id, address user) returns bool = forall uint256 collateralIndex. collateralIndex < 128 => currentContract.collateralOf[id][user][collateralIndex] == 0;

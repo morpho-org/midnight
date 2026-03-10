@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
@@ -81,7 +81,7 @@ contract TradingFeeTest is BaseTest {
 
     function testBuyObligationShares(uint256 tradingFee, uint256 sellerTick, uint256 obligationShares) public {
         obligationShares = bound(obligationShares, 0, MAX_DEBT);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
@@ -101,7 +101,7 @@ contract TradingFeeTest is BaseTest {
 
     function testSellObligationShares(uint256 tradingFee, uint256 buyerTick, uint256 obligationShares) public {
         obligationShares = bound(obligationShares, 0, MAX_DEBT);
-        buyerTick = bound(buyerTick, 0, TICK_RANGE);
+        buyerTick = bound(buyerTick, 0, MAX_TICK);
         uint256 buyerPrice = TickLib.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= MIN_SELLER_PRICE);
         tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
@@ -121,7 +121,7 @@ contract TradingFeeTest is BaseTest {
 
     function testDefaultFee(uint256 obligationShares, uint256 sellerTick, uint256 tradingFee) public {
         obligationShares = bound(obligationShares, 0, MAX_ASSETS);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
@@ -143,7 +143,7 @@ contract TradingFeeTest is BaseTest {
         public
     {
         obligationShares = bound(obligationShares, 0, MAX_ASSETS);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         fee1Day = bound(fee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
@@ -177,7 +177,7 @@ contract TradingFeeTest is BaseTest {
         public
     {
         obligationShares = bound(obligationShares, 0, MAX_ASSETS);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         fee0Day = bound(fee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
@@ -205,7 +205,7 @@ contract TradingFeeTest is BaseTest {
 
     function testEarlyFee(uint256 obligationShares, uint256 sellerTick, uint256 fee360Days, uint256 maturity) public {
         obligationShares = bound(obligationShares, 0, MAX_ASSETS);
-        sellerTick = bound(sellerTick, 0, TICK_RANGE);
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         fee360Days = bound(fee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;

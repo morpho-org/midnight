@@ -9,6 +9,7 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function remainingContinuousFee(bytes32 id, address user) external returns (uint128) envfree;
 
     function _.price() external => NONDET;
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -36,6 +37,8 @@ hook Sstore borrowerState[KEY bytes32 id][KEY address owner].debt uint128 newDeb
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (x == 0 || y == 0) return 0;
+    if (d > 0 && y == d) return x;
+    if (d > 0 && x == d) return y;
     uint256 res;
     return res;
 }
@@ -103,6 +106,9 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 
 strong invariant notBorrowerAndLender(bytes32 id, address user)
     sharesOf(id, user) == 0 || debtOf(id, user) == 0;
+
+strong invariant noRemainingContinuousFeeWithoutDebt(bytes32 id, address user)
+    debtOf(id, user) == 0 => remainingContinuousFee(id, user) == 0;
 
 strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     totalUnits(id) == sumDebtOf[id] + withdrawable(id);

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD, ORACLE_PRICE_SCALE, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
@@ -43,12 +43,12 @@ contract ContinuousFeeTest is BaseTest {
         lenderOffer.maker = otherLender;
         lenderOffer.obligationShares = type(uint256).max;
         lenderOffer.expiry = block.timestamp;
-        lenderOffer.tick = TICK_RANGE;
+        lenderOffer.tick = MAX_TICK;
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(borrower, address(this), true);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(address(this), true);
+        midnight.setIsAuthorized(otherBorrower, address(this), true);
     }
 
     function setupBorrower(uint256 debt, uint256 feeRate, uint256 ttm) internal {
@@ -71,21 +71,21 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed);
         uint256 expectedFee = remaining.mulDivDown(elapsed, ttm);
 
-        // Via repay(0)
+        // Via repay
         uint256 snap = vm.snapshotState();
         midnight.repay(obligation, 0, borrower);
         assertEq(midnight.debtOf(id, borrower), debt + expectedFee, "debt after repay");
         assertEq(midnight.pendingFee(id, borrower), remaining - expectedFee, "remaining after repay");
         vm.revertToState(snap);
 
-        // Via withdrawCollateral(0)
+        // Via withdrawCollateral
         snap = vm.snapshotState();
         vm.prank(borrower);
         midnight.withdrawCollateral(obligation, 0, 0, borrower, borrower);
         assertEq(midnight.debtOf(id, borrower), debt + expectedFee, "debt after withdrawCollateral");
         vm.revertToState(snap);
 
-        // Via take (borrower enters more debt, triggering accrue for seller=borrower)
+        // Via take
         deal(address(loanToken), otherLender, 1);
         lenderOffer.obligation = obligation;
         lenderOffer.obligationShares = 1;
@@ -108,14 +108,14 @@ contract ContinuousFeeTest is BaseTest {
 
         vm.warp(obligation.maturity + extraTime);
 
-        // Via repay(0)
+        // Via repay
         uint256 snap = vm.snapshotState();
         midnight.repay(obligation, 0, borrower);
         assertEq(midnight.debtOf(id, borrower), debt + remaining, "all remaining consumed (repay)");
         assertEq(midnight.pendingFee(id, borrower), 0, "remaining is zero (repay)");
         vm.revertToState(snap);
 
-        // Via withdrawCollateral(0)
+        // Via withdrawCollateral
         snap = vm.snapshotState();
         vm.prank(borrower);
         midnight.withdrawCollateral(obligation, 0, 0, borrower, borrower);
@@ -123,7 +123,7 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.pendingFee(id, borrower), 0, "remaining is zero (withdrawCollateral)");
         vm.revertToState(snap);
 
-        // Via take (borrower enters more debt)
+        // Via take
         deal(address(loanToken), otherLender, 1);
         lenderOffer.obligation = obligation;
         lenderOffer.obligationShares = 1;
@@ -169,8 +169,6 @@ contract ContinuousFeeTest is BaseTest {
         assertApproxEqAbs(debtTwoAccruals, debtOneAccrual, 2, "two accruals ~ one accrual");
     }
 
-    // --- 2. Entry ---
-
     function testSingleBorrow(uint256 debt, uint256 feeRate, uint256 ttm) public {
         debt = bound(debt, 1, MAX_DEBT);
         feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
@@ -206,7 +204,7 @@ contract ContinuousFeeTest is BaseTest {
         setupObligation(obligation, debt1);
         uint256 remaining1 = midnight.pendingFee(id, borrower);
 
-        // Change rate, second borrow at rate2 (same block, no accrual effect)
+        // Change rate, second borrow at rate2
         midnight.setObligationContinuousFee(id, rate2);
 
         deal(address(loanToken), otherLender, debt2);
@@ -221,7 +219,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 blendedRemaining = midnight.pendingFee(id, borrower);
         assertApproxEqAbs(blendedRemaining, remaining1 + expectedAdded, 1, "remaining blended");
 
-        // Accrue on blended remaining
+        // Accrue on both
         vm.warp(block.timestamp + elapsed);
         midnight.repay(obligation, 0, borrower);
 
@@ -245,8 +243,6 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.pendingFee(id, borrower), 0, "remaining is 0 at maturity");
     }
 
-    // --- 3. Exit (repay + take) ---
-
     function testExitViaRepay(uint256 debt, uint256 exitAmount, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         debt = bound(debt, 1, MAX_DEBT);
         feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
@@ -257,7 +253,7 @@ contract ContinuousFeeTest is BaseTest {
 
         vm.warp(block.timestamp + elapsed);
 
-        // Compute post-accrual state
+        // Compute state after accrual
         uint256 remaining = midnight.pendingFee(id, borrower);
         uint256 feeUnits = remaining.mulDivDown(elapsed, ttm);
         uint256 debtAfterAccrual = debt + feeUnits;
@@ -278,8 +274,6 @@ contract ContinuousFeeTest is BaseTest {
         }
     }
 
-    // --- 3b. Liquidation Exit ---
-
     function testExitViaLiquidation(uint256 debt, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         debt = bound(debt, 1e18, MAX_DEBT);
         feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
@@ -288,11 +282,11 @@ contract ContinuousFeeTest is BaseTest {
 
         setupBorrower(debt, feeRate, ttm);
 
-        // Make liquidatable: drop price so maxDebt < debt
+        // Make liquidatabl
         oracle1.setPrice(ORACLE_PRICE_SCALE / 4);
         vm.warp(block.timestamp + elapsed);
 
-        // Compute expected post-accrual state
+        // Compute expected state after accrual
         uint256 remaining = midnight.pendingFee(id, borrower);
         uint256 feeUnits = remaining.mulDivDown(elapsed, ttm);
         uint256 debtAfterAccrual = debt + feeUnits;
@@ -310,8 +304,6 @@ contract ContinuousFeeTest is BaseTest {
             assertApproxEqAbs(midnight.pendingFee(id, borrower), expectedRemaining, 1, "remaining after liquidation");
         }
     }
-
-    // --- 5. Fee Shares ---
 
     function testFeeSharesMintedToRecipient(uint256 debt, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         debt = bound(debt, 1e18, MAX_DEBT);
@@ -335,8 +327,6 @@ contract ContinuousFeeTest is BaseTest {
             assertEq(midnight.sharesOf(id, feeRecipient), expectedShares, "fee recipient shares");
         }
     }
-
-    // --- 6. Per-User Rate Lock-In ---
 
     function testPerUserRateLockIn(
         uint256 debt1,
@@ -382,8 +372,6 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(fee2, remaining2.mulDivDown(elapsed, ttm), "borrower2 fee from rate2");
     }
 
-    // --- 8. Integration ---
-
     function testFeesCanMakePositionLiquidatable() public {
         uint256 debt = 100e18;
         uint256 ttm = 360 days;
@@ -392,7 +380,7 @@ contract ContinuousFeeTest is BaseTest {
 
         uint256 snap = vm.snapshotState();
 
-        // Without fee: borrow at boundary, warp, not liquidatable
+        // Without fee: borrow, warp, not liquidatable
         collateralize(obligation, borrower, debt);
         setupObligation(obligation, debt);
         vm.warp(block.timestamp + 180 days);
@@ -402,7 +390,7 @@ contract ContinuousFeeTest is BaseTest {
 
         vm.revertToState(snap);
 
-        // With fee: same setup, same warp, liquidatable
+        // With fee: same setup, liquidatable
         midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
         collateralize(obligation, borrower, debt);
         setupObligation(obligation, debt);
@@ -411,7 +399,22 @@ contract ContinuousFeeTest is BaseTest {
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
-    // --- 9. Admin ---
+    function testIsHealthyAccountsForPendingFee() public {
+        uint256 debt = 100e18;
+        uint256 ttm = 360 days;
+
+        obligation.maturity = block.timestamp + ttm;
+        id = toId(obligation);
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
+        collateralize(obligation, borrower, debt);
+        setupObligation(obligation, debt);
+
+        assertTrue(midnight.isHealthy(obligation, id, borrower), "healthy at entry");
+
+        vm.warp(block.timestamp + 180 days);
+
+        assertFalse(midnight.isHealthy(obligation, id, borrower), "unhealthy from pending fee");
+    }
 
     function testSetContinuousFeeOnlyFeeSetter(address rdm) public {
         vm.assume(rdm != address(this));

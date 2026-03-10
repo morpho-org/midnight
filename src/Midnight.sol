@@ -69,7 +69,7 @@ contract Midnight is IMidnight {
     /// @dev Whether an address is authorized to manage positions on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
-    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later updated by the
+    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overriden by the
     /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
 
@@ -238,11 +238,12 @@ contract Midnight is IMidnight {
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
         // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
         // used to discriminate, as the remaining two cases do not change total units and total shares.
-        uint256 obligationUnits = buyerIsLender
-            ? obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1)
-            : obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        uint256 buyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-        uint256 sellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        uint256 unitsDown =
+            obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 unitsUp = obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
+        uint256 obligationUnits = buyerIsLender ? unitsUp : unitsDown;
+        uint256 buyerAssets = offer.buy ? unitsDown.mulDivDown(buyerPrice, WAD) : unitsUp.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets = offer.buy ? unitsDown.mulDivDown(sellerPrice, WAD) : unitsUp.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed;
         if (offer.obligationUnits > 0) {
@@ -371,6 +372,7 @@ contract Midnight is IMidnight {
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
         accrueContinuousFee(id, onBehalf, obligation.maturity);
@@ -379,7 +381,7 @@ contract Midnight is IMidnight {
         if (_repayState.debt > 0) {
             _repayState.pendingFee -= uint128(_repayState.pendingFee.mulDivDown(obligationUnits, _repayState.debt));
         }
-        _repayState.debt -= UtilsLib.toUint128(obligationUnits);
+        _state.debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
@@ -447,7 +449,7 @@ contract Midnight is IMidnight {
     /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
     /// TIME_TO_MAX_LIF.
-    /// @dev Liquidations non zero amounts revert if LLTV = 1.
+    /// @dev Liquidating non zero amounts reverts if LLTV = 1.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
@@ -545,25 +547,28 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
-    function setConsumed(bytes32 group, uint256 amount) external {
-        require(amount >= consumed[msg.sender][group], "consumed");
+    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        require(amount >= consumed[onBehalf][group], "consumed");
 
-        consumed[msg.sender][group] = amount;
+        consumed[onBehalf][group] = amount;
 
-        emit EventsLib.SetConsumed(msg.sender, group, amount);
+        emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
     }
 
     /// @dev TODO: is it safe enough?
-    function shuffleSession() external {
-        bytes32 newSession = keccak256(abi.encode(session[msg.sender], blockhash(block.number - 1)));
-        session[msg.sender] = newSession;
+    function shuffleSession(address onBehalf) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        bytes32 newSession = keccak256(abi.encode(session[onBehalf], blockhash(block.number - 1)));
+        session[onBehalf] = newSession;
 
-        emit EventsLib.ShuffleSession(msg.sender, newSession);
+        emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
-    function setIsAuthorized(address authorized, bool newIsAuthorized) external {
-        isAuthorized[msg.sender][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized);
+    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        isAuthorized[onBehalf][authorized] = newIsAuthorized;
+        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
@@ -664,7 +669,7 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
-        uint256 debt = _borrowerState.debt;
+        uint256 debt = _borrowerState.debt + pendingContinuousFee(id, borrower, obligation.maturity);
         uint256 maxDebt;
         uint256 bitmap = _borrowerState.activatedCollaterals;
         while (maxDebt < debt && bitmap != 0) {
@@ -676,6 +681,15 @@ contract Midnight is IMidnight {
             bitmap ^= (1 << i);
         }
         return maxDebt >= debt;
+    }
+
+    function pendingContinuousFee(bytes32 id, address borrower, uint256 maturity) public view returns (uint256) {
+        BorrowerState storage _state = borrowerState[id][borrower];
+        uint128 remaining = _state.pendingFee;
+        if (remaining == 0 || _state.lastContinuousFeeAccrual == 0) return 0;
+        if (block.timestamp >= maturity) return remaining;
+        uint256 elapsed = block.timestamp - _state.lastContinuousFeeAccrual;
+        return remaining.mulDivDown(elapsed, maturity - _state.lastContinuousFeeAccrual);
     }
 
     function domainSeparator() internal view returns (bytes32) {
@@ -716,7 +730,7 @@ contract Midnight is IMidnight {
             }
         }
 
-        _state.lastContinuousFeeAccrual = uint48(block.timestamp);
+        borrowerState[id][borrower].lastContinuousFeeAccrual = uint48(block.timestamp);
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
