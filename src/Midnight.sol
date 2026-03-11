@@ -266,6 +266,9 @@ contract Midnight is IMidnight {
             remainingFeeShares[id][buyer] += newFeeShares;
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
+            uint256 lostFeeShares = remainingFeeShares[id][seller].mulDivDown(obligationShares, sharesOf[id][seller]);
+            remainingFeeShares[id][seller] -= lostFeeShares;
+
             sharesOf[id][buyer] += obligationShares;
             sharesOf[id][seller] -= obligationShares;
 
@@ -273,22 +276,19 @@ contract Midnight is IMidnight {
             uint256 newFeeShares = UtilsLib.toUint128(obligationShares)
                 .mulDivDown(continuousFee * (offer.obligation.maturity.zeroFloorSub(block.timestamp)), WAD);
             remainingFeeShares[id][buyer] += newFeeShares;
-            remainingFeeShares[id][seller] -= newFeeShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
         } else {
             // Borrower exits + lender exits.
+            uint256 lostFeeShares = remainingFeeShares[id][seller].mulDivDown(obligationShares, sharesOf[id][seller]);
+            remainingFeeShares[id][seller] -= lostFeeShares;
+
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
             sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
-
-            uint256 continuousFee = _obligationState.continuousFee;
-            uint256 newFeeShares = UtilsLib.toUint128(obligationShares)
-                .mulDivDown(continuousFee * (offer.obligation.maturity.zeroFloorSub(block.timestamp)), WAD);
-            remainingFeeShares[id][seller] -= newFeeShares;
         }
 
         emit EventsLib.Take(
@@ -354,6 +354,7 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+
         accrueContinuousFee(id, onBehalf, obligation.maturity);
 
         if (obligationUnits > 0) {
@@ -361,6 +362,8 @@ contract Midnight is IMidnight {
         } else {
             obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         }
+        uint256 lostFeeShares = remainingFeeShares[id][onBehalf].mulDivDown(shares, sharesOf[id][onBehalf]);
+        remainingFeeShares[id][onBehalf] -= lostFeeShares;
 
         sharesOf[id][onBehalf] -= shares;
         _obligationState.withdrawable -= obligationUnits;
