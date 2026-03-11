@@ -22,7 +22,7 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-definition liquidationAccruesNoFee(bytes32 id, address borrower, uint256 blockTimestamp, uint256 maturity) returns bool = currentContract.borrowerState[id][borrower].pendingFee == 0 || currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual == 0 || (blockTimestamp < maturity && blockTimestamp == currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual);
+definition liquidationAccruesNoFee(bytes32 id, address borrower, uint256 blockTimestamp, uint256 maturity) returns bool = currentContract.borrowerState[id][borrower].debtAtMaturity == currentContract.borrowerState[id][borrower].debt || currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual == 0 || (blockTimestamp < maturity && blockTimestamp == currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual);
 
 // Check the ratio of units over shares is below or equal to 1.
 strong invariant sharePriceBelowOrEqOne(bytes32 id)

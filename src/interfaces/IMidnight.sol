@@ -44,7 +44,7 @@ struct Signature {
 struct BorrowerState {
     uint128 debt;
     uint128 activatedCollaterals;
-    uint128 pendingFee;
+    uint128 debtAtMaturity;
     uint48 lastContinuousFeeAccrual;
 }
 
