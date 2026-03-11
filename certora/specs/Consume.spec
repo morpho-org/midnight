@@ -81,16 +81,17 @@ rule takeConsumedAtMaxUnchanged(env e, uint256 obligationShares, address taker, 
     assert consumedBefore >= maxAmount => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
-/// A fully-consumed offer always reverts when the take input is non-zero in the offer's consumption dimension.
+/// A fully-consumed offer in shares (rest. in units) only allows no-ops in shares (rest. in units).
 rule fullyConsumedOfferRevertsOnNonTrivialTake(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
     bytes32 id = toId(e, offer.obligation);
 
-    require obligationShares > 0, "take input is non-zero in the offers consumption dimension";
     require (offer.obligationUnits > 0 && consumedBefore >= offer.obligationUnits) || (offer.obligationShares > 0 && consumedBefore >= offer.obligationShares), "assume the offer is fully consumed";
-    require offer.obligationUnits > 0 => to_mathint(obligationShares) * (to_mathint(totalUnits(id)) + 1) >= to_mathint(totalShares(id)) + 1, "when consumption is units-based, ensure not rounded down to 0";
 
-    take@withrevert(e, obligationShares, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 returnedUnits;
+    _, _, returnedUnits, _ = take(e, obligationShares, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert lastReverted;
+    // If take does not revert, its input has to be zero in the offer's consumption dimension.
+    assert offer.obligationUnits > 0 => returnedUnits == 0;
+    assert offer.obligationShares > 0 => obligationShares == 0;
 }
