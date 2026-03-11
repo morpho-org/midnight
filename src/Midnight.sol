@@ -256,6 +256,7 @@ contract Midnight is IMidnight {
         if (!buyerIsLender) {
             accrueContinuousFee(id, buyer, offer.obligation.maturity);
             BorrowerState storage _buyerState = borrowerState[id][buyer];
+            // forge-lint: disable-next-item(unsafe-typecast)
             _buyerState.debtAtMaturity -= uint128(
                 _buyerState.debtAtMaturity.mulDivUp(obligationUnits, _buyerState.debt)
             );
@@ -263,6 +264,7 @@ contract Midnight is IMidnight {
 
         if (sellerIsBorrower) {
             accrueContinuousFee(id, seller, offer.obligation.maturity);
+            // forge-lint: disable-next-item(unsafe-typecast)
             borrowerState[id][seller].debtAtMaturity += uint128(
                 obligationUnits + _obligationState.continuousFee.mulDivDown(obligationUnits * timeToMaturity, WAD)
             );
