@@ -140,7 +140,7 @@ contract SettersTest is BaseTest {
         midnight.setFeeRecipient(makeAddr("newRecipient"));
     }
 
-    function testSetContinuousFeeOnlyFeeSetter(address notFeeSetter, bytes20 id) public {
+    function testSetContinuousFeeOnlyFeeSetter(address notFeeSetter, bytes32 id) public {
         vm.assume(notFeeSetter != address(this));
 
         vm.prank(notFeeSetter);
@@ -148,7 +148,7 @@ contract SettersTest is BaseTest {
         midnight.setObligationContinuousFee(id, 0.01e18);
     }
 
-    function testContinuousFeeCannotIncrease(uint256 continuousFee, bytes20 id) public {
+    function testContinuousFeeCannotIncrease(uint256 continuousFee, bytes32 id) public {
         continuousFee = bound(continuousFee, 1, MAX_CONTINUOUS_FEE * 100);
 
         vm.expectRevert("Continuous fee can only decrease");

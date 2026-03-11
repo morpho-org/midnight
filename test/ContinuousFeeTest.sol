@@ -229,4 +229,55 @@ contract ContinuousFeeTest is BaseTest {
             recipientSharesAfter3, recipientSharesAfter2 + expectedShares3, "recipient should receive third accrual"
         );
     }
+
+    function testNoFeeAccrualAfterMaturity(uint256 initialShares, uint256 fee) public {
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
+        fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
+
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
+
+        collateralize(obligation, borrower, initialShares);
+        take(initialShares, borrower, lenderOffer);
+
+        // Warp to maturity, accrue all fees.
+        vm.warp(obligation.maturity);
+        take(0, borrower, lenderOffer);
+
+        uint256 totalSharesAtMaturity = midnight.totalShares(id);
+        uint256 recipientSharesAtMaturity = midnight.sharesOf(id, feeRecipient);
+
+        // Warp well past maturity (but within offer expiry).
+        vm.warp(obligation.maturity + 30 days);
+        take(0, borrower, lenderOffer);
+
+        assertEq(midnight.totalShares(id), totalSharesAtMaturity, "no new shares should be minted after maturity");
+        assertEq(
+            midnight.sharesOf(id, feeRecipient),
+            recipientSharesAtMaturity,
+            "recipient should not receive shares after maturity"
+        );
+    }
+
+    function testFeeAccrualCappedAtMaturity(uint256 initialShares, uint256 fee) public {
+        initialShares = bound(initialShares, 1e18, MAX_TEST_AMOUNT / 2);
+        fee = bound(fee, MAX_CONTINUOUS_FEE / 100, MAX_CONTINUOUS_FEE);
+
+        midnight.setDefaultContinuousFee(address(loanToken), fee);
+
+        collateralize(obligation, borrower, initialShares);
+        take(initialShares, borrower, lenderOffer);
+
+        uint256 totalSharesBefore = midnight.totalShares(id);
+        uint256 lastUpdateBefore = midnight.lastUpdate(id);
+
+        // Warp past maturity in a single step — fees should only accrue up to maturity.
+        vm.warp(obligation.maturity + 30 days);
+        take(0, borrower, lenderOffer);
+
+        uint256 effectiveElapsed = obligation.maturity - lastUpdateBefore;
+        uint256 expectedShares =
+            totalSharesBefore.mulDivDown(WAD.mulDivDown(WAD, WAD - fee * effectiveElapsed) - WAD, WAD);
+
+        assertEq(midnight.totalShares(id), totalSharesBefore + expectedShares, "fees should only accrue up to maturity");
+    }
 }

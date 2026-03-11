@@ -150,11 +150,11 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Overrides the continuous fee of a specific obligation. Can only decrease the fee.
+    /// @dev Does not accrue fees before updating. The fee change takes effect from the next accrual.
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "Only feeSetter");
         require(newContinuousFee <= obligationState[id].continuousFee, "Continuous fee can only decrease");
         require(obligationState[id].created, "obligation not created");
-        accrueContinuousFees(id);
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= 317097919 < type(uint64).max
         obligationState[id].continuousFee = uint64(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
@@ -199,7 +199,7 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        accrueContinuousFees(id);
+        accrueContinuousFees(offer.obligation, id);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -341,7 +341,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
-        accrueContinuousFees(id);
+        accrueContinuousFees(obligation, id);
         ObligationState storage _obligationState = obligationState[id];
 
         if (obligationUnits > 0) {
@@ -563,9 +563,12 @@ contract Midnight is IMidnight {
     /// @dev We want sharePrice' = sharePrice * (1 - f*t), so totalShares' = totalShares / (1 - f*t). So feeShares =
     /// totalShares * (1/(1 - f*t) - 1).
     /// @dev Obligations' time to maturity must not exceed 100 years.
-    function accrueContinuousFees(bytes32 id) internal {
+    /// @dev Fees do not accrue after the obligation's maturity. This means lenders can estimate their withdrawable
+    /// units at maturity: once the last accrual before maturity is processed, the share price is fixed.
+    function accrueContinuousFees(Obligation memory obligation, bytes32 id) internal {
         uint256 feeShares;
-        uint256 elapsed = block.timestamp - obligationState[id].lastUpdate;
+        uint256 end = UtilsLib.min(block.timestamp, obligation.maturity);
+        uint256 elapsed = UtilsLib.zeroFloorSub(end, obligationState[id].lastUpdate);
         uint256 _continuousFee = obligationState[id].continuousFee;
         if (elapsed > 0 && _continuousFee > 0 && borrowerState[id][feeRecipient].debt == 0) {
             feeShares = obligationState[id].totalShares
