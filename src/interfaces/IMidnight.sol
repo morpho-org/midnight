@@ -51,7 +51,8 @@ struct ObligationState {
     uint128 totalShares;
     uint256 withdrawable;
     bool created;
-    uint16[7] fees;
+    uint16[7] tradingFees;
+    uint128 continuousFee;
 }
 
 interface IMidnight {}

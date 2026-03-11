@@ -16,7 +16,8 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    MAX_CONTINUOUS_FEE
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -51,6 +52,8 @@ contract Midnight is IMidnight {
     /// STORAGE ///
 
     mapping(bytes32 id => mapping(address user => uint256)) public sharesOf;
+    mapping(bytes32 id => mapping(address user => uint256)) public remainingFeeShares;
+    mapping(bytes32 id => mapping(address user => uint256)) public lastFeeUpdate;
     mapping(bytes32 id => mapping(address user => BorrowerState)) public borrowerState;
     mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
@@ -68,9 +71,13 @@ contract Midnight is IMidnight {
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
     /// @dev Default fees per loan token. Set when the obligation is created. Can be later overridden by the feeSetter.
-    mapping(address loanToken => uint16[7]) public defaultFees;
+    mapping(address loanToken => uint16[7]) public defaultTradingFees;
 
-    address public tradingFeeRecipient;
+    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overridden by the
+    /// feeSetter.
+    mapping(address loanToken => uint128) public defaultContinuousFee;
+
+    address public feeRecipient;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -120,7 +127,7 @@ contract Midnight is IMidnight {
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         require(obligationState[id].created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
-        obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
+        obligationState[id].tradingFees[index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -131,14 +138,29 @@ contract Midnight is IMidnight {
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee is less than maxTradingFee
-        defaultFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
+        defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    function setTradingFeeRecipient(address feeRecipient) external {
+    function setObligationContinuousFee(bytes32 id, uint256 continuousFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        require(continuousFee <= MAX_CONTINUOUS_FEE, "value too high");
+        require(obligationState[id].created, "obligation not created");
+        obligationState[id].continuousFee = UtilsLib.toUint128(continuousFee);
+        emit EventsLib.SetObligationContinuousFee(id, continuousFee);
+    }
+
+    function setDefaultContinuousFee(address loanToken, uint256 continuousFee) external {
+        require(msg.sender == feeSetter, "only fee setter");
+        require(continuousFee <= MAX_CONTINUOUS_FEE, "value too high");
+        defaultContinuousFee[loanToken] = UtilsLib.toUint128(continuousFee);
+        emit EventsLib.SetDefaultContinuousFee(loanToken, continuousFee);
+    }
+
+    function setFeeRecipient(address newFeeRecipient) external {
         require(msg.sender == owner, "only owner");
-        tradingFeeRecipient = feeRecipient;
-        emit EventsLib.SetTradingFeeRecipient(feeRecipient);
+        feeRecipient = newFeeRecipient;
+        emit EventsLib.SetFeeRecipient(newFeeRecipient);
     }
 
     /// ENTRY-POINTS ///
@@ -228,16 +250,30 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.obligationShares, "consumed");
         }
 
+        accrueContinuousFee(id, buyer, offer.obligation.maturity);
+        accrueContinuousFee(id, seller, offer.obligation.maturity);
+
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
+
+            uint256 continuousFee = _obligationState.continuousFee;
+            uint256 newFeeShares = UtilsLib.toUint128(obligationShares)
+                .mulDivDown(continuousFee * (offer.obligation.maturity.zeroFloorSub(block.timestamp)), WAD);
+            remainingFeeShares[id][buyer] += newFeeShares;
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
             sharesOf[id][buyer] += obligationShares;
             sharesOf[id][seller] -= obligationShares;
+
+            uint256 continuousFee = _obligationState.continuousFee;
+            uint256 newFeeShares = UtilsLib.toUint128(obligationShares)
+                .mulDivDown(continuousFee * (offer.obligation.maturity.zeroFloorSub(block.timestamp)), WAD);
+            remainingFeeShares[id][buyer] += newFeeShares;
+            remainingFeeShares[id][seller] -= newFeeShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
@@ -248,6 +284,11 @@ contract Midnight is IMidnight {
             sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
+
+            uint256 continuousFee = _obligationState.continuousFee;
+            uint256 newFeeShares = UtilsLib.toUint128(obligationShares)
+                .mulDivDown(continuousFee * (offer.obligation.maturity.zeroFloorSub(block.timestamp)), WAD);
+            remainingFeeShares[id][seller] -= newFeeShares;
         }
 
         emit EventsLib.Take(
@@ -280,9 +321,7 @@ contract Midnight is IMidnight {
                 );
         }
 
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
-        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -315,6 +354,7 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        accrueContinuousFee(id, onBehalf, obligation.maturity);
 
         if (obligationUnits > 0) {
             shares = obligationUnits.mulDivUp(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
@@ -552,12 +592,38 @@ contract Midnight is IMidnight {
             }
 
             obligationState[id].created = true;
-            obligationState[id].fees = defaultFees[obligation.loanToken];
+            obligationState[id].tradingFees = defaultTradingFees[obligation.loanToken];
+            obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
         return id;
+    }
+
+    function pendingContinuousFee(bytes32 id, address user, uint256 maturity) internal view returns (uint256) {
+        uint256 _lastFeeUpdate = lastFeeUpdate[id][user];
+        if (_lastFeeUpdate == 0 || _lastFeeUpdate >= maturity) {
+            return 0;
+        } else {
+            return remainingFeeShares[id][user].mulDivDown(
+                UtilsLib.min(block.timestamp, maturity) - _lastFeeUpdate, maturity - _lastFeeUpdate
+            );
+        }
+    }
+
+    function accrueContinuousFee(bytes32 id, address user, uint256 maturity) internal {
+        uint256 realizedContinuousFee = pendingContinuousFee(id, user, maturity);
+
+        if (realizedContinuousFee > 0) {
+            remainingFeeShares[id][user] -= realizedContinuousFee;
+            sharesOf[id][user] -= realizedContinuousFee;
+            sharesOf[id][feeRecipient] += realizedContinuousFee;
+        }
+
+        lastFeeUpdate[id][user] = block.timestamp;
+
+        emit EventsLib.AccrueContinuousFees(id, user, realizedContinuousFee);
     }
 
     /// VIEW FUNCTIONS ///
@@ -598,8 +664,8 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
-    function fees(bytes32 id) external view returns (uint16[7] memory) {
-        return obligationState[id].fees;
+    function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
+        return obligationState[id].tradingFees;
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
@@ -645,7 +711,7 @@ contract Midnight is IMidnight {
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         require(obligationState[id].created, "not created");
 
-        uint16[7] memory _fees = obligationState[id].fees;
+        uint16[7] memory _fees = obligationState[id].tradingFees;
 
         if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
 

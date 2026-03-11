@@ -12,3 +12,4 @@ uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
 uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
+uint256 constant MAX_CONTINUOUS_FEE = uint256(0.01e18) / uint256(365 days);
