@@ -24,6 +24,9 @@ persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
     /* floor bound: (floor(a*b/d) + 1) * d > a*b -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
 
+    /* floor upper bound: floor(a*b/d) * d <= a*b -- proved in MulDiv.spec */
+    axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivDownM(a, b, d) * d <= a * b;
+
     /* floor ratio: floor(a*b/d) >= a when b >= d -- in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= d && d > 0 => summaryMulDivDownM(a, b, d) >= a;
 }
@@ -34,6 +37,9 @@ persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint {
 
     /* ceil upper bound: ceil(a*b/d) * d < a*b + d -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) * d < a * b + d;
+
+    /* ceil lower bound: ceil(a*b/d) * d >= a*b -- proved in MulDiv.spec */
+    axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) * d >= a * b;
 
     /* ceil ratio: ceil(a*b/d) <= a when 0 < b <= d -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && 0 < b && b <= d => summaryMulDivUpM(a, b, d) <= a;
@@ -81,4 +87,42 @@ rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation,
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
     assert to_mathint(seizedResult) * price + ORACLE_PRICE_SCALE() > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
+}
+
+/// Liquidation profit is bounded by maxLif (repaidUnits input)
+rule liquidationProfitBounded_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
+    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    require maxLif >= WAD();
+    require repaidUnits > 0;
+
+    // reduce callback path exploration
+    require data.length == 0;
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
+
+    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+
+    assert to_mathint(seizedResult) * price * WAD() <= to_mathint(repaidResult) * ORACLE_PRICE_SCALE() * maxLif;
+}
+
+/// Liquidation profit is bounded by maxLif (seizedAssets input)
+rule liquidationProfitBounded_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
+    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    require maxLif >= WAD();
+    require seizedAssets > 0;
+
+    // reduce callback path exploration
+    require data.length == 0;
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
+
+    require repaidResult > 0;
+
+    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+
+    assert to_mathint(seizedResult) * price * WAD() <= to_mathint(repaidResult) * ORACLE_PRICE_SCALE() * maxLif;
 }
