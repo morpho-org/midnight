@@ -240,7 +240,6 @@ contract Midnight is IMidnight {
         accrueLenderFee(id, buyer, offer.obligation.maturity);
         accrueLenderFee(id, seller, offer.obligation.maturity);
 
-
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
 
@@ -283,8 +282,9 @@ contract Midnight is IMidnight {
             LenderState storage _sellerLenderState = lenderState[id][seller];
             uint256 sellerShares = sharesOf[id][seller];
             if (sellerShares > 0) {
-                _sellerLenderState.pendingFeeShares -=
-                    uint128(_sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares));
+                _sellerLenderState.pendingFeeShares -= uint128(
+                    _sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares)
+                );
             }
             sharesOf[id][seller] -= obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
@@ -297,8 +297,9 @@ contract Midnight is IMidnight {
             LenderState storage _sellerLenderState = lenderState[id][seller];
             uint256 sellerShares = sharesOf[id][seller];
             if (sellerShares > 0) {
-                _sellerLenderState.pendingFeeShares -=
-                    uint128(_sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares));
+                _sellerLenderState.pendingFeeShares -= uint128(
+                    _sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares)
+                );
             }
             sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
