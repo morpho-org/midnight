@@ -73,7 +73,7 @@ contract Midnight is IMidnight {
     /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultFees;
 
-    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later updated by the
+    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overriden by the
     /// feeSetter.
     mapping(address loanToken => uint64) public defaultContinuousFee;
 
@@ -618,6 +618,7 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Obligation));
     }
 
+    /// @dev Returns the borrower's debt (last accrued, does not include pending unaccrued interest).
     function debtOf(bytes32 id, address user) external view returns (uint256) {
         return borrowerState[id][user].debt;
     }
@@ -698,14 +699,18 @@ contract Midnight is IMidnight {
         return tentativeSigner;
     }
 
+    /// CONTINUOUS FEE ACCRUAL ///
+
+    /// @dev Accrues a borrower's continuous fee up to now or until maturity.
+    /// @dev The pending fee is computed from the borrower's debt and averageFee.
+    /// @dev Increases the borrower's debt and mints corresponding shares to the feeRecipient.
     function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal {
         BorrowerState storage _state = borrowerState[id][borrower];
         uint128 feeUnits = UtilsLib.toUint128(pendingContinuousFee(id, borrower, maturity));
         if (feeUnits > 0) {
-            uint256 debt = _state.debt;
             ObligationState storage _obligationState = obligationState[id];
             uint256 feeShares = feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
-            _state.averageFee = uint64(_state.averageFee.mulDivDown(debt, debt + feeUnits));
+            _state.averageFee = uint64(_state.averageFee.mulDivDown(_state.debt, _state.debt + feeUnits));
             _state.debt += feeUnits;
             _obligationState.totalUnits += feeUnits;
             sharesOf[id][feeRecipient] += feeShares;
