@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, ORACLE_PRICE_SCALE, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, MAX_CONTINUOUS_FEE, PASSIVE_FEE_RECIPIENT} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
@@ -324,7 +324,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 feeUnits = remaining.mulDivDown(elapsed, ttm);
         if (feeUnits > 0) {
             uint256 expectedShares = feeUnits.mulDivDown(totalSharesBefore + 1, totalUnitsBefore + 1);
-            assertEq(midnight.sharesOf(id, feeRecipient), expectedShares, "fee recipient shares");
+            assertEq(midnight.sharesOf(id, PASSIVE_FEE_RECIPIENT), expectedShares, "fee recipient shares");
         }
     }
 
@@ -460,12 +460,9 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.continuousFee(id), fee, "obligation fee updated");
     }
 
-    function testFeeSharesStayWithOldRecipientAfterRecipientChange(
-        uint256 debt,
-        uint256 feeRate,
-        uint256 ttm,
-        uint256 elapsed
-    ) public {
+    function testFeeSharesRetrievableAfterRecipientChange(uint256 debt, uint256 feeRate, uint256 ttm, uint256 elapsed)
+        public
+    {
         debt = bound(debt, 1e18, MAX_DEBT);
         feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
@@ -478,7 +475,7 @@ contract ContinuousFeeTest is BaseTest {
         // Accrue fees
         vm.warp(block.timestamp + elapsed);
         midnight.repay(obligation, 0, borrower);
-        uint256 feeShares = midnight.sharesOf(id, feeRecipient);
+        uint256 feeShares = midnight.sharesOf(id, PASSIVE_FEE_RECIPIENT);
         vm.assume(feeShares > 0);
 
         // Repay all debt so withdrawable is filled
@@ -490,14 +487,13 @@ contract ContinuousFeeTest is BaseTest {
         address newRecipient = makeAddr("newFeeRecipient");
         midnight.setFeeRecipient(newRecipient);
 
-        // Previously accrued shares stay with the old recipient.
-        vm.prank(feeRecipient);
-        (uint256 units,) = midnight.withdraw(obligation, 0, feeShares, feeRecipient, feeRecipient);
+        // New recipient can withdraw the fee shares
+        vm.prank(newRecipient);
+        (uint256 units,) = midnight.withdraw(obligation, 0, feeShares, PASSIVE_FEE_RECIPIENT, newRecipient);
 
-        assertGt(units, 0, "old recipient got assets");
-        assertEq(midnight.sharesOf(id, feeRecipient), 0, "old recipient shares drained");
-        assertEq(midnight.sharesOf(id, newRecipient), 0, "new recipient has no past shares");
-        assertEq(loanToken.balanceOf(feeRecipient), units, "assets received");
+        assertGt(units, 0, "new recipient got assets");
+        assertEq(midnight.sharesOf(id, PASSIVE_FEE_RECIPIENT), 0, "passive shares drained");
+        assertEq(loanToken.balanceOf(newRecipient), units, "assets received");
     }
 
     function testRateChangeDoesNotAffectExistingBorrower(
