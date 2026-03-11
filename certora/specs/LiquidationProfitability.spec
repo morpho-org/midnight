@@ -21,10 +21,10 @@ persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
     /* mulDiv always returns an unsigned integer */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivDownM(a, b, d) >= 0;
 
-    /* floor bound: (floor(a*b/d) + 1) * d > a*b -- should be proved in MulDiv.spec */
+    /* floor bound: (floor(a*b/d) + 1) * d > a*b -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
 
-    /* floor ratio: floor(a*b/d) >= a when b >= d -- should be proved in MulDiv.spec */
+    /* floor ratio: floor(a*b/d) >= a when b >= d -- in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= d && d > 0 => summaryMulDivDownM(a, b, d) >= a;
 }
 
@@ -32,10 +32,10 @@ persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint {
     /* mulDiv always returns an unsigned integer */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) >= 0;
 
-    /* ceil upper bound: ceil(a*b/d) * d < a*b + d -- should be proved in MulDiv.spec */
+    /* ceil upper bound: ceil(a*b/d) * d < a*b + d -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) * d < a * b + d;
 
-    /* ceil ratio: ceil(a*b/d) <= a when 0 < b <= d -- should be proved in MulDiv.spec */
+    /* ceil ratio: ceil(a*b/d) <= a when 0 < b <= d -- proved in MulDiv.spec */
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && 0 < b && b <= d => summaryMulDivUpM(a, b, d) <= a;
 }
 
