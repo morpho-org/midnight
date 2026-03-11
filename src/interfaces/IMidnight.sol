@@ -46,12 +46,16 @@ struct BorrowerState {
     uint128 activatedCollaterals;
 }
 
+struct LenderState {
+    uint128 pendingFeeShares;
+    uint48 lastContinuousFeeAccrual;
+}
+
 struct ObligationState {
     uint128 totalUnits;
     uint128 totalShares;
     uint256 withdrawable;
     bool created;
-    uint56 lastUpdate;
     uint16[7] fees;
     uint64 continuousFee;
 }

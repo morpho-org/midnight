@@ -26,6 +26,7 @@ import {
     Signature,
     Collateral,
     BorrowerState,
+    LenderState,
     ObligationState
 } from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
@@ -52,6 +53,7 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => uint256)) public sharesOf;
     mapping(bytes32 id => mapping(address user => BorrowerState)) public borrowerState;
+    mapping(bytes32 id => mapping(address user => LenderState)) public lenderState;
     mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
 
@@ -199,7 +201,6 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        accrueContinuousFees(offer.obligation, id);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -236,8 +237,13 @@ contract Midnight is IMidnight {
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
 
+        accrueLenderFee(id, buyer, offer.obligation.maturity);
+        accrueLenderFee(id, seller, offer.obligation.maturity);
+
+
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
+
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
         // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
         // used to discriminate, as the remaining two cases do not change total units and total shares.
@@ -260,12 +266,26 @@ contract Midnight is IMidnight {
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
             sharesOf[id][buyer] += obligationShares;
+            LenderState storage _buyerLenderState = lenderState[id][buyer];
+            _buyerLenderState.pendingFeeShares += UtilsLib.toUint128(
+                uint256(_obligationState.continuousFee).mulDivDown(obligationShares * timeToMaturity, WAD)
+            );
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
             sharesOf[id][buyer] += obligationShares;
+            LenderState storage _buyerLenderState = lenderState[id][buyer];
+            _buyerLenderState.pendingFeeShares += UtilsLib.toUint128(
+                uint256(_obligationState.continuousFee).mulDivDown(obligationShares * timeToMaturity, WAD)
+            );
+            LenderState storage _sellerLenderState = lenderState[id][seller];
+            uint256 sellerShares = sharesOf[id][seller];
+            if (sellerShares > 0) {
+                _sellerLenderState.pendingFeeShares -=
+                    uint128(_sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares));
+            }
             sharesOf[id][seller] -= obligationShares;
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
@@ -274,6 +294,12 @@ contract Midnight is IMidnight {
         } else {
             // Borrower exits + lender exits.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
+            LenderState storage _sellerLenderState = lenderState[id][seller];
+            uint256 sellerShares = sharesOf[id][seller];
+            if (sellerShares > 0) {
+                _sellerLenderState.pendingFeeShares -=
+                    uint128(_sellerLenderState.pendingFeeShares.mulDivDown(obligationShares, sellerShares));
+            }
             sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
@@ -341,7 +367,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
-        accrueContinuousFees(obligation, id);
+        accrueLenderFee(id, onBehalf, obligation.maturity);
         ObligationState storage _obligationState = obligationState[id];
 
         if (obligationUnits > 0) {
@@ -350,6 +376,11 @@ contract Midnight is IMidnight {
             obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
         }
 
+        LenderState storage _lenderState = lenderState[id][onBehalf];
+        uint256 lenderShares = sharesOf[id][onBehalf];
+        if (lenderShares > 0) {
+            _lenderState.pendingFeeShares -= uint128(_lenderState.pendingFeeShares.mulDivDown(shares, lenderShares));
+        }
         sharesOf[id][onBehalf] -= shares;
         _obligationState.withdrawable -= obligationUnits;
         _obligationState.totalShares -= UtilsLib.toUint128(shares);
@@ -559,24 +590,28 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
-    /// @dev Fees are not accrued if the fee recipient has outstanding debt in this obligation.
-    /// @dev We want sharePrice' = sharePrice * (1 - f*t), so totalShares' = totalShares / (1 - f*t). So feeShares =
-    /// totalShares * (1/(1 - f*t) - 1).
-    /// @dev Obligations' time to maturity must not exceed 100 years.
-    /// @dev Fees do not accrue after the obligation's maturity. This means lenders can estimate their withdrawable
-    /// units at maturity: once the last accrual before maturity is processed, the share price is fixed.
-    function accrueContinuousFees(Obligation memory obligation, bytes32 id) internal {
-        uint256 feeShares;
-        uint256 end = UtilsLib.min(block.timestamp, obligation.maturity);
-        uint256 elapsed = UtilsLib.zeroFloorSub(end, obligationState[id].lastUpdate);
-        uint256 _continuousFee = obligationState[id].continuousFee;
-        if (elapsed > 0 && _continuousFee > 0 && borrowerState[id][feeRecipient].debt == 0) {
-            feeShares = obligationState[id].totalShares
-                .mulDivDown(WAD.mulDivDown(WAD, WAD - _continuousFee * elapsed) - WAD, WAD);
-            obligationState[id].totalShares += UtilsLib.toUint128(feeShares);
-            sharesOf[id][feeRecipient] += UtilsLib.toUint128(feeShares);
+    function pendingContinuousFeeShares(bytes32 id, address lender, uint256 maturity) public view returns (uint256) {
+        LenderState storage _state = lenderState[id][lender];
+        uint256 lastAccrual = _state.lastContinuousFeeAccrual;
+        if (lastAccrual == 0 || maturity <= lastAccrual) {
+            return 0;
+        } else {
+            uint256 accrualEnd = UtilsLib.min(block.timestamp, maturity);
+            return _state.pendingFeeShares.mulDivDown(accrualEnd - lastAccrual, maturity - lastAccrual);
         }
-        obligationState[id].lastUpdate = uint56(block.timestamp);
+    }
+
+    /// @dev Fees are not accrued if the fee recipient has outstanding debt in this obligation.
+    /// @dev Fees do not accrue after the obligation's maturity.
+    function accrueLenderFee(bytes32 id, address lender, uint256 maturity) internal {
+        uint128 feeShares = uint128(pendingContinuousFeeShares(id, lender, maturity));
+        if (feeShares > 0) {
+            LenderState storage _state = lenderState[id][lender];
+            _state.pendingFeeShares -= feeShares;
+            sharesOf[id][lender] -= feeShares;
+            sharesOf[id][feeRecipient] += feeShares;
+        }
+        lenderState[id][lender].lastContinuousFeeAccrual = uint48(block.timestamp);
         emit EventsLib.AccrueContinuousFees(id, feeRecipient, feeShares);
     }
 
@@ -648,16 +683,20 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
-    function lastUpdate(bytes32 id) external view returns (uint256) {
-        return obligationState[id].lastUpdate;
-    }
-
     function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
         return obligationState[id].fees;
     }
 
     function continuousFee(bytes32 id) external view returns (uint64) {
         return obligationState[id].continuousFee;
+    }
+
+    function pendingFeeShares(bytes32 id, address user) external view returns (uint128) {
+        return lenderState[id][user].pendingFeeShares;
+    }
+
+    function lastContinuousFeeAccrual(bytes32 id, address user) external view returns (uint48) {
+        return lenderState[id][user].lastContinuousFeeAccrual;
     }
 
     function fees(bytes32 id) external view returns (uint16[7] memory) {
