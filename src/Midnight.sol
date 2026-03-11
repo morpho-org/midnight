@@ -231,6 +231,9 @@ contract Midnight is IMidnight {
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
 
+        accrueContinuousFee(id, seller, offer.obligation.maturity);
+        accrueContinuousFee(id, buyer, offer.obligation.maturity);
+
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
@@ -252,37 +255,40 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.obligationShares, "consumed");
         }
 
-        if (buyerIsLender) {
-            // Lender enters.
-            sharesOf[id][buyer] += obligationShares;
-        } else {
-            // Borrower exits.
-            accrueContinuousFee(id, buyer);
+        if (!buyerIsLender) {
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
         }
 
         if (sellerIsBorrower) {
             // Borrower enters.
-            accrueContinuousFee(id, seller);
-            if (obligationUnits > 0) {
-                BorrowerState storage _state = borrowerState[id][seller];
-                uint128 oldDebt = _state.debt;
-                uint128 newDebt = oldDebt + UtilsLib.toUint128(obligationUnits);
-                _state.averageContinuousFee = uint64(
-                    _state.averageContinuousFee.mulDivDown(oldDebt, newDebt)
-                        + _obligationState.continuousFee.mulDivDown(obligationUnits, newDebt)
-                );
-                _state.debt = newDebt;
-            }
-        } else {
-            // Lender exits.
-            sharesOf[id][seller] -= obligationShares;
+            BorrowerState storage _state = borrowerState[id][seller];
+            uint128 oldDebt = _state.debt;
+            uint128 newDebt = oldDebt + UtilsLib.toUint128(obligationUnits);
+            _state.averageContinuousFee = uint64(
+                _state.averageContinuousFee.mulDivDown(oldDebt, newDebt)
+                    + _obligationState.continuousFee.mulDivDown(obligationUnits, newDebt)
+            );
+            _state.debt = newDebt;
         }
 
         if (buyerIsLender && sellerIsBorrower) {
+            // Lender enters + borrower enters.
+            sharesOf[id][buyer] += obligationShares;
+            borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
-        } else if (!buyerIsLender && !sellerIsBorrower) {
+        } else if (buyerIsLender && !sellerIsBorrower) {
+            // Lender enters + lender exits.
+            sharesOf[id][buyer] += obligationShares;
+            sharesOf[id][seller] -= obligationShares;
+        } else if (!buyerIsLender && sellerIsBorrower) {
+            // Borrower exits + borrower enters.
+            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
+            borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
+        } else {
+            // Borrower exits + lender exits.
+            borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
+            sharesOf[id][seller] -= obligationShares;
             _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
         }
@@ -373,7 +379,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
-        accrueContinuousFee(id, onBehalf);
+        accrueContinuousFee(id, onBehalf, obligation.maturity);
 
         borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
@@ -418,7 +424,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collaterals[collateralIndex].token;
 
-        accrueContinuousFee(id, onBehalf);
+        accrueContinuousFee(id, onBehalf, obligation.maturity);
 
         uint256 newCollateralOf = collateralOf[id][onBehalf][collateralIndex] - assets;
         collateralOf[id][onBehalf][collateralIndex] = UtilsLib.toUint128(newCollateralOf);
@@ -457,7 +463,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
 
-        accrueContinuousFee(id, borrower);
+        accrueContinuousFee(id, borrower, obligation.maturity);
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
@@ -656,11 +662,22 @@ contract Midnight is IMidnight {
         return borrowerState[id][user].lastContinuousFeeAccrual;
     }
 
+    function pendingContinuousFee(bytes32 id, address borrower, uint256 maturity) public view returns (uint256) {
+        BorrowerState storage _state = borrowerState[id][borrower];
+        uint256 lastAccrual = _state.lastContinuousFeeAccrual;
+        if (lastAccrual == 0 || maturity <= lastAccrual) {
+            return 0;
+        } else {
+            uint256 accrualEnd = UtilsLib.min(block.timestamp, maturity);
+            return (_state.averageContinuousFee * _state.debt).mulDivDown(accrualEnd - lastAccrual, WAD);
+        }
+    }
+
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         BorrowerState storage _borrowerState = borrowerState[id][borrower];
-        uint256 debt = _borrowerState.debt;
+        uint256 debt = _borrowerState.debt + pendingContinuousFee(id, borrower, obligation.maturity);
         uint256 maxDebt;
         uint256 bitmap = _borrowerState.activatedCollaterals;
         while (maxDebt < debt && bitmap != 0) {
@@ -686,28 +703,19 @@ contract Midnight is IMidnight {
         return tentativeSigner;
     }
 
-    function accrueContinuousFee(bytes32 id, address borrower) internal {
+    function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal {
         BorrowerState storage _state = borrowerState[id][borrower];
-        uint256 averageFee = _state.averageContinuousFee;
-
-        if (averageFee > 0 && _state.lastContinuousFeeAccrual > 0) {
+        uint128 feeUnits = UtilsLib.toUint128(pendingContinuousFee(id, borrower, maturity));
+        if (feeUnits > 0) {
+            uint256 averageFee = _state.averageContinuousFee;
             uint256 debt = _state.debt;
-            uint128 feeUnits = UtilsLib.toUint128(
-                (averageFee * debt).mulDivDown(block.timestamp - _state.lastContinuousFeeAccrual, WAD)
-            );
-
-            if (feeUnits > 0) {
-                ObligationState storage _obligationState = obligationState[id];
-                uint256 feeShares =
-                    feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
-                _state.averageContinuousFee = uint64(averageFee.mulDivDown(debt, debt + feeUnits));
-                _state.debt += feeUnits;
-                _obligationState.totalUnits += feeUnits;
-                if (feeShares > 0) {
-                    sharesOf[id][feeRecipient] += feeShares;
-                    _obligationState.totalShares += UtilsLib.toUint128(feeShares);
-                }
-            }
+            ObligationState storage _obligationState = obligationState[id];
+            uint256 feeShares = feeUnits.mulDivDown(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
+            _state.averageContinuousFee = uint64(averageFee.mulDivDown(debt, debt + feeUnits));
+            _state.debt += feeUnits;
+            _obligationState.totalUnits += feeUnits;
+            sharesOf[id][feeRecipient] += feeShares;
+            _obligationState.totalShares += UtilsLib.toUint128(feeShares);
         }
 
         _state.lastContinuousFeeAccrual = uint48(block.timestamp);
