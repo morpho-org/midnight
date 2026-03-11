@@ -8,7 +8,13 @@ import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {MAX_COLLATERALS, MAX_COLLATERALS_PER_BORROWER, WAD} from "../src/libraries/ConstantsLib.sol";
+import {
+    MAX_COLLATERALS,
+    MAX_COLLATERALS_PER_BORROWER,
+    MAX_CONTINUOUS_FEE,
+    PASSIVE_FEE_RECIPIENT,
+    WAD
+} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
@@ -110,6 +116,39 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.withdrawable(id), repaid);
         assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
+    }
+
+    function testContinuousFeeSharesMintToPassiveRecipientAndCanBeWithdrawn() public {
+        address configuredFeeRecipient = makeAddr("configuredFeeRecipient");
+        Obligation memory _obligation = obligation;
+        _obligation.maturity = block.timestamp + 365 days;
+        bytes32 _id = toId(_obligation);
+        uint256 units = 1e18;
+
+        midnight.setFeeRecipient(configuredFeeRecipient);
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
+
+        collateralize(_obligation, borrower, units);
+        setupObligation(_obligation, units);
+
+        skip(100 days);
+
+        uint256 repaid =
+            midnight.debtOf(_id, borrower) + midnight.pendingContinuousFee(_id, borrower, _obligation.maturity);
+        deal(address(loanToken), borrower, repaid);
+
+        vm.prank(borrower);
+        midnight.repay(_obligation, repaid, borrower);
+
+        uint256 feeShares = midnight.sharesOf(_id, PASSIVE_FEE_RECIPIENT);
+        assertEq(midnight.sharesOf(_id, configuredFeeRecipient), 0, "configured fee recipient should not hold shares");
+        assertGt(feeShares, 0, "passive fee recipient should hold shares");
+
+        vm.prank(configuredFeeRecipient);
+        midnight.withdraw(_obligation, 0, feeShares, PASSIVE_FEE_RECIPIENT, configuredFeeRecipient);
+
+        assertEq(midnight.sharesOf(_id, PASSIVE_FEE_RECIPIENT), 0, "passive fee recipient should be emptied");
+        assertGt(loanToken.balanceOf(configuredFeeRecipient), 0, "configured fee recipient should receive units");
     }
 
     function testWithdrawInconsistentInput(uint256 units, uint256 shares) public {

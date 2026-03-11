@@ -17,7 +17,8 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    PASSIVE_FEE_RECIPIENT
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -231,9 +232,6 @@ contract Midnight is IMidnight {
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
 
-        accrueContinuousFee(id, seller, offer.obligation.maturity);
-        accrueContinuousFee(id, buyer, offer.obligation.maturity);
-
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
         // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
@@ -255,8 +253,11 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.obligationShares, "consumed");
         }
 
+        if (!buyerIsLender) accrueContinuousFee(id, buyer, offer.obligation.maturity);
+
         if (sellerIsBorrower) {
             // Borrower enters.
+            accrueContinuousFee(id, seller, offer.obligation.maturity);
             if (obligationUnits > 0) {
                 BorrowerState storage _state = borrowerState[id][seller];
                 uint128 oldDebt = _state.debt;
@@ -348,7 +349,11 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external returns (uint256, uint256) {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
+        require(
+            onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender]
+                || (onBehalf == PASSIVE_FEE_RECIPIENT && msg.sender == feeRecipient),
+            "unauthorized"
+        );
         require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -703,7 +708,7 @@ contract Midnight is IMidnight {
 
     /// @dev Accrues a borrower's continuous fee up to now or until maturity.
     /// @dev The pending fee is computed from the borrower's debt and averageFee.
-    /// @dev Increases the borrower's debt and mints corresponding shares to the feeRecipient.
+    /// @dev Increases the borrower's debt and mints corresponding shares to the passive fee recipient.
     function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal {
         BorrowerState storage _state = borrowerState[id][borrower];
         uint128 feeUnits = UtilsLib.toUint128(pendingContinuousFee(id, borrower, maturity));
@@ -713,7 +718,7 @@ contract Midnight is IMidnight {
             _state.averageFee = uint64(_state.averageFee.mulDivDown(_state.debt, _state.debt + feeUnits));
             _state.debt += feeUnits;
             _obligationState.totalUnits += feeUnits;
-            sharesOf[id][feeRecipient] += feeShares;
+            sharesOf[id][PASSIVE_FEE_RECIPIENT] += feeShares;
             _obligationState.totalShares += UtilsLib.toUint128(feeShares);
         }
 
