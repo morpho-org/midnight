@@ -19,6 +19,7 @@ jobs:
           - ExactMath
           - Liquidate
           - Midnight
+          - MulDivSummary
           - OnlyAuthorizedCanChange
           - SharePrice
           - Solvency
