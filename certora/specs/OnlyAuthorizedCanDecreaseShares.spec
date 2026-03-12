@@ -6,17 +6,7 @@ methods {
     function feeRecipient() external returns (address) envfree;
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
-}
-
-function accruedContinuousFeeBefore(bytes32 id, address user, uint256 blockTimestamp, uint256 maturity) returns mathint {
-    mathint lastAccrual = currentContract.borrowerState[id][user].lastContinuousFeeAccrual;
-    mathint pendingFee = currentContract.borrowerState[id][user].pendingFee;
-
-    if (lastAccrual == 0 || maturity <= lastAccrual) return 0;
-
-    mathint accrualEnd = blockTimestamp < maturity ? blockTimestamp : maturity;
-
-    return pendingFee * (accrualEnd - lastAccrual) / (maturity - lastAccrual);
+    function pendingContinuousFee(bytes32 id, address borrower, uint256 maturity) external returns (uint256);
 }
 
 use invariant noRemainingContinuousFeeWithoutDebt;
@@ -89,26 +79,32 @@ rule takeOnlyAffectsBuyerOrSellerDebt(env e, uint256 obligationShares, address t
 rule withdrawCollateralDebtIncreasesByAccruedFee(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     bytes32 id = toId(obligation);
     mathint debtBefore = debtOf(id, onBehalf);
-    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, onBehalf, e.block.timestamp, obligation.maturity);
+    require e.block.timestamp >= require_uint256(lastContinuousFeeAccrual(e, id, onBehalf));
+    mathint accruedFeeBefore = pendingContinuousFee(e, id, onBehalf, obligation.maturity);
 
     withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
+    require id == lastId;
     assert debtOf(id, onBehalf) == debtBefore + accruedFeeBefore;
 }
 
 rule repayDebtMatchesAccrualAndRepayment(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
     bytes32 id = toId(obligation);
     mathint debtBefore = debtOf(id, onBehalf);
-    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, onBehalf, e.block.timestamp, obligation.maturity);
+    require e.block.timestamp >= require_uint256(lastContinuousFeeAccrual(e, id, onBehalf));
+    mathint accruedFeeBefore = pendingContinuousFee(e, id, onBehalf, obligation.maturity);
 
     repay(e, obligation, obligationUnits, onBehalf);
+    require id == lastId;
     assert debtOf(id, onBehalf) + obligationUnits == debtBefore + accruedFeeBefore;
 }
 
 rule liquidateDebtIncreaseBoundedByAccruedFee(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id = toId(obligation);
     mathint debtBefore = debtOf(id, borrower);
-    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, borrower, e.block.timestamp, obligation.maturity);
+    require e.block.timestamp >= require_uint256(lastContinuousFeeAccrual(e, id, borrower));
+    mathint accruedFeeBefore = pendingContinuousFee(e, id, borrower, obligation.maturity);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    require id == lastId;
     assert debtOf(id, borrower) <= debtBefore + accruedFeeBefore;
 }

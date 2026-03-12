@@ -15,12 +15,20 @@ methods {
     function Utils.passiveFeeRecipient() external returns (address) envfree;
 
     function _.price() external => NONDET;
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
 /// HELPERS ///
+
+persistent ghost bytes32 lastId;
+
+function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
+    bytes32 id;
+    lastId = id;
+    return id;
+}
 
 persistent ghost mapping(bytes32 => mathint) sumSharesOf {
     init_state axiom (forall bytes32 id. sumSharesOf[id] == 0);
@@ -38,7 +46,20 @@ hook Sstore borrowerState[KEY bytes32 id][KEY address owner].debt uint128 newDeb
     sumDebtOf[id] = sumDebtOf[id] - oldDebt + newDebt;
 }
 
-function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (x == 0 || y == 0) return 0;
+    if (d > 0 && y == d) return x;
+    if (d > 0 && x == d) return y;
+
+    uint256 res;
+    if (d > 0) {
+        require to_mathint(res) * to_mathint(d) <= to_mathint(x) * to_mathint(y);
+        require (to_mathint(res) + 1) * to_mathint(d) > to_mathint(x) * to_mathint(y);
+    }
+    return res;
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (x == 0 || y == 0) return 0;
     if (d > 0 && y == d) return x;
     if (d > 0 && x == d) return y;
