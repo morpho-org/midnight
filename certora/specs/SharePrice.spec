@@ -21,33 +21,6 @@ methods {
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
-}
-
-function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (x == 0 || y == 0) return 0;
-    if (d > 0 && y == d) return x;
-    if (d > 0 && x == d) return y;
-    uint256 res;
-
-    // Exact floor: res = floor(x*y/d).
-    require to_mathint(res) * to_mathint(d) <= to_mathint(x) * to_mathint(y);
-    require (to_mathint(res) + 1) * to_mathint(d) > to_mathint(x) * to_mathint(y);
-    return res;
-}
-
-function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (x == 0 || y == 0) return 0;
-    if (d > 0 && y == d) return x;
-    if (d > 0 && x == d) return y;
-    uint256 res;
-
-    // Exact ceil: res = ceil(x*y/d).
-    require to_mathint(res) * to_mathint(d) >= to_mathint(x) * to_mathint(y);
-    require res == 0 || (to_mathint(res) - 1) * to_mathint(d) < to_mathint(x) * to_mathint(y);
-    return res;
 }
 
 definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.borrowerState[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual;
