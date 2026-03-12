@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
+import "Midnight.spec";
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function feeRecipient() external returns (address) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function sharesOf(bytes32 id, address user) external returns (uint256) envfree;
+    function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
-    function Utils.passiveFeeRecipient() external returns (address) envfree;
-
-    function _.price() external => NONDET;
 }
+
+function accruedContinuousFeeBefore(bytes32 id, address user, uint256 blockTimestamp, uint256 maturity) returns mathint {
+    mathint lastAccrual = currentContract.borrowerState[id][user].lastContinuousFeeAccrual;
+    mathint pendingFee = currentContract.borrowerState[id][user].pendingFee;
+
+    if (lastAccrual == 0 || maturity <= lastAccrual) return 0;
+
+    mathint accrualEnd = blockTimestamp < maturity ? blockTimestamp : maturity;
+
+    return pendingFee * (accrualEnd - lastAccrual) / (maturity - lastAccrual);
+}
+
+use invariant noRemainingContinuousFeeWithoutDebt;
 
 /// An unauthorized caller cannot decrease a user's shares except via take.
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant share decreases are not covered.
@@ -45,23 +52,24 @@ rule takeOnlyAuthorizedSellerSharesDecrease(env e, uint256 obligationShares, add
 
     assert takerUnauthorized => reverted;
     assert user == seller => sharesAfter <= sharesBefore;
-    assert user == buyer => sharesAfter >= sharesBefore;
-    assert user != buyer && user != seller => sharesAfter == sharesBefore;
+    assert user != seller => sharesAfter >= sharesBefore;
 }
 
-/// No function other than take can increase a user's debt.
-rule debtOnlyIncreasesViaTake(env e, method f, bytes32 id, address user) {
+/// A user whose debt is zero can only become a borrower via take.
+rule zeroDebtOnlyIncreasesViaTake(env e, method f, bytes32 id, address user) {
     uint256 debtBefore = debtOf(id, user);
+
+    requireInvariant noRemainingContinuousFeeWithoutDebt(id, user);
 
     calldataarg args;
     f(e, args);
 
-    assert debtBefore >= debtOf(id, user) || f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector;
+    assert debtBefore > 0 || debtOf(id, user) == 0 || f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector;
 }
 
-/// In take, the caller must be authorized by the taker, and only the seller's debt can increase.
-/// Assumes no reentrancy: the onBuy/onSell callbacks could re-enter take (or another function) and increase a different user's debt.
-rule takeOnlyAuthorizedSellerDebtIncrease(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
+/// In take, the caller must be authorized by the taker, and only the buyer's or seller's debt can change.
+/// Assumes no reentrancy: the onBuy/onSell callbacks could re-enter take (or another function) and change a different user's debt.
+rule takeOnlyAffectsBuyerOrSellerDebt(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
     bool takerUnauthorized = e.msg.sender != taker && !isAuthorized(taker, e.msg.sender);
@@ -74,7 +82,33 @@ rule takeOnlyAuthorizedSellerDebtIncrease(env e, uint256 obligationShares, addre
     uint256 debtAfter = debtOf(id, user);
 
     assert takerUnauthorized => reverted;
-    assert user == buyer => debtAfter <= debtBefore;
     assert user == seller => debtAfter >= debtBefore;
     assert user != buyer && user != seller => debtAfter == debtBefore;
+}
+
+rule withdrawCollateralDebtIncreasesByAccruedFee(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+    bytes32 id = toId(obligation);
+    mathint debtBefore = debtOf(id, onBehalf);
+    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, onBehalf, e.block.timestamp, obligation.maturity);
+
+    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
+    assert debtOf(id, onBehalf) == debtBefore + accruedFeeBefore;
+}
+
+rule repayDebtMatchesAccrualAndRepayment(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
+    bytes32 id = toId(obligation);
+    mathint debtBefore = debtOf(id, onBehalf);
+    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, onBehalf, e.block.timestamp, obligation.maturity);
+
+    repay(e, obligation, obligationUnits, onBehalf);
+    assert debtOf(id, onBehalf) + obligationUnits == debtBefore + accruedFeeBefore;
+}
+
+rule liquidateDebtIncreaseBoundedByAccruedFee(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+    bytes32 id = toId(obligation);
+    mathint debtBefore = debtOf(id, borrower);
+    mathint accruedFeeBefore = accruedContinuousFeeBefore(id, borrower, e.block.timestamp, obligation.maturity);
+
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    assert debtOf(id, borrower) <= debtBefore + accruedFeeBefore;
 }
