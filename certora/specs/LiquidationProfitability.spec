@@ -61,7 +61,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(summaryMulDivUpM(a, b, d));
 }
 
-/// Liquidation is profitable up to floor rounding (repaidUnits input)
+/// Liquidation is profitable up to floor rounding (1 collateral token unit)
 rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require repaidUnits > 0;
@@ -75,7 +75,7 @@ rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, 
     assert (to_mathint(seizedResult) + 1) * price > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
 }
 
-/// Liquidation is profitable up to ceil rounding (seizedAssets input)
+/// Liquidation is profitable up to ceil rounding (1 loan token unit)
 rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require seizedAssets > 0;
@@ -89,11 +89,13 @@ rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation,
     assert to_mathint(seizedResult) * price + ORACLE_PRICE_SCALE() > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
 }
 
+// LIF BOUNDARIES ///
+
 /// Liquidation profit is bounded by maxLif (repaidUnits input)
-rule liquidationProfitBounded_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
+rule liquidationProfitBounded_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, uint256 seizedAssets, address borrower, bytes data) {
     mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
     require maxLif >= WAD();
-    require repaidUnits > 0;
+    require (repaidUnits > 0 && seizedAssets == 0) || (repaidUnits == 0 && seizedAssets > 0);
 
     // reduce callback path exploration
     require data.length == 0;
@@ -101,26 +103,6 @@ rule liquidationProfitBounded_repaidUnits(env e, Midnight.Obligation obligation,
     uint256 seizedResult;
     uint256 repaidResult;
     seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
-
-    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
-
-    assert to_mathint(seizedResult) * price * WAD() <= to_mathint(repaidResult) * ORACLE_PRICE_SCALE() * maxLif;
-}
-
-/// Liquidation profit is bounded by maxLif (seizedAssets input)
-rule liquidationProfitBounded_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
-    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
-    require maxLif >= WAD();
-    require seizedAssets > 0;
-
-    // reduce callback path exploration
-    require data.length == 0;
-
-    uint256 seizedResult;
-    uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
-
-    require repaidResult > 0;
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
