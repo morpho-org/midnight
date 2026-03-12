@@ -10,18 +10,6 @@ methods {
 
 use invariant noRemainingContinuousFeeWithoutDebt;
 
-rule takeCannotChangeBothSharesAndDebt(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
-    uint256 sharesBefore = sharesOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
-
-    take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
-
-    uint256 sharesAfter = sharesOf(id, user);
-    uint256 debtAfter = debtOf(id, user);
-
-    assert sharesAfter == sharesBefore || debtAfter == debtBefore;
-}
-
 /// SHARES CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's shares except via take.
@@ -134,15 +122,4 @@ rule repayDebtMatchesAccrualAndRepayment(env e, Midnight.Obligation obligation, 
     repay(e, obligation, obligationUnits, onBehalf);
     require id == lastId, "rule id must match internal toId result";
     assert debtOf(id, onBehalf) + obligationUnits == debtBefore + accruedFeeBefore;
-}
-
-rule liquidateDebtIncreaseBoundedByAccruedFee(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    bytes32 id = toId(obligation);
-    mathint debtBefore = debtOf(id, borrower);
-    require e.block.timestamp >= require_uint256(lastContinuousFeeAccrual(e, id, borrower)), "timestamp must not precede stored accrual";
-    mathint accruedFeeBefore = pendingContinuousFee(e, id, borrower, obligation.maturity);
-
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    require id == lastId, "rule id must match internal toId result";
-    assert debtOf(id, borrower) <= debtBefore + accruedFeeBefore;
 }

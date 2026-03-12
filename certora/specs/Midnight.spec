@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import "ContinuousFeeInvariants.spec";
+
 using Utils as Utils;
 
 methods {
@@ -10,8 +12,6 @@ methods {
     function totalShares(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
 
     function _.price() external => NONDET;
@@ -68,6 +68,8 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
 }
 
 definition isPassiveFeeRecipient(address user) returns bool = user == Utils.passiveFeeRecipient();
+
+use invariant noRemainingContinuousFeeWithoutDebt;
 
 rule takeInputOutputConsistency(env e, uint256 obligationSharesInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
@@ -128,6 +130,18 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
+rule takeCannotChangeBothSharesAndDebt(env e, uint256 obligationSharesInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData, bytes32 id, address user) {
+    uint256 sharesBefore = sharesOf(id, user);
+    uint256 debtBefore = debtOf(id, user);
+
+    take(e, obligationSharesInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+
+    uint256 sharesAfter = sharesOf(id, user);
+    uint256 debtAfter = debtOf(id, user);
+
+    assert sharesAfter == sharesBefore || debtAfter == debtBefore;
+}
+
 /// INVARIANTS ///
 
 strong invariant notBorrowerAndLender(bytes32 id, address user)
@@ -137,9 +151,6 @@ strong invariant notBorrowerAndLender(bytes32 id, address user)
             requireInvariant noRemainingContinuousFeeWithoutDebt(id, user);
         }
     }
-
-strong invariant noRemainingContinuousFeeWithoutDebt(bytes32 id, address user)
-    debtOf(id, user) == 0 => pendingFee(id, user) == 0;
 
 strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     totalUnits(id) == sumDebtOf[id] + withdrawable(id);
