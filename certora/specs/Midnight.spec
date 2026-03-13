@@ -21,6 +21,14 @@ persistent ghost mapping(bytes32 => mathint) sumBalanceOf {
     init_state axiom (forall bytes32 id. sumBalanceOf[id] == 0);
 }
 
+persistent ghost mapping(bytes32 => mathint) sumPositiveBalanceOf {
+    init_state axiom (forall bytes32 id. sumPositiveBalanceOf[id] == 0);
+}
+
+persistent ghost mapping(bytes32 => mathint) sumNegativeBalanceOf {
+    init_state axiom (forall bytes32 id. sumNegativeBalanceOf[id] == 0);
+}
+
 function negativePart(mathint x) returns mathint {
     return x < 0 ? -x : 0;
 }
@@ -31,6 +39,8 @@ function positivePart(mathint x) returns mathint {
 
 hook Sstore balanceOf[KEY bytes32 id][KEY address owner] int256 newBalance (int256 oldBalance) {
     sumBalanceOf[id] = sumBalanceOf[id] - oldBalance + newBalance;
+    sumPositiveBalanceOf[id] = sumPositiveBalanceOf[id] - positivePart(to_mathint(oldBalance)) + positivePart(to_mathint(newBalance));
+    sumNegativeBalanceOf[id] = sumNegativeBalanceOf[id] - negativePart(to_mathint(oldBalance)) + negativePart(to_mathint(newBalance));
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -89,7 +99,9 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 /// INVARIANTS ///
 
 strong invariant totalUnitsEqualsSumNegativeBalancePlusWithdrawable(bytes32 id)
-    to_mathint(totalUnits(id)) == negativePart(sumBalanceOf[id]) + to_mathint(withdrawable(id));
+    to_mathint(totalUnits(id)) == sumNegativeBalanceOf[id] + to_mathint(withdrawable(id));
 
-strong invariant totalUnitsEqualsSumPositiveBalance(bytes32 id)
-    to_mathint(totalUnits(id)) == positivePart(sumBalanceOf[id]);
+// Inequality due to lazy slashing: bad debt reduces totalUnits immediately,
+// but lender balances are only reduced when slash is called.
+strong invariant totalUnitsLeqSumPositiveBalance(bytes32 id)
+    to_mathint(totalUnits(id)) <= sumPositiveBalanceOf[id];

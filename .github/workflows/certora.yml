@@ -14,12 +14,14 @@ jobs:
       fail-fast: false
       matrix:
         conf:
+          - Consume
           - CreatedObligations
           - ExactMath
           - Liquidate
           - Midnight
-          - OnlyAuthorizedCanDecreaseShares
+          - OnlyAuthorizedCanChange
           - Solvency
+          - WithdrawableMonotonicity
 
     steps:
       - uses: actions/checkout@v4

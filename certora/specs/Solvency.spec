@@ -12,6 +12,15 @@ methods {
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
 
+    // Summaries for complex internals irrelevant to token balance tracking.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.negativePart(int256) internal returns (uint256) => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
