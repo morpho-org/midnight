@@ -37,10 +37,10 @@ ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256 {
 
 ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 c. c != 0 => to_mathint(CVL_mulDivUp(a, b, c)) * to_mathint(c) >= to_mathint(a) * to_mathint(b);
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. (c != 0 && to_mathint(CVL_mulDivUp(a, b, c)) - 1) * to_mathint(c) < to_mathint(a) * to_mathint(b);
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. (c != 0 && to_mathint(a) * to_mathint(b) > 0) => (to_mathint(CVL_mulDivUp(a, b, c)) - 1) * to_mathint(c) < to_mathint(a) * to_mathint(b);
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. to_mathint(a) * to_mathint(b) == 0 => CVL_mulDivUp(a, b, c) == 0;
     axiom forall uint256 a. forall uint256 b. forall uint256 c. (c != 0 && to_mathint(b) <= to_mathint(c)) => to_mathint(CVL_mulDivUp(a, b, c)) <= to_mathint(a);
     axiom forall uint256 a. forall uint256 b. forall uint256 c. (c != 0 && to_mathint(b) >= to_mathint(c)) => to_mathint(CVL_mulDivUp(a, b, c)) >= to_mathint(a);
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. to_mathint(a) * to_mathint(b) == 0 => CVL_mulDivUp(a, b, c) == 0;
 }
 
 definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.borrowerState[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.borrowerState[id][borrower].lastContinuousFeeAccrual;
