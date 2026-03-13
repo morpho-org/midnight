@@ -29,6 +29,7 @@ jobs:
           - CreatedObligations
           - ExactMath
           - Liquidate
+          - LiquidationBoundedByLIF
           - LiquidationProfitability
           - Midnight
           - OnlyAuthorizedCanDecreaseShares
