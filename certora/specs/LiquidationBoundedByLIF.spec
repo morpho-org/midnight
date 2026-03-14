@@ -2,7 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
-    
+
     // Assume price doesn't change during the execution of a transaction.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
