@@ -23,14 +23,12 @@ persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivDownM(a, b, d) >= 0;
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivDownM(a, b, d) * d <= a * b;
-    axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= d && d > 0 => summaryMulDivDownM(a, b, d) >= a;
 }
 
 persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint {
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) >= 0;
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) * d < a * b + d;
     axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && b >= 0 && d > 0 => summaryMulDivUpM(a, b, d) * d >= a * b;
-    axiom forall mathint a. forall mathint b. forall mathint d. a >= 0 && 0 < b && b <= d => summaryMulDivUpM(a, b, d) <= a;
 }
 
 // Non-deterministic overflow models potential revert on x * y overflow.
@@ -50,7 +48,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(summaryMulDivUpM(a, b, d));
 }
 
-/// LIQUIDATION IS PROFITABLE ///
+/// LIQUIDATION PROFITABILITY ///
 
 /// Liquidation is profitable up 1 collateral token unit in price-scaled terms due to floor rounding
 rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
