@@ -52,6 +52,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// Liquidation is profitable up 1 collateral token unit in price-scaled terms due to floor rounding
 rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
+    // Profitability only holds when the liquidation incentive factor is at least 1x.
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require repaidUnits > 0;
 
@@ -66,6 +67,7 @@ rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, 
 
 /// Liquidation is profitable up to 1 loan token unit due to ceil rounding
 rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
+    // Profitability only holds when the liquidation incentive factor is at least 1x.
     require obligation.collaterals[collateralIndex].maxLif >= WAD();
     require seizedAssets > 0;
 

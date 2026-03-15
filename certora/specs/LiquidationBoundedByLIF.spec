@@ -53,7 +53,6 @@ rule liquidationProfitBounded_seizedAssets(env e, Midnight.Obligation obligation
     // Safe: seized/repaid amounts are computed before the callback; data.length == 0 skips it for prover performance.
     require data.length == 0;
 
-    // The while loop over activatedCollaterals is unrolled optimistically (loop_iter: 2).
     // Restrict to 1 active collateral so the loop processes collateralIndex and sets liquidatedCollatPrice.
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
     require to_mathint(currentContract.borrowerState[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex);
