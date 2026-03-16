@@ -146,6 +146,7 @@ contract BundlerTest is BaseTest {
         offers[1].obligationUnits = offerUnits1;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
+        // NB: splitting across offers can require 1 extra unit due to per-leg rounding of buyer assets.
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 

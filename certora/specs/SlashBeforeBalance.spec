@@ -47,12 +47,13 @@ hook Sstore position[KEY bytes32 id][KEY address user].balance int256 newValue (
 // View functions that read balanceOf don't call slash (they can't mutate state).
 rule balanceReadAfterSlash(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector != sig:balanceOf(bytes32, address).selector
+    f ->
+    // Skipped: liquidate and withdrawCollateral read balance via debtOf/isHealthy without
+    // calling slash first (but don't do anything with it). TODO: improve this.
+    f.selector != sig:balanceOf(bytes32, address).selector
         && f.selector != sig:debtOf(bytes32, address).selector
         && f.selector != sig:balanceOfAfterSlashing(bytes32, address).selector
         && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
-        // Skipped: liquidate and withdrawCollateral read balance via debtOf/isHealthy without
-        // calling slash first (but don't do anything with it). TODO: improve this.
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
 } {
