@@ -13,6 +13,7 @@ import {
     MAX_COLLATERALS_PER_BORROWER,
     WAD,
     ORACLE_PRICE_SCALE,
+    SHARE_PRICE_SCALE,
     TIME_TO_MAX_LIF
 } from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -195,6 +196,7 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        assertEq(midnight.sharePrice(_id), SHARE_PRICE_SCALE, "share price initialized");
         uint16[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
             assertEq(fees[i], midnight.defaultFees(_obligation.loanToken, i), "fees");

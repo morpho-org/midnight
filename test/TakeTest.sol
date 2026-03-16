@@ -769,6 +769,36 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), targetUnits, "borrower debt");
         assertEq(midnight.consumed(lender, lenderOffer.group), targetUnits, "consumed");
     }
+
+    // roundtrip invariant: enter then exit the same units should not inflate shares.
+
+    function testEnterExitRoundtrip(uint256 obligationUnits, uint256 existingUnits) public {
+        obligationUnits = bound(obligationUnits, 1, maxAssets);
+        existingUnits = bound(existingUnits, obligationUnits, max(obligationUnits, maxAssets));
+        setupOtherUsers(obligation, existingUnits);
+
+        uint256 sharesBefore = midnight.sharesOf(id, lender);
+
+        // Lender enters by buying from otherLender (path 2: lender enters + lender exits).
+        otherLenderOffer.buy = false;
+        otherLenderOffer.obligationUnits = type(uint256).max;
+        otherLenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        deal(address(loanToken), lender, obligationUnits.mulDivUp(price, WAD));
+        take(obligationUnits, lender, otherLenderOffer);
+
+        // Lender exits by selling to otherLender (path 2: lender enters + lender exits).
+        Offer memory otherLenderBuyOffer;
+        otherLenderBuyOffer.buy = true;
+        otherLenderBuyOffer.maker = otherLender;
+        otherLenderBuyOffer.obligationUnits = type(uint256).max;
+        otherLenderBuyOffer.obligation = obligation;
+        otherLenderBuyOffer.expiry = block.timestamp + 200;
+        otherLenderBuyOffer.tick = MAX_TICK;
+        take(obligationUnits, lender, otherLenderBuyOffer);
+
+        assertLe(midnight.sharesOf(id, lender), sharesBefore, "shares must not inflate after roundtrip");
+    }
 }
 
 contract BorrowCallback is ICallbacks {
