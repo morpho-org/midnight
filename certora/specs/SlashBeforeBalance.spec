@@ -25,14 +25,14 @@ persistent ghost bool balanceWrittenWithoutSlash {
 }
 
 function slashSummary(bytes32 id, address user) {
-    slashedAtLossIndex[id][user] = obligationState[id].lossIndex;
+    slashedAtLossIndex[id][user] = currentContract.obligationState[id].lossIndex;
 }
 
 /// HOOKS ///
 
 // Positive balances must only be read after slash at the current lossIndex.
 hook Sload int256 value position[KEY bytes32 id][KEY address user].balance {
-    if (slashedAtLossIndex[id][user] != obligationState[id].lossIndex && value > 0) {
+    if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && value > 0) {
         balanceReadWithoutSlash = true;
     }
 }
@@ -41,7 +41,7 @@ hook Sload int256 value position[KEY bytes32 id][KEY address user].balance {
 // This also covers zero-to-positive transitions: when newValue > 0, slash is required
 // even if oldValue <= 0, ensuring the user's lossIndex is refreshed first.
 hook Sstore position[KEY bytes32 id][KEY address user].balance int256 newValue (int256 oldValue) {
-    if (slashedAtLossIndex[id][user] != obligationState[id].lossIndex && (oldValue > 0 || newValue > 0)) {
+    if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && (oldValue > 0 || newValue > 0)) {
         balanceWrittenWithoutSlash = true;
     }
 }
@@ -64,4 +64,3 @@ rule balanceWrittenAfterSlash(method f, env e, calldataarg args) {
     f(e, args);
     assert !balanceWrittenWithoutSlash;
 }
-

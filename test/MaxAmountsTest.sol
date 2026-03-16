@@ -34,8 +34,7 @@ contract MaxAmountsTest is BaseTest {
 
         id = toId(obligation);
 
-        vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        authorize(borrower, address(this));
     }
 
     function testMaxAmountIsUint128Max() public pure {

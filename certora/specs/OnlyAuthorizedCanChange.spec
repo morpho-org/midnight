@@ -19,7 +19,7 @@ methods {
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    function _.price() external => CVL_price(calledContract) expect(uint256);
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy: callbacks do not re-enter Midnight.
     function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
@@ -30,8 +30,6 @@ methods {
 }
 
 /// HELPERS ///
-
-ghost CVL_price(address) returns uint256;
 
 ghost mapping(address => bool) signed {
     init_state axiom forall address a. signed[a] == false;
@@ -45,17 +43,14 @@ function CVL_signer() returns address {
 
 /// BALANCE CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's balance except via slash.
+/// An unauthorized caller cannot change a user's balance except via liquidate and slash.
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant balance changes are not covered.
-rule onlyAuthorizedCanChangeBalanceExceptSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:slash(bytes32, address).selector } {
+rule onlyAuthorizedCanChangeBalanceExceptLiquidateAndSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:slash(bytes32, address).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
-    Midnight.Obligation obligation = toObligation(e, id);
-    bool userIsUnHealthy = !isHealthy(e, obligation, id, user);
-    bool isPastMaturity = e.block.timestamp > obligation.maturity;
 
     int256 balanceBefore = balanceOf(id, user);
     f(e, args);
     int256 balanceAfter = balanceOf(id, user);
 
-    assert balanceAfter == balanceBefore || userIsAuthorized || signed[user] || userIsUnHealthy || isPastMaturity;
+    assert balanceAfter == balanceBefore || userIsAuthorized || signed[user];
 }
