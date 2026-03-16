@@ -52,7 +52,7 @@ contract Midnight is IMidnight {
 
     /// STORAGE ///
 
-    mapping(bytes32 id => mapping(address user => uint256)) public sharesOf;
+    mapping(bytes32 id => mapping(address user => uint128)) public sharesOf;
     mapping(bytes32 id => mapping(address user => BorrowerState)) public borrowerState;
     mapping(bytes32 id => mapping(address user => uint128[128])) public collateralOf;
     mapping(bytes32 id => ObligationState) public obligationState;
@@ -221,17 +221,28 @@ contract Midnight is IMidnight {
 
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
-            uint256 targetBuyerUnits = sharesOf[id][buyer].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits;
-            sharesOf[id][buyer] = targetBuyerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+            uint128 oldBuyerShares = sharesOf[id][buyer];
+            sharesOf[id][buyer] = UtilsLib.toUint128(
+                (oldBuyerShares.mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits)
+                .mulDivUp(SHARE_PRICE_SCALE, sharePrice_)
+            );
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
+            _obligationState.totalShares += sharesOf[id][buyer] - oldBuyerShares;
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
-            uint256 targetBuyerUnits = sharesOf[id][buyer].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits;
-            sharesOf[id][buyer] = targetBuyerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
-            uint256 targetSellerUnits =
-                sharesOf[id][seller].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
-            sharesOf[id][seller] = targetSellerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+            uint128 oldBuyerShares = sharesOf[id][buyer];
+            sharesOf[id][buyer] = UtilsLib.toUint128(
+                (oldBuyerShares.mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits)
+                .mulDivUp(SHARE_PRICE_SCALE, sharePrice_)
+            );
+            uint128 oldSellerShares = sharesOf[id][seller];
+            sharesOf[id][seller] = UtilsLib.toUint128(
+                (oldSellerShares.mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits)
+                .mulDivUp(SHARE_PRICE_SCALE, sharePrice_)
+            );
+            _obligationState.totalShares += sharesOf[id][buyer] - oldBuyerShares;
+            _obligationState.totalShares -= oldSellerShares - sharesOf[id][seller];
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
@@ -239,10 +250,13 @@ contract Midnight is IMidnight {
         } else {
             // Borrower exits + lender exits.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
-            uint256 targetSellerUnits =
-                sharesOf[id][seller].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
-            sharesOf[id][seller] = targetSellerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+            uint128 oldSellerShares = sharesOf[id][seller];
+            sharesOf[id][seller] = UtilsLib.toUint128(
+                (oldSellerShares.mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits)
+                .mulDivUp(SHARE_PRICE_SCALE, sharePrice_)
+            );
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
+            _obligationState.totalShares -= oldSellerShares - sharesOf[id][seller];
         }
 
         emit EventsLib.Take(
@@ -306,14 +320,16 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         uint256 sharePrice_ = _obligationState.sharePrice;
-        uint256 currentShares = sharesOf[id][onBehalf];
-        uint256 targetUnits = sharesOf[id][onBehalf].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
-        sharesOf[id][onBehalf] = targetUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
-        uint256 shares = currentShares - sharesOf[id][onBehalf];
-        _obligationState.withdrawable -= obligationUnits;
+        uint128 oldShares = sharesOf[id][onBehalf];
+        sharesOf[id][onBehalf] = UtilsLib.toUint128(
+            (oldShares.mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits)
+            .mulDivUp(SHARE_PRICE_SCALE, sharePrice_)
+        );
+        _obligationState.withdrawable -= UtilsLib.toUint128(obligationUnits);
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
+        _obligationState.totalShares -= oldShares - sharesOf[id][onBehalf];
 
-        emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf, receiver);
+        emit EventsLib.Withdraw(msg.sender, id, obligationUnits, oldShares - sharesOf[id][onBehalf], onBehalf, receiver);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
     }
@@ -323,7 +339,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
 
         borrowerState[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
-        obligationState[id].withdrawable += obligationUnits;
+        obligationState[id].withdrawable += UtilsLib.toUint128(obligationUnits);
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
@@ -424,12 +440,12 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
-            uint256 oldTotalUnits = _obligationState.totalUnits;
             _state.debt -= UtilsLib.toUint128(badDebt);
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
             // forge-lint: disable-next-line(unsafe-typecast) as sharePrice only decreases from uint128 max
-            _obligationState.sharePrice =
-                uint128(uint256(_obligationState.sharePrice).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits));
+            _obligationState.sharePrice = uint128(
+                uint256(_obligationState.totalUnits).mulDivDown(SHARE_PRICE_SCALE, _obligationState.totalShares)
+            );
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
@@ -467,7 +483,7 @@ contract Midnight is IMidnight {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _state.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
-            _obligationState.withdrawable += repaidUnits;
+            _obligationState.withdrawable += UtilsLib.toUint128(repaidUnits);
             _state.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
@@ -574,6 +590,10 @@ contract Midnight is IMidnight {
 
     function totalUnits(bytes32 id) external view returns (uint256) {
         return obligationState[id].totalUnits;
+    }
+
+    function totalShares(bytes32 id) external view returns (uint256) {
+        return obligationState[id].totalShares;
     }
 
     function sharePrice(bytes32 id) external view returns (uint256) {

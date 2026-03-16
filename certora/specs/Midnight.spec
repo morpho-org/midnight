@@ -5,9 +5,10 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function totalShares(bytes32 id) external returns (uint256) envfree;
     function sharePrice(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
+    function sharesOf(bytes32 id, address owner) external returns (uint128) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
@@ -22,7 +23,7 @@ persistent ghost mapping(bytes32 => mathint) sumSharesOf {
     init_state axiom (forall bytes32 id. sumSharesOf[id] == 0);
 }
 
-hook Sstore sharesOf[KEY bytes32 id][KEY address owner] uint256 newShares (uint256 oldShares) {
+hook Sstore sharesOf[KEY bytes32 id][KEY address owner] uint128 newShares (uint128 oldShares) {
     sumSharesOf[id] = sumSharesOf[id] - oldShares + newShares;
 }
 
@@ -58,12 +59,8 @@ rule takeInputOutputConsistency(env e, uint256 obligationUnitsInput, address tak
 rule offerInputsConsumed(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    uint256 buyerAssetsOutput;
-    uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
-    uint256 obligationSharesOutput;
-
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    _, _, obligationUnitsOutput, _ = take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
     assert consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsOutput;
 }
@@ -99,5 +96,5 @@ strong invariant notBorrowerAndLender(bytes32 id, address user)
 strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     totalUnits(id) == sumDebtOf[id] + withdrawable(id);
 
-strong invariant sharePriceBelowOrEqScale(bytes32 id)
-    sharePrice(id) <= max_uint128;
+strong invariant totalSharesEqualsSumSharesOf(bytes32 id)
+    totalShares(id) == sumSharesOf[id];

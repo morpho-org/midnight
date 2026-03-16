@@ -48,7 +48,8 @@ struct BorrowerState {
 struct ObligationState {
     uint128 totalUnits;
     uint128 sharePrice;
-    uint256 withdrawable;
+    uint128 totalShares;
+    uint128 withdrawable;
     bool created;
     uint16[7] fees;
 }

@@ -4,7 +4,9 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function totalShares(bytes32 id) external returns (uint256) envfree;
     function sharePrice(bytes32 id) external returns (uint256) envfree;
+    function obligationCreated(bytes32 id) external returns (bool) envfree;
 
     function _.price() external => NONDET;
 
@@ -20,34 +22,45 @@ methods {
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onLiquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
 }
 
-// Share price is at most SHARE_PRICE_SCALE (type(uint128).max).
-strong invariant sharePriceBelowOrEqScale(bytes32 id)
-    sharePrice(id) <= max_uint128;
-
-/// Liquidation does not increase the share price.
+/// Liquidation does not increase the share price of an already-created obligation.
 rule liquidateDoesNotIncreaseSharePrice(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
+    require obligationCreated(id);
     mathint sharePriceBefore = sharePrice(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert sharePrice(id) <= sharePriceBefore;
 }
 
-/// Liquidation does not increase the total units.
+/// Liquidation does not increase the total units of an already-created obligation.
 rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
+    require obligationCreated(id);
     mathint unitsBefore = totalUnits(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert totalUnits(id) <= unitsBefore;
 }
 
-/// Share price monotonicity: share price does not decrease for non-liquidation functions.
-/// Liquidation is excluded: it can decrease the share price via bad debt socialization but covered above.
-rule sharePriceDoesNotDecrease(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
+/// After liquidation, sharePrice is calibrated to totalShares: sharePrice * totalShares <= totalUnits * SCALE.
+/// This is the solvency postcondition — it guarantees sum of lender claims <= totalUnits.
+rule liquidateSharePriceCalibrated(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
+    require obligationCreated(id);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    assert to_mathint(sharePrice(id)) * to_mathint(totalShares(id)) <= to_mathint(totalUnits(id)) * to_mathint(max_uint128);
+}
+
+/// sharePrice is unchanged by any function other than liquidate (which can only decrease it).
+rule sharePriceUnchangedOutsideLiquidate(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
+    require obligationCreated(id);
     mathint sharePriceBefore = sharePrice(id);
 
     env e;
     calldataarg args;
     f(e, args);
 
-    assert sharePrice(id) >= sharePriceBefore;
+    assert sharePrice(id) == sharePriceBefore;
 }

@@ -5,6 +5,8 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
+
+    function _.price() external => NONDET;
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
