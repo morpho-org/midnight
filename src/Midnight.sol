@@ -530,8 +530,7 @@ contract Midnight is IMidnight {
             int256 balance = _position.balance;
             if (balance > 0) {
                 balance = UtilsLib.toInt256(
-                    // forge-lint: disable-next-line(unsafe-typecast) as balance > 0 and result <= uint256(balance) <=
-                    // uint256(type(int256).max)
+                    // forge-lint: disable-next-line(unsafe-typecast) as balance > 0
                     uint256(balance).mulDivDown(type(uint128).max - lossIndex, type(uint128).max - _userLossIndex)
                 );
                 _position.balance = balance;
