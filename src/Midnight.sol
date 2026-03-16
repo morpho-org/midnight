@@ -34,7 +34,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of debt, totalUnits, and collateral is type(uint128).max (~1e38).
-/// @dev Share price is scaled by type(uint128).max and only moves on bad debt.
+/// @dev Share price is scaled by type(uint128).max and only moves after a bad debt.
 ///
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -444,7 +444,10 @@ contract Midnight is IMidnight {
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
             // forge-lint: disable-next-line(unsafe-typecast) as sharePrice only decreases from uint128 max
             _obligationState.sharePrice = uint128(
-                uint256(_obligationState.totalUnits).mulDivDown(SHARE_PRICE_SCALE, _obligationState.totalShares)
+                UtilsLib.min(
+                    _obligationState.sharePrice,
+                    uint256(_obligationState.totalUnits).mulDivDown(SHARE_PRICE_SCALE, _obligationState.totalShares)
+                )
             );
         }
 

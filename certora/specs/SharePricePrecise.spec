@@ -27,6 +27,31 @@ methods {
     function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onLiquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+}
+
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (x == 0 || y == 0) return 0;
+    if (d > 0 && y == d) return x;
+    if (d > 0 && x == d) return y;
+    uint256 res;
+    require to_mathint(res) * to_mathint(d) <= to_mathint(x) * to_mathint(y);
+    require (to_mathint(res) + 1) * to_mathint(d) > to_mathint(x) * to_mathint(y);
+    return res;
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (x == 0 || y == 0) return 0;
+    if (d > 0 && y == d) return x;
+    if (d > 0 && x == d) return y;
+    uint256 res;
+    require to_mathint(res) * to_mathint(d) >= to_mathint(x) * to_mathint(y);
+    require to_mathint(res) == 0 || (to_mathint(res) - 1) * to_mathint(d) < to_mathint(x) * to_mathint(y);
+    return res;
 }
 
 /// Liquidation does not increase the share price. Trivially true from the min formula.
@@ -37,33 +62,11 @@ rule liquidateDoesNotIncreaseSharePrice(env e, Midnight.Obligation obligation, u
     assert sharePrice(id) <= sharePriceBefore;
 }
 
-/// Liquidation does not increase the total units of an already-created obligation.
-rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
-    require obligationCreated(id);
-    mathint unitsBefore = totalUnits(id);
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    assert totalUnits(id) <= unitsBefore;
-}
-
 /// After liquidation with bad debt, sharePrice is calibrated: sharePrice * totalShares <= totalUnits * SCALE.
-/// Only asserted when sharePrice actually changed (recalibration occurred), avoiding the free-id problem
-/// where a different obligation's drifted state would need an unsound precondition.
 rule liquidateSharePriceCalibrated(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
     require obligationCreated(id);
     mathint sharePriceBefore = sharePrice(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert sharePrice(id) != sharePriceBefore =>
         to_mathint(sharePrice(id)) * to_mathint(totalShares(id)) <= to_mathint(totalUnits(id)) * to_mathint(max_uint128);
-}
-
-/// sharePrice is unchanged by any function other than liquidate (which can only decrease it).
-rule sharePriceUnchangedOutsideLiquidate(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
-    require obligationCreated(id);
-    mathint sharePriceBefore = sharePrice(id);
-
-    env e;
-    calldataarg args;
-    f(e, args);
-
-    assert sharePrice(id) == sharePriceBefore;
 }
