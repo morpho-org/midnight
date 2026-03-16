@@ -215,14 +215,23 @@ contract LiquidationTest is BaseTest {
 
     function testCannotRepayMoreThanDebt(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS - 1);
-        repaid = bound(repaid, units + 1, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+
+        uint256 _maxLif = obligation.collaterals[0].maxLif;
+        uint256 collateral = midnight.collateralOf(id, borrower, 0);
+
+        // Price must be high enough that seized assets for (units + 1) don't exceed available collateral.
+        uint256 minPrice = (units + 1).mulDivUp(_maxLif, WAD).mulDivUp(ORACLE_PRICE_SCALE, collateral);
+        liquidationOraclePrice = bound(liquidationOraclePrice, minPrice, ORACLE_PRICE_SCALE);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert();
+        // Bound repaid above debt but within collateral capacity so the "repay too much" check is reached.
+        uint256 maxRepaid = collateral.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, _maxLif);
+        repaid = bound(repaid, units + 1, max(maxRepaid, units + 1));
+
+        vm.expectRevert("repay too much");
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
     }
 
