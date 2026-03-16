@@ -52,8 +52,7 @@ rule liquidateSharePriceCalibrated(env e, Midnight.Obligation obligation, uint25
     require obligationCreated(id);
     mathint sharePriceBefore = sharePrice(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    assert sharePrice(id) != sharePriceBefore =>
-        to_mathint(sharePrice(id)) * to_mathint(totalShares(id)) <= to_mathint(totalUnits(id)) * to_mathint(max_uint128);
+    assert sharePrice(id) != sharePriceBefore => to_mathint(sharePrice(id)) * to_mathint(totalShares(id)) <= to_mathint(totalUnits(id)) * to_mathint(max_uint128);
 }
 
 /// sharePrice is unchanged by any function other than liquidate (which can only decrease it).
