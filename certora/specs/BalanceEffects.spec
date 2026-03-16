@@ -140,6 +140,7 @@ rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUse
     require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "TODO prove this";
 
     int256 balanceBefore = balanceOf(id, user);
+    int256 balanceAfterSlashingBefore = balanceOfAfterSlashing(id, user);
     int256 otherBalanceBefore = balanceOf(anyId, anyUser);
 
     slash(e, id, user);
@@ -148,6 +149,7 @@ rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUse
     int256 otherBalanceAfter = balanceOf(anyId, anyUser);
 
     assert balanceAfter <= balanceBefore;
+    assert balanceAfter == balanceAfterSlashingBefore;
     assert balanceBefore >= 0 => balanceAfter >= 0;
     assert balanceBefore <= 0 => balanceAfter == balanceBefore;
     assert anyUser != user || anyId != id => otherBalanceAfter == otherBalanceBefore;
