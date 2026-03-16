@@ -24,7 +24,6 @@ struct Offer {
     bool buy;
     address maker;
     uint256 obligationUnits;
-    uint256 obligationShares;
     uint256 start;
     uint256 expiry;
     uint256 tick;
@@ -48,7 +47,7 @@ struct BorrowerState {
 
 struct ObligationState {
     uint128 totalUnits;
-    uint128 totalShares;
+    uint128 sharePrice;
     uint256 withdrawable;
     bool created;
     uint16[7] fees;

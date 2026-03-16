@@ -11,10 +11,10 @@ methods {
 }
 
 /// A single take cannot change both a user's shares and debt.
-rule takeCannotChangeBothSharesAndDebt(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
+rule takeCannotChangeBothSharesAndDebt(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
     uint256 sharesBefore = sharesOf(id, user);
     uint256 debtBefore = debtOf(id, user);
-    take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     uint256 sharesAfter = sharesOf(id, user);
     uint256 debtAfter = debtOf(id, user);
 
@@ -37,13 +37,13 @@ rule onlyAuthorizedCanChangeSharesExceptTake(env e, method f, calldataarg args, 
 
 /// In take, the caller must be authorized by the taker and only the seller's shares can decrease.
 /// Assumes no reentrancy: the onBuy/onSell callbacks could re-enter take (or another function) and decrease a different user's shares.
-rule takeOnlyAuthorizedSellerSharesDecrease(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
+rule takeOnlyAuthorizedSellerSharesDecrease(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
     address seller = offer.buy ? taker : offer.maker;
     address buyer = offer.buy ? offer.maker : taker;
     bool takerIsAuthorized = e.msg.sender == taker || isAuthorized(taker, e.msg.sender);
 
     uint256 sharesBefore = sharesOf(id, user);
-    take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     uint256 sharesAfter = sharesOf(id, user);
 
     assert takerIsAuthorized;
@@ -77,13 +77,13 @@ rule liquidateCanChangeDebt(env e, Midnight.Obligation obligation, uint256 colla
 
 /// In take, the caller must be authorized by the taker, and only the seller's debt can increase.
 /// Assumes no reentrancy: the onBuy/onSell callbacks could re-enter take (or another function) and increase a different user's debt.
-rule takeOnlyAuthorizedCanChangeDebt(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
+rule takeOnlyAuthorizedCanChangeDebt(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
     bool takerIsAuthorized = e.msg.sender == taker || isAuthorized(taker, e.msg.sender);
 
     uint256 debtBefore = debtOf(id, user);
-    take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     uint256 debtAfter = debtOf(id, user);
 
     assert takerIsAuthorized;

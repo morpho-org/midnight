@@ -5,7 +5,7 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function totalShares(bytes32 id) external returns (uint256) envfree;
+    function sharePrice(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function sharesOf(bytes32 id, address owner) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
@@ -40,22 +40,22 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return res;
 }
 
-rule takeInputOutputConsistency(env e, uint256 obligationSharesInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, obligationSharesInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    // The output obligationShares is equal to the input.
-    assert obligationSharesOutput == obligationSharesInput;
+    // The output obligationUnits is equal to the input.
+    assert obligationUnitsOutput == obligationUnitsInput;
 
     // If the input is zero, all the output arguments are zero.
-    assert obligationSharesInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && obligationUnitsOutput == 0 && obligationSharesOutput == 0;
+    assert obligationUnitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && obligationUnitsOutput == 0 && obligationSharesOutput == 0;
 }
 
-rule offerInputsConsumed(env e, uint256 obligationSharesInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsConsumed(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     uint256 buyerAssetsOutput;
@@ -63,23 +63,15 @@ rule offerInputsConsumed(env e, uint256 obligationSharesInput, address taker, ad
     uint256 obligationUnitsOutput;
     uint256 obligationSharesOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, obligationSharesInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    if (offer.obligationUnits > 0) {
-        assert consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsOutput;
-    } else {
-        assert consumed(offer.maker, offer.group) == consumedBefore + obligationSharesOutput;
-    }
+    assert consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsOutput;
 }
 
-rule offerInputsLimit(env e, uint256 obligationSharesInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
-    take(e, obligationSharesInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+rule offerInputsLimit(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+    take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    if (offer.obligationUnits > 0) {
-        assert consumed(offer.maker, offer.group) <= offer.obligationUnits;
-    } else {
-        assert consumed(offer.maker, offer.group) <= offer.obligationShares;
-    }
+    assert consumed(offer.maker, offer.group) <= offer.obligationUnits;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
@@ -107,5 +99,5 @@ strong invariant notBorrowerAndLender(bytes32 id, address user)
 strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     totalUnits(id) == sumDebtOf[id] + withdrawable(id);
 
-strong invariant totalSharesEqualsSumSharesOf(bytes32 id)
-    totalShares(id) == sumSharesOf[id];
+strong invariant sharePriceBelowOrEqScale(bytes32 id)
+    sharePrice(id) <= max_uint128;

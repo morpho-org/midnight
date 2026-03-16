@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 uint256 constant WAD = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
+uint256 constant SHARE_PRICE_SCALE = type(uint128).max;
 uint256 constant FEE_STEP = 1e12;
 uint256 constant TIME_TO_MAX_LIF = 15 minutes;
 bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");

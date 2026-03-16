@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, SHARE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -270,7 +270,11 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(
+            midnight.sharePrice(id),
+            UtilsLib.mulDivDown(SHARE_PRICE_SCALE, units - expectedBadDebt, units),
+            "share price"
+        );
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -286,7 +290,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertLt(midnight.sharePrice(id), SHARE_PRICE_SCALE, "share price decreased");
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -306,7 +310,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertLt(midnight.sharePrice(id), SHARE_PRICE_SCALE, "share price decreased");
     }
 
     // Check that if there is bad debt it is possible to seize almost all collateral.

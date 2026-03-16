@@ -8,7 +8,7 @@ methods {
     function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
-    function Midnight.totalShares(bytes32) external returns (uint256) envfree;
+    function Midnight.sharePrice(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
@@ -67,13 +67,13 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
-rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 obligationUnits, uint256 shares, address onBehalf, address receiver) {
-    Midnight.withdraw(e, obligation, obligationUnits, shares, onBehalf, receiver);
+rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) {
+    Midnight.withdraw(e, obligation, obligationUnits, onBehalf, receiver);
     assert obligationIsCreated(obligation);
 }
 
@@ -101,7 +101,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.totalShares(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
+definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.sharePrice(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);

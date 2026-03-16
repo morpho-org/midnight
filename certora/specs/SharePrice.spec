@@ -4,7 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function totalShares(bytes32 id) external returns (uint256) envfree;
+    function sharePrice(bytes32 id) external returns (uint256) envfree;
 
     function _.price() external => NONDET;
 
@@ -22,15 +22,15 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-// Check the ratio of units over shares is below or equal to 1.
-strong invariant sharePriceBelowOrEqOne(bytes32 id)
-    totalShares(id) >= totalUnits(id);
+// Share price is at most SHARE_PRICE_SCALE (type(uint128).max).
+strong invariant sharePriceBelowOrEqScale(bytes32 id)
+    sharePrice(id) <= max_uint128;
 
-/// Liquidation does not change the total shares.
-rule liquidateDoesNotChangeShares(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
-    mathint sharesBefore = totalShares(id);
+/// Liquidation does not increase the share price.
+rule liquidateDoesNotIncreaseSharePrice(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 id) {
+    mathint sharePriceBefore = sharePrice(id);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    assert totalShares(id) == sharesBefore;
+    assert sharePrice(id) <= sharePriceBefore;
 }
 
 /// Liquidation does not increase the total units.
@@ -40,18 +40,14 @@ rule liquidateDoesNotIncreaseUnits(env e, Midnight.Obligation obligation, uint25
     assert totalUnits(id) <= unitsBefore;
 }
 
-/// Virtual share price = (totalUnits+1)/(totalShares+1) monotonicity.
+/// Share price monotonicity: share price does not decrease for non-liquidation functions.
 /// Liquidation is excluded: it can decrease the share price via bad debt socialization but covered above.
 rule sharePriceDoesNotDecrease(bytes32 id, method f) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && !f.isView } {
-    mathint unitsBefore = totalUnits(id);
-    mathint sharesBefore = totalShares(id);
+    mathint sharePriceBefore = sharePrice(id);
 
     env e;
     calldataarg args;
     f(e, args);
 
-    mathint unitsAfter = totalUnits(id);
-    mathint sharesAfter = totalShares(id);
-
-    assert (unitsAfter + 1) * (sharesBefore + 1) >= (unitsBefore + 1) * (sharesAfter + 1);
+    assert sharePrice(id) >= sharePriceBefore;
 }

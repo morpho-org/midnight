@@ -9,6 +9,7 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
+    SHARE_PRICE_SCALE,
     FEE_STEP,
     TIME_TO_MAX_LIF,
     MAX_COLLATERALS,
@@ -32,7 +33,8 @@ import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
-/// @dev The max amount of debt, totalUnits, totalShares, and collateral is type(uint128).max (~1e38).
+/// @dev The max amount of debt, totalUnits, and collateral is type(uint128).max (~1e38).
+/// @dev Share price is scaled by type(uint128).max and only moves on bad debt.
 ///
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -56,8 +58,7 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same obligationShares, obligationUnits, and
-    /// loan token.
+    /// @dev To work as expected, all offers in a same group should have the same obligationUnits and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
     /// @dev Offers should have the current session to be valid.
@@ -149,10 +150,10 @@ contract Midnight is IMidnight {
     /// position at the end.
     /// @dev Neither the taker nor the maker can pass from having shares to having debt in one take.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev All sellerAssets are reachable with the obligationShares input, and all buyerAssets are reachable only if
+    /// @dev All sellerAssets are reachable with the obligationUnits input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     function take(
-        uint256 obligationShares,
+        uint256 obligationUnits,
         address taker,
         address takerCallback,
         bytes memory takerCallbackData,
@@ -166,7 +167,6 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(UtilsLib.atMostOneNonZero(offer.obligationUnits, offer.obligationShares), "INCONSISTENT_INPUT");
         require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
@@ -209,35 +209,29 @@ contract Midnight is IMidnight {
 
         bool buyerIsLender = borrowerState[id][buyer].debt == 0;
         bool sellerIsBorrower = sharesOf[id][seller] == 0;
-        // To ensure that the share price does not decrease, units should be rounded up when buyerIsLender &
-        // sellerIsBorrower, and rounded down when !buyerIsLender & !sellerIsBorrower. The variable buyerIsLender is
-        // used to discriminate, as the remaining two cases do not change total units and total shares.
-        uint256 unitsDown =
-            obligationShares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        uint256 unitsUp = obligationShares.mulDivUp(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        uint256 obligationUnits = buyerIsLender ? unitsUp : unitsDown;
-        uint256 buyerAssets = offer.buy ? unitsDown.mulDivDown(buyerPrice, WAD) : unitsUp.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? unitsDown.mulDivDown(sellerPrice, WAD) : unitsUp.mulDivUp(sellerPrice, WAD);
+        uint256 sharePrice_ = _obligationState.sharePrice;
+        uint256 obligationShares = obligationUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+        uint256 buyerAssets =
+            offer.buy ? obligationUnits.mulDivDown(buyerPrice, WAD) : obligationUnits.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets =
+            offer.buy ? obligationUnits.mulDivDown(sellerPrice, WAD) : obligationUnits.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed;
-        if (offer.obligationUnits > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
-            require(newConsumed <= offer.obligationUnits, "consumed");
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] += obligationShares;
-            require(newConsumed <= offer.obligationShares, "consumed");
-        }
+        uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
+        require(newConsumed <= offer.obligationUnits, "consumed");
 
         if (buyerIsLender && sellerIsBorrower) {
             // Lender enters + borrower enters.
-            sharesOf[id][buyer] += obligationShares;
+            uint256 targetBuyerUnits = sharesOf[id][buyer].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits;
+            sharesOf[id][buyer] = targetBuyerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
             borrowerState[id][seller].debt += UtilsLib.toUint128(obligationUnits);
-            _obligationState.totalShares += UtilsLib.toUint128(obligationShares);
             _obligationState.totalUnits += UtilsLib.toUint128(obligationUnits);
         } else if (buyerIsLender && !sellerIsBorrower) {
             // Lender enters + lender exits.
-            sharesOf[id][buyer] += obligationShares;
-            sharesOf[id][seller] -= obligationShares;
+            uint256 targetBuyerUnits = sharesOf[id][buyer].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) + obligationUnits;
+            sharesOf[id][buyer] = targetBuyerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+            uint256 targetSellerUnits =
+                sharesOf[id][seller].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
+            sharesOf[id][seller] = targetSellerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
         } else if (!buyerIsLender && sellerIsBorrower) {
             // Borrower exits + borrower enters.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
@@ -245,8 +239,9 @@ contract Midnight is IMidnight {
         } else {
             // Borrower exits + lender exits.
             borrowerState[id][buyer].debt -= UtilsLib.toUint128(obligationUnits);
-            sharesOf[id][seller] -= obligationShares;
-            _obligationState.totalShares -= UtilsLib.toUint128(obligationShares);
+            uint256 targetSellerUnits =
+                sharesOf[id][seller].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
+            sharesOf[id][seller] = targetSellerUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
             _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
         }
 
@@ -304,34 +299,23 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdraw(
-        Obligation memory obligation,
-        uint256 obligationUnits,
-        uint256 shares,
-        address onBehalf,
-        address receiver
-    ) external returns (uint256, uint256) {
+    function withdraw(Obligation memory obligation, uint256 obligationUnits, address onBehalf, address receiver)
+        external
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
-        require(UtilsLib.atMostOneNonZero(obligationUnits, shares), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-
-        if (obligationUnits > 0) {
-            shares = obligationUnits.mulDivUp(_obligationState.totalShares + 1, _obligationState.totalUnits + 1);
-        } else {
-            obligationUnits = shares.mulDivDown(_obligationState.totalUnits + 1, _obligationState.totalShares + 1);
-        }
-
-        sharesOf[id][onBehalf] -= shares;
+        uint256 sharePrice_ = _obligationState.sharePrice;
+        uint256 currentShares = sharesOf[id][onBehalf];
+        uint256 targetUnits = sharesOf[id][onBehalf].mulDivDown(sharePrice_, SHARE_PRICE_SCALE) - obligationUnits;
+        sharesOf[id][onBehalf] = targetUnits.mulDivUp(SHARE_PRICE_SCALE, sharePrice_);
+        uint256 shares = currentShares - sharesOf[id][onBehalf];
         _obligationState.withdrawable -= obligationUnits;
-        _obligationState.totalShares -= UtilsLib.toUint128(shares);
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, shares, onBehalf, receiver);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
-
-        return (obligationUnits, shares);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
@@ -440,8 +424,12 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
+            uint256 oldTotalUnits = _obligationState.totalUnits;
             _state.debt -= UtilsLib.toUint128(badDebt);
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
+            // forge-lint: disable-next-line(unsafe-typecast) as sharePrice only decreases from uint128 max
+            _obligationState.sharePrice =
+                uint128(uint256(_obligationState.sharePrice).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits));
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
@@ -552,6 +540,8 @@ contract Midnight is IMidnight {
             }
 
             obligationState[id].created = true;
+            // forge-lint: disable-next-line(unsafe-typecast) as SHARE_PRICE_SCALE is type(uint128).max
+            obligationState[id].sharePrice = uint128(SHARE_PRICE_SCALE);
             obligationState[id].fees = defaultFees[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
@@ -586,8 +576,8 @@ contract Midnight is IMidnight {
         return obligationState[id].totalUnits;
     }
 
-    function totalShares(bytes32 id) external view returns (uint256) {
-        return obligationState[id].totalShares;
+    function sharePrice(bytes32 id) external view returns (uint256) {
+        return obligationState[id].sharePrice;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
