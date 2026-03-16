@@ -6,8 +6,6 @@ methods {
     function balanceOf(bytes32 id, address user) external returns (int256) envfree;
     function balanceOfAfterSlashing(bytes32 id, address user) external returns (int256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
-    function toId(Midnight.Obligation) external returns (bytes32);
-
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to balance tracking.
@@ -17,7 +15,6 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
@@ -29,8 +26,6 @@ methods {
     function _.onLiquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
-    function _.transferFrom(address, address, uint256) external => NONDET;
-
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
 }
 
@@ -50,159 +45,110 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// REPAY ///
 
-/// repay increases onBehalf's balance by exactly obligationUnits.
-rule repayIncreasesBalanceExactly(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
+/// repay increases onBehalf's balance by exactly obligationUnits, leaves it non-positive,
+/// and only changes position[id][onBehalf].balance.
+rule repayEffects(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
+
     int256 balanceBefore = balanceOf(id, onBehalf);
-    repay(e, obligation, obligationUnits, onBehalf);
-    int256 balanceAfter = balanceOf(id, onBehalf);
-    assert to_mathint(balanceAfter) == to_mathint(balanceBefore) + to_mathint(obligationUnits);
-}
+    int256 otherBalanceBefore = balanceOf(anyId, anyUser);
 
-/// After repay, onBehalf's balance is non-positive.
-rule repayLeavesNonPositiveBalance(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
-    bytes32 id = toId(e, obligation);
     repay(e, obligation, obligationUnits, onBehalf);
+
     int256 balanceAfter = balanceOf(id, onBehalf);
+    int256 otherBalanceAfter = balanceOf(anyId, anyUser);
+
+    assert balanceAfter == balanceBefore + obligationUnits;
     assert balanceAfter <= 0;
-}
-
-/// repay only changes position[id][onBehalf].balance.
-rule repayOnlyChangesTargetBalance(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, obligation);
-    require anyUser != onBehalf || anyId != id;
-    int256 balanceBefore = balanceOf(anyId, anyUser);
-    repay(e, obligation, obligationUnits, onBehalf);
-    int256 balanceAfter = balanceOf(anyId, anyUser);
-    assert balanceAfter == balanceBefore;
+    assert anyUser != onBehalf || anyId != id => otherBalanceAfter == otherBalanceBefore;
 }
 
 /// WITHDRAW ///
 
-/// withdraw decreases onBehalf's post-slash balance by exactly obligationUnits.
-rule withdrawDecreasesBalanceExactly(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) {
+/// withdraw decreases onBehalf's post-slash balance by exactly obligationUnits, leaves it non-negative,
+/// and only changes position[id][onBehalf].balance.
+rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
-    int256 balanceBeforeSlash = balanceOfAfterSlashing(id, onBehalf);
-    withdraw(e, obligation, obligationUnits, onBehalf, receiver);
-    int256 balanceAfter = balanceOf(id, onBehalf);
-    assert to_mathint(balanceAfter) == to_mathint(balanceBeforeSlash) - to_mathint(obligationUnits);
-}
 
-/// After withdraw, onBehalf's balance is non-negative.
-rule withdrawLeavesNonNegativeBalance(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) {
-    bytes32 id = toId(e, obligation);
+    int256 balanceAfterSlash = balanceOfAfterSlashing(id, onBehalf);
+    int256 otherBalanceBefore = balanceOf(anyId, anyUser);
+
     withdraw(e, obligation, obligationUnits, onBehalf, receiver);
+
     int256 balanceAfter = balanceOf(id, onBehalf);
+    int256 otherBalanceAfter = balanceOf(anyId, anyUser);
+
+    assert balanceAfter == balanceAfterSlash - obligationUnits;
     assert balanceAfter >= 0;
-}
-
-/// withdraw only changes position[id][onBehalf].balance.
-rule withdrawOnlyChangesTargetBalance(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, obligation);
-    require anyUser != onBehalf || anyId != id;
-    int256 balanceBefore = balanceOf(anyId, anyUser);
-    withdraw(e, obligation, obligationUnits, onBehalf, receiver);
-    int256 balanceAfter = balanceOf(anyId, anyUser);
-    assert balanceAfter == balanceBefore;
+    assert anyUser != onBehalf || anyId != id => otherBalanceAfter == otherBalanceBefore;
 }
 
 /// TAKE ///
 
-/// take changes maker's balance by +/- obligationUnits relative to its post-slash balance.
-rule takeChangesMakerBalance(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+/// take changes maker's and taker's balances by +/- obligationUnits relative to their post-slash balances,
+/// and only changes balances of maker and taker at the obligation id.
+rule takeEffects(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.obligation);
+
     int256 makerPostSlash = balanceOfAfterSlashing(id, offer.maker);
+    int256 takerPostSlash = balanceOfAfterSlashing(id, taker);
+    int256 otherBalanceBefore = balanceOf(anyId, anyUser);
 
     take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     int256 makerAfter = balanceOf(id, offer.maker);
-    mathint delta = offer.buy ? to_mathint(obligationUnits) : -to_mathint(obligationUnits);
-    assert to_mathint(makerAfter) == to_mathint(makerPostSlash) + delta;
-}
-
-/// take changes taker's balance by +/- obligationUnits relative to its post-slash balance.
-rule takeChangesTakerBalance(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    bytes32 id = toId(e, offer.obligation);
-    int256 takerPostSlash = balanceOfAfterSlashing(id, taker);
-
-    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-
     int256 takerAfter = balanceOf(id, taker);
-    mathint delta = offer.buy ? -to_mathint(obligationUnits) : to_mathint(obligationUnits);
-    assert to_mathint(takerAfter) == to_mathint(takerPostSlash) + delta;
-}
+    int256 otherBalanceAfter = balanceOf(anyId, anyUser);
 
-/// take only changes balances of maker and taker at the obligation id.
-rule takeOnlyChangesMakerAndTakerBalances(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, offer.obligation);
-    require anyId != id || (anyUser != offer.maker && anyUser != taker);
-    int256 balanceBefore = balanceOf(anyId, anyUser);
-    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-    int256 balanceAfter = balanceOf(anyId, anyUser);
-    assert balanceAfter == balanceBefore;
+    mathint makerDelta = offer.buy ? obligationUnits : -obligationUnits;
+    assert makerAfter == makerPostSlash + makerDelta;
+    mathint takerDelta = offer.buy ? -obligationUnits : obligationUnits;
+    assert takerAfter == takerPostSlash + takerDelta;
+    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => otherBalanceAfter == otherBalanceBefore;
 }
 
 /// LIQUIDATE ///
 
-/// liquidate increases the borrower's balance by at least repaidUnits.
-rule liquidateIncreasesBalanceByAtLeastRepaid(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+/// liquidate increases the borrower's balance by at least repaidUnits, leaves it non-positive
+/// when repayment is non-zero, and only changes position[id][borrower].balance.
+rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
+
     int256 balanceBefore = balanceOf(id, borrower);
-    uint256 seizedResult;
-    uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    int256 balanceAfter = balanceOf(id, borrower);
-    assert to_mathint(balanceAfter) >= to_mathint(balanceBefore) + to_mathint(repaidResult);
-}
+    int256 otherBalanceBefore = balanceOf(anyId, anyUser);
 
-/// After liquidate with non-zero repayment, the borrower's balance is non-positive.
-rule liquidateLeavesNonPositiveBalance(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    bytes32 id = toId(e, obligation);
     uint256 seizedResult;
     uint256 repaidResult;
     seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+
     int256 balanceAfter = balanceOf(id, borrower);
+    int256 otherBalanceAfter = balanceOf(anyId, anyUser);
+
+    assert balanceAfter >= balanceBefore + repaidResult;
     assert repaidResult > 0 => balanceAfter <= 0;
-}
-
-/// liquidate only changes position[id][borrower].balance.
-rule liquidateOnlyChangesTargetBalance(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, obligation);
-    require anyUser != borrower || anyId != id;
-    int256 balanceBefore = balanceOf(anyId, anyUser);
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-    int256 balanceAfter = balanceOf(anyId, anyUser);
-    assert balanceAfter == balanceBefore;
+    assert anyUser != borrower || anyId != id => otherBalanceAfter == otherBalanceBefore;
 }
 
 /// SLASH ///
 
-/// slash can only decrease balances (or keep them unchanged).
+/// slash can only decrease balances (or keep them unchanged), preserves non-positive balances,
+/// leaves the balance non-negative, and only changes position[id][user].balance.
 /// Requires the system invariant that the obligation's lossIndex >= the user's lossIndex.
-rule slashOnlyDecreasesBalance(env e, bytes32 id, address user) {
+rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUser) {
     require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "TODO prove this";
-    int256 balanceBefore = balanceOf(id, user);
-    slash(e, id, user);
-    int256 balanceAfter = balanceOf(id, user);
-    assert to_mathint(balanceAfter) <= to_mathint(balanceBefore);
-}
 
-/// slash does not change non-positive balances.
-rule slashPreservesNonPositiveBalance(env e, bytes32 id, address user) {
     int256 balanceBefore = balanceOf(id, user);
-    require balanceBefore <= 0;
-    slash(e, id, user);
-    int256 balanceAfter = balanceOf(id, user);
-    assert balanceAfter == balanceBefore;
-}
+    int256 otherBalanceBefore = balanceOf(anyId, anyUser);
 
-/// slash only changes position[id][user].balance.
-rule slashOnlyChangesTargetBalance(env e, bytes32 id, address user, bytes32 anyId, address anyUser) {
-    require anyUser != user || anyId != id;
-    int256 balanceBefore = balanceOf(anyId, anyUser);
     slash(e, id, user);
-    int256 balanceAfter = balanceOf(anyId, anyUser);
-    assert balanceAfter == balanceBefore;
+
+    int256 balanceAfter = balanceOf(id, user);
+    int256 otherBalanceAfter = balanceOf(anyId, anyUser);
+
+    assert balanceAfter <= balanceBefore;
+    assert balanceAfter >= 0;
+    assert balanceBefore <= 0 => balanceAfter == balanceBefore;
+    assert anyUser != user || anyId != id => otherBalanceAfter == otherBalanceBefore;
 }
 
 /// ALL OTHER FUNCTIONS ///

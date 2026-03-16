@@ -118,5 +118,5 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeBalancePlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumNegativeBalanceOf[id] + to_mathint(withdrawable(id));
 
-invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
+strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
     userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;

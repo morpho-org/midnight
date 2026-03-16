@@ -37,19 +37,19 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 }
 
 // Show that a created obligation has at least one collateral.
-invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
+strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
     obligationIsCreated(obligation) => obligation.collaterals.length > 0;
 
 // Show that a created obligation has sorted collaterals.
-invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
+strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
     obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
 
 // Show that a created obligation do not have address(0) collaterals.
-invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
+strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
 
 // Show that a created obligation has lltv <= WAD.
-invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
+strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
@@ -97,7 +97,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that an obligation state is empty if it is not created.
-invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
 definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.balanceOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
