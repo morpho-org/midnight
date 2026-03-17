@@ -101,8 +101,7 @@ strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
 strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex
-    || userLossIndex(id, user) == 0;
+    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, user) == 0;
 
 strong invariant noCreditAndDebt(bytes32 id, address user)
     creditOf(id, user) == 0 || debtOf(id, user) == 0;
