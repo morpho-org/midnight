@@ -353,7 +353,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
         require(
-            collateralOf[id][onBehalf][collateralIndex] <= maxCollateralPerUser[collateralToken],
+            _position.collateral[collateralIndex] <= maxCollateralPerUser[collateralToken],
             "exceeds max collateral per user"
         );
 
