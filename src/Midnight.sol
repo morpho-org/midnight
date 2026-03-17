@@ -521,6 +521,7 @@ contract Midnight is IMidnight {
     }
 
     function slash(bytes32 id, address user) public {
+        require(obligationState[id].created, "not created");
         Position storage _position = position[id][user];
         uint128 _userLossIndex = _position.lossIndex;
         uint128 lossIndex = obligationState[id].lossIndex;
