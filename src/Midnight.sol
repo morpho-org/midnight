@@ -204,10 +204,12 @@ contract Midnight is IMidnight {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssetsScaled =
-            offer.buy ? obligationUnits.mulDivDown(buyerPrice, WAD) : obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssetsScaled =
-            offer.buy ? obligationUnits.mulDivDown(sellerPrice, WAD) : obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets = offer.buy
+            ? obligationUnits.mulDivDown(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS)
+            : obligationUnits.mulDivUp(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+        uint256 sellerAssets = offer.buy
+            ? obligationUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS)
+            : obligationUnits.mulDivUp(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
 
         uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
         require(newConsumed <= offer.obligationUnits, "consumed");
@@ -231,8 +233,8 @@ contract Midnight is IMidnight {
             offer.maker,
             taker,
             offer.buy,
-            buyerAssetsScaled,
-            sellerAssetsScaled,
+            buyerAssets,
+            sellerAssets,
             obligationUnits,
             receiver,
             offer.group,
@@ -242,36 +244,22 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
-                .onBuy(
-                    offer.obligation, buyer, buyerAssetsScaled, sellerAssetsScaled, obligationUnits, buyerCallbackData
-                );
+                .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, obligationUnits, buyerCallbackData);
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken,
-            buyer,
-            tradingFeeRecipient,
-            (buyerAssetsScaled - sellerAssetsScaled) / BALANCE_DECIMALS
+            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
         );
-        SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, receiver, sellerAssetsScaled / BALANCE_DECIMALS
-        );
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
-                .onSell(
-                    offer.obligation,
-                    seller,
-                    buyerAssetsScaled / BALANCE_DECIMALS,
-                    sellerAssetsScaled / BALANCE_DECIMALS,
-                    obligationUnits,
-                    sellerCallbackData
-                );
+                .onSell(offer.obligation, seller, buyerAssets, sellerAssets, obligationUnits, sellerCallbackData);
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
-        return (buyerAssetsScaled, sellerAssetsScaled, obligationUnits);
+        return (buyerAssets, sellerAssets, obligationUnits);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -290,7 +278,7 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits / BALANCE_DECIMALS);
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits.mulDivDown(1, BALANCE_DECIMALS));
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
@@ -304,7 +292,7 @@ contract Midnight is IMidnight {
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
         SafeTransferLib.safeTransferFrom(
-            obligation.loanToken, msg.sender, address(this), obligationUnits / BALANCE_DECIMALS
+            obligation.loanToken, msg.sender, address(this), obligationUnits.mulDivDown(1, BALANCE_DECIMALS)
         );
     }
 
@@ -391,7 +379,7 @@ contract Midnight is IMidnight {
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = scaledOracle(_collateral.oracle);
+            uint256 price = IOracle(_collateral.oracle).price().mulDivDown(BALANCE_DECIMALS, 1);
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = _position.collateral[i];
             maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
@@ -464,7 +452,7 @@ contract Midnight is IMidnight {
         }
 
         SafeTransferLib.safeTransferFrom(
-            obligation.loanToken, msg.sender, address(this), repaidUnits / BALANCE_DECIMALS
+            obligation.loanToken, msg.sender, address(this), repaidUnits.mulDivDown(1, BALANCE_DECIMALS)
         );
 
         return (seizedAssets, repaidUnits);
@@ -625,8 +613,9 @@ contract Midnight is IMidnight {
         while (maxDebt < debt && bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = scaledOracle(collateral.oracle);
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            uint256 price = IOracle(collateral.oracle).price().mulDivDown(BALANCE_DECIMALS, 1);
+            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD)
+                .mulDivDown(BALANCE_DECIMALS, 1);
             bitmap ^= (1 << i);
         }
         return maxDebt >= debt;
@@ -642,10 +631,6 @@ contract Midnight is IMidnight {
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
-    }
-
-    function scaledOracle(address oracle) public view returns (uint256) {
-        return IOracle(oracle).price() * BALANCE_DECIMALS;
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
