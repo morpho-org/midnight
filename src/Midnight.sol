@@ -370,19 +370,19 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
 
         uint256 maxDebt;
-        uint256 liquidatedCollatPrice;
+        uint256 liquidatedCollatPriceInUnit;
         uint256 originalDebt = debtOf(id, borrower);
         uint256 badDebt = originalDebt;
         uint256 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = IOracle(_collateral.oracle).price().mulDivDown(BALANCE_DECIMALS, 1);
-            if (i == collateralIndex) liquidatedCollatPrice = price;
+            uint256 priceInUnit = IOracle(_collateral.oracle).price() * BALANCE_DECIMALS;
+            if (i == collateralIndex) liquidatedCollatPriceInUnit = priceInUnit;
             uint256 _collateralOf = _position.collateral[i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            maxDebt += _collateralOf.mulDivDown(priceInUnit, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
+                _collateralOf.mulDivUp(priceInUnit, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
             );
             bitmap ^= (1 << i);
         }
@@ -409,9 +409,10 @@ contract Midnight is IMidnight {
                 );
 
             if (seizedAssets > 0) {
-                repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
+                repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPriceInUnit, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
-                seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
+                seizedAssets =
+                    repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPriceInUnit);
             }
 
             if (block.timestamp <= obligation.maturity) {
@@ -422,8 +423,9 @@ contract Midnight is IMidnight {
                 uint256 maxRepaid = (debtOf(id, borrower) - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
                 require(
                     repaidUnits <= maxRepaid
-                        || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < obligation.rcfThreshold,
+                        || _position.collateral[collateralIndex].mulDivDown(
+                                liquidatedCollatPriceInUnit, ORACLE_PRICE_SCALE
+                            ).mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < obligation.rcfThreshold,
                     "recovery close factor conditions violated"
                 );
             }
