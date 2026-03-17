@@ -12,6 +12,15 @@ methods {
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
 
+    // Summaries for complex internals irrelevant to token balance tracking.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
@@ -98,12 +107,12 @@ ghost mapping(bytes32 => mapping(address => mapping(address => mathint))) collat
 }
 
 // Safe require as obligations limit the number of collaterals.
-hook Sload uint128 value collateralOf[KEY bytes32 id][KEY address owner][INDEX uint256 collateralIndex] {
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] {
     require value == collateralOfMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]], "ghost mirror";
 }
 
 // Safe require as obligations limit the number of collaterals.
-hook Sstore collateralOf[KEY bytes32 id][KEY address owner][INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
+hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
     collateralOfMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
 }
 
@@ -132,7 +141,7 @@ strong invariant tokenBalanceCorrect(address token)
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
         }
-        preserved take(uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+        preserved take(uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
             require taker != currentContract, "no trading with contract";
             require offer.maker != currentContract, "no trading with contract";
         }

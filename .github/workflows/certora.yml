@@ -8,21 +8,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      confs: ${{ steps.list.outputs.confs }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: list
+        run: echo "confs=$(ls certora/confs/*.conf | xargs -I{} basename {} .conf | jq -nRc '[inputs]')" >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        conf:
-          - Consume
-          - CreatedObligations
-          - ExactMath
-          - Liquidate
-          - Midnight
-          - OnlyAuthorizedCanDecreaseShares
-          - SharePrice
-          - Solvency
-          - WithdrawableMonotonicity
+        conf: ${{ fromJson(needs.matrix.outputs.confs) }}
 
     steps:
       - uses: actions/checkout@v4

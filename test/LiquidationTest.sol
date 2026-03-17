@@ -10,6 +10,7 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 // Collateral = units / lltv (up to ~1.33x for lltv=0.75).
 // To keep collateral within uint128, we cap amounts at type(uint128).max / 2.
@@ -214,12 +215,21 @@ contract LiquidationTest is BaseTest {
 
     function testCannotRepayMoreThanDebt(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS - 1);
-        repaid = bound(repaid, units + 1, MAX_UNITS);
-        liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+
+        uint256 _maxLif = obligation.collaterals[0].maxLif;
+        uint256 collateral = midnight.collateralOf(id, borrower, 0);
+
+        // Price must be high enough that seized assets for (units + 1) don't exceed available collateral.
+        uint256 minPrice = (units + 1).mulDivUp(_maxLif, WAD).mulDivUp(ORACLE_PRICE_SCALE, collateral);
+        liquidationOraclePrice = bound(liquidationOraclePrice, minPrice, ORACLE_PRICE_SCALE);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
+
+        // Bound repaid above debt but within collateral capacity so the "repay too much" check is reached.
+        uint256 maxRepaid = collateral.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, _maxLif);
+        repaid = bound(repaid, units + 1, max(maxRepaid, units + 1));
 
         vm.expectRevert(stdError.arithmeticError);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
@@ -270,7 +280,47 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.creditOf(id, lender), units, "lender units");
+        assertApproxEqAbs(
+            midnight.creditAfterSlashing(id, lender), units - expectedBadDebt, 1, "lender units after slashing"
+        );
+    }
+
+    function testLiquidateEmitsLossIndex(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
+
+        uint256 expectedBadDebt = _badDebt();
+        (uint128 oldTotalUnits,, uint256 previousLossIndex,) = midnight.obligationState(id);
+        uint256 expectedLossIndex = expectedBadDebt == 0
+            ? previousLossIndex
+            : type(uint128).max
+                - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+
+        vm.expectEmit(true, true, true, true);
+        emit EventsLib.Liquidate(address(this), id, 0, 0, 0, borrower, expectedBadDebt, expectedLossIndex);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+    }
+
+    function testSlashEvent(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
+
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+
+        uint256 expectedCredit = midnight.creditAfterSlashing(id, lender);
+        (,, uint256 lossIndex,) = midnight.obligationState(id);
+
+        vm.expectEmit(true, true, false, true);
+        emit EventsLib.Slash(address(this), id, lender, expectedCredit, lossIndex);
+        midnight.slash(id, lender);
+
+        assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");
+        assertEq(midnight.userLossIndex(id, lender), lossIndex, "user loss index");
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -286,7 +336,8 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.creditOf(id, lender), units, "lender units");
+        assertApproxEqAbs(midnight.creditAfterSlashing(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -306,7 +357,8 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
-        assertEq(midnight.totalShares(id), units, "total shares");
+        assertEq(midnight.creditOf(id, lender), units, "lender units");
+        assertApproxEqAbs(midnight.creditAfterSlashing(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
     }
 
     // Check that if there is bad debt it is possible to seize almost all collateral.
@@ -520,18 +572,19 @@ contract LiquidationTest is BaseTest {
         units = bound(units, maxDebt, repayableDebt);
         vm.assume(units > maxDebt);
 
-        // Write the debt first, supply collateral later, so that the activated collaterals are not overwritten.
-        uint256 mappingSlot = 1;
+        // Write debt into Position storage.
+        // Layout: slot 0 = credit | lossIndex, slot 1 = debt | activatedCollaterals.
+        // Debt is in the lower 128 bits of slot 1.
+        uint256 mappingSlot = 0;
         bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
         bytes32 borrowerSlot = keccak256(abi.encode(borrower, intermediateSlot));
-        vm.store(address(midnight), borrowerSlot, bytes32(units));
+        vm.store(address(midnight), bytes32(uint256(borrowerSlot) + 1), bytes32(units));
 
         assertEq(midnight.debtOf(id, borrower), units, "debt");
 
         // Collateralize with both collaterals.
 
-        vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        authorize(borrower, address(this));
 
         deal(obligation.collaterals[0].token, address(this), collateral1);
         ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral1);
@@ -566,8 +619,7 @@ contract LiquidationTest is BaseTest {
         uint256 lltv0 = obligation.collaterals[0].lltv;
         uint256 lltv1 = obligation.collaterals[1].lltv;
 
-        vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        authorize(borrower, address(this));
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -607,8 +659,7 @@ contract LiquidationTest is BaseTest {
         uint256 units = 1000e18;
         uint256 collateralAmount = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
 
-        vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        authorize(borrower, address(this));
 
         // Supply both collaterals.
         for (uint256 i = 0; i < 2; i++) {
