@@ -7,6 +7,10 @@ methods {
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
     function slash(bytes32 id, address user) internal => slashSummary(id, user);
+
+    // Bypass the hook update when calling debtOf, because it only looks at the negative part of the balance.
+    // Note that this also summarizes the external view function debtOf, which is thus skipped by the readAfterSlash rule.
+    function debtOf(bytes32 id, address user) internal returns (uint256) => NONDET;
 }
 
 /// GHOSTS ///
@@ -45,18 +49,7 @@ hook Sstore position[KEY bytes32 id][KEY address user].balance int256 newValue (
 /// RULES ///
 
 // View functions that read balanceOf don't call slash (they can't mutate state).
-rule balanceReadAfterSlash(method f, env e, calldataarg args)
-filtered {
-    f ->
-    // Skipped: liquidate and withdrawCollateral read balance via debtOf/isHealthy without
-    // calling slash first (but don't do anything with it). TODO: improve this.
-    f.selector != sig:balanceOf(bytes32, address).selector
-        && f.selector != sig:debtOf(bytes32, address).selector
-        && f.selector != sig:balanceOfAfterSlashing(bytes32, address).selector
-        && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
-        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
-} {
+rule balanceReadAfterSlash(method f, env e, calldataarg args) filtered { f -> f.selector != sig:balanceOf(bytes32, address).selector && f.selector != sig:balanceOfAfterSlashing(bytes32, address).selector && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector } {
     require !balanceReadWithoutSlash, "initialize the ghost variable";
     f(e, args);
     assert !balanceReadWithoutSlash;
