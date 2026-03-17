@@ -380,13 +380,13 @@ contract Midnight is IMidnight {
         uint256 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
-            Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = IOracle(_collateral.oracle).price();
+            uint256 price = IOracle(obligation.collaterals[i].oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = _position.collateral[i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE)
+                .mulDivDown(obligation.collaterals[i].lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
+                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, obligation.collaterals[i].maxLif)
             );
             bitmap ^= (1 << i);
         }
