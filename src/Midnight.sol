@@ -46,7 +46,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Max trading fee is defined per index (see maxTradingFee function).
 ///
 /// ROUNDINGS
-/// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev lossIndex is rounded down so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
 /// afterwards (bad debt can no longer be realized).
@@ -397,11 +397,8 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            _obligationState.lossIndex = UtilsLib.toUint128(
-                type(uint128).max
-                    - (type(uint128).max - _obligationState.lossIndex)
-                    .mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
-            );
+            _obligationState.lossIndex =
+                UtilsLib.toUint128(_obligationState.lossIndex.mulDivDown(oldTotalUnits - badDebt, oldTotalUnits));
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
@@ -513,6 +510,7 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
+            obligationState[id].lossIndex = type(uint128).max;
             obligationState[id].created = true;
             obligationState[id].fees = defaultFees[obligation.loanToken];
             IdLib.storeInCode(obligation);
@@ -527,12 +525,13 @@ contract Midnight is IMidnight {
         uint128 _userLossIndex = _position.lossIndex;
         uint128 lossIndex = obligationState[id].lossIndex;
         if (_userLossIndex != lossIndex) {
-            uint256 newCredit =
-                _position.credit.mulDivDown(type(uint128).max - lossIndex, type(uint128).max - _userLossIndex);
-            // forge-lint: disable-next-item(unsafe-typecast) as newCredit <= credits.
-            _position.credit = uint128(newCredit);
+            if (_userLossIndex != 0) {
+                uint256 newCredit = _position.credit.mulDivDown(lossIndex, _userLossIndex);
+                // forge-lint: disable-next-item(unsafe-typecast) as newCredit <= credits.
+                _position.credit = uint128(newCredit);
+                emit EventsLib.Slash(msg.sender, id, user, newCredit, lossIndex);
+            }
             _position.lossIndex = lossIndex;
-            emit EventsLib.Slash(msg.sender, id, user, newCredit, lossIndex);
         }
     }
 
@@ -564,8 +563,9 @@ contract Midnight is IMidnight {
 
     function creditAfterSlashing(bytes32 id, address user) public view returns (uint256) {
         Position storage _position = position[id][user];
-        return _position.credit
-            .mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _position.lossIndex);
+        uint128 _userLossIndex = _position.lossIndex;
+        if (_userLossIndex == 0) return 0;
+        return _position.credit.mulDivDown(obligationState[id].lossIndex, _userLossIndex);
     }
 
     function creditOf(bytes32 id, address user) public view returns (uint256) {

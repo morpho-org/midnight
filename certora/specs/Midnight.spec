@@ -80,19 +80,19 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
-rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
     uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter >= lossIndexBefore;
+    assert lossIndexAfter <= lossIndexBefore;
 }
 
-rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
+rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant userLossIndexGeqObligationLossIndex(id, user);
     uint128 lossIndexBefore = userLossIndex(id, user);
     f(e, args);
     uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter >= lossIndexBefore;
+    assert lossIndexAfter <= lossIndexBefore || lossIndexBefore == 0;
 }
 
 /// INVARIANTS ///
@@ -100,8 +100,9 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
-strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
+    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex
+    || userLossIndex(id, user) == 0;
 
 strong invariant noCreditAndDebt(bytes32 id, address user)
     creditOf(id, user) == 0 || debtOf(id, user) == 0;
