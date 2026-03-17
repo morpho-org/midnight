@@ -146,8 +146,6 @@ contract Midnight is IMidnight {
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev All sellerAssets are reachable with the obligationUnits input, and all buyerAssets are reachable only if
-    /// buyerPrice <= WAD.
     function take(
         uint256 obligationUnits,
         address taker,
