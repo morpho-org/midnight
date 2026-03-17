@@ -12,7 +12,7 @@ library TakeAmountsLib {
 
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.
-    function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
+    function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssetsScaled)
         internal
         view
         returns (uint256)
@@ -21,11 +21,13 @@ library TakeAmountsLib {
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 buyerPrice = offer.buy ? makerPrice : makerPrice + tradingFee;
         require(buyerPrice <= WAD, "buyerPrice");
-        return offer.buy ? targetBuyerAssets.mulDivUp(WAD, buyerPrice) : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
+        return offer.buy
+            ? targetBuyerAssetsScaled.mulDivUp(WAD, buyerPrice)
+            : targetBuyerAssetsScaled.mulDivDown(WAD, buyerPrice);
     }
 
     /// @dev Returns the number of units to take to get the target seller assets.
-    function sellerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
+    function sellerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssetsScaled)
         internal
         view
         returns (uint256)
@@ -33,7 +35,8 @@ library TakeAmountsLib {
         uint256 makerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 sellerPrice = offer.buy ? makerPrice - tradingFee : makerPrice;
-        return
-            offer.buy ? targetSellerAssets.mulDivUp(WAD, sellerPrice) : targetSellerAssets.mulDivDown(WAD, sellerPrice);
+        return offer.buy
+            ? targetSellerAssetsScaled.mulDivUp(WAD, sellerPrice)
+            : targetSellerAssetsScaled.mulDivDown(WAD, sellerPrice);
     }
 }
