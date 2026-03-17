@@ -27,7 +27,7 @@ function summaryToId(Midnight.Obligation obligation) returns bytes32 {
 /// LIF BOUNDARIES ///
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input)
-rule liquidationProfitBounded_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
+rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
     require maxLif >= WAD();
     require repaidUnits > 0;
