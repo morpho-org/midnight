@@ -18,7 +18,7 @@ import {
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
-// To keep total collateral within uint128, we cap amounts at MAX_TEST_AMOUNT / 3.
+// To keep total collateral within uint128, we cap amounts at type(uint128).max / 3.
 uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 3;
 
 contract OtherFunctionsTest is BaseTest {

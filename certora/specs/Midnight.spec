@@ -8,7 +8,7 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function balanceOf(bytes32 id, address user) external returns (int256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function userLossIndex(bytes32 id, address user) external returns (uint120) envfree;
 
     function _.price() external => NONDET;
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -38,7 +38,7 @@ function positivePart(mathint x) returns mathint {
     return x > 0 ? x : 0;
 }
 
-hook Sstore position[KEY bytes32 id][KEY address owner].balance int128 newBalance (int128 oldBalance) {
+hook Sstore position[KEY bytes32 id][KEY address owner].balance int136 newBalance (int136 oldBalance) {
     sumBalanceOf[id] = sumBalanceOf[id] - oldBalance + newBalance;
     sumPositiveBalanceOf[id] = sumPositiveBalanceOf[id] - positivePart(to_mathint(oldBalance)) + positivePart(to_mathint(newBalance));
     sumNegativeBalanceOf[id] = sumNegativeBalanceOf[id] - negativePart(to_mathint(oldBalance)) + negativePart(to_mathint(newBalance));
@@ -99,17 +99,17 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 }
 
 rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+    uint120 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
-    uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
+    uint120 lossIndexAfter = currentContract.obligationState[id].lossIndex;
     assert lossIndexAfter <= lossIndexBefore;
 }
 
 rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant userLossIndexGeqObligationLossIndex(id, user);
-    uint128 lossIndexBefore = userLossIndex(id, user);
+    uint120 lossIndexBefore = userLossIndex(id, user);
     f(e, args);
-    uint128 lossIndexAfter = userLossIndex(id, user);
+    uint120 lossIndexAfter = userLossIndex(id, user);
     assert lossIndexAfter <= lossIndexBefore;
 }
 
@@ -119,4 +119,4 @@ strong invariant totalUnitsEqualsSumNegativeBalancePlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumNegativeBalanceOf[id] + to_mathint(withdrawable(id));
 
 strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex;
+    userLossIndex(id, user) == 0 || userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex;

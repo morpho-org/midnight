@@ -44,14 +44,14 @@ struct Signature {
 struct ObligationState {
     uint128 totalUnits;
     uint256 withdrawable;
-    uint128 lossIndex;
+    uint120 lossIndex;
     bool created;
     uint16[7] fees;
 }
 
 struct Position {
-    int128 balance;
-    uint128 lossIndex;
+    int136 balance;
+    uint120 lossIndex;
     uint128 activatedCollaterals;
     uint128[128] collateral;
 }

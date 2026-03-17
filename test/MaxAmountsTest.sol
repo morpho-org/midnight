@@ -8,8 +8,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
-uint256 constant MAX_BALANCE = uint256(uint128(type(int128).max));
-uint256 constant MAX_COLLATERAL = type(uint128).max;
+uint256 constant MAX_AMOUNT = type(uint128).max;
 
 contract MaxAmountsTest is BaseTest {
     using UtilsLib for uint256;
@@ -38,12 +37,12 @@ contract MaxAmountsTest is BaseTest {
         authorize(borrower, address(this));
     }
 
-    function testMaxBalanceIsInt128Max() public pure {
-        assertEq(MAX_BALANCE, uint256(uint128(type(int128).max)));
+    function testMaxAmountIsUint128Max() public pure {
+        assertEq(MAX_AMOUNT, type(uint128).max);
     }
 
     function testTakeMaxAmount() public {
-        uint256 amount = MAX_BALANCE;
+        uint256 amount = MAX_AMOUNT;
 
         deal(address(loanToken), lender, amount);
 
@@ -51,7 +50,7 @@ contract MaxAmountsTest is BaseTest {
 
         // Set a very high oracle price so a small collateral amount is sufficient.
         // With price = ORACLE_PRICE_SCALE * 1e36, 1 collateral token = 1e36 loan tokens.
-        // maxDebt = collateral * 1e36 * 0.75, so ~454 tokens covers MAX_BALANCE.
+        // maxDebt = collateral * 1e36 * 0.75, so ~454 tokens covers MAX_AMOUNT.
         oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
@@ -74,7 +73,7 @@ contract MaxAmountsTest is BaseTest {
     }
 
     function testTakeAboveMaxAmountReverts() public {
-        uint256 amount = MAX_BALANCE + 1;
+        uint256 amount = uint256(MAX_AMOUNT) + 1;
 
         deal(address(loanToken), lender, amount);
 
@@ -93,12 +92,12 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert("uint256 overflows int128");
+        vm.expectRevert("uint256 overflows uint128");
         take(amount, lender, borrowerOffer);
     }
 
     function testSupplyCollateralMaxAmount() public {
-        uint256 amount = MAX_COLLATERAL;
+        uint256 amount = MAX_AMOUNT;
 
         deal(address(collateralToken1), address(this), amount);
         collateralToken1.approve(address(midnight), amount);
@@ -111,7 +110,7 @@ contract MaxAmountsTest is BaseTest {
     }
 
     function testSupplyCollateralAboveMaxAmountReverts() public {
-        uint256 amount = uint256(MAX_COLLATERAL) + 1;
+        uint256 amount = uint256(MAX_AMOUNT) + 1;
 
         deal(address(collateralToken1), address(this), amount);
         collateralToken1.approve(address(midnight), amount);

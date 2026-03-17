@@ -19,7 +19,7 @@ import {
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 
-uint256 constant MAX_TEST_AMOUNT = uint256(uint128(type(int128).max));
+uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;

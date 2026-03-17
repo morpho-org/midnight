@@ -5,7 +5,7 @@ methods {
 
     function balanceOf(bytes32 id, address user) external returns (int256) envfree;
     function balanceOfAfterSlashing(bytes32 id, address user) external returns (int256) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function userLossIndex(bytes32 id, address user) external returns (uint120) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to balance tracking.
@@ -137,7 +137,7 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 /// leaves the balance non-negative, and only changes position[id][user].balance.
 /// Requires the system invariant that the obligation's lossIndex <= the user's lossIndex.
 rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUser) {
-    require userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex, "TODO prove this";
+    require userLossIndex(id, user) == 0 || userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex, "TODO prove this";
 
     int256 balanceBefore = balanceOf(id, user);
     int256 balanceAfterSlashingBefore = balanceOfAfterSlashing(id, user);

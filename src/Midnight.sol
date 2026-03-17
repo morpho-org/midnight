@@ -211,10 +211,10 @@ contract Midnight is IMidnight {
         uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
         require(newConsumed <= offer.obligationUnits, "consumed");
 
-        int128 oldBuyerBalance = position[id][buyer].balance;
-        int128 oldSellerBalance = position[id][seller].balance;
-        int128 newBuyerBalance = oldBuyerBalance + UtilsLib.toInt128(obligationUnits);
-        int128 newSellerBalance = oldSellerBalance - UtilsLib.toInt128(obligationUnits);
+        int136 oldBuyerBalance = position[id][buyer].balance;
+        int136 oldSellerBalance = position[id][seller].balance;
+        int136 newBuyerBalance = oldBuyerBalance + UtilsLib.toInt136(obligationUnits);
+        int136 newSellerBalance = oldSellerBalance - UtilsLib.toInt136(obligationUnits);
         position[id][buyer].balance = newBuyerBalance;
         position[id][seller].balance = newSellerBalance;
         if (offer.exitOnly) require(offer.buy ? newBuyerBalance <= 0 : newSellerBalance >= 0, "crossed");
@@ -268,7 +268,7 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         slash(id, onBehalf);
 
-        position[id][onBehalf].balance -= UtilsLib.toInt128(obligationUnits);
+        position[id][onBehalf].balance -= UtilsLib.toInt136(obligationUnits);
         require(position[id][onBehalf].balance >= 0, "withdraw too much");
         _obligationState.withdrawable -= obligationUnits;
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
@@ -282,7 +282,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
-        position[id][onBehalf].balance += UtilsLib.toInt128(obligationUnits);
+        position[id][onBehalf].balance += UtilsLib.toInt136(obligationUnits);
         require(position[id][onBehalf].balance <= 0, "repay too much");
         obligationState[id].withdrawable += obligationUnits;
 
@@ -387,9 +387,9 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
-            _position.balance += UtilsLib.toInt128(badDebt);
+            _position.balance += UtilsLib.toInt136(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            _obligationState.lossIndex = UtilsLib.toUint128(
+            _obligationState.lossIndex = UtilsLib.toUint120(
                 uint256(_obligationState.lossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
@@ -430,7 +430,7 @@ contract Midnight is IMidnight {
                 _position.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
             _obligationState.withdrawable += repaidUnits;
-            _position.balance += UtilsLib.toInt128(repaidUnits);
+            _position.balance += UtilsLib.toInt136(repaidUnits);
             require(_position.balance <= 0, "repay too much");
         }
 
@@ -505,7 +505,7 @@ contract Midnight is IMidnight {
             }
 
             obligationState[id].created = true;
-            obligationState[id].lossIndex = type(uint128).max;
+            obligationState[id].lossIndex = type(uint120).max;
             obligationState[id].fees = defaultFees[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
@@ -516,15 +516,15 @@ contract Midnight is IMidnight {
 
     function slash(bytes32 id, address user) public {
         Position storage _position = position[id][user];
-        uint128 _userLossIndex = _position.lossIndex;
-        uint128 lossIndex = obligationState[id].lossIndex;
+        uint120 _userLossIndex = _position.lossIndex;
+        uint120 lossIndex = obligationState[id].lossIndex;
         if (_userLossIndex != lossIndex) {
-            int128 balance = _position.balance;
+            int136 balance = _position.balance;
             if (balance > 0) {
-                balance = UtilsLib.toInt128(
+                balance = UtilsLib.toInt136(
                     UtilsLib.toInt256(
                         // forge-lint: disable-next-line(unsafe-typecast) as balance > 0
-                        uint128(balance).mulDivDown(lossIndex, _userLossIndex)
+                        uint256(uint136(balance)).mulDivDown(lossIndex, _userLossIndex)
                     )
                 );
                 _position.balance = balance;
@@ -540,7 +540,7 @@ contract Midnight is IMidnight {
         return position[id][user].balance;
     }
 
-    function userLossIndex(bytes32 id, address user) public view returns (uint128) {
+    function userLossIndex(bytes32 id, address user) public view returns (uint120) {
         return position[id][user].lossIndex;
     }
 
@@ -566,13 +566,13 @@ contract Midnight is IMidnight {
 
     function balanceOfAfterSlashing(bytes32 id, address user) public view returns (int256) {
         Position storage _position = position[id][user];
-        int128 balance = _position.balance;
-        uint128 _userLossIndex = _position.lossIndex;
-        uint128 lossIndex = obligationState[id].lossIndex;
+        int136 balance = _position.balance;
+        uint120 _userLossIndex = _position.lossIndex;
+        uint120 lossIndex = obligationState[id].lossIndex;
         if (balance > 0 && _userLossIndex != lossIndex) {
             return UtilsLib.toInt256(
                 // forge-lint: disable-next-line(unsafe-typecast) as balance > 0
-                uint128(balance).mulDivDown(lossIndex, _userLossIndex)
+                uint256(uint136(balance)).mulDivDown(lossIndex, _userLossIndex)
             );
         }
         return balance;
