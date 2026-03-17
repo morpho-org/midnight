@@ -13,7 +13,7 @@ library TakeAmountsLib {
     // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.
-    function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
+    function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssetsScaled)
         internal
         view
         returns (uint256)
@@ -23,8 +23,8 @@ library TakeAmountsLib {
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
         require(buyerPrice <= WAD, "buyerPrice");
         return offer.buy
-            ? targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1)
-            : targetBuyerAssets.mulDivDown(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1);
+            ? targetBuyerAssetsScaled.mulDivUp(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1)
+            : targetBuyerAssetsScaled.mulDivDown(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1);
     }
 
     // Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
