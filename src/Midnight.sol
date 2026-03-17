@@ -45,6 +45,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits.
 /// @dev Max trading fee is defined per index (see maxTradingFee function).
+///
+/// ROUNDINGS
+/// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev slash rounds the balance down, so lenders lose a bit at each interaction.
+/// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
+/// afterwards (bad debt can no longer be realized).
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
