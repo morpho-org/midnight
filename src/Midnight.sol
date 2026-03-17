@@ -204,10 +204,10 @@ contract Midnight is IMidnight {
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 buyerAssets = offer.buy
             ? obligationUnits.mulDivDown(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS)
-            : obligationUnits.mulDivUp(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+            : obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 sellerAssets = offer.buy
             ? obligationUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS)
-            : obligationUnits.mulDivUp(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+            : obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
 
         uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
         require(newConsumed <= offer.obligationUnits, "consumed");
@@ -450,7 +450,7 @@ contract Midnight is IMidnight {
         }
 
         SafeTransferLib.safeTransferFrom(
-            obligation.loanToken, msg.sender, address(this), repaidUnits.mulDivDown(1, BALANCE_DECIMALS)
+            obligation.loanToken, msg.sender, address(this), repaidUnits.mulDivUp(1, BALANCE_DECIMALS)
         );
 
         return (seizedAssets, repaidUnits);
