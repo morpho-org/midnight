@@ -48,7 +48,7 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness";
 
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
-    require to_mathint(currentContract.borrowerState[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex),"exactly 1 active collateral at collateralIndex so the loop sets liquidatedCollatPrice";
+    require to_mathint(currentContract.borrowerState[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex), "exactly 1 active collateral at collateralIndex so the loop sets liquidatedCollatPrice";
 
     uint256 seizedResult;
     uint256 repaidResult;
