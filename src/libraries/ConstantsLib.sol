@@ -12,3 +12,4 @@ uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
 uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
+uint256 constant BALANCE_DECIMALS = 1e6; // 1 obligation unit = 1e-6 loan token units

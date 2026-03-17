@@ -16,7 +16,8 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    BALANCE_DECIMALS
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -203,9 +204,9 @@ contract Midnight is IMidnight {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets =
+        uint256 buyerAssetsScaled =
             offer.buy ? obligationUnits.mulDivDown(buyerPrice, WAD) : obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets =
+        uint256 sellerAssetsScaled =
             offer.buy ? obligationUnits.mulDivDown(sellerPrice, WAD) : obligationUnits.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
@@ -230,8 +231,8 @@ contract Midnight is IMidnight {
             offer.maker,
             taker,
             offer.buy,
-            buyerAssets,
-            sellerAssets,
+            buyerAssetsScaled,
+            sellerAssetsScaled,
             obligationUnits,
             receiver,
             offer.group,
@@ -241,22 +242,36 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
-                .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, obligationUnits, buyerCallbackData);
+                .onBuy(
+                    offer.obligation, buyer, buyerAssetsScaled, sellerAssetsScaled, obligationUnits, buyerCallbackData
+                );
         }
 
         SafeTransferLib.safeTransferFrom(
-            offer.obligation.loanToken, buyer, tradingFeeRecipient, buyerAssets - sellerAssets
+            offer.obligation.loanToken,
+            buyer,
+            tradingFeeRecipient,
+            buyerAssetsScaled / BALANCE_DECIMALS - sellerAssetsScaled / BALANCE_DECIMALS
         );
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(
+            offer.obligation.loanToken, buyer, receiver, sellerAssetsScaled / BALANCE_DECIMALS
+        );
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
-                .onSell(offer.obligation, seller, buyerAssets, sellerAssets, obligationUnits, sellerCallbackData);
+                .onSell(
+                    offer.obligation,
+                    seller,
+                    buyerAssetsScaled / BALANCE_DECIMALS,
+                    sellerAssetsScaled / BALANCE_DECIMALS,
+                    obligationUnits,
+                    sellerCallbackData
+                );
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
-        return (buyerAssets, sellerAssets, obligationUnits);
+        return (buyerAssetsScaled, sellerAssetsScaled, obligationUnits);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
@@ -275,7 +290,7 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Withdraw(msg.sender, id, obligationUnits, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits / BALANCE_DECIMALS);
     }
 
     function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
@@ -288,7 +303,9 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
+        SafeTransferLib.safeTransferFrom(
+            obligation.loanToken, msg.sender, address(this), obligationUnits / BALANCE_DECIMALS
+        );
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
@@ -374,7 +391,7 @@ contract Midnight is IMidnight {
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = IOracle(_collateral.oracle).price();
+            uint256 price = scaledOracle(_collateral.oracle);
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateralOf = _position.collateral[i];
             maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
@@ -446,7 +463,9 @@ contract Midnight is IMidnight {
             ICallbacks(msg.sender).onLiquidate(obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
+        SafeTransferLib.safeTransferFrom(
+            obligation.loanToken, msg.sender, address(this), repaidUnits / BALANCE_DECIMALS
+        );
 
         return (seizedAssets, repaidUnits);
     }
@@ -606,7 +625,7 @@ contract Midnight is IMidnight {
         while (maxDebt < debt && bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price();
+            uint256 price = scaledOracle(collateral.oracle);
             maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
             bitmap ^= (1 << i);
         }
@@ -623,6 +642,10 @@ contract Midnight is IMidnight {
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    function scaledOracle(address oracle) public view returns (uint256) {
+        return IOracle(oracle).price() * BALANCE_DECIMALS;
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
