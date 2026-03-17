@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // Assume price doesn't change during the execution of a transaction.
+    // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     // Summarize mulDivDown and mulDivUp by ghost functions for prover performance.
@@ -52,9 +52,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// Liquidation is profitable up 1 collateral token unit in price-scaled terms due to floor rounding
 rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
-    // Profitability only holds when the liquidation incentive factor is at least 1x.
-    require obligation.collaterals[collateralIndex].maxLif >= WAD();
-    require repaidUnits > 0;
+    require repaidUnits > 0, "repaidUnits must be positive";
 
     uint256 seizedResult;
     uint256 repaidResult;
@@ -62,14 +60,12 @@ rule liquidationIsProfitable_repaidUnits(env e, Midnight.Obligation obligation, 
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert (to_mathint(seizedResult) + 1) * price > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
+    assert obligation.collaterals[collateralIndex].maxLif >= WAD() => (to_mathint(seizedResult) + 1) * price > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
 }
 
 /// Liquidation is profitable up to 1 loan token unit due to ceil rounding
 rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
-    // Profitability only holds when the liquidation incentive factor is at least 1x.
-    require obligation.collaterals[collateralIndex].maxLif >= WAD();
-    require seizedAssets > 0;
+    require seizedAssets > 0, "seizedAssets must be positive";
 
     uint256 seizedResult;
     uint256 repaidResult;
@@ -77,5 +73,5 @@ rule liquidationIsProfitable_seizedAssets(env e, Midnight.Obligation obligation,
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert to_mathint(seizedResult) * price + ORACLE_PRICE_SCALE() > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
+    assert obligation.collaterals[collateralIndex].maxLif >= WAD() => to_mathint(seizedResult) * price + ORACLE_PRICE_SCALE() > to_mathint(repaidResult) * ORACLE_PRICE_SCALE();
 }
