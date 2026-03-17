@@ -251,7 +251,7 @@ contract Midnight is IMidnight {
             offer.obligation.loanToken,
             buyer,
             tradingFeeRecipient,
-            buyerAssetsScaled / BALANCE_DECIMALS - sellerAssetsScaled / BALANCE_DECIMALS
+            (buyerAssetsScaled - sellerAssetsScaled) / BALANCE_DECIMALS
         );
         SafeTransferLib.safeTransferFrom(
             offer.obligation.loanToken, buyer, receiver, sellerAssetsScaled / BALANCE_DECIMALS
