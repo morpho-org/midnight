@@ -10,7 +10,7 @@ methods {
 
     // Bypass the hook update when calling debtOf, because it only looks at the negative part of the balance.
     // Note that this also summarizes the external view function debtOf, which is thus skipped by the readAfterSlash rule.
-    function debtOf(bytes32 id, address user) internal returns (uint256) => NONDET;
+    function debtOf(bytes32 id, address user) internal returns (uint256) => debtOfSummary(id, user);
 }
 
 /// GHOSTS ///
@@ -26,6 +26,12 @@ persistent ghost bool balanceWrittenWithoutSlash;
 
 function slashSummary(bytes32 id, address user) {
     slashedAtLossIndex[id][user] = currentContract.obligationState[id].lossIndex;
+}
+
+function debtOfSummary(bytes32 id, address user) returns uint256 {
+    int256 balance = currentContract.position[id][user].balance;
+    mathint debt = balance < 0 ? -balance : 0;
+    return assert_uint256(debt);
 }
 
 /// HOOKS ///
