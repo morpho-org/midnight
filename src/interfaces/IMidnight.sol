@@ -50,7 +50,7 @@ struct ObligationState {
 }
 
 struct Position {
-    int256 balance;
+    int128 balance;
     uint128 lossIndex;
     uint128 activatedCollaterals;
     uint128[128] collateral;

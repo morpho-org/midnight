@@ -38,7 +38,7 @@ function positivePart(mathint x) returns mathint {
     return x > 0 ? x : 0;
 }
 
-hook Sstore position[KEY bytes32 id][KEY address owner].balance int256 newBalance (int256 oldBalance) {
+hook Sstore position[KEY bytes32 id][KEY address owner].balance int128 newBalance (int128 oldBalance) {
     sumBalanceOf[id] = sumBalanceOf[id] - oldBalance + newBalance;
     sumPositiveBalanceOf[id] = sumPositiveBalanceOf[id] - positivePart(to_mathint(oldBalance)) + positivePart(to_mathint(newBalance));
     sumNegativeBalanceOf[id] = sumNegativeBalanceOf[id] - negativePart(to_mathint(oldBalance)) + negativePart(to_mathint(newBalance));
@@ -98,19 +98,19 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
-rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
     uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter >= lossIndexBefore;
+    assert lossIndexAfter <= lossIndexBefore;
 }
 
-rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
+rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant userLossIndexGeqObligationLossIndex(id, user);
     uint128 lossIndexBefore = userLossIndex(id, user);
     f(e, args);
     uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter >= lossIndexBefore;
+    assert lossIndexAfter <= lossIndexBefore;
 }
 
 /// INVARIANTS ///
@@ -118,5 +118,5 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeBalancePlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumNegativeBalanceOf[id] + to_mathint(withdrawable(id));
 
-strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
+    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex;

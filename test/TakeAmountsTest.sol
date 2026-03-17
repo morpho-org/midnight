@@ -71,7 +71,7 @@ contract TakeAmountsTest is BaseTest {
 
     /// @dev Creates an initial borrowing position so borrower has debt and lender has obligation units.
     function _createPosition(uint256 positionUnits) internal {
-        deal(address(loanToken), lender, type(uint128).max);
+        deal(address(loanToken), lender, uint256(uint128(type(int128).max)));
         collateralize(obligation, borrower, positionUnits);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;

@@ -27,7 +27,7 @@ function slashSummary(bytes32 id, address user) {
 /// HOOKS ///
 
 // Positive balances must only be read after slash at the current lossIndex.
-hook Sload int256 value position[KEY bytes32 id][KEY address user].balance {
+hook Sload int128 value position[KEY bytes32 id][KEY address user].balance {
     if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && value > 0) {
         balanceReadWithoutSlash = true;
     }
@@ -36,7 +36,7 @@ hook Sload int256 value position[KEY bytes32 id][KEY address user].balance {
 // Positive balances must only be written after slash at the current lossIndex.
 // This also covers zero-to-positive transitions: when newValue > 0, slash is required
 // even if oldValue <= 0, ensuring the user's lossIndex is refreshed first.
-hook Sstore position[KEY bytes32 id][KEY address user].balance int256 newValue (int256 oldValue) {
+hook Sstore position[KEY bytes32 id][KEY address user].balance int128 newValue (int128 oldValue) {
     if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && (oldValue > 0 || newValue > 0)) {
         balanceWrittenWithoutSlash = true;
     }

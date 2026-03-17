@@ -59,6 +59,18 @@ library UtilsLib {
         return uint128(x);
     }
 
+    function toInt128(int256 x) internal pure returns (int128) {
+        require(x >= type(int128).min && x <= type(int128).max, "int256 overflows int128");
+        // forge-lint: disable-next-item(unsafe-typecast) as x is within int128 range
+        return int128(x);
+    }
+
+    function toInt128(uint256 x) internal pure returns (int128) {
+        require(x <= uint128(type(int128).max), "uint256 overflows int128");
+        // forge-lint: disable-next-item(unsafe-typecast) as x is within int128 range
+        return int128(uint128(x));
+    }
+
     function toInt256(uint256 x) internal pure returns (int256) {
         require(x <= uint256(type(int256).max), "uint256 overflows int256");
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(int256).max

@@ -13,7 +13,7 @@ import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 // Collateral = units / lltv (up to ~1.33x for lltv=0.75).
-// To keep collateral within uint128, we cap amounts at type(uint128).max / 2.
+// To keep collateral within uint128, we cap amounts at MAX_TEST_AMOUNT / 2.
 uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 2;
 
 contract LiquidationTest is BaseTest {
@@ -299,8 +299,7 @@ contract LiquidationTest is BaseTest {
         (uint128 oldTotalUnits,, uint256 previousLossIndex,) = midnight.obligationState(id);
         uint256 expectedLossIndex = expectedBadDebt == 0
             ? previousLossIndex
-            : type(uint128).max
-                - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+            : previousLossIndex.mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(address(this), id, 0, 0, 0, borrower, expectedBadDebt, expectedLossIndex);

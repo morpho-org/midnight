@@ -135,9 +135,9 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 
 /// slash can only decrease balances (or keep them unchanged), preserves non-positive balances,
 /// leaves the balance non-negative, and only changes position[id][user].balance.
-/// Requires the system invariant that the obligation's lossIndex >= the user's lossIndex.
+/// Requires the system invariant that the obligation's lossIndex <= the user's lossIndex.
 rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUser) {
-    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "TODO prove this";
+    require userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex, "TODO prove this";
 
     int256 balanceBefore = balanceOf(id, user);
     int256 balanceAfterSlashingBefore = balanceOfAfterSlashing(id, user);

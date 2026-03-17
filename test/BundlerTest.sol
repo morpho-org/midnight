@@ -95,7 +95,7 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
-        units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
+        units = bound(units, 0, uint256(uint128(type(int128).max)) * 3 / 4);
         offers[0].obligationUnits = offerUnits0;
         offers[1].obligationUnits = offerUnits1;
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
@@ -141,7 +141,7 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
-        targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(uint128(type(int128).max)) / 2);
         offers[0].obligationUnits = offerUnits0;
         offers[1].obligationUnits = offerUnits1;
 
@@ -191,7 +191,7 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeSellerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
-        targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
+        targetSellerAssets = bound(targetSellerAssets, 1, uint256(uint128(type(int128).max)) / 2);
         offers[0].obligationUnits = offerUnits0;
         offers[1].obligationUnits = offerUnits1;
 
@@ -277,7 +277,7 @@ contract BundlerTest is BaseTest {
         tick1 = bound(tick1, minTick, MAX_TICK);
         // Ensure buyerAssets > 0 so the max bound actually triggers.
         uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
-        targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
+        targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(uint128(type(int128).max)) * 3 / 4);
         offers[0].obligationUnits = offerUnits0;
         offers[0].tick = tick0;
         offers[1].obligationUnits = offerUnits1;
@@ -328,7 +328,7 @@ contract BundlerTest is BaseTest {
         uint256 minTick = _minTick();
         tick0 = bound(tick0, minTick, MAX_TICK);
         tick1 = bound(tick1, minTick, MAX_TICK);
-        targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
+        targetUnits = bound(targetUnits, 1, uint256(uint128(type(int128).max)) * 3 / 4);
         offers[0].obligationUnits = offerUnits0;
         offers[0].tick = tick0;
         offers[1].obligationUnits = offerUnits1;
