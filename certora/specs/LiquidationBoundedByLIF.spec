@@ -8,8 +8,8 @@ methods {
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
-    // Deterministic toId summary so the rule and the contract resolve to the same obligation id.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation);
+    // Deterministic toId summary using a ghost that takes simple types (no struct).
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
 
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 }
@@ -22,17 +22,15 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-function summaryToId(Midnight.Obligation obligation) returns bytes32 {
-    return Utils.hashObligation(obligation);
-}
+persistent ghost summaryObligationId(address, uint256) returns bytes32;
 
 /// LIF BOUNDARIES ///
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input)
 rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
-    require repaidUnits > 0, "repaidUnits must be positive";
     require data.length == 0, "no callback for prover performance";
+    require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness";
 
     uint256 seizedResult;
     uint256 repaidResult;
@@ -40,18 +38,17 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligat
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert maxLif >= WAD() => to_mathint(seizedResult) * price * WAD() <= to_mathint(repaidResult) * ORACLE_PRICE_SCALE() * maxLif;
+    assert repaidUnits > 0 => seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
 /// Liquidation profit is bounded by maxLif (seizedAssets input)
-rule liquidationProfitBounded_seizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
+rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
     mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
-    require seizedAssets > 0, "seizedAssets must be positive";
     require data.length == 0, "no callback for prover performance";
+    require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness";
 
-    // Restrict to 1 active collateral so the loop processes collateralIndex and sets liquidatedCollatPrice.
-    bytes32 id0 = summaryToId(obligation);
-    require to_mathint(currentContract.borrowerState[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex);
+    bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
+    require to_mathint(currentContract.borrowerState[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex),"exactly 1 active collateral at collateralIndex so the loop sets liquidatedCollatPrice";
 
     uint256 seizedResult;
     uint256 repaidResult;
@@ -59,5 +56,5 @@ rule liquidationProfitBounded_seizedAssets(env e, Midnight.Obligation obligation
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert maxLif >= WAD() => to_mathint(seizedResult) * price * WAD() <= to_mathint(repaidResult) * ORACLE_PRICE_SCALE() * maxLif;
+    assert seizedAssets > 0 => seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
