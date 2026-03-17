@@ -292,7 +292,7 @@ contract Midnight is IMidnight {
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
         SafeTransferLib.safeTransferFrom(
-            obligation.loanToken, msg.sender, address(this), obligationUnits.mulDivDown(1, BALANCE_DECIMALS)
+            obligation.loanToken, msg.sender, address(this), obligationUnits.mulDivUp(1, BALANCE_DECIMALS)
         );
     }
 
