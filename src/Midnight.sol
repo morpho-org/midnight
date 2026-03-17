@@ -389,9 +389,9 @@ contract Midnight is IMidnight {
         if (badDebt > 0) {
             _position.balance += UtilsLib.toInt136(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            _obligationState.lossIndex = UtilsLib.toUint120(
-                uint256(_obligationState.lossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
-            );
+            // forge-lint: disable-next-line(unsafe-typecast) as mulDivDown result <= _obligationState.lossIndex
+            _obligationState.lossIndex =
+                uint120(uint256(_obligationState.lossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits));
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
