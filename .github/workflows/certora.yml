@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - id: list
-        run: echo "confs=$(ls certora/confs/*.conf | xargs -I{} basename {} .conf | jq -nRc '[inputs]')" >> "$GITHUB_OUTPUT"
+        run: echo "confs=$(ls certora/confs/*.conf | xargs -I{} basename {} .conf | jq -Rc '[inputs]')" >> "$GITHUB_OUTPUT"
 
   verify:
     needs: matrix
