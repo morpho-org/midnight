@@ -22,8 +22,8 @@ library TakeAmountsLib {
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
         return offer.buy
-            ? targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1)
-            : targetBuyerAssets.mulDivDown(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1);
+            ? targetBuyerAssets.mulDivUp(WAD * BALANCE_DECIMALS, buyerPrice)
+            : targetBuyerAssets.mulDivDown(WAD * BALANCE_DECIMALS, buyerPrice);
     }
 
     /// @dev Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS) :
@@ -38,7 +38,7 @@ library TakeAmountsLib {
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
         return offer.buy
-            ? targetSellerAssets.mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1)
-            : targetSellerAssets.mulDivDown(WAD, sellerPrice).mulDivDown(BALANCE_DECIMALS, 1);
+            ? targetSellerAssets.mulDivUp(WAD * BALANCE_DECIMALS, sellerPrice)
+            : targetSellerAssets.mulDivDown(WAD * BALANCE_DECIMALS, sellerPrice);
     }
 }

@@ -107,7 +107,6 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         // With BALANCE_DECIMALS, collateral rounding may keep some edge-case positions healthy.
-        vm.assume(!midnight.isHealthy(obligation, id, borrower));
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
@@ -456,7 +455,6 @@ contract LiquidationTest is BaseTest {
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE - 1);
 
         _setupUnhealthy(units, liquidationOraclePrice);
-        vm.assume(!midnight.isHealthy(obligation, id, borrower));
 
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
@@ -473,7 +471,6 @@ contract LiquidationTest is BaseTest {
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
 
         _setupUnhealthy(units, liquidationOraclePrice);
-        vm.assume(!midnight.isHealthy(obligation, id, borrower));
 
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
@@ -551,7 +548,6 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
-        vm.assume(!midnight.isHealthy(obligation, id, borrower));
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
 
         // At exact maturity: recovery close factor applies.
