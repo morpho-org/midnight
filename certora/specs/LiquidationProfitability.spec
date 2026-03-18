@@ -58,7 +58,7 @@ rule liquidationIsProfitableRepaidUnits(env e, Midnight.Obligation obligation, u
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert repaidUnits > 0 => (seizedResult + 1) * price > repaidResult * ORACLE_PRICE_SCALE();
+    assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 }
 
 /// Liquidation is profitable up to 1 loan token unit due to ceil rounding
@@ -71,5 +71,35 @@ rule liquidationIsProfitableSeizedAssets(env e, Midnight.Obligation obligation, 
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert seizedAssets > 0 => seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
+    assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
+}
+
+
+/// Liquidation profit is at least maxLif-proportional when lif = maxLif (repaidUnits input).
+/// Pre-maturity forces the borrower to be unhealthy, which forces lif = maxLif.
+rule liquidationLIFProfitability_RepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
+    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    require maxLif >= WAD();
+    require e.block.timestamp <= obligation.maturity || e.block.timestamp >= require_uint256(obligation.maturity + 900);
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
+    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+
+
+    assert (seizedResult + 1) * price * WAD() + WAD() * ORACLE_PRICE_SCALE() > repaidResult * ORACLE_PRICE_SCALE() * maxLif;
+}
+/// Liquidation profit is at least maxLif-proportional when lif = maxLif (seizedAssets input).
+rule liquidationLIFProfitability_SeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
+    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    require maxLif >= WAD();
+    require e.block.timestamp <= obligation.maturity || e.block.timestamp >= require_uint256(obligation.maturity + 900);
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
+    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+
+    assert seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
 }
