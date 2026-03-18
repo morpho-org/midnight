@@ -45,7 +45,9 @@ hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newValue (
 /// RULES ///
 
 // View functions that read credit don't call slash (they can't mutate state).
-rule creditReadAfterSlash(method f, env e, calldataarg args) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:creditAfterSlashing(bytes32, address).selector } {
+// take is excluded because it reads credit as a guard to decide whether to call slash.
+// but take is still subject to creditWrittenAfterSlash
+rule creditReadAfterSlash(method f, env e, calldataarg args) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:creditAfterSlashing(bytes32, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
     require !creditReadWithoutSlash, "initialize the ghost variable";
     f(e, args);
     assert !creditReadWithoutSlash;
