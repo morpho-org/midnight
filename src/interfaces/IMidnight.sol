@@ -9,7 +9,6 @@ struct Obligation {
     uint256 maturity;
     // The recovery close factor is deactivated for a collateral if the liquidation could leave a collateral value that
     // would not be enough to repay rcfThreshold units.
-    // rcfThreshold is scaled by BALANCE_DECIMALS.
     uint256 rcfThreshold; // 1 rcfThreshold unit = 1e-6 loan token
 }
 

@@ -11,7 +11,6 @@ library TakeAmountsLib {
     using UtilsLib for uint256;
 
     // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
-    /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.
     function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
@@ -21,14 +20,14 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
-        require(buyerPrice <= WAD, "buyerPrice");
         return offer.buy
             ? targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1)
             : targetBuyerAssets.mulDivDown(WAD, buyerPrice).mulDivDown(BALANCE_DECIMALS, 1);
     }
 
-    // Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
-    /// @dev Returns the number of units to take to get the target seller assets.
+    // Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS) :
+    // units.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS). / @dev Returns the number of units to take to get
+    // the target seller assets.
     function sellerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
         internal
         view
