@@ -10,8 +10,9 @@ import {WAD, BALANCE_DECIMALS} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
-    // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
-    /// @dev Returns the number of units to take to get the target buyer assets.
+    // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS) :
+    // units.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS). / @dev Returns the number of units to take to get
+    // the target buyer assets.
     function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
         view

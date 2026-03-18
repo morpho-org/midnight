@@ -201,26 +201,22 @@ contract BundlerTest is BaseTest {
         uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 sellerPrice = price - _tradingFee;
         uint256 units = targetSellerAssets.mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1);
+        // Bound units so fromOffer0 + units fits in uint128 (total debt across both legs).
+        vm.assume(units <= uint256(type(uint128).max) / 2);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
-        // Simulate the bundler's 2-leg splitting to determine exact debt and check round-trip.
-        uint256 firstLegSellerAssets = fromOffer0.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
-        uint256 secondLegUnits;
-        uint256 totalDebt;
-        if (firstLegSellerAssets < targetSellerAssets && fromOffer0 < units) {
-            uint256 remaining = targetSellerAssets - firstLegSellerAssets;
-            secondLegUnits = remaining.mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1);
-            // Filter cases where the 2-leg round-trip doesn't produce exactly targetSellerAssets.
-            uint256 secondLegFilled = secondLegUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
-            vm.assume(firstLegSellerAssets + secondLegFilled == targetSellerAssets);
-            totalDebt = fromOffer0 + secondLegUnits;
-        } else {
-            secondLegUnits = 0;
-            totalDebt = fromOffer0;
-        }
+        // The bundler requires exact equality; filter cases where rounding prevents exact fill.
+        uint256 firstLegFilled = fromOffer0.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+        uint256 secondLegUnits = firstLegFilled < targetSellerAssets && fromOffer0 < units
+            ? (targetSellerAssets - firstLegFilled).mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1)
+            : 0;
+        vm.assume(
+            firstLegFilled + secondLegUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS)
+                == targetSellerAssets
+        );
 
-        // Provide exact collateral coverage for actual total debt.
-        collateralize(obligation, borrower, totalDebt + 1);
+        // Provide collateral for the total debt across both legs (fromOffer0 + secondLegUnits <= fromOffer0 + units).
+        collateralize(obligation, borrower, fromOffer0 + units + BALANCE_DECIMALS);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({

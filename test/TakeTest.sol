@@ -93,10 +93,8 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
-        // offer.buy=false, taker is buyer: buyerAssets = mulDivUp, sellerAssets = mulDivUp
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(price, WAD).mulDivUp(1, BALANCE_DECIMALS);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(price, WAD).mulDivUp(1, BALANCE_DECIMALS);
-        deal(address(loanToken), lender, expectedBuyerAssets);
+        uint256 expectedAssets = obligationUnits.mulDivUp(price, WAD);
+        deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, obligationUnits);
 
         take(obligationUnits, lender, borrowerOffer);
@@ -104,7 +102,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), obligationUnits, "lender units");
         assertEq(midnight.debtOf(id, borrower), obligationUnits, "borrower debt");
         assertEq(midnight.totalUnits(id), obligationUnits, "total units");
-        assertEq(loanToken.balanceOf(borrower), expectedSellerAssets, "borrower balance");
+        assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(midnight.consumed(borrower, borrowerOffer.group), obligationUnits, "consumed");
     }

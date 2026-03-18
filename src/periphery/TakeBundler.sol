@@ -18,7 +18,7 @@ contract TakeBundler {
         bytes32[] proof;
     }
 
-    /// @dev Iterates through orders, filling up to `targetUnits` obligation units total.
+    /// @dev Iterates through orders, filling up to targetUnits obligation units total.
     /// @dev Assumes offers are all buy or all sell and share the same obligation id.
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
