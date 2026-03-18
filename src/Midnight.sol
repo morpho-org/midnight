@@ -527,12 +527,11 @@ contract Midnight is IMidnight {
         uint128 lossIndex = obligationState[id].lossIndex;
         if (_userLossIndex != lossIndex) {
             if (_userLossIndex != 0) {
-                uint256 newCredit = _position.credit.mulDivDown(lossIndex, _userLossIndex);
                 // forge-lint: disable-next-item(unsafe-typecast) as newCredit <= credits.
-                _position.credit = uint128(newCredit);
-                emit EventsLib.Slash(msg.sender, id, user, newCredit, lossIndex);
+                _position.credit = uint128(_position.credit.mulDivDown(lossIndex, _userLossIndex));
             }
             _position.lossIndex = lossIndex;
+            emit EventsLib.Slash(msg.sender, id, user, _position.credit, lossIndex);
         }
     }
 
@@ -565,8 +564,12 @@ contract Midnight is IMidnight {
     function creditAfterSlashing(bytes32 id, address user) public view returns (uint256) {
         Position storage _position = position[id][user];
         uint128 _userLossIndex = _position.lossIndex;
-        if (_userLossIndex == 0) return 0;
-        return _position.credit.mulDivDown(obligationState[id].lossIndex, _userLossIndex);
+        uint128 lossIndex = obligationState[id].lossIndex;
+        if (_userLossIndex != lossIndex && _userLossIndex != 0) {
+            return _position.credit.mulDivDown(lossIndex, _userLossIndex);
+        } else {
+            return _position.credit;
+        }
     }
 
     function creditOf(bytes32 id, address user) public view returns (uint256) {

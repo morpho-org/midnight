@@ -110,12 +110,12 @@ strong invariant userLossIndexZeroIfNotCreated(bytes32 id, address user)
 
 strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
     userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, user) == 0
-{
-    preserved {
-        requireInvariant obligationLossIndexZeroIfNotCreated(id);
-        requireInvariant userLossIndexZeroIfNotCreated(id, user);
+    {
+        preserved {
+            requireInvariant obligationLossIndexZeroIfNotCreated(id);
+            requireInvariant userLossIndexZeroIfNotCreated(id, user);
+        }
     }
-}
 
 strong invariant noCreditAndDebt(bytes32 id, address user)
     creditOf(id, user) == 0 || debtOf(id, user) == 0;

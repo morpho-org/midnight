@@ -73,7 +73,6 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 obligationUn
     bytes32 id = toId(e, obligation);
     require userLossIndex(id, onBehalf) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, onBehalf) == 0, "see Midnight.spec";
     require !currentContract.obligationState[id].created => userLossIndex(id, onBehalf) == 0, "see Midnight.spec";
-    require creditOf(id, onBehalf) > 0 => userLossIndex(id, onBehalf) != 0, "see Midnight.spec";
 
     uint256 creditPostSlash = creditAfterSlashing(id, onBehalf);
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
@@ -94,10 +93,8 @@ rule takeEffects(env e, uint256 obligationUnits, address taker, address takerCal
     bytes32 id = toId(e, offer.obligation);
     require userLossIndex(id, offer.maker) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, offer.maker) == 0, "see Midnight.spec";
     require !currentContract.obligationState[id].created => userLossIndex(id, offer.maker) == 0, "see Midnight.spec";
-    require creditOf(id, offer.maker) > 0 => userLossIndex(id, offer.maker) != 0, "see Midnight.spec";
     require userLossIndex(id, taker) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, taker) == 0, "see Midnight.spec";
     require !currentContract.obligationState[id].created => userLossIndex(id, taker) == 0, "see Midnight.spec";
-    require creditOf(id, taker) > 0 => userLossIndex(id, taker) != 0, "see Midnight.spec";
 
     mathint makerPostSlash = to_mathint(creditAfterSlashing(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerPostSlash = to_mathint(creditAfterSlashing(id, taker)) - to_mathint(debtOf(id, taker));
@@ -143,7 +140,6 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 /// Requires the system invariant that the obligation's lossIndex <= the user's lossIndex.
 rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUser) {
     require userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, user) == 0, "see Midnight.spec";
-    require creditOf(id, user) > 0 => userLossIndex(id, user) != 0, "see Midnight.spec";
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
