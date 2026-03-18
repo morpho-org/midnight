@@ -406,6 +406,7 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
+            require(liquidatedCollatPrice > 0, "collateral not active or zero oracle price");
             uint256 _maxLif = obligation.collaterals[collateralIndex].maxLif;
             uint256 lif = originalDebt > maxDebt
                 ? _maxLif
