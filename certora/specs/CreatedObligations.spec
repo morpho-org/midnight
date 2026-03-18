@@ -42,22 +42,28 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 
 // Show that a created obligation has at least one collateral.
 strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
-    obligationIsCreated(obligation) => obligation.collaterals.length > 0;
+    obligationIsCreated(obligation) => obligation.collaterals.length > 0
+    filtered { f -> !f.isView }
 
 // Show that a created obligation has sorted collaterals.
 strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
-    obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
+    obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token
+    filtered { f -> !f.isView }
 
 // Show that a created obligation do not have address(0) collaterals.
 strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
+    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0
+    filtered { f -> !f.isView }
 
 // Show that a created obligation has lltv <= WAD.
 strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
+    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD()
+    filtered { f -> !f.isView }
 
 // Show that a created obligation cannot be deleted.
-rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
+rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id)
+    filtered { f -> !f.isView }
+{
     require Midnight.obligationCreated(id), "Assume that the obligation is created";
     f(e, args);
     assert Midnight.obligationCreated(id);
@@ -101,10 +107,18 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that an obligation state is empty if it is not created.
-strong invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && userHasNoCollateral(id, user) && currentContract.obligationState[id].lossIndex == 0 && currentContract.position[id][user].lossIndex == 0;
+strong invariant obligationGlobalStateIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && currentContract.obligationState[id].lossIndex == 0
+    filtered { f -> !f.isView }
+
+strong invariant positionScalarStateIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && currentContract.position[id][user].lossIndex == 0
+    filtered { f -> !f.isView }
+
+strong invariant positionCollateralIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasNoCollateral(id, user)
+    filtered { f -> !f.isView }
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
