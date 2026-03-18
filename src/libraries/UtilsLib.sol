@@ -59,12 +59,6 @@ library UtilsLib {
         return uint128(x);
     }
 
-    function toInt256(uint256 x) internal pure returns (int256) {
-        require(x <= uint256(type(int256).max), "uint256 overflows int256");
-        // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(int256).max
-        return int256(x);
-    }
-
     function countBits(uint128 x) internal pure returns (uint256) {
         unchecked {
             x = x - ((x >> 1) & 0x55555555555555555555555555555555);
@@ -77,12 +71,6 @@ library UtilsLib {
     function msb(uint256 bitmap) internal pure returns (uint256 res) {
         assembly {
             res := sub(255, clz(bitmap))
-        }
-    }
-
-    function negativePart(int256 x) internal pure returns (uint256 res) {
-        assembly {
-            res := mul(shr(255, x), sub(0, x))
         }
     }
 }

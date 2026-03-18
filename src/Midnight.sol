@@ -48,7 +48,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// ROUNDINGS
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
-/// @dev slash rounds the balance down, so lenders lose a bit at each interaction.
+/// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
 /// afterwards (bad debt can no longer be realized).
 contract Midnight is IMidnight {
@@ -218,18 +218,21 @@ contract Midnight is IMidnight {
         uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
         require(newConsumed <= offer.obligationUnits, "consumed");
 
-        int256 oldBuyerBalance = position[id][buyer].balance;
-        int256 oldSellerBalance = position[id][seller].balance;
-        int256 newBuyerBalance = oldBuyerBalance + UtilsLib.toInt256(obligationUnits);
-        int256 newSellerBalance = oldSellerBalance - UtilsLib.toInt256(obligationUnits);
-        position[id][buyer].balance = newBuyerBalance;
-        position[id][seller].balance = newSellerBalance;
-        if (offer.exitOnly) require(offer.buy ? newBuyerBalance <= 0 : newSellerBalance >= 0, "crossed");
+        Position storage buyerPos = position[id][buyer];
+        Position storage sellerPos = position[id][seller];
+        uint256 oldBuyerDebt = buyerPos.debt;
+        uint256 oldSellerDebt = sellerPos.debt;
+        uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, obligationUnits);
+        uint256 sellerCreditReduction = UtilsLib.min(sellerPos.credit, obligationUnits);
+        buyerPos.debt -= UtilsLib.toUint128(buyerDebtReduction);
+        buyerPos.credit += UtilsLib.toUint128(obligationUnits - buyerDebtReduction);
+        sellerPos.credit -= UtilsLib.toUint128(sellerCreditReduction);
+        sellerPos.debt += UtilsLib.toUint128(obligationUnits - sellerCreditReduction);
         _obligationState.totalUnits = UtilsLib.toUint128(
-            uint256(_obligationState.totalUnits) + UtilsLib.negativePart(newSellerBalance)
-                + UtilsLib.negativePart(newBuyerBalance) - UtilsLib.negativePart(oldSellerBalance)
-                - UtilsLib.negativePart(oldBuyerBalance)
+            _obligationState.totalUnits - oldSellerDebt - oldBuyerDebt + sellerPos.debt + buyerPos.debt
         );
+
+        if (offer.exitOnly) require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "crossed");
 
         emit EventsLib.Take(
             msg.sender,
@@ -275,8 +278,7 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         slash(id, onBehalf);
 
-        position[id][onBehalf].balance -= UtilsLib.toInt256(obligationUnits);
-        require(position[id][onBehalf].balance >= 0, "withdraw too much");
+        position[id][onBehalf].credit -= UtilsLib.toUint128(obligationUnits);
         _obligationState.withdrawable -= obligationUnits;
         _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
 
@@ -289,8 +291,7 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
-        position[id][onBehalf].balance += UtilsLib.toInt256(obligationUnits);
-        require(position[id][onBehalf].balance <= 0, "repay too much");
+        position[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
         obligationState[id].withdrawable += obligationUnits;
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
@@ -396,7 +397,8 @@ contract Midnight is IMidnight {
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
         if (badDebt > 0) {
-            _position.balance += UtilsLib.toInt256(badDebt);
+            // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
+            _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
             _obligationState.lossIndex = UtilsLib.toUint128(
                 type(uint128).max
@@ -443,8 +445,7 @@ contract Midnight is IMidnight {
                 _position.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
             _obligationState.withdrawable += repaidUnits;
-            _position.balance += UtilsLib.toInt256(repaidUnits);
-            require(_position.balance <= 0, "repay too much");
+            _position.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
         emit EventsLib.Liquidate(
@@ -533,24 +534,16 @@ contract Midnight is IMidnight {
         uint128 _userLossIndex = _position.lossIndex;
         uint128 lossIndex = obligationState[id].lossIndex;
         if (_userLossIndex != lossIndex) {
-            int256 balance = _position.balance;
-            if (balance > 0) {
-                balance = UtilsLib.toInt256(
-                    // forge-lint: disable-next-line(unsafe-typecast) as balance > 0
-                    uint256(balance).mulDivDown(type(uint128).max - lossIndex, type(uint128).max - _userLossIndex)
-                );
-                _position.balance = balance;
-            }
+            uint256 newCredit =
+                _position.credit.mulDivDown(type(uint128).max - lossIndex, type(uint128).max - _userLossIndex);
+            // forge-lint: disable-next-item(unsafe-typecast) as newCredit <= credits.
+            _position.credit = uint128(newCredit);
             _position.lossIndex = lossIndex;
-            emit EventsLib.Slash(msg.sender, id, user, balance, lossIndex);
+            emit EventsLib.Slash(msg.sender, id, user, newCredit, lossIndex);
         }
     }
 
     /// VIEW FUNCTIONS ///
-
-    function balanceOf(bytes32 id, address user) public view returns (int256) {
-        return position[id][user].balance;
-    }
 
     function userLossIndex(bytes32 id, address user) public view returns (uint128) {
         return position[id][user].lossIndex;
@@ -576,22 +569,18 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Obligation));
     }
 
-    function balanceOfAfterSlashing(bytes32 id, address user) public view returns (int256) {
+    function creditAfterSlashing(bytes32 id, address user) public view returns (uint256) {
         Position storage _position = position[id][user];
-        int256 balance = _position.balance;
-        uint128 _userLossIndex = _position.lossIndex;
-        uint128 lossIndex = obligationState[id].lossIndex;
-        if (balance > 0 && _userLossIndex != lossIndex) {
-            return UtilsLib.toInt256(
-                // forge-lint: disable-next-line(unsafe-typecast) as balance > 0
-                uint256(balance).mulDivDown(type(uint128).max - lossIndex, type(uint128).max - _userLossIndex)
-            );
-        }
-        return balance;
+        return _position.credit
+            .mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _position.lossIndex);
+    }
+
+    function creditOf(bytes32 id, address user) public view returns (uint256) {
+        return uint256(position[id][user].credit);
     }
 
     function debtOf(bytes32 id, address user) public view returns (uint256) {
-        return UtilsLib.negativePart(position[id][user].balance);
+        return uint256(position[id][user].debt);
     }
 
     function totalUnits(bytes32 id) external view returns (uint256) {
@@ -620,9 +609,8 @@ contract Midnight is IMidnight {
         while (maxDebt < debt && bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price().mulDivDown(BALANCE_DECIMALS, 1);
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD)
-                .mulDivDown(BALANCE_DECIMALS, 1);
+            uint256 price = IOracle(collateral.oracle).price() * BALANCE_DECIMALS;
+            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
             bitmap ^= (1 << i);
         }
         return maxDebt >= debt;

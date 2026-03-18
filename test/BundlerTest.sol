@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, BALANCE_DECIMALS} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
 
@@ -141,16 +141,17 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
-        targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / (2 * BALANCE_DECIMALS));
         offers[0].obligationUnits = offerUnits0;
         offers[1].obligationUnits = offerUnits1;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
-        // NB: splitting across offers can require 1 extra unit due to per-leg rounding of buyer assets.
-        uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
+        // NB: splitting across 2 offers can add up to BALANCE_DECIMALS - 1 extra units due to per-leg rounding.
+        uint256 units = targetBuyerAssets.mulDivUp(WAD, price).mulDivUp(BALANCE_DECIMALS, 1);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
-        collateralize(obligation, borrower, units);
+        // Provide collateral buffer for potential extra units from 2-leg rounding.
+        collateralize(obligation, borrower, units + BALANCE_DECIMALS);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
@@ -170,7 +171,7 @@ contract BundlerTest is BaseTest {
 
         _authorizeBundler();
 
-        if (offerUnits1 >= units - fromOffer0) {
+        if (fromOffer0 >= units || offerUnits1 >= units + BALANCE_DECIMALS - fromOffer0) {
             vm.prank(borrower);
             takeBundler.bundleTakeBuyerAssets(
                 midnight, targetBuyerAssets, borrower, address(0), takes, 0, type(uint256).max
@@ -191,18 +192,35 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeSellerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
-        targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
+        targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / (2 * BALANCE_DECIMALS));
         offers[0].obligationUnits = offerUnits0;
         offers[1].obligationUnits = offerUnits1;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchObligation(obligation);
         uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
-        uint256 units = targetSellerAssets.mulDivUp(WAD, price - _tradingFee);
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 units = targetSellerAssets.mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
-        // Extra collateral headroom for the potential extra unit of debt.
-        collateralize(obligation, borrower, units + 1);
+        // Simulate the bundler's 2-leg splitting to determine exact debt and check round-trip.
+        uint256 firstLegSellerAssets = fromOffer0.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+        uint256 secondLegUnits;
+        uint256 totalDebt;
+        if (firstLegSellerAssets < targetSellerAssets && fromOffer0 < units) {
+            uint256 remaining = targetSellerAssets - firstLegSellerAssets;
+            secondLegUnits = remaining.mulDivUp(WAD, sellerPrice).mulDivUp(BALANCE_DECIMALS, 1);
+            // Filter cases where the 2-leg round-trip doesn't produce exactly targetSellerAssets.
+            uint256 secondLegFilled = secondLegUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+            vm.assume(firstLegSellerAssets + secondLegFilled == targetSellerAssets);
+            totalDebt = fromOffer0 + secondLegUnits;
+        } else {
+            secondLegUnits = 0;
+            totalDebt = fromOffer0;
+        }
+
+        // Provide exact collateral coverage for actual total debt.
+        collateralize(obligation, borrower, totalDebt + 1);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
@@ -222,8 +240,7 @@ contract BundlerTest is BaseTest {
 
         _authorizeBundler();
 
-        // Splitting across offers can cause up to 1 extra unit of debt due to rounding.
-        if (fromOffer0 >= units || offerUnits1 >= units + 1 - fromOffer0) {
+        if (fromOffer0 >= units || offerUnits1 >= secondLegUnits) {
             vm.prank(borrower);
             takeBundler.bundleTakeSellerAssets(
                 midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
@@ -259,9 +276,9 @@ contract BundlerTest is BaseTest {
     {
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         uint256 fromOffer1 = targetUnits - fromOffer0;
-        return
-            fromOffer0.mulDivDown(TickLib.tickToPrice(tick0), WAD)
-                + fromOffer1.mulDivDown(TickLib.tickToPrice(tick1), WAD);
+        // Returns token-scale buyer assets (divided by BALANCE_DECIMALS).
+        return fromOffer0.mulDivDown(TickLib.tickToPrice(tick0), WAD).mulDivDown(1, BALANCE_DECIMALS)
+            + fromOffer1.mulDivDown(TickLib.tickToPrice(tick1), WAD).mulDivDown(1, BALANCE_DECIMALS);
     }
 
     function testAveragePriceTooHigh(

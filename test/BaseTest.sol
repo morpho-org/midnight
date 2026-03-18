@@ -14,7 +14,8 @@ import {
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    BALANCE_DECIMALS
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
@@ -80,8 +81,8 @@ abstract contract BaseTest is Test {
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
         uint256 oraclePrice = Oracle(obligation.collaterals[0].oracle).price();
-        uint256 collateral =
-            debt.mulDivUp(WAD, obligation.collaterals[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        uint256 collateral = debt.mulDivUp(WAD, obligation.collaterals[0].lltv)
+            .mulDivUp(ORACLE_PRICE_SCALE, oraclePrice * BALANCE_DECIMALS);
         deal(address(obligation.collaterals[0].token), _borrower, collateral);
 
         vm.prank(_borrower);
@@ -106,7 +107,7 @@ abstract contract BaseTest is Test {
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
-        uint256 assets = units.mulDivUp(price, WAD);
+        uint256 assets = units.mulDivUp(price, WAD).mulDivUp(1, BALANCE_DECIMALS);
         deal(address(loanToken), otherLender, assets);
 
         Offer memory lenderOffer;
@@ -134,7 +135,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
-        badBorrowerOffer.obligationUnits = 100;
+        badBorrowerOffer.obligationUnits = 100 * BALANCE_DECIMALS;
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.tick = MAX_TICK;
@@ -149,7 +150,7 @@ abstract contract BaseTest is Test {
 
         deal(address(loanToken), unluckyLender, 100);
 
-        take(100, unluckyLender, badBorrowerOffer);
+        take(100 * BALANCE_DECIMALS, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");

@@ -13,13 +13,15 @@ import {
     MAX_COLLATERALS_PER_BORROWER,
     WAD,
     ORACLE_PRICE_SCALE,
-    TIME_TO_MAX_LIF
+    TIME_TO_MAX_LIF,
+    BALANCE_DECIMALS
 } from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
-// To keep total collateral within uint128, we cap amounts at type(uint128).max / 3.
-uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 3;
+// With BALANCE_DECIMALS, collateral * (oracle_price * BD) must fit in uint256.
+// Cap at MAX_TEST_AMOUNT / 3 / 1e6 to prevent overflow in isHealthy.
+uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 3 / 1e6;
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
@@ -106,14 +108,15 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         skip(99);
-        deal(address(loanToken), address(borrower), repaid);
+        uint256 repaidTokens = repaid.mulDivUp(1, BALANCE_DECIMALS);
+        deal(address(loanToken), address(borrower), repaidTokens);
 
         vm.prank(borrower);
         midnight.repay(obligation, repaid, borrower);
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
-        assertEq(loanToken.balanceOf(address(midnight)), repaid);
+        assertEq(loanToken.balanceOf(address(midnight)), repaidTokens);
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
@@ -122,14 +125,18 @@ contract OtherFunctionsTest is BaseTest {
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
 
+        uint256 midnightBefore = loanToken.balanceOf(address(midnight));
+        uint256 lenderBefore = loanToken.balanceOf(lender);
+        uint256 withdrawTokens = withdraw.mulDivDown(1, BALANCE_DECIMALS);
+
         vm.prank(lender);
         midnight.withdraw(obligation, withdraw, lender, lender);
 
-        assertEq(midnight.balanceOf(id, lender), int256(units - withdraw), "balanceOf");
+        assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
         assertEq(midnight.totalUnits(id), units - withdraw, "totalUnits");
-        assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
-        assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
+        assertEq(loanToken.balanceOf(address(midnight)), midnightBefore - withdrawTokens, "balance of midnight");
+        assertEq(loanToken.balanceOf(lender), lenderBefore + withdrawTokens, "balance of lender");
     }
 
     function testWithdrawToReceiver(uint256 units, uint256 withdraw) public {
@@ -137,12 +144,15 @@ contract OtherFunctionsTest is BaseTest {
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
         address receiver = makeAddr("receiver");
+        uint256 withdrawTokens = withdraw.mulDivDown(1, BALANCE_DECIMALS);
+
+        uint256 lenderBefore = loanToken.balanceOf(lender);
 
         vm.prank(lender);
         midnight.withdraw(obligation, withdraw, lender, receiver);
 
-        assertEq(loanToken.balanceOf(lender), 0, "balance of lender");
-        assertEq(loanToken.balanceOf(receiver), withdraw, "balance of receiver");
+        assertEq(loanToken.balanceOf(lender), lenderBefore, "balance of lender");
+        assertEq(loanToken.balanceOf(receiver), withdrawTokens, "balance of receiver");
     }
 
     function testWithdrawCollateralToReceiver(uint256 supply, uint256 withdraw) public {
@@ -460,23 +470,25 @@ contract OtherFunctionsTest is BaseTest {
             Oracle(_obligation.collaterals[i].oracle).setPrice(ORACLE_PRICE_SCALE);
         }
 
+        uint256 collatPerToken = 1e12;
         for (uint256 i = 0; i < numCollaterals; i++) {
             address token = _obligation.collaterals[i].token;
-            deal(token, address(this), 1e18);
-            ERC20(token).approve(address(midnight), 1e18);
-            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
+            deal(token, address(this), collatPerToken);
+            ERC20(token).approve(address(midnight), collatPerToken);
+            midnight.supplyCollateral(_obligation, i, collatPerToken, borrower);
         }
 
         bytes32 _id = toId(_obligation);
         assertEq(UtilsLib.countBits(midnight.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
 
+        // Debt of 1e18 units with collateral of 1e12 tokens per collateral (each token worth 1e6 units).
         setupObligation(_obligation, 1e18);
 
         // Warp to maturity + TIME_TO_MAX_LIF to bypass recovery close factor.
         vm.warp(_obligation.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
-        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, "");
+        midnight.liquidate(_obligation, collateralIndex, collatPerToken, 0, borrower, "");
 
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");

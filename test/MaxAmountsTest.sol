@@ -51,7 +51,7 @@ contract MaxAmountsTest is BaseTest {
         // Set a very high oracle price so a small collateral amount is sufficient.
         // With price = ORACLE_PRICE_SCALE * 1e36, 1 collateral token = 1e36 loan tokens.
         // maxDebt = collateral * 1e36 * 0.75, so ~454 tokens covers MAX_AMOUNT.
-        oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
+        oracle1.setPrice(ORACLE_PRICE_SCALE * 1e30);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
         collateralToken1.approve(address(midnight), collateralAmount);
@@ -77,7 +77,7 @@ contract MaxAmountsTest is BaseTest {
 
         deal(address(loanToken), lender, amount);
 
-        oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
+        oracle1.setPrice(ORACLE_PRICE_SCALE * 1e30);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
         collateralToken1.approve(address(midnight), collateralAmount);

@@ -7,6 +7,7 @@ import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {BALANCE_DECIMALS} from "../src/libraries/ConstantsLib.sol";
 
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
@@ -50,13 +51,13 @@ contract AuthorizationTest is BaseTest {
     }
 
     function testWithdrawUnauthorized() public {
-        uint256 units = 1000;
+        uint256 units = 1000 * BALANCE_DECIMALS;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
         // Borrower repays
         skip(99);
-        deal(address(loanToken), borrower, units);
+        deal(address(loanToken), borrower, units / BALANCE_DECIMALS + 1);
         vm.prank(borrower);
         midnight.repay(obligation, units, borrower);
 
@@ -87,13 +88,13 @@ contract AuthorizationTest is BaseTest {
     }
 
     function testWithdrawAuthorized() public {
-        uint256 units = 1000;
+        uint256 units = 1000 * BALANCE_DECIMALS;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
         // Borrower repays
         skip(99);
-        deal(address(loanToken), borrower, units);
+        deal(address(loanToken), borrower, units / BALANCE_DECIMALS + 1);
         vm.prank(borrower);
         midnight.repay(obligation, units, borrower);
 
@@ -106,7 +107,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.withdraw(obligation, units, lender, operator);
 
-        assertEq(loanToken.balanceOf(operator), units);
+        assertEq(loanToken.balanceOf(operator), units / BALANCE_DECIMALS);
     }
 
     function testWithdrawCollateralAuthorized() public {
@@ -159,21 +160,22 @@ contract AuthorizationTest is BaseTest {
     }
 
     function testWithdrawSelf() public {
-        uint256 units = 1000;
+        uint256 units = 1000 * BALANCE_DECIMALS;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
         // Borrower repays
         skip(99);
-        deal(address(loanToken), borrower, units);
+        deal(address(loanToken), borrower, units / BALANCE_DECIMALS + 1);
         vm.prank(borrower);
         midnight.repay(obligation, units, borrower);
 
         // Lender can withdraw their own units (no authorization needed)
+        uint256 lenderBefore = loanToken.balanceOf(lender);
         vm.prank(lender);
         midnight.withdraw(obligation, units, lender, lender);
 
-        assertEq(loanToken.balanceOf(lender), units);
+        assertEq(loanToken.balanceOf(lender), lenderBefore + units / BALANCE_DECIMALS);
     }
 
     function testWithdrawCollateralSelf() public {

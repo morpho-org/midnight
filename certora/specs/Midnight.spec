@@ -6,7 +6,7 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function balanceOf(bytes32 id, address user) external returns (int256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
 
@@ -18,30 +18,12 @@ methods {
 
 /// HELPERS ///
 
-persistent ghost mapping(bytes32 => mathint) sumBalanceOf {
-    init_state axiom (forall bytes32 id. sumBalanceOf[id] == 0);
+persistent ghost mapping(bytes32 => mathint) sumDebt {
+    init_state axiom (forall bytes32 id. sumDebt[id] == 0);
 }
 
-persistent ghost mapping(bytes32 => mathint) sumPositiveBalanceOf {
-    init_state axiom (forall bytes32 id. sumPositiveBalanceOf[id] == 0);
-}
-
-persistent ghost mapping(bytes32 => mathint) sumNegativeBalanceOf {
-    init_state axiom (forall bytes32 id. sumNegativeBalanceOf[id] == 0);
-}
-
-function negativePart(mathint x) returns mathint {
-    return x < 0 ? -x : 0;
-}
-
-function positivePart(mathint x) returns mathint {
-    return x > 0 ? x : 0;
-}
-
-hook Sstore position[KEY bytes32 id][KEY address owner].balance int256 newBalance (int256 oldBalance) {
-    sumBalanceOf[id] = sumBalanceOf[id] - oldBalance + newBalance;
-    sumPositiveBalanceOf[id] = sumPositiveBalanceOf[id] - positivePart(to_mathint(oldBalance)) + positivePart(to_mathint(newBalance));
-    sumNegativeBalanceOf[id] = sumNegativeBalanceOf[id] - negativePart(to_mathint(oldBalance)) + negativePart(to_mathint(newBalance));
+hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
+    sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -115,8 +97,11 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 
 /// INVARIANTS ///
 
-strong invariant totalUnitsEqualsSumNegativeBalancePlusWithdrawable(bytes32 id)
-    to_mathint(totalUnits(id)) == sumNegativeBalanceOf[id] + to_mathint(withdrawable(id));
+strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
+    to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
 strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
     userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+
+strong invariant noCreditAndDebt(bytes32 id, address user)
+    creditOf(id, user) == 0 || debtOf(id, user) == 0;

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, BALANCE_DECIMALS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
@@ -90,8 +90,8 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -110,8 +110,8 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - tradingFee;
-        uint256 expectedBuyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivDown(buyerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivDown(sellerPrice, WAD).mulDivDown(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -131,8 +131,8 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -165,8 +165,8 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -196,8 +196,8 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -226,8 +226,8 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 expectedBuyerAssets = obligationUnits.mulDivUp(buyerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
+        uint256 expectedSellerAssets = obligationUnits.mulDivUp(sellerPrice, WAD).mulDivUp(1, BALANCE_DECIMALS);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);

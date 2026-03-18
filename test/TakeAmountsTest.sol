@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, BALANCE_DECIMALS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -88,7 +88,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -106,7 +106,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
+        targetSellerAssets = bound(targetSellerAssets, 1, 1e24);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -126,7 +126,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
@@ -149,7 +149,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 fee1
     ) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
+        targetSellerAssets = bound(targetSellerAssets, 1, 1e24);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
@@ -169,10 +169,10 @@ contract TakeAmountsTest is BaseTest {
 
     function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
-        uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
+        uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(BALANCE_DECIMALS, 1);
 
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, targetUnits);
@@ -181,17 +181,22 @@ contract TakeAmountsTest is BaseTest {
 
         (uint256 buyerAssets,,) = take(targetUnits, lender, offer);
 
-        assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
+        assertEq(
+            buyerAssets,
+            targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(BALANCE_DECIMALS, 1).mulDivUp(buyerPrice, WAD)
+                .mulDivUp(1, BALANCE_DECIMALS),
+            "e2e buyerAssets"
+        );
     }
 
     function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
 
         _createPosition(1e36);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
-        uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
+        uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(BALANCE_DECIMALS, 1);
 
         deal(address(loanToken), borrower, type(uint256).max);
         offer.maker = lender;
@@ -199,6 +204,11 @@ contract TakeAmountsTest is BaseTest {
 
         (uint256 buyerAssets,,) = take(targetUnits, borrower, offer);
 
-        assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
+        assertEq(
+            buyerAssets,
+            targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(BALANCE_DECIMALS, 1).mulDivUp(buyerPrice, WAD)
+                .mulDivUp(1, BALANCE_DECIMALS),
+            "e2e buyerAssets"
+        );
     }
 }
