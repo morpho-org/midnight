@@ -39,13 +39,13 @@ function summaryAccrueContinuousFee(bytes32 id, address borrower) {
 /// HOOKS ///
 
 hook Sstore position[KEY bytes32 id][KEY address user].debt uint128 newVal (uint128 oldVal) {
-    if (!accrued[id][user]) {
+    if (!accrued[id][user] && (oldVal != 0 || newVal != 0)) {
         debtStoredBeforeAccrual[id][user] = true;
     }
 }
 
 hook Sload uint128 val position[KEY bytes32 id][KEY address user].debt {
-    if (!accrued[id][user]) {
+    if (!accrued[id][user] && val != 0) {
         debtLoadedBeforeAccrual[id][user] = true;
     }
 }

@@ -102,8 +102,6 @@ contract ContinuousFeeTest is BaseTest {
         collateralize(obligation, borrower, 1);
         uint256 addedPending = uint256(feeRate).mulDivDown(1 * (ttm - elapsed), WAD);
         vm.expectEmit();
-        emit EventsLib.AccrueContinuousFee(id, otherLender, 0, 0, 0);
-        vm.expectEmit();
         emit EventsLib.AccrueContinuousFee(id, borrower, expectedFee, expectedFee, remaining - expectedFee);
         vm.expectEmit();
         emit EventsLib.UpdatePendingFee(id, borrower, remaining - expectedFee + addedPending);
@@ -154,8 +152,6 @@ contract ContinuousFeeTest is BaseTest {
         lenderOffer.expiry = block.timestamp;
         lenderOffer.group = keccak256("postmaturity-take");
         collateralize(obligation, borrower, 1);
-        vm.expectEmit();
-        emit EventsLib.AccrueContinuousFee(id, otherLender, 0, 0, 0);
         vm.expectEmit();
         emit EventsLib.AccrueContinuousFee(id, borrower, remaining, remaining, 0);
         vm.expectEmit();

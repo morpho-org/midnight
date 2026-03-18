@@ -199,8 +199,6 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(offer.obligation);
         slash(id, offer.maker);
         slash(id, taker);
-        accrueContinuousFee(id, offer.maker, offer.obligation.maturity);
-        accrueContinuousFee(id, taker, offer.obligation.maturity);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -246,6 +244,12 @@ contract Midnight is IMidnight {
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
+
+        if (buyerPos.debt > 0) accrueContinuousFee(id, buyer, offer.obligation.maturity);
+        if (sellerPos.debt > 0 || obligationUnits > sellerPos.credit) {
+            accrueContinuousFee(id, seller, offer.obligation.maturity);
+        }
+
         uint256 oldBuyerDebt = buyerPos.debt;
         uint256 oldSellerDebt = sellerPos.debt;
         uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, obligationUnits);
