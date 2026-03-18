@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-/// @notice Draft Certora specification for Recovery Close Factor (RCF) and rcfThreshold
-///         properties, scoped to the `liquidate` function.
-///
 /// Properties 1-2 are general (any number of collaterals).
 /// Properties 3-5 assume single-collateral obligations to keep the arithmetic in
 /// CVL tractable; the `require obligation.collaterals.length == 1` is clearly marked.
