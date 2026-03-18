@@ -13,13 +13,30 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Lif, Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+
+// FuzzCollateral and FuzzObligation exist to fuzz on the Lif enum struct, since Foundry's fuzzer cannot directly
+// fuzz enum types. They use uint8 for maxLif, which is then mapped to a Lif value in _toObligation.
+struct FuzzCollateral {
+    address token;
+    uint256 lltv;
+    uint8 maxLif;
+    address oracle;
+}
+
+struct FuzzObligation {
+    address loanToken;
+    FuzzCollateral[] collaterals;
+    uint256 maturity;
+    uint256 rcfThreshold;
+}
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -235,7 +252,7 @@ abstract contract BaseTest is Test {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
             uint256 lltv = obligation.collaterals[i].lltv > WAD ? WAD : obligation.collaterals[i].lltv;
             collaterals[i].lltv = lltv;
-            collaterals[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collaterals[i].maxLif = Lif.Low;
         }
         collaterals = sortCollaterals(collaterals);
         obligation.collaterals = collaterals;
@@ -283,5 +300,9 @@ abstract contract BaseTest is Test {
 
     function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
         return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+    }
+
+    function lifToMaxLif(Collateral memory collateral) internal pure returns (uint256) {
+        return maxLif(collateral.lltv, collateral.maxLif == Lif.Low ? LIQUIDATION_CURSOR_LOW : LIQUIDATION_CURSOR_HIGH);
     }
 }

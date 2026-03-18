@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Lif, Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
@@ -36,7 +36,7 @@ contract BundlerTest is BaseTest {
                 Collateral({
                     token: address(collateralToken1),
                     lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    maxLif: Lif.Low,
                     oracle: address(oracle1)
                 })
             );
@@ -45,7 +45,7 @@ contract BundlerTest is BaseTest {
                 Collateral({
                     token: address(collateralToken2),
                     lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    maxLif: Lif.Low,
                     oracle: address(oracle2)
                 })
             );

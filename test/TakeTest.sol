@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Lif, Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -34,7 +34,7 @@ contract TakeTest is BaseTest {
                 Collateral({
                     token: address(collateralToken1),
                     lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    maxLif: Lif.Low,
                     oracle: address(oracle1)
                 })
             );
@@ -43,7 +43,7 @@ contract TakeTest is BaseTest {
                 Collateral({
                     token: address(collateralToken2),
                     lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    maxLif: Lif.Low,
                     oracle: address(oracle2)
                 })
             );
@@ -562,43 +562,32 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory proof) public {
+    function testTakeInvalidProofTwoLeaves(bytes32 otherLeaf, bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
-        vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
+        bytes32 lenderLeaf = keccak256(abi.encode(lenderOffer));
+        vm.assume(proof[0] != otherLeaf);
+        bytes32 _root = UtilsLib.commutativeHash(lenderLeaf, otherLeaf);
+        Signature memory _sig = sig(_root, privateKey[lender]);
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
-        midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            sig([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            proof
-        );
+        midnight.take(100, borrower, address(0), hex"", borrower, lenderOffer, _sig, _root, proof);
     }
 
-    function testTakeTwoLeaves(uint256 units, Offer memory otherOffer) public {
+    function testTakeTwoLeaves(uint256 units, bytes32 otherLeaf) public {
         units = bound(units, 0, maxAssets);
         uint256 price = TickLib.tickToPrice(lenderOffer.tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, units);
         lenderOffer.obligationUnits = units;
 
+        bytes32 lenderLeaf = keccak256(abi.encode(lenderOffer));
+        bytes32 _root = UtilsLib.commutativeHash(lenderLeaf, otherLeaf);
+        Signature memory _sig = sig(_root, privateKey[lender]);
+        bytes32[] memory _proof = new bytes32[](1);
+        _proof[0] = otherLeaf;
+
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            sig([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            proof([lenderOffer, otherOffer])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, lenderOffer, _sig, _root, _proof);
     }
 
     // test callbacks.

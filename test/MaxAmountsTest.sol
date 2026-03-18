@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Lif, Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -26,7 +26,7 @@ contract MaxAmountsTest is BaseTest {
                 Collateral({
                     token: address(collateralToken1),
                     lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    maxLif: Lif.Low,
                     oracle: address(oracle1)
                 })
             );

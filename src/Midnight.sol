@@ -21,6 +21,7 @@ import {
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
     IMidnight,
+    Lif,
     Obligation,
     Offer,
     Signature,
@@ -386,7 +387,9 @@ contract Midnight is IMidnight {
             uint256 _collateralOf = _position.collateral[i];
             maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
+                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(
+                    WAD, maxLif(_collateral.lltv, lifToCursor(_collateral.maxLif))
+                )
             );
             bitmap ^= (1 << i);
         }
@@ -406,7 +409,10 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = obligation.collaterals[collateralIndex].maxLif;
+            uint256 _maxLif = maxLif(
+                obligation.collaterals[collateralIndex].lltv,
+                lifToCursor(obligation.collaterals[collateralIndex].maxLif)
+            );
             uint256 lif = originalDebt > maxDebt
                 ? _maxLif
                 : UtilsLib.min(
@@ -505,11 +511,6 @@ contract Midnight is IMidnight {
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 lltv = obligation.collaterals[i].lltv;
                 require(lltv <= WAD, "lltv too high");
-                require(
-                    obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
-                        || obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
-                    "invalid maxLif"
-                );
                 previousCollateralToken = collateralToken;
             }
 
@@ -622,6 +623,10 @@ contract Midnight is IMidnight {
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
+    }
+
+    function lifToCursor(Lif lif) internal pure returns (uint256) {
+        return lif == Lif.Low ? LIQUIDATION_CURSOR_LOW : LIQUIDATION_CURSOR_HIGH;
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {

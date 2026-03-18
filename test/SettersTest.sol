@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Lif, Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
     function testInitialOwner() public view {
@@ -54,7 +54,7 @@ contract SettersTest is BaseTest {
 
         Collateral[] memory collaterals = new Collateral[](1);
         collaterals[0] = Collateral({
-            token: address(collateralToken1), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.75e18, maxLif: Lif.Low, oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: collaterals, rcfThreshold: 0
@@ -174,7 +174,7 @@ contract SettersTest is BaseTest {
         // touch obligation with this loan token
         Collateral[] memory collaterals = new Collateral[](1);
         collaterals[0] = Collateral({
-            token: address(collateralToken1), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.75e18, maxLif: Lif.Low, oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: loanToken, maturity: block.timestamp + 1 days, collaterals: collaterals, rcfThreshold: 0
@@ -226,7 +226,7 @@ contract SettersTest is BaseTest {
 
         Collateral[] memory cols = new Collateral[](1);
         cols[0] = Collateral({
-            token: address(collateralToken1), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.75e18, maxLif: Lif.Low, oracle: address(oracle1)
         });
         Obligation memory obligation =
             Obligation({loanToken: address(0), maturity: block.timestamp + 1 days, collaterals: cols, rcfThreshold: 0});

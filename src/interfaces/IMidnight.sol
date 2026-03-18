@@ -12,10 +12,15 @@ struct Obligation {
     uint256 rcfThreshold;
 }
 
+enum Lif {
+    Low,
+    High
+}
+
 struct Collateral {
     address token;
     uint256 lltv;
-    uint256 maxLif;
+    Lif maxLif;
     address oracle;
 }
 
