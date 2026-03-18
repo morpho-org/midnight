@@ -38,7 +38,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligat
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert repaidUnits > 0 => seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
+    assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
 /// Liquidation profit is bounded by maxLif (seizedAssets input)
