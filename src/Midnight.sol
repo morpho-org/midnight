@@ -587,6 +587,10 @@ contract Midnight is IMidnight {
         return obligationState[id].created;
     }
 
+    function obligationLossIndex(bytes32 id) external view returns (uint128) {
+        return obligationState[id].lossIndex;
+    }
+
     function withdrawable(bytes32 id) external view returns (uint256) {
         return obligationState[id].withdrawable;
     }
