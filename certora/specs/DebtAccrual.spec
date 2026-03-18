@@ -39,20 +39,21 @@ function summaryAccrueContinuousFee(bytes32 id, address borrower) {
 /// HOOKS ///
 
 hook Sstore position[KEY bytes32 id][KEY address user].debt uint128 newVal (uint128 oldVal) {
-    if (!accrued[id][user] && (oldVal != 0 || newVal != 0)) {
+    if (!accrued[id][user] && (currentContract.position[id][user].pendingFee > 0 || newVal > oldVal)) {
         debtStoredBeforeAccrual[id][user] = true;
     }
 }
 
 hook Sload uint128 val position[KEY bytes32 id][KEY address user].debt {
-    if (!accrued[id][user] && val != 0) {
+    if (!accrued[id][user] && currentContract.position[id][user].pendingFee > 0) {
         debtLoadedBeforeAccrual[id][user] = true;
     }
 }
 
 /// RULES ///
 
-/// Check that debt is never stored before accrueContinuousFee is called.
+/// Check that debt is never stored before accrueContinuousFee is called when
+/// there is remaining fee to realize or debt is being increased.
 /// The SSTOREs of accrueContinuousFee are ignored.
 rule debtNotStoredBeforeAccrual(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> !f.isView } {
     require !accrued[id][user], "initialize the ghost variable";
@@ -63,7 +64,8 @@ rule debtNotStoredBeforeAccrual(env e, method f, calldataarg args, bytes32 id, a
     assert !debtStoredBeforeAccrual[id][user], "debt was stored before accrueContinuousFee was called";
 }
 
-/// Check that debt is never loaded before accrueContinuousFee is called.
+/// Check that debt is never loaded before accrueContinuousFee is called when
+/// there is remaining fee to realize.
 /// The SLOADs of accrueContinuousFee are ignored.
 rule debtNotLoadedBeforeAccrual(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:isHealthy(Midnight.Obligation memory, bytes32, address).selector && f.selector != sig:debtOf(bytes32, address).selector } {
     require !accrued[id][user], "initialize the ghost variable";

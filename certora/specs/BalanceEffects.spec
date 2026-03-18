@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -7,6 +9,7 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function creditAfterSlashing(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function Utils.passiveFeeRecipient() external returns (address) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
@@ -182,6 +185,6 @@ filtered {
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     f(e, args);
-    assert creditOf(id, user) == creditBefore;
+    assert user == Utils.passiveFeeRecipient() || creditOf(id, user) == creditBefore;
     assert debtOf(id, user) == debtBefore;
 }

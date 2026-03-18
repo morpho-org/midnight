@@ -245,8 +245,8 @@ contract Midnight is IMidnight {
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
 
-        if (buyerPos.debt > 0) accrueContinuousFee(id, buyer, offer.obligation.maturity);
-        if (sellerPos.debt > 0 || obligationUnits > sellerPos.credit) {
+        if (buyerPos.pendingFee > 0) accrueContinuousFee(id, buyer, offer.obligation.maturity);
+        if (sellerPos.pendingFee > 0 || obligationUnits > sellerPos.credit) {
             accrueContinuousFee(id, seller, offer.obligation.maturity);
         }
 
