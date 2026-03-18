@@ -14,6 +14,9 @@ methods {
 // Track the lossIndex at which each user was last slashed.
 persistent ghost mapping(bytes32 => mapping(address => uint128)) slashedAtLossIndex;
 
+// Track whether slash was ever called for a user, to distinguish "never slashed" from "synced at lossIndex 0".
+persistent ghost mapping(bytes32 => mapping(address => bool)) wasSlashed;
+
 // Track whether credit was read without prior slash.
 persistent ghost bool creditReadWithoutSlash;
 
@@ -22,13 +25,14 @@ persistent ghost bool creditWrittenWithoutSlash;
 
 function slashSummary(bytes32 id, address user) {
     slashedAtLossIndex[id][user] = currentContract.obligationState[id].lossIndex;
+    wasSlashed[id][user] = true;
 }
 
 /// HOOKS ///
 
 // Credit must only be read after slash at the current lossIndex.
 hook Sload uint128 value position[KEY bytes32 id][KEY address user].credit {
-    if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && value > 0) {
+    if ((!wasSlashed[id][user] || slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex) && value > 0) {
         creditReadWithoutSlash = true;
     }
 }
@@ -37,7 +41,7 @@ hook Sload uint128 value position[KEY bytes32 id][KEY address user].credit {
 // This also covers zero-to-positive transitions: when newValue > 0, slash is required
 // even if oldValue == 0, ensuring the user's lossIndex is refreshed first.
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newValue (uint128 oldValue) {
-    if (slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex && (oldValue > 0 || newValue > 0)) {
+    if ((!wasSlashed[id][user] || slashedAtLossIndex[id][user] != currentContract.obligationState[id].lossIndex) && (oldValue > 0 || newValue > 0)) {
         creditWrittenWithoutSlash = true;
     }
 }

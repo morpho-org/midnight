@@ -82,19 +82,21 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 
 rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
     requireInvariant obligationLossIndexZeroIfNotCreated(id);
+    bool createdBefore = currentContract.obligationState[id].created;
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
     uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter <= lossIndexBefore || lossIndexBefore == 0;
+    assert createdBefore => lossIndexAfter <= lossIndexBefore;
 }
 
 rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant userLossIndexGeqObligationLossIndex(id, user);
     requireInvariant userLossIndexZeroIfNotCreated(id, user);
+    uint128 oblLossIndexBefore = currentContract.obligationState[id].lossIndex;
     uint128 lossIndexBefore = userLossIndex(id, user);
     f(e, args);
     uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter <= lossIndexBefore || lossIndexBefore == 0;
+    assert lossIndexBefore != 0 => lossIndexAfter <= lossIndexBefore;
 }
 
 /// INVARIANTS ///
