@@ -292,13 +292,14 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
 
         position[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
-        obligationState[id].withdrawable += obligationUnits;
 
         emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
 
         SafeTransferLib.safeTransferFrom(
             obligation.loanToken, msg.sender, address(this), obligationUnits.mulDivUp(1, BALANCE_DECIMALS)
         );
+
+        obligationState[id].withdrawable += obligationUnits;
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
@@ -444,7 +445,6 @@ contract Midnight is IMidnight {
                 // forge-lint: disable-next-item(unsafe-typecast) as collateralIndex < MAX_COLLATERALS (128)
                 _position.activatedCollaterals &= ~uint128(1 << collateralIndex);
             }
-            _obligationState.withdrawable += repaidUnits;
             _position.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
@@ -461,6 +461,8 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(
             obligation.loanToken, msg.sender, address(this), repaidUnits.mulDivUp(1, BALANCE_DECIMALS)
         );
+
+        _obligationState.withdrawable += repaidUnits;
 
         return (seizedAssets, repaidUnits);
     }

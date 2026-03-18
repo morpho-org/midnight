@@ -93,7 +93,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
-        uint256 expectedAssets = obligationUnits.mulDivUp(price, WAD);
+        uint256 expectedAssets = obligationUnits.mulDivUp(price, WAD).mulDivUp(1, BALANCE_DECIMALS);
         deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, obligationUnits);
 

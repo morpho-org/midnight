@@ -66,9 +66,15 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
 
 // UtilsLib summaries.
 
-ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
+ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256 {
+    // floor(a * b / c) * c <= a * b
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. c > 0 => to_mathint(CVL_mulDivDown(a, b, c)) * to_mathint(c) <= to_mathint(a) * to_mathint(b);
+}
 
-ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
+ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256 {
+    // ceil(a * b / c) * c >= a * b
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. c > 0 => to_mathint(CVL_mulDivUp(a, b, c)) * to_mathint(c) >= to_mathint(a) * to_mathint(b);
+}
 
 // IdLib summaries.
 
