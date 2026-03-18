@@ -81,6 +81,7 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 }
 
 rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
+    requireInvariant obligationLossIndexZeroIfNotCreated(id);
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
     uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
@@ -89,6 +90,7 @@ rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, call
 
 rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant userLossIndexGeqObligationLossIndex(id, user);
+    requireInvariant userLossIndexZeroIfNotCreated(id, user);
     uint128 lossIndexBefore = userLossIndex(id, user);
     f(e, args);
     uint128 lossIndexAfter = userLossIndex(id, user);
@@ -100,11 +102,20 @@ rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
+strong invariant obligationLossIndexZeroIfNotCreated(bytes32 id)
+    !currentContract.obligationState[id].created => currentContract.obligationState[id].lossIndex == 0;
+
 strong invariant userLossIndexZeroIfNotCreated(bytes32 id, address user)
     !currentContract.obligationState[id].created => userLossIndex(id, user) == 0;
 
 strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, user) == 0;
+    userLossIndex(id, user) >= currentContract.obligationState[id].lossIndex || userLossIndex(id, user) == 0
+{
+    preserved {
+        requireInvariant obligationLossIndexZeroIfNotCreated(id);
+        requireInvariant userLossIndexZeroIfNotCreated(id, user);
+    }
+}
 
 strong invariant noCreditAndDebt(bytes32 id, address user)
     creditOf(id, user) == 0 || debtOf(id, user) == 0;
