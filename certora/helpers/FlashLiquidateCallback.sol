@@ -9,11 +9,22 @@ interface IHavoc {
 }
 
 contract FlashLiquidateCallback {
+    // Tracks flashloans in obligation units (repaidUnits is already in units).
     function startFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
 
     function endFlashloan(address token, uint256 amount) internal {
+        // Dummy function to insert the flashloan logic in the spec.
+    }
+
+    // Tracks flashloans in obligation units by scaling token amounts by BALANCE_DECIMALS.
+    // Used for regular flash loans where amount is in actual tokens.
+    function startFlashloanTokens(address token, uint256 amount) internal {
+        // Dummy function to insert the flashloan logic in the spec.
+    }
+
+    function endFlashloanTokens(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
 
@@ -32,9 +43,9 @@ contract FlashLiquidateCallback {
     }
 
     function onFlashLoan(address token, uint256 amount, bytes calldata data) external {
-        startFlashloan(token, amount);
+        startFlashloanTokens(token, amount);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(token, amount);
+        endFlashloanTokens(token, amount);
     }
 }

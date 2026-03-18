@@ -24,8 +24,14 @@ methods {
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
+
+    // startFlashloan/endFlashloan are called from onLiquidate with repaidUnits already in obligation units.
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
+
+    // startFlashloanTokens/endFlashloanTokens are called from onFlashLoan with token amounts; CVL scales by BALANCE_DECIMALS.
+    function FlashLiquidateCallback.startFlashloanTokens(address token, uint256 amount) internal => CVL_flashLoanStartTokens(token, amount);
+    function FlashLiquidateCallback.endFlashloanTokens(address token, uint256 amount) internal => CVL_flashLoanEndTokens(token, amount);
 
     // Assume ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
     function _.transfer(address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, a, v) expect(bool);
@@ -33,6 +39,11 @@ methods {
 }
 
 /// HELPERS ///
+
+// BALANCE_DECIMALS from ConstantsLib: 1 obligation unit = 1e-6 loan token units.
+// The invariant is expressed in obligation unit space (multiply token amounts by this factor)
+// so that collateralSum (tokens) and withdrawableSum (units) can be compared uniformly.
+definition BALANCE_DECIMALS() returns mathint = 1000000;
 
 // ERC20 summaries.
 
@@ -97,6 +108,15 @@ function CVL_flashLoanEnd(address token, uint256 amount) {
     flashloans[token] = flashloans[token] - amount;
 }
 
+// For regular flash loans: amount is in tokens, so scale by BALANCE_DECIMALS to convert to units.
+function CVL_flashLoanStartTokens(address token, uint256 amount) {
+    flashloans[token] = flashloans[token] + to_mathint(amount) * BALANCE_DECIMALS();
+}
+
+function CVL_flashLoanEndTokens(address token, uint256 amount) {
+    flashloans[token] = flashloans[token] - to_mathint(amount) * BALANCE_DECIMALS();
+}
+
 // Define collateral sum and withdrawable sum.
 
 definition collateralSum(address token) returns mathint = usum bytes32 id, address owner. collateralOfMirror[id][owner][token];
@@ -133,10 +153,14 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint256 newWithdrawable
 
 /// INVARIANTS AND RULES ///
 
-// For any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token minus the flash loaned amount.
+// For any token, the balance of the contract (in obligation units) is always greater than or equal to
+// the sum of all collateral and withdrawable amounts for that token (in obligation units) minus the
+// flash loaned amount (in obligation units).
+// The invariant is expressed in obligation unit space: token amounts are multiplied by BALANCE_DECIMALS
+// so that collateralSum (tokens) and withdrawableSum (already in units) are comparable.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) - flashloans[token]
+    to_mathint(tokenBalances[token][currentContract]) * BALANCE_DECIMALS() >= collateralSum(token) * BALANCE_DECIMALS() + withdrawableSum(token) - flashloans[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
