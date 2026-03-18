@@ -56,5 +56,5 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
 
     mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
 
-    assert seizedAssets > 0 => seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
+    assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
