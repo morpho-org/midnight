@@ -172,8 +172,6 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        slash(id, offer.maker);
-        slash(id, taker);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -221,10 +219,12 @@ contract Midnight is IMidnight {
         Position storage sellerPos = position[id][seller];
         uint256 oldBuyerDebt = buyerPos.debt;
         uint256 oldSellerDebt = sellerPos.debt;
-        uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, obligationUnits);
+        if (sellerPos.credit > 0) slash(id, seller);
+        uint256 buyerCreditIncrease = obligationUnits.zeroFloorSub(oldBuyerDebt);
+        if (buyerPos.credit > 0 || buyerCreditIncrease > 0) slash(id, buyer);
         uint256 sellerCreditReduction = UtilsLib.min(sellerPos.credit, obligationUnits);
-        buyerPos.debt -= UtilsLib.toUint128(buyerDebtReduction);
-        buyerPos.credit += UtilsLib.toUint128(obligationUnits - buyerDebtReduction);
+        buyerPos.debt -= UtilsLib.toUint128(obligationUnits - buyerCreditIncrease);
+        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditReduction);
         sellerPos.debt += UtilsLib.toUint128(obligationUnits - sellerCreditReduction);
         _obligationState.totalUnits = UtilsLib.toUint128(
