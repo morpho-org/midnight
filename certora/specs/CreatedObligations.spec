@@ -61,9 +61,7 @@ strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligat
     filtered { f -> !f.isView }
 
 // Show that a created obligation cannot be deleted.
-rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id)
-    filtered { f -> !f.isView }
-{
+rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require Midnight.obligationCreated(id), "Assume that the obligation is created";
     f(e, args);
     assert Midnight.obligationCreated(id);
