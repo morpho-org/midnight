@@ -11,14 +11,14 @@ contract TakeBundler {
     using UtilsLib for uint256;
 
     struct Take {
-        uint256 obligationUnits;
+        uint256 units;
         Offer offer;
         Signature sig;
         bytes32 root;
         bytes32[] proof;
     }
 
-    /// @dev Iterates through orders, filling up to targetUnits obligation units total.
+    /// @dev Iterates through orders, filling up to targetUnits units total.
     /// @dev Assumes offers are all buy or all sell and share the same obligation id.
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
@@ -41,7 +41,7 @@ contract TakeBundler {
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             try midnight.take(
-                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].obligationUnits),
+                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
                 taker,
                 address(0),
                 "",
@@ -51,9 +51,9 @@ contract TakeBundler {
                 takes[i].root,
                 takes[i].proof
             ) returns (
-                uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledObligationUnits
+                uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits
             ) {
-                totalFilledUnits += filledObligationUnits;
+                totalFilledUnits += filledUnits;
                 totalBuyerAssets += filledBuyerAssets;
                 totalSellerAssets += filledSellerAssets;
             } catch {}
@@ -76,21 +76,21 @@ contract TakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minObligationUnits,
-        uint256 maxObligationUnits
+        uint256 minUnits,
+        uint256 maxUnits
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalObligationUnits;
+        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.buyerAssetsToUnits(
                         midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
                     ),
-                    takes[i].obligationUnits
+                    takes[i].units
                 ),
                 taker,
                 address(0),
@@ -101,16 +101,16 @@ contract TakeBundler {
                 takes[i].root,
                 takes[i].proof
             ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledObligationUnits
+                uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalObligationUnits += filledObligationUnits;
+                totalUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, "insufficient liquidity");
-        require(totalObligationUnits >= minObligationUnits, "obligation units below min");
-        require(totalObligationUnits <= maxObligationUnits, "obligation units above max");
+        require(totalUnits >= minUnits, "units below min");
+        require(totalUnits <= maxUnits, "units above max");
     }
 
     /// @dev Same as bundleTakeUnits but targets seller assets.
@@ -122,21 +122,21 @@ contract TakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minObligationUnits,
-        uint256 maxObligationUnits
+        uint256 minUnits,
+        uint256 maxUnits
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
 
         uint256 totalFilledSellerAssets;
-        uint256 totalObligationUnits;
+        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.sellerAssetsToUnits(
                         midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
                     ),
-                    takes[i].obligationUnits
+                    takes[i].units
                 ),
                 taker,
                 address(0),
@@ -147,15 +147,15 @@ contract TakeBundler {
                 takes[i].root,
                 takes[i].proof
             ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledObligationUnits
+                uint256, uint256 filledSellerAssets, uint256 filledUnits
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalObligationUnits += filledObligationUnits;
+                totalUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledSellerAssets == targetSellerAssets, "insufficient liquidity");
-        require(totalObligationUnits >= minObligationUnits, "obligation units below min");
-        require(totalObligationUnits <= maxObligationUnits, "obligation units above max");
+        require(totalUnits >= minUnits, "units below min");
+        require(totalUnits <= maxUnits, "units above max");
     }
 }
