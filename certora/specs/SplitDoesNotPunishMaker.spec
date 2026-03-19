@@ -15,6 +15,9 @@ methods {
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
 
+    // same inputs always return the same value across all 3 take calls.
+    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
+
     // Deterministic signer: must return the same address across all 3 take calls.
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => CVL_signer();
 
