@@ -3,8 +3,8 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function balanceOf(bytes32 id, address user) external returns (int256) envfree;
-    function balanceOfAfterSlashing(bytes32 id, address user) external returns (int256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function creditAfterSlashing(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationLossIndex(bytes32) external returns (uint128) envfree;
@@ -19,7 +19,7 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    // Summarize internals irrelevant to balance tracking.
+    // Summarize internals irrelevant to credit tracking.
     function toId(Midnight.Obligation) external returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
@@ -39,7 +39,7 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(a * b / d);
 }
 
-/// GHOST balanceAfterSlashingWithPrecision ///
+/// GHOST creditAfterSlashingWithPrecision ///
 
 // precision is an integer that is so large that no rounding error will ever occur.
 // A possible value would be 2^128! (factorial).
@@ -48,12 +48,12 @@ persistent ghost mathint PRECISION {
     axiom PRECISION > 0;
 }
 
-// ghost mapping for PRECISION * balanceOf(id,user) / userLossIndex(id,user)
+// ghost mapping for PRECISION * creditOf(id,user) / userLossIndex(id,user)
 // PRECISION ensures that the division will be without rounding errors.
-ghost mapping(bytes32 => mapping(address => mathint)) preciseBalanceDivIndex {
-    init_state axiom forall bytes32 id. forall address user. preciseBalanceDivIndex[id][user] == 0;
+ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
+    init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
     // this is necessary to help the prover. It's an obvious consequence, but the usum implementation does not reason about quantifiers.
-    init_state axiom forall bytes32 id. (usum address user. preciseBalanceDivIndex[id][user]) == 0;
+    init_state axiom forall bytes32 id. (usum address user. preciseCreditDivIndex[id][user]) == 0;
 }
 
 /// HELPER FUNCTIONS ///
@@ -61,47 +61,47 @@ ghost mapping(bytes32 => mapping(address => mathint)) preciseBalanceDivIndex {
 // Map index to 1-index, for easier math. 
 definition mapIndex(mathint index) returns mathint = 2^128 - 1 - index;
 
-definition cvlBalanceOf(bytes32 id, address owner) returns int256 = currentContract.position[id][owner].balance;
+definition cvlCreditOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
 definition cvlUserLossIndex(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lossIndex;
 
 /// HOOKS ///
 
-function updateBalanceDivIndex(bytes32 id, address owner, int256 newBalance, uint128 newIndex) {
+function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint128 newIndex) {
     mathint ownerLossIndex = mapIndex(newIndex);
-    require ownerLossIndex > 0 => PRECISION * newBalance % ownerLossIndex == 0, "PRECISION is 2^128!";
-    preciseBalanceDivIndex[id][owner] = 
-        newBalance <= 0 || ownerLossIndex == 0 ? 0 : PRECISION * newBalance / ownerLossIndex;
+    require ownerLossIndex > 0 => PRECISION * newCredit % ownerLossIndex == 0, "PRECISION is 2^128!";
+    preciseCreditDivIndex[id][owner] = 
+        ownerLossIndex == 0 ? 0 : PRECISION * newCredit / ownerLossIndex;
 }
 
-function checkBalanceDivInvariant(bytes32 id, address owner) returns bool {
-    int256 balance = cvlBalanceOf(id,owner);
+function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
+    uint128 credit = cvlCreditOf(id,owner);
     uint128 userIndex = cvlUserLossIndex(id,owner);
     mathint mappedIndex = mapIndex(userIndex);
-    return balance <= 0 || mappedIndex == 0 
-        ? preciseBalanceDivIndex[id][owner] == 0
-        : preciseBalanceDivIndex[id][owner] * mappedIndex == PRECISION * balance;
+    return mappedIndex == 0 
+        ? preciseCreditDivIndex[id][owner] == 0
+        : preciseCreditDivIndex[id][owner] * mappedIndex == PRECISION * credit;
 }
 
-hook Sstore position[KEY bytes32 id][KEY address owner].balance int256 newBalance (int256 oldBalance) {
-    updateBalanceDivIndex(id, owner, newBalance, cvlUserLossIndex(id, owner));
+hook Sstore position[KEY bytes32 id][KEY address owner].credit uint128 newCredit (uint128 oldCredit) {
+    updateCreditDivIndex(id, owner, newCredit, cvlUserLossIndex(id, owner));
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].lossIndex uint128 newIndex (uint128 oldIndex) {
-    updateBalanceDivIndex(id, owner, cvlBalanceOf(id, owner), newIndex);
+    updateCreditDivIndex(id, owner, cvlCreditOf(id, owner), newIndex);
 }
 
 /// invariants ///
-strong invariant preciseBalanceCorrect(bytes32 id, address owner)
-    checkBalanceDivInvariant(id, owner);
+strong invariant preciseCreditCorrect(bytes32 id, address owner)
+    checkCreditDivInvariant(id, owner);
 
-strong invariant sumOfBalancesLeTotalUnits(bytes32 id)
-    (usum address owner. preciseBalanceDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) <= PRECISION * totalUnits(id)
+strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
+    (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) <= PRECISION * totalUnits(id)
 {
     preserved slash(bytes32 slashid, address user) with (env e) {
     }
 
     preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
-        requireInvariant preciseBalanceCorrect(id, onBehalf);
+        requireInvariant preciseCreditCorrect(id, onBehalf);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
     }
 
@@ -115,9 +115,9 @@ strong invariant sumOfBalancesLeTotalUnits(bytes32 id)
         Midnight.Signature signature,
         bytes32 root,
         bytes32[] proof) with (env e) {
-        requireInvariant preciseBalanceCorrect(id, taker);
+        requireInvariant preciseCreditCorrect(id, taker);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
-        requireInvariant preciseBalanceCorrect(id, offer.maker);
+        requireInvariant preciseCreditCorrect(id, offer.maker);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, offer.maker);
     }
 
@@ -128,12 +128,12 @@ strong invariant obligationLossIndexLeqUserLossIndex(bytes32 id, address owner)
     mapIndex(cvlUserLossIndex(id, owner)) == 0 => mapIndex(obligationLossIndex(id)) == 0;
 //    mapIndex(obligationLossIndex(id)) <= mapIndex(cvlUserLossIndex(id, owner));
 
-strong invariant balanceOfAfterSlashing(bytes32 id, address owner)
-    cvlBalanceOf(id, owner) >= 0 && mapIndex(cvlUserLossIndex(id,owner)) != 0 =>
-    (balanceOfAfterSlashing(id, owner) == preciseBalanceDivIndex[id][owner] * mapIndex(obligationLossIndex(id)) / PRECISION)
+strong invariant creditAfterSlashingValue(bytes32 id, address owner)
+    mapIndex(cvlUserLossIndex(id,owner)) != 0 =>
+    (creditAfterSlashing(id, owner) == preciseCreditDivIndex[id][owner] * mapIndex(obligationLossIndex(id)) / PRECISION)
 {
     preserved {
-        requireInvariant preciseBalanceCorrect(id, owner);
+        requireInvariant preciseCreditCorrect(id, owner);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, owner);
     }
 }
