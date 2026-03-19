@@ -60,7 +60,7 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same obligationUnits and loan token.
+    /// @dev To work as expected, all offers in a same group should have the same units and loan token.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
     /// @dev Offers should have the current session to be valid.
@@ -146,15 +146,15 @@ contract Midnight is IMidnight {
 
     /// ENTRY-POINTS ///
 
-    /// @dev Returns buyerAssets, sellerAssets, obligationUnits.
+    /// @dev Returns buyerAssets, sellerAssets, units.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev All sellerAssets are reachable with the obligationUnits input, and all buyerAssets are reachable only if
+    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     function take(
-        uint256 obligationUnits,
+        uint256 units,
         address taker,
         address takerCallback,
         bytes memory takerCallbackData,
@@ -209,24 +209,22 @@ contract Midnight is IMidnight {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets =
-            offer.buy ? obligationUnits.mulDivDown(buyerPrice, WAD) : obligationUnits.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets =
-            offer.buy ? obligationUnits.mulDivDown(sellerPrice, WAD) : obligationUnits.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed = consumed[offer.maker][offer.group] += obligationUnits;
-        require(newConsumed <= offer.obligationUnits, "consumed");
+        uint256 newConsumed = consumed[offer.maker][offer.group] += units;
+        require(newConsumed <= offer.maxUnits, "consumed");
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
         uint256 oldBuyerDebt = buyerPos.debt;
         uint256 oldSellerDebt = sellerPos.debt;
-        uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, obligationUnits);
-        uint256 sellerCreditReduction = UtilsLib.min(sellerPos.credit, obligationUnits);
+        uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, units);
+        uint256 sellerCreditReduction = UtilsLib.min(sellerPos.credit, units);
         buyerPos.debt -= UtilsLib.toUint128(buyerDebtReduction);
-        buyerPos.credit += UtilsLib.toUint128(obligationUnits - buyerDebtReduction);
+        buyerPos.credit += UtilsLib.toUint128(units - buyerDebtReduction);
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditReduction);
-        sellerPos.debt += UtilsLib.toUint128(obligationUnits - sellerCreditReduction);
+        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditReduction);
         _obligationState.totalUnits = UtilsLib.toUint128(
             _obligationState.totalUnits - oldSellerDebt - oldBuyerDebt + sellerPos.debt + buyerPos.debt
         );
@@ -241,7 +239,7 @@ contract Midnight is IMidnight {
             offer.buy,
             buyerAssets,
             sellerAssets,
-            obligationUnits,
+            units,
             receiver,
             offer.group,
             newConsumed,
@@ -250,7 +248,7 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
-                .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, obligationUnits, buyerCallbackData);
+                .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
         }
 
         SafeTransferLib.safeTransferFrom(
@@ -260,42 +258,40 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
-                .onSell(offer.obligation, seller, buyerAssets, sellerAssets, obligationUnits, sellerCallbackData);
+                .onSell(offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
-        return (buyerAssets, sellerAssets, obligationUnits);
+        return (buyerAssets, sellerAssets, units);
     }
 
     /// @dev Will revert if there is no withdrawable funds.
-    function withdraw(Obligation memory obligation, uint256 obligationUnits, address onBehalf, address receiver)
-        external
-    {
+    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         slash(id, onBehalf);
 
-        position[id][onBehalf].credit -= UtilsLib.toUint128(obligationUnits);
-        _obligationState.withdrawable -= obligationUnits;
-        _obligationState.totalUnits -= UtilsLib.toUint128(obligationUnits);
+        position[id][onBehalf].credit -= UtilsLib.toUint128(units);
+        _obligationState.withdrawable -= units;
+        _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, obligationUnits, onBehalf, receiver);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver);
 
-        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, obligationUnits);
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 obligationUnits, address onBehalf) external {
+    function repay(Obligation memory obligation, uint256 units, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
-        position[id][onBehalf].debt -= UtilsLib.toUint128(obligationUnits);
-        obligationState[id].withdrawable += obligationUnits;
+        position[id][onBehalf].debt -= UtilsLib.toUint128(units);
+        obligationState[id].withdrawable += units;
 
-        emit EventsLib.Repay(msg.sender, id, obligationUnits, onBehalf);
+        emit EventsLib.Repay(msg.sender, id, units, onBehalf);
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), obligationUnits);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.

@@ -62,7 +62,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.obligationUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -88,7 +88,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.obligationUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 

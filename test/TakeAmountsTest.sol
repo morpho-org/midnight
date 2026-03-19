@@ -45,7 +45,7 @@ contract TakeAmountsTest is BaseTest {
         id = toId(obligation);
 
         offer.buy = false;
-        offer.obligationUnits = type(uint256).max;
+        offer.maxUnits = type(uint256).max;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
@@ -69,7 +69,7 @@ contract TakeAmountsTest is BaseTest {
         return TickLib.tickToPrice(t) > maxPrice ? t - 1 : t;
     }
 
-    /// @dev Creates an initial borrowing position so borrower has debt and lender has obligation units.
+    /// @dev Creates an initial borrowing position so borrower has debt and lender has units.
     function _createPosition(uint256 positionUnits) internal {
         deal(address(loanToken), lender, type(uint128).max);
         collateralize(obligation, borrower, positionUnits);
@@ -120,7 +120,7 @@ contract TakeAmountsTest is BaseTest {
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
 
-    // buyerIsLender = false: buyer = taker (borrower, has debt), seller = maker (lender, has obligation units).
+    // buyerIsLender = false: buyer = taker (borrower, has debt), seller = maker (lender, has units).
 
     function testBuyerAssetsToUnitsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 tick, uint256 fee0, uint256 fee1)
         public

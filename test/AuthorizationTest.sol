@@ -201,7 +201,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.obligationUnits = units;
+        offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
@@ -224,7 +224,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.obligationUnits = units;
+        offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
@@ -320,7 +320,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.obligationUnits = units;
+        offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;

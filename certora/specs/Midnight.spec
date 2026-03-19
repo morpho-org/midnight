@@ -33,34 +33,34 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return res;
 }
 
-rule takeInputOutputConsistency(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
-    uint256 obligationUnitsOutput;
+    uint256 unitsOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput = take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    // The output obligationUnits is equal to the input.
-    assert obligationUnitsOutput == obligationUnitsInput;
+    // The output units is equal to the input.
+    assert unitsOutput == unitsInput;
 
     // If the input is zero, all the output arguments are zero.
-    assert obligationUnitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && obligationUnitsOutput == 0;
+    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
 }
 
-rule offerInputsConsumed(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsConsumed(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsInput;
+    assert consumed(offer.maker, offer.group) == consumedBefore + unitsInput;
 }
 
-rule offerInputsLimit(env e, uint256 obligationUnitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsLimit(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, obligationUnitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert obligationUnitsInput <= offer.obligationUnits - consumedBefore;
+    assert unitsInput <= offer.maxUnits - consumedBefore;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {

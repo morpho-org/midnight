@@ -80,11 +80,7 @@ contract BundlerTest is BaseTest {
     function testUnauthorized() public {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
         takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            obligationUnits: 100,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
         });
 
         vm.prank(address(0xdead));
@@ -96,8 +92,8 @@ contract BundlerTest is BaseTest {
 
     function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
         units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
-        offers[0].obligationUnits = offerUnits0;
-        offers[1].obligationUnits = offerUnits1;
+        offers[0].maxUnits = offerUnits0;
+        offers[1].maxUnits = offerUnits1;
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
         collateralize(obligation, borrower, units);
@@ -105,14 +101,14 @@ contract BundlerTest is BaseTest {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
             offer: offers[0],
-            obligationUnits: offerUnits0,
+            units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
-            obligationUnits: offerUnits1,
+            units: offerUnits1,
             sig: sig([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
@@ -142,8 +138,8 @@ contract BundlerTest is BaseTest {
 
     function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
         targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
-        offers[0].obligationUnits = offerUnits0;
-        offers[1].obligationUnits = offerUnits1;
+        offers[0].maxUnits = offerUnits0;
+        offers[1].maxUnits = offerUnits1;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         // NB: splitting across offers can require 1 extra unit due to per-leg rounding of buyer assets.
@@ -155,14 +151,14 @@ contract BundlerTest is BaseTest {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
             offer: offers[0],
-            obligationUnits: offerUnits0,
+            units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
-            obligationUnits: offerUnits1,
+            units: offerUnits1,
             sig: sig([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
@@ -192,8 +188,8 @@ contract BundlerTest is BaseTest {
 
     function testBundleTakeSellerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
-        offers[0].obligationUnits = offerUnits0;
-        offers[1].obligationUnits = offerUnits1;
+        offers[0].maxUnits = offerUnits0;
+        offers[1].maxUnits = offerUnits1;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchObligation(obligation);
@@ -207,14 +203,14 @@ contract BundlerTest is BaseTest {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
             offer: offers[0],
-            obligationUnits: offerUnits0,
+            units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
-            obligationUnits: offerUnits1,
+            units: offerUnits1,
             sig: sig([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
@@ -278,9 +274,9 @@ contract BundlerTest is BaseTest {
         // Ensure buyerAssets > 0 so the max bound actually triggers.
         uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
         targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
-        offers[0].obligationUnits = offerUnits0;
+        offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;
-        offers[1].obligationUnits = offerUnits1;
+        offers[1].maxUnits = offerUnits1;
         offers[1].tick = tick1;
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
@@ -295,14 +291,14 @@ contract BundlerTest is BaseTest {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
             offer: offers[0],
-            obligationUnits: offerUnits0,
+            units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
-            obligationUnits: offerUnits1,
+            units: offerUnits1,
             sig: sig([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
@@ -329,9 +325,9 @@ contract BundlerTest is BaseTest {
         tick0 = bound(tick0, minTick, MAX_TICK);
         tick1 = bound(tick1, minTick, MAX_TICK);
         targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
-        offers[0].obligationUnits = offerUnits0;
+        offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;
-        offers[1].obligationUnits = offerUnits1;
+        offers[1].maxUnits = offerUnits1;
         offers[1].tick = tick1;
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
@@ -345,14 +341,14 @@ contract BundlerTest is BaseTest {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
             offer: offers[0],
-            obligationUnits: offerUnits0,
+            units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
-            obligationUnits: offerUnits1,
+            units: offerUnits1,
             sig: sig([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])

@@ -52,25 +52,25 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// REPAY ///
 
-/// repay decreases onBehalf's debt by exactly obligationUnits and only changes position[id][onBehalf].debt.
-rule repayEffects(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, bytes32 anyId, address anyUser) {
+/// repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt.
+rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, onBehalf);
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    repay(e, obligation, obligationUnits, onBehalf);
+    repay(e, obligation, units, onBehalf);
 
-    assert debtOf(id, onBehalf) == debtBefore - obligationUnits;
+    assert debtOf(id, onBehalf) == debtBefore - units;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
     assert anyUser != onBehalf || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
 }
 
 /// WITHDRAW ///
 
-/// withdraw decreases onBehalf's post-slash credit by exactly obligationUnits, and only changes position[id][onBehalf].credit.
-rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
+/// withdraw decreases onBehalf's post-slash credit by exactly units, and only changes position[id][onBehalf].credit.
+rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
     require userLossIndex(id, onBehalf) <= currentContract.obligationState[id].lossIndex, "see Midnight.spec";
 
@@ -78,18 +78,18 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 obligationUn
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    withdraw(e, obligation, obligationUnits, onBehalf, receiver);
+    withdraw(e, obligation, units, onBehalf, receiver);
 
-    assert creditOf(id, onBehalf) == creditPostSlash - obligationUnits;
+    assert creditOf(id, onBehalf) == creditPostSlash - units;
     assert debtOf(anyId, anyUser) == otherDebtBefore;
     assert anyUser != onBehalf || anyId != id => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
 /// TAKE ///
 
-/// take changes maker's and taker's net credit and debt by +/- obligationUnits relative to their post-slash values,
+/// take changes maker's and taker's net credit and debt by +/- units relative to their post-slash values,
 /// and only changes credit and debt of maker and taker at the obligation id.
-rule takeEffects(env e, uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.obligation);
     require userLossIndex(id, offer.maker) <= currentContract.obligationState[id].lossIndex, "see Midnight.spec";
     require userLossIndex(id, taker) <= currentContract.obligationState[id].lossIndex, "see Midnight.spec";
@@ -99,14 +99,14 @@ rule takeEffects(env e, uint256 obligationUnits, address taker, address takerCal
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, obligationUnits, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     mathint makerAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
 
-    mathint makerDelta = offer.buy ? obligationUnits : -obligationUnits;
+    mathint makerDelta = offer.buy ? units : -units;
     assert makerAfter == makerPostSlash + makerDelta;
-    mathint takerDelta = offer.buy ? -obligationUnits : obligationUnits;
+    mathint takerDelta = offer.buy ? -units : units;
     assert takerAfter == takerPostSlash + takerDelta;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore && debtOf(anyId, anyUser) == otherDebtBefore;
 }
