@@ -743,7 +743,7 @@ contract Midnight is IMidnight {
         }
         _position.lastContinuousFeeAccrual = uint48(block.timestamp);
 
-        emit EventsLib.AccrueContinuousFee(id, borrower, accruedFee, accruedFee, _position.pendingFee);
+        emit EventsLib.AccrueContinuousFee(id, borrower, accruedFee, _position.pendingFee);
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {

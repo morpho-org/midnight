@@ -15,9 +15,7 @@ library EventsLib {
     event SetFeeRecipient(address indexed feeRecipient);
     event SetObligationContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
-    event AccrueContinuousFee(
-        bytes32 indexed id_, address indexed borrower, uint256 accruedFee, uint256 feeShares, uint256 newPendingFee
-    );
+    event AccrueContinuousFee(bytes32 indexed id_, address indexed borrower, uint256 accruedFee, uint256 newPendingFee);
     event ObligationCreated(bytes32 indexed id_, Obligation obligation);
     event Take(
         address caller,
