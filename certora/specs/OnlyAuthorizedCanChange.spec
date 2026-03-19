@@ -40,10 +40,10 @@ function CVL_signer() returns address {
 
 /// CREDIT AND DEBT CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's credit and debt except via liquidate and slash.
+/// An unauthorized caller cannot change a user's credit and debt except via liquidate, slash, and accrueContinuousFee.
 /// PASSIVE_FEE_RECIPIENT's credit can increase via fee accrual without authorization.
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
-rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:slash(bytes32, address).selector } {
+rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:slash(bytes32, address).selector && f.selector != sig:accrueContinuousFee(Midnight.Obligation, address).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
     bool isPassiveFeeRecipient = user == Utils.passiveFeeRecipient();
 

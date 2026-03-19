@@ -188,7 +188,7 @@ rule withdrawCollateralEffects(env e, Midnight.Obligation obligation, uint256 co
 
 /// ALL OTHER FUNCTIONS ///
 
-/// Functions other than take, withdraw, repay, liquidate, slash, and withdrawCollateral do not change any user's credit or debt.
+/// Functions other than take, withdraw, repay, liquidate, slash, withdrawCollateral, and accrueContinuousFee do not change any user's credit or debt.
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
@@ -198,6 +198,7 @@ filtered {
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:slash(bytes32, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
+        && f.selector != sig:accrueContinuousFee(Midnight.Obligation, address).selector
 } {
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
