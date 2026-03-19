@@ -36,7 +36,9 @@ methods {
 /// GHOSTS ///
 
 persistent ghost bytes32 ghostId;
+
 persistent ghost uint256 ghostTickPrice;
+
 persistent ghost address ghostSignerResult;
 
 /// SUMMARY FUNCTIONS ///
@@ -50,7 +52,7 @@ function CVL_tickToPrice() returns uint256 {
 }
 
 function CVL_signer() returns address {
-    return ghostSignerResult; 
+    return ghostSignerResult;
 }
 
 function CVL_isHealthy() returns bool {
