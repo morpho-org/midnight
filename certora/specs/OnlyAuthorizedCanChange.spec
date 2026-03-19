@@ -5,6 +5,7 @@ methods {
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
@@ -55,4 +56,18 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f
     uint256 debtAfter = debtOf(id, user);
 
     assert (creditAfter == creditBefore && debtAfter == debtBefore) || userIsAuthorized || signed[user];
+}
+
+/// COLLATERAL CHANGE RULES ///
+
+/// An unauthorized caller cannot change a user's collateral except via liquidate.
+/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
+rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+
+    uint256 collateralBefore = collateralOf(id, user, collateralIndex);
+    f(e, args);
+    uint256 collateralAfter = collateralOf(id, user, collateralIndex);
+
+    assert collateralAfter == collateralBefore || userIsAuthorized;
 }
