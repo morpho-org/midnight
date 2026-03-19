@@ -10,12 +10,15 @@ methods {
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
-    function Midnight.continuousFee(bytes32) external returns (uint64) envfree;
+    function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
     function Midnight.lastContinuousFeeAccrual(bytes32, address) external returns (uint48) envfree;
+    function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -104,7 +107,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 strong invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && userHasNoCollateral(id, user);
+definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && userHasNoCollateral(id, user) && currentContract.obligationState[id].lossIndex == 0 && currentContract.position[id][user].lossIndex == 0;
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);

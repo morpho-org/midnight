@@ -8,6 +8,7 @@ methods {
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
@@ -22,18 +23,6 @@ methods {
 }
 
 /// HELPERS ///
-
-function accruedContinuousFeeBefore(bytes32 id, address user, uint256 blockTimestamp, uint256 maturity) returns mathint {
-    mathint lastAccrual = currentContract.position[id][user].lastContinuousFeeAccrual;
-    mathint _pendingFee = currentContract.position[id][user].pendingFee;
-
-    if (lastAccrual == 0 || maturity <= require_uint256(lastAccrual)) return 0;
-
-    uint256 accrualEnd = blockTimestamp < maturity ? blockTimestamp : maturity;
-
-    // Use the same mulDiv summary as the code to ensure consistency.
-    return summaryMulDiv(assert_uint256(_pendingFee), assert_uint256(accrualEnd - lastAccrual), assert_uint256(maturity - lastAccrual));
-}
 
 definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastContinuousFeeAccrual;
 
@@ -65,4 +54,18 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f
     uint256 debtAfter = debtOf(id, user);
 
     assert (creditAfter == creditBefore && debtAfter == debtBefore) || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
+}
+
+/// COLLATERAL CHANGE RULES ///
+
+/// An unauthorized caller cannot change a user's collateral except via liquidate.
+/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
+rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+
+    uint256 collateralBefore = collateralOf(id, user, collateralIndex);
+    f(e, args);
+    uint256 collateralAfter = collateralOf(id, user, collateralIndex);
+
+    assert collateralAfter == collateralBefore || userIsAuthorized;
 }

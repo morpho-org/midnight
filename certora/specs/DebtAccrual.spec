@@ -14,7 +14,7 @@ methods {
 
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
-    function accrueContinuousFee(bytes32 id, address borrower, uint256 maturity) internal => summaryAccrueContinuousFee(id, borrower);
+    function accrueContinuousFee(Midnight.Obligation memory, bytes32 id, address borrower) internal => summaryAccrueContinuousFee(id, borrower);
 }
 
 /// GHOSTS ///
@@ -67,7 +67,7 @@ rule debtNotStoredBeforeAccrual(env e, method f, calldataarg args, bytes32 id, a
 /// Check that debt is never loaded before accrueContinuousFee is called when
 /// there is remaining fee to realize.
 /// The SLOADs of accrueContinuousFee are ignored.
-rule debtNotLoadedBeforeAccrual(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:isHealthy(Midnight.Obligation memory, bytes32, address).selector && f.selector != sig:debtOf(bytes32, address).selector } {
+rule debtNotLoadedBeforeAccrual(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:debtOf(bytes32, address).selector } {
     require !accrued[id][user], "initialize the ghost variable";
     require !debtLoadedBeforeAccrual[id][user], "initialize the ghost variable";
 

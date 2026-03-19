@@ -10,6 +10,7 @@ methods {
     function creditAfterSlashing(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
+    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
@@ -55,8 +56,7 @@ definition noAccrual(env e, bytes32 id, address borrower) returns bool = current
 
 /// REPAY ///
 
-/// repay decreases onBehalf's debt by exactly obligationUnits and only changes position[id][onBehalf].debt.
-/// When no fee accrual occurs during repay.
+/// When no fee accrual occurs, repay decreases onBehalf's debt by exactly obligationUnits and only changes position[id][onBehalf].debt
 rule repayEffects(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -126,9 +126,8 @@ rule takeEffects(env e, uint256 obligationUnits, address taker, address takerCal
 
 /// LIQUIDATE ///
 
-/// liquidate decreases the borrower's debt by at least repaidUnits,
+/// When no fee accrual occurs, liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
-/// When no fee accrual occurs during liquidate.
 rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -169,9 +168,27 @@ rule slashEffects(env e, bytes32 id, address user, bytes32 anyId, address anyUse
     assert anyUser != user || anyId != id => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
+/// WITHDRAW COLLATERAL ///
+
+/// When no fee accrual occurs, withdrawCollateral does not change any user's credit or debt.
+rule withdrawCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
+    bytes32 id = toId(e, obligation);
+
+    // Exclude fee accrual effects.
+    require noAccrual(e, id, onBehalf);
+
+    uint256 otherCreditBefore = creditOf(anyId, anyUser);
+    uint256 otherDebtBefore = debtOf(anyId, anyUser);
+
+    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
+
+    assert creditOf(anyId, anyUser) == otherCreditBefore;
+    assert debtOf(anyId, anyUser) == otherDebtBefore;
+}
+
 /// ALL OTHER FUNCTIONS ///
 
-/// Functions other than take, withdraw, repay, liquidate, and slash do not change any user's credit or debt.
+/// Functions other than take, withdraw, repay, liquidate, slash, and withdrawCollateral do not change any user's credit or debt.
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
@@ -180,11 +197,75 @@ filtered {
         && f.selector != sig:repay(Midnight.Obligation, uint256, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:slash(bytes32, address).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
 } {
-    require noAccrual(e, id, user);
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     f(e, args);
     assert user == Utils.passiveFeeRecipient() || creditOf(id, user) == creditBefore;
     assert debtOf(id, user) == debtBefore;
+}
+
+/// SUPPLY COLLATERAL ///
+
+/// supplyCollateral increases onBehalf's collateral by exactly assets,
+/// and only changes position[id][onBehalf].collateral[collateralIndex].
+rule supplyCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
+    bytes32 id = toId(e, obligation);
+
+    uint256 collateralBefore = collateralOf(id, onBehalf, collateralIndex);
+    uint256 otherCollateralBefore = collateralOf(anyId, anyUser, anyIndex);
+
+    supplyCollateral(e, obligation, collateralIndex, assets, onBehalf);
+
+    assert collateralOf(id, onBehalf, collateralIndex) == collateralBefore + assets;
+    assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateralOf(anyId, anyUser, anyIndex) == otherCollateralBefore;
+}
+
+/// WITHDRAW COLLATERAL ///
+
+/// withdrawCollateral decreases onBehalf's collateral by exactly assets,
+/// and only changes position[id][onBehalf].collateral[collateralIndex].
+rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
+    bytes32 id = toId(e, obligation);
+
+    uint256 collateralBefore = collateralOf(id, onBehalf, collateralIndex);
+    uint256 otherCollateralBefore = collateralOf(anyId, anyUser, anyIndex);
+
+    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
+
+    assert collateralOf(id, onBehalf, collateralIndex) == collateralBefore - assets;
+    assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateralOf(anyId, anyUser, anyIndex) == otherCollateralBefore;
+}
+
+/// LIQUIDATE (COLLATERAL) ///
+
+/// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
+/// and only changes position[id][borrower].collateral[collateralIndex].
+rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+    bytes32 id = toId(e, obligation);
+
+    uint256 collateralBefore = collateralOf(id, borrower, collateralIndex);
+    uint256 otherCollateralBefore = collateralOf(anyId, anyUser, anyIndex);
+
+    uint256 seizedResult;
+    seizedResult, _ = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+
+    assert collateralOf(id, borrower, collateralIndex) == collateralBefore - seizedResult;
+    assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateralOf(anyId, anyUser, anyIndex) == otherCollateralBefore;
+}
+
+/// ALL OTHER FUNCTIONS (COLLATERAL) ///
+
+/// Functions other than supplyCollateral, withdrawCollateral, and liquidate do not change any user's collateral.
+rule collateralUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user, uint256 colIdx)
+filtered {
+    f -> !f.isView
+        && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+} {
+    uint256 collateralBefore = collateralOf(id, user, colIdx);
+    f(e, args);
+    assert collateralOf(id, user, colIdx) == collateralBefore;
 }

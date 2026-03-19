@@ -18,9 +18,6 @@ library EventsLib {
     event AccrueContinuousFee(
         bytes32 indexed id_, address indexed borrower, uint256 accruedFee, uint256 feeShares, uint256 newPendingFee
     );
-    /// @dev UpdatePendingFee should always happen on a freshly accrued borrower state.
-    event UpdatePendingFee(bytes32 indexed id_, address indexed borrower, uint256 pendingFee);
-
     event ObligationCreated(bytes32 indexed id_, Obligation obligation);
     event Take(
         address caller,
@@ -34,12 +31,20 @@ library EventsLib {
         address sellerReceiver,
         bytes32 group,
         uint256 consumed,
-        uint256 totalUnits
+        uint256 totalUnits,
+        uint256 buyerPendingFee,
+        uint256 sellerPendingFee
     );
     event Withdraw(
         address caller, bytes32 indexed id_, uint256 obligationUnits, address indexed onBehalf, address indexed receiver
     );
-    event Repay(address indexed caller, bytes32 indexed id_, uint256 obligationUnits, address indexed onBehalf);
+    event Repay(
+        address indexed caller,
+        bytes32 indexed id_,
+        uint256 obligationUnits,
+        address indexed onBehalf,
+        uint256 pendingFee
+    );
     event SupplyCollateral(
         address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf
     );
@@ -61,7 +66,8 @@ library EventsLib {
         uint256 repaidUnits,
         address indexed borrower,
         uint256 badDebt,
-        uint256 latestLossIndex
+        uint256 latestLossIndex,
+        uint256 pendingFee
     );
     event Slash(address caller, bytes32 indexed id_, address indexed user, uint256 credit, uint256 latestLossIndex);
 
