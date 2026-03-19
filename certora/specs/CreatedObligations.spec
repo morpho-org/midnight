@@ -26,14 +26,9 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onLiquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
@@ -52,22 +47,18 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 // Show that a created obligation has at least one collateral.
 strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
     obligationIsCreated(obligation) => obligation.collaterals.length > 0
-    filtered { f -> !f.isView }
 
 // Show that a created obligation has sorted collaterals.
 strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
     obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token
-    filtered { f -> !f.isView }
 
 // Show that a created obligation do not have address(0) collaterals.
 strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0
-    filtered { f -> !f.isView }
 
 // Show that a created obligation has lltv <= WAD.
 strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD()
-    filtered { f -> !f.isView }
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
@@ -117,15 +108,12 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 
 strong invariant obligationGlobalStateIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.continuousFee(id) == 0 && currentContract.obligationState[id].lossIndex == 0
-    filtered { f -> !f.isView }
 
 strong invariant positionScalarStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoRemainingContinuousFee(id, user) && userHasNoLastContinuousFeeAccrual(id, user) && currentContract.position[id][user].lossIndex == 0
-    filtered { f -> !f.isView }
 
 strong invariant positionCollateralIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => userHasNoCollateral(id, user)
-    filtered { f -> !f.isView }
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
