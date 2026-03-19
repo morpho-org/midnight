@@ -31,7 +31,9 @@ methods {
 /// GHOSTS ///
 
 persistent ghost bytes32 ghostId;
+
 persistent ghost uint256 ghostTickPrice;
+
 persistent ghost address ghostSignerResult;
 
 /// SUMMARY FUNCTIONS ///
@@ -44,10 +46,13 @@ function CVL_tickToPrice() returns uint256 {
     return ghostTickPrice;
 }
 
-function CVL_signer() returns address { return ghostSignerResult; }
+function CVL_signer() returns address {
+    return ghostSignerResult;
+}
 
-function CVL_isHealthy() returns bool { return true; }
-
+function CVL_isHealthy() returns bool {
+    return true;
+}
 
 /// Splitting an offer does not punish the maker on asset amounts.
 /// When maker is buyer (offer.buy), buyerAssets uses mulDivDown so splitting should not increase what the maker pays: assets(B) + assets(C) <= assets(A).
@@ -73,6 +78,7 @@ rule splitDoesNotPunishMaker(env e, uint256 obligationUnitsA, uint256 obligation
 
     // Maker is buyer: splitting should not make them pay more.
     assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
+
     // Maker is seller: splitting should not make them receive less.
     assert !offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) >= to_mathint(sellerAssetsA);
 }
