@@ -98,6 +98,8 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) <= PRECISION * totalUnits(id)
 {
     preserved slash(bytes32 slashid, address user) with (env e) {
+        requireInvariant preciseCreditCorrect(id, user);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
     }
 
     preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
