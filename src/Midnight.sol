@@ -378,6 +378,7 @@ contract Midnight is IMidnight {
         uint256 originalDebt = debtOf(id, borrower);
         uint256 badDebt = originalDebt;
         uint256 bitmap = _position.activatedCollaterals;
+        require((bitmap & (1 << collateralIndex)) != 0, "collateral not activated");
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
@@ -406,7 +407,6 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            require(liquidatedCollatPrice > 0, "collateral not active or zero oracle price");
             uint256 _maxLif = obligation.collaterals[collateralIndex].maxLif;
             uint256 lif = originalDebt > maxDebt
                 ? _maxLif
