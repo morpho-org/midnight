@@ -9,8 +9,6 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
 
-    function _.price() external => NONDET;
-
     // Deterministic id: every obligation maps to the same ghostId.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
@@ -31,6 +29,8 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+
+    function _.price() external => NONDET;
 }
 
 /// GHOSTS ///
