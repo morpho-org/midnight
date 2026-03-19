@@ -18,6 +18,7 @@ methods {
     function Midnight.lastContinuousFeeAccrual(bytes32, address) external returns (uint48) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    // NONDET to accelerate the prover.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
@@ -25,6 +26,14 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onLiquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
