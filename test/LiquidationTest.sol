@@ -304,7 +304,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
-    function testSlashEvent(uint256 units) public {
+    function testSlashNonFull(uint256 units) public {
         units = bound(units, 10, MAX_UNITS);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -698,6 +698,84 @@ contract LiquidationTest is BaseTest {
 
         emit log_named_uint("Gas 1st seizure (cold)", gas1);
         emit log_named_uint("Gas 2nd seizure (warm)", gas2 - gas1);
+    }
+
+    // slash tests.
+
+    function testSlashNoBadDebt(uint256 units) public {
+        units = bound(units, 1, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+
+        uint256 creditBefore = midnight.creditOf(id, lender);
+
+        midnight.slash(id, lender);
+
+        assertEq(midnight.creditOf(id, lender), creditBefore, "credit unchanged");
+    }
+
+    function testSlashNoCredit(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+
+        assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
+        uint256 debtBefore = midnight.debtOf(id, borrower);
+        (,, uint128 oblLossIndex,) = midnight.obligationState(id);
+        assertGt(oblLossIndex, midnight.userLossIndex(id, borrower), "loss index stale before");
+
+        midnight.slash(id, borrower);
+
+        assertEq(midnight.creditOf(id, borrower), 0, "no credit after");
+        assertEq(midnight.debtOf(id, borrower), debtBefore, "debt unchanged");
+        assertEq(midnight.userLossIndex(id, borrower), oblLossIndex, "loss index synced");
+    }
+
+    function testSlashAlreadySynced(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+
+        Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+
+        uint256 creditBeforeSlash = midnight.creditOf(id, lender);
+        midnight.slash(id, lender);
+        uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
+        uint128 lossIndexAfterFirstSlash = midnight.userLossIndex(id, lender);
+        assertLt(creditAfterFirstSlash, creditBeforeSlash, "first slash reduced credit");
+
+        midnight.slash(id, lender);
+
+        assertEq(midnight.creditOf(id, lender), creditAfterFirstSlash, "credit unchanged");
+        assertEq(midnight.userLossIndex(id, lender), lossIndexAfterFirstSlash, "loss index unchanged");
+    }
+
+    // full bad debt test.
+
+    function testFullBadDebtWithdrawCollateral(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+
+        Oracle(obligation.collaterals[0].oracle).setPrice(0);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+
+        assertEq(midnight.debtOf(id, borrower), 0, "debt");
+        assertEq(midnight.totalUnits(id), 0, "total units");
+        (,, uint128 _lossIndex,) = midnight.obligationState(id);
+        assertEq(_lossIndex, type(uint128).max, "loss index");
+        assertEq(midnight.creditAfterSlashing(id, lender), 0, "credit after slashing");
+
+        // withdrawCollateral still works
+        uint256 collateral = midnight.collateralOf(id, borrower, 0);
+        assertGt(collateral, 0, "has collateral");
+        authorize(borrower, address(this));
+        midnight.withdrawCollateral(obligation, 0, collateral, borrower, borrower);
+        assertEq(midnight.collateralOf(id, borrower, 0), 0, "collateral withdrawn");
     }
 
     // helpers.

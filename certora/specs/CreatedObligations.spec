@@ -101,7 +101,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 strong invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
+definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.creditOf(id, user) == 0 && Midnight.debtOf(id, user) == 0 && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user) && currentContract.obligationState[id].lossIndex == 0 && currentContract.position[id][user].lossIndex == 0;
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
