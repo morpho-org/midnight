@@ -23,16 +23,16 @@ library EventsLib {
         bool offerIsBuy,
         uint256 buyerAssets,
         uint256 sellerAssets,
-        uint256 obligationUnits,
+        uint256 units,
         address sellerReceiver,
         bytes32 group,
         uint256 consumed,
         uint256 totalUnits
     );
     event Withdraw(
-        address caller, bytes32 indexed id_, uint256 obligationUnits, address indexed onBehalf, address indexed receiver
+        address caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address indexed receiver
     );
-    event Repay(address indexed caller, bytes32 indexed id_, uint256 obligationUnits, address indexed onBehalf);
+    event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf);
     event SupplyCollateral(
         address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf
     );
