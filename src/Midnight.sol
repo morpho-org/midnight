@@ -175,9 +175,9 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         address offerSigner = signer(root, sig);
-        bool offerPreValidated =
+        bool offerPreRatified =
             offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner] || ratified[offer.maker][root];
-        require(offerPreValidated || isAuthorized[offer.maker][offer.callback], "unauthorized");
+        require(offerPreRatified || isAuthorized[offer.maker][offer.callback], "unauthorized");
 
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -281,7 +281,7 @@ contract Midnight is IMidnight {
                 ICallbacks(buyerCallback)
                     .onBuy(
                         offer,
-                        (offer.buy && !offerPreValidated) ? offerSigner : address(1),
+                        (offer.buy && !offerPreRatified) ? offerSigner : address(1),
                         buyer,
                         buyerAssets,
                         sellerAssets,
@@ -303,7 +303,7 @@ contract Midnight is IMidnight {
                 ICallbacks(sellerCallback)
                     .onSell(
                         offer,
-                        (!offer.buy && !offerPreValidated) ? offerSigner : address(1),
+                        (!offer.buy && !offerPreRatified) ? offerSigner : address(1),
                         seller,
                         buyerAssets,
                         sellerAssets,
