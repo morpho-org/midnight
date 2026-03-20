@@ -24,6 +24,7 @@ persistent ghost summaryPrice(address) returns uint256;
 
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
 
+
 /// LIF BOUNDARIES ///
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input)
@@ -48,7 +49,6 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness";
 
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
-    require currentContract.position[id0][borrower].collateral[collateralIndex] != 0, "collateral must be non-zero for meaningful liquidation";
     require to_mathint(currentContract.position[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex), "exactly 1 active collateral at collateralIndex so the loop sets liquidatedCollatPrice";
 
     uint256 seizedResult;
@@ -59,3 +59,4 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
 
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
+

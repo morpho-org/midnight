@@ -77,8 +77,7 @@ rule liquidationIsProfitableSeizedAssets(env e, Midnight.Obligation obligation, 
     assert seizedAssets > 0 => seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 }
 
-/// When lif = maxLif (borrower unhealthy or >= 15 min post-maturity), the liquidator receives
-/// collateral worth at least maxLif/WAD * repaid debt, up to rounding.
+/// When lif = maxLif (borrower unhealthy or >= 15 min post-maturity), the liquidator receives collateral worth at least maxLif/WAD * repaid debt, up to rounding.
 rule liquidationLifProfitabilityRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     uint256 maxLif = obligation.collaterals[collateralIndex].maxLif;
     require maxLif >= WAD(), "maxLif must be at least 1x for profitability";
@@ -93,8 +92,7 @@ rule liquidationLifProfitabilityRepaidUnits(env e, Midnight.Obligation obligatio
     assert (seizedResult + 1) * price * WAD() + WAD() * ORACLE_PRICE_SCALE() > repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
-/// When lif = maxLif (borrower unhealthy or >= 15 min post-maturity), the liquidator receives
-/// collateral worth at least maxLif/WAD * repaid debt, up to rounding.
+/// When lif = maxLif (borrower unhealthy or >= 15 min post-maturity), the liquidator receives collateral worth at least maxLif/WAD * repaid debt, up to rounding.
 rule liquidationLifProfitabilitySeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
     uint256 maxLif = obligation.collaterals[collateralIndex].maxLif;
     require maxLif >= WAD(), "maxLif must be at least 1x for profitability";
