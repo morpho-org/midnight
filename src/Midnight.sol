@@ -197,10 +197,8 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        slash(id, offer.maker);
-        accrueContinuousFee(offer.obligation, id, offer.maker);
-        slash(id, taker);
-        accrueContinuousFee(offer.obligation, id, taker);
+        slashAndAccrue(offer.obligation, id, offer.maker);
+        slashAndAccrue(offer.obligation, id, taker);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -308,8 +306,7 @@ contract Midnight is IMidnight {
         );
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        slash(id, onBehalf);
-        accrueContinuousFee(obligation, id, onBehalf);
+        slashAndAccrue(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
         if (_position.credit > 0) {
@@ -573,12 +570,10 @@ contract Midnight is IMidnight {
     function slashAndAccrue(Obligation memory obligation, address user) external {
         bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
         require(obligationState[id].created, "not created");
-        slash(id, user);
-        accrueContinuousFee(obligation, id, user);
+        slashAndAccrue(obligation, id, user);
     }
 
-    function slash(bytes32 id, address user) internal {
-        require(obligationState[id].created, "not created");
+    function slashAndAccrue(Obligation memory obligation, bytes32 id, address user) internal {
         Position storage _position = position[id][user];
         uint128 lossIndex = obligationState[id].lossIndex;
         if (_position.lossIndex != lossIndex) {
@@ -594,18 +589,13 @@ contract Midnight is IMidnight {
             _position.lossIndex = lossIndex;
             emit EventsLib.Slash(msg.sender, id, user, newCredit, lossIndex);
         }
-    }
 
-    /// @dev Expects the obligation to be touched.
-    /// @dev Expects the id to correspond to the obligation's id.
-    function accrueContinuousFee(Obligation memory obligation, bytes32 id, address user) internal {
-        Position storage _position = position[id][user];
         // forge-lint: disable-next-item(unsafe-typecast) as accrued fee is <= pendingFee
         uint128 accruedFee = uint128(accrueView(id, user, obligation.maturity));
         if (accruedFee > 0) {
             _position.pendingFee -= accruedFee;
             _position.credit -= accruedFee;
-            slash(id, PASSIVE_FEE_RECIPIENT);
+            slashAndAccrue(obligation, id, PASSIVE_FEE_RECIPIENT);
             position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
         }
         _position.lastContinuousFeeAccrual = uint128(block.timestamp);
