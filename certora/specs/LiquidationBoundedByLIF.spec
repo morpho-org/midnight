@@ -12,6 +12,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
 
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
 }
 
 /// SUMMARIES ///
@@ -23,6 +24,16 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 persistent ghost summaryPrice(address) returns uint256;
 
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
+
+
+/// INVARIANTS ///
+
+/// Proven in BitmapSummaries.spec; assumed here via requireInvariant (not re-proven in this spec).
+strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 idx)
+    idx < 128 => (
+        collateralOf(id, user, idx) != 0 <=>
+        to_mathint(currentContract.position[id][user].activatedCollaterals) / (2 ^ to_mathint(idx)) % 2 == 1
+    );
 
 
 /// LIF BOUNDARIES ///
@@ -49,7 +60,8 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness";
 
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
-    require to_mathint(currentContract.position[id0][borrower].activatedCollaterals) == 2 ^ to_mathint(collateralIndex), "exactly 1 active collateral at collateralIndex so the loop sets liquidatedCollatPrice";
+    require collateralIndex < 128, "collateralIndex must be less than 128";
+    requireInvariant nonZeroCollateralsAreActivated(id0, borrower, collateralIndex);
 
     uint256 seizedResult;
     uint256 repaidResult;
