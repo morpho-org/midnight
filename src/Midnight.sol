@@ -10,6 +10,7 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     FEE_STEP,
+    CALLBACK_SUCCESS,
     TIME_TO_MAX_LIF,
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -173,21 +174,13 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(offer.obligationUnits, offer.obligationShares), "INCONSISTENT_INPUT");
         require(offer.session == session[offer.maker], "invalid session");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        address offerSigner = signer(root, sig);
+        require(
+            offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner]
+                || isAuthorized[offer.maker][offer.callback] || ratified[offer.maker][root],
+            "unauthorized"
+        );
 
-        if (sig.v != 0) {
-            address _signer = signer(root, sig);
-            if (offer.ratifier != address(0)) {
-                require(
-                    (offer.maker == offer.ratifier || isAuthorized[offer.maker][offer.ratifier])
-                        && ICallbacks(offer.ratifier).onRatify(offer, _signer),
-                    "offer ratification failed"
-                );
-            } else {
-                require(_signer == offer.maker, "invalid signer");
-            }
-        } else {
-            require(ratified[offer.maker][root], "offer not ratified");
-        }
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
 
@@ -286,16 +279,20 @@ contract Midnight is IMidnight {
         );
 
         if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback)
-                .onBuy(
-                    offer.obligation,
-                    buyer,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    buyerCallbackData
-                );
+            require(
+                ICallbacks(buyerCallback)
+                    .onBuy(
+                        offer,
+                        offer.buy ? offerSigner : address(0),
+                        buyer,
+                        buyerAssets,
+                        sellerAssets,
+                        obligationUnits,
+                        obligationShares,
+                        buyerCallbackData
+                    ) == CALLBACK_SUCCESS,
+                "callback failed"
+            );
         }
 
         SafeTransferLib.safeTransferFrom(
@@ -304,16 +301,20 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback)
-                .onSell(
-                    offer.obligation,
-                    seller,
-                    buyerAssets,
-                    sellerAssets,
-                    obligationUnits,
-                    obligationShares,
-                    sellerCallbackData
-                );
+            require(
+                ICallbacks(sellerCallback)
+                    .onSell(
+                        offer,
+                        offer.buy ? address(0) : offerSigner,
+                        seller,
+                        buyerAssets,
+                        sellerAssets,
+                        obligationUnits,
+                        obligationShares,
+                        sellerCallbackData
+                    ) == CALLBACK_SUCCESS,
+                "callback failed"
+            );
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
@@ -664,11 +665,11 @@ contract Midnight is IMidnight {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
+    /// @dev Does not revert if the signature is invalid.
     function signer(bytes32 root, Signature memory signature) internal view returns (address) {
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
     }
 

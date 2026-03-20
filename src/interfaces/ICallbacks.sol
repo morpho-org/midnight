@@ -6,23 +6,25 @@ import {Obligation, Offer} from "./IMidnight.sol";
 
 interface ICallbacks {
     function onBuy(
-        Obligation memory obligation,
+        Offer memory offer,
+        address signer,
         address buyer,
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
         bytes memory data
-    ) external;
+    ) external returns (bytes32);
     function onSell(
-        Obligation memory obligation,
+        Offer memory offer,
+        address signer,
         address seller,
         uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 obligationUnits,
         uint256 obligationShares,
         bytes memory data
-    ) external;
+    ) external returns (bytes32);
     function onLiquidate(
         Obligation memory obligation,
         uint256 collateralIndex,
@@ -31,7 +33,6 @@ interface ICallbacks {
         address borrower,
         bytes memory data
     ) external;
-    function onRatify(Offer memory offer, address signer) external returns (bool);
 }
 
 interface IFlashLoanCallback {

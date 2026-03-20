@@ -143,14 +143,6 @@ rule unauthorizedTakeFails(env e, uint256 obligationShares, address taker, addre
     assert !lastReverted => e.msg.sender == taker || isAuthorized(taker, e.msg.sender);
 }
 
-/// take with a ratifier callback requires the ratifier to be the maker or authorized by the maker.
-rule unauthorizedOnRatifyFails(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require signature.v != 0;
-    require offer.ratifier != 0;
-    take@withrevert(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
-    assert !lastReverted => offer.maker == offer.ratifier || isAuthorized(offer.maker, offer.ratifier);
-}
-
 /// withdrawCollateral requires the caller to be onBehalf or authorized by onBehalf.
 rule unauthorizedWithdrawCollateralFails(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     withdrawCollateral@withrevert(e, obligation, collateralIndex, assets, onBehalf, receiver);

@@ -7,9 +7,10 @@ methods {
     function ratified(address user, bytes32 root) external returns (bool) envfree;
 
     function _.price() external => NONDET;
-    function _.onRatify(Midnight.Offer, address) external => NONDET;
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.transfer(address, uint256) external => NONDET;
+    function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 
@@ -33,20 +34,20 @@ function signerSummary(bytes32 root, Midnight.Signature s) returns address {
     return ghostSigner(root);
 }
 
-/// Every successful take requires maker consent: either a ratifier callback, a ratified root, or a valid signature.
+/// Every successful take requires maker consent via at least one of:
+///   1. Maker signed directly (offerSigner == offer.maker)
+///   2. Maker authorized the signer (isAuthorized[offer.maker][offerSigner])
+///   3. Maker authorized the callback (isAuthorized[offer.maker][offer.callback])
+///   4. Maker pre-ratified the root (ratified[offer.maker][root])
 rule takeRequiresMakerConsent(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    bool makerAuthorizedRatifier = isAuthorized(offer.maker, offer.ratifier);
+    bool makerSigned = ghostSigner(root) == offer.maker;
+    bool makerAuthorizedSigner = isAuthorized(offer.maker, ghostSigner(root));
+    bool makerAuthorizedCallback = isAuthorized(offer.maker, offer.callback);
     bool rootRatified = ratified(offer.maker, root);
 
     take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
-    if (signature.v == 0) {
-        assert rootRatified;
-    } else if (offer.ratifier != 0) {
-        assert offer.maker == offer.ratifier || makerAuthorizedRatifier;
-    } else {
-        assert ghostSigner(root) == offer.maker;
-    }
+    assert makerSigned || makerAuthorizedSigner || makerAuthorizedCallback || rootRatified;
 }
 
 /// ISOLATION ///

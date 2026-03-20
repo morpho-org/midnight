@@ -33,7 +33,6 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
-    address ratifier;
 }
 
 struct Signature {
