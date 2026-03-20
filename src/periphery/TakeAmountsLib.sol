@@ -10,56 +10,32 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
-    // Forward: units = shares.mulDivUp/Down(totalUnits + 1, totalShares + 1) depending on buyerIsLender.
-    // When buyerIsLender (forward rounds up): inverse rounds down.
-    // When !buyerIsLender (forward rounds down): inverse rounds up.
-    function unitsToShares(Midnight midnight, bytes32 id, address taker, Offer memory offer, uint256 targetUnits)
-        internal
-        view
-        returns (uint256)
-    {
-        address buyer = offer.buy ? offer.maker : taker;
-        bool buyerIsLender = midnight.debtOf(id, buyer) == 0;
-        return buyerIsLender
-            ? targetUnits.mulDivDown(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1)
-            : targetUnits.mulDivUp(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
-    }
-
-    // Forward: buyerAssets = offer.buy ? unitsDown.mulDivDown(buyerPrice, WAD) : unitsUp.mulDivUp(buyerPrice, WAD).
-    /// @dev Should not be used if buyerPrice > WAD, because not all buyerAssets are reachable then.
-    function buyerAssetsToShares(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
+    // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
+    /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
+    /// @dev Returns the number of units to take to get the target buyer assets.
+    function buyerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
         view
         returns (uint256)
     {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 _tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + _tradingFee;
+        uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
+        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
         require(buyerPrice <= WAD, "buyerPrice");
-        if (offer.buy) {
-            return targetBuyerAssets.mulDivUp(WAD, buyerPrice)
-                .mulDivUp(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
-        } else {
-            return targetBuyerAssets.mulDivDown(WAD, buyerPrice)
-                .mulDivDown(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
-        }
+        return offer.buy ? targetBuyerAssets.mulDivUp(WAD, buyerPrice) : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
     }
 
-    // Forward: sellerAssets = offer.buy ? unitsDown.mulDivDown(sellerPrice, WAD) : unitsUp.mulDivUp(sellerPrice, WAD).
-    function sellerAssetsToShares(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
+    // Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
+    /// @dev Returns the number of units to take to get the target seller assets.
+    function sellerAssetsToUnits(Midnight midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
         internal
         view
         returns (uint256)
     {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 _tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        if (offer.buy) {
-            return targetSellerAssets.mulDivUp(WAD, sellerPrice)
-                .mulDivUp(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
-        } else {
-            return targetSellerAssets.mulDivDown(WAD, sellerPrice)
-                .mulDivDown(midnight.totalShares(id) + 1, midnight.totalUnits(id) + 1);
-        }
+        uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
+        uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
+        return
+            offer.buy ? targetSellerAssets.mulDivUp(WAD, sellerPrice) : targetSellerAssets.mulDivDown(WAD, sellerPrice);
     }
 }

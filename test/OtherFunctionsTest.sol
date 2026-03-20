@@ -119,47 +119,19 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
-    function testWithdrawInconsistentInput(uint256 units, uint256 shares) public {
-        vm.assume(units > 0 && shares > 0);
-        vm.prank(lender);
-        vm.expectRevert("inconsistent input");
-        midnight.withdraw(obligation, units, shares, lender, lender);
-    }
-
-    function testWithdrawWithObligations(uint256 units, uint256 withdraw) public {
+    function testWithdraw(uint256 units, uint256 withdraw) public {
         units = bound(units, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, units);
         testRepay(units, withdraw);
 
         vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) =
-            midnight.withdraw(obligation, withdraw, 0, lender, lender);
+        midnight.withdraw(obligation, withdraw, lender, lender);
 
-        assertEq(midnight.sharesOf(id, lender), units - withdraw, "obligationSharesOf");
+        assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
-        assertEq(midnight.totalShares(id), units - withdraw, "totalShares");
+        assertEq(midnight.totalUnits(id), units - withdraw, "totalUnits");
         assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
         assertEq(loanToken.balanceOf(lender), withdraw, "balance of lender");
-        assertEq(returnedObligationUnits, withdraw, "returned obligation units");
-        assertEq(returnedShares, withdraw, "returned shares");
-    }
-
-    function testWithdrawWithShares(uint256 units, uint256 shares) public {
-        units = bound(units, 1, MAX_UNITS);
-        shares = bound(shares, 1, units);
-        testRepay(units, shares);
-
-        // TODO: sharesPrice != 1
-        vm.prank(lender);
-        (uint256 returnedObligationUnits, uint256 returnedShares) =
-            midnight.withdraw(obligation, 0, shares, lender, lender);
-
-        assertEq(midnight.sharesOf(id, lender), units - shares, "obligationSharesOf");
-        assertEq(midnight.withdrawable(id), 0, "withdrawable");
-        assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
-        assertEq(loanToken.balanceOf(lender), shares, "balance of lender");
-        assertEq(returnedObligationUnits, shares, "returned obligation units");
-        assertEq(returnedShares, shares, "returned shares");
     }
 
     function testWithdrawToReceiver(uint256 units, uint256 withdraw) public {
@@ -169,7 +141,7 @@ contract OtherFunctionsTest is BaseTest {
         address receiver = makeAddr("receiver");
 
         vm.prank(lender);
-        midnight.withdraw(obligation, withdraw, 0, lender, receiver);
+        midnight.withdraw(obligation, withdraw, lender, receiver);
 
         assertEq(loanToken.balanceOf(lender), 0, "balance of lender");
         assertEq(loanToken.balanceOf(receiver), withdraw, "balance of receiver");

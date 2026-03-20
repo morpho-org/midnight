@@ -58,6 +58,13 @@ contract TickLibTest is BaseTest {
 
     // Price to tick
 
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testPriceToTickGreaterThanOne(uint256 price) public {
+        price = bound(price, 1 ether + 1, type(uint256).max);
+        vm.expectRevert("Price is greater than one");
+        TickLib.priceToTick(price);
+    }
+
     function testPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
         uint256 tick = TickLib.priceToTick(price);
@@ -76,13 +83,6 @@ contract TickLibTest is BaseTest {
 
     function testGasPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
-        TickLib.priceToTick(price);
-    }
-
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testPriceToTickPriceGreaterThanOne(uint256 price) public {
-        price = bound(price, 1e18 + 1, type(uint256).max);
-        vm.expectRevert("Price is greater than one");
         TickLib.priceToTick(price);
     }
 
