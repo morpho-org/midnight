@@ -25,9 +25,8 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy: callbacks do not re-enter Midnight.
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, address) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
 
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => CVL_signer();
@@ -47,9 +46,10 @@ function CVL_signer() returns address {
 
 /// CREDIT AND DEBT CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's credit and debt except via liquidate and slash.
+/// An unauthorized caller cannot change a user's credit and debt except via take, liquidate, and slash.
+/// take verified separately
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
-rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:slash(bytes32, address).selector } {
+rule onlyAuthorizedCanChangeCreditAndDebtExceptTakeLiquidateAndSlash(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:slash(bytes32, address).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
     uint256 creditBefore = creditOf(id, user);
