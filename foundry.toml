@@ -2,7 +2,7 @@
 via_ir = true
 optimizer = true
 optimizer_runs = 4294967295
-evm_version = "osaka"
+evm_version = "prague"
 fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
 
 [profile.default.fmt]
