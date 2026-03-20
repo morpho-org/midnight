@@ -1165,10 +1165,7 @@ contract BorrowCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
+    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory) external returns (bytes32) {
         return CALLBACK_SUCCESS;
     }
 
@@ -1178,15 +1175,10 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    function onBuy(
-        Offer memory offer,
-        address,
-        address buyer,
-        uint256 buyerAssets,
-        uint256,
-        uint256,
-        bytes memory data
-    ) external returns (bytes32) {
+    function onBuy(Offer memory offer, address, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
         recordedData = data;
         require(ERC20(offer.obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
         return CALLBACK_SUCCESS;
