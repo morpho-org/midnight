@@ -332,7 +332,6 @@ contract ContinuousFeeTest is BaseTest {
         midnight.slashAndAccrue(obligation, lender);
 
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
-        uint256 pendingBeforeSlash = midnight.pendingFee(id, lender);
 
         // Slash.
         createBadDebt(obligation);
