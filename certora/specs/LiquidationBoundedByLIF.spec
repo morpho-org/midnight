@@ -66,4 +66,3 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
 
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
-
