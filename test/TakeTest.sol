@@ -508,7 +508,7 @@ contract TakeTest is BaseTest {
         take(shares, lender, borrowerOffer);
     }
 
-    function testSellUnhealthy(uint256 shares, uint256 tick, uint256 collateralized) public {
+    function testSell_RevertsWhenSellerIsUnhealthy(uint256 shares, uint256 tick, uint256 collateralized) public {
         shares = bound(shares, 1, maxAssets);
         uint256 units = shares.mulDivUp(initialUnits + 1, initialShares + 1);
         collateralized = bound(collateralized, 0, units / 2);
@@ -531,7 +531,7 @@ contract TakeTest is BaseTest {
         take(100, borrower, lenderOffer);
     }
 
-    function testTakeOfferNotStarted(uint256 start) public {
+    function testTake_RevertsWhenOfferHasNotStarted(uint256 start) public {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
@@ -539,7 +539,7 @@ contract TakeTest is BaseTest {
         take(0, borrower, badOffer);
     }
 
-    function testTakeOfferExpired(uint256 elapsed) public {
+    function testTake_RevertsWhenOfferHasExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
         vm.expectRevert("offer expired");
@@ -602,9 +602,10 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeByAuthorizedCallback(address maker, address sender, uint256 otherPrivateKey) public {
+    function testAuthorizedCallbackValidates(address maker, address sender, uint256 otherPrivateKey) public {
         otherPrivateKey = boundPrivateKey(otherPrivateKey);
         vm.assume(maker != sender);
+        vm.assume(vm.addr(otherPrivateKey) != maker);
         RatifyCallback callback = new RatifyCallback();
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
@@ -740,16 +741,40 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testMakerCallbackRejects(uint256 makerPrivateKey, address sender) public {
-        makerPrivateKey = boundPrivateKey(makerPrivateKey);
-        address maker = vm.addr(makerPrivateKey);
-        privateKey[maker] = makerPrivateKey;
+    function testMakerCallbackRejects(address maker, address sender, uint256 signerPrivateKey) public {
+        signerPrivateKey = boundPrivateKey(signerPrivateKey);
+        vm.assume(vm.addr(signerPrivateKey) != maker);
+        privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
         RatifyCallback callback = new RatifyCallback();
         callback.setReturnData(false);
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
 
+        vm.prank(maker);
+        midnight.setIsAuthorized(maker, address(callback), true);
         vm.expectRevert("ratification rejected");
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sign([lenderOffer], vm.addr(signerPrivateKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testMakerCallbackGetsAddress1WhenAlreadyValidated(uint256 makerPrivateKey, address sender) public {
+        makerPrivateKey = boundPrivateKey(makerPrivateKey);
+        address maker = vm.addr(makerPrivateKey);
+        privateKey[maker] = makerPrivateKey;
+        SignerRecordingCallback callback = new SignerRecordingCallback();
+        lenderOffer.maker = maker;
+        lenderOffer.callback = address(callback);
+
         vm.prank(sender);
         midnight.take(
             0,
@@ -762,10 +787,12 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
+        assertEq(callback.recordedSigner(), address(1), "maker callback should receive address1 signer");
     }
 
     function testAuthorizedCallbackWithEmptySignature(address maker, address sender) public {
         vm.assume(maker != sender);
+        vm.assume(maker != address(0));
         RatifyCallback callback = new RatifyCallback();
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
@@ -829,7 +856,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testSellSideMakerCallbackGetsSigner(uint256 makerPrivateKey, address sender) public {
+    function testSellSideMakerCallbackGetsAddress1WhenAlreadyValidated(uint256 makerPrivateKey, address sender) public {
         makerPrivateKey = boundPrivateKey(makerPrivateKey);
         address maker = vm.addr(makerPrivateKey);
         privateKey[maker] = makerPrivateKey;
@@ -859,10 +886,10 @@ contract TakeTest is BaseTest {
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
-        assertEq(callback.recordedSigner(), maker, "sell-side callback should receive signer");
+        assertEq(callback.recordedSigner(), address(1), "sell-side callback should receive address1 signer");
     }
 
-    function testNonMakerCallbackGetsZeroSigner(uint256 makerPrivateKey, address sender) public {
+    function testNonMakerCallbackGetsAddress1Signer(uint256 makerPrivateKey, address sender) public {
         makerPrivateKey = boundPrivateKey(makerPrivateKey);
         address maker = vm.addr(makerPrivateKey);
         privateKey[maker] = makerPrivateKey;
@@ -882,7 +909,7 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(takerCb.recordedSigner(), address(0), "non-maker callback should receive zero signer");
+        assertEq(takerCb.recordedSigner(), address(1), "non-maker callback should receive address1 signer");
     }
 
     function testOrderNotAuthorized(address taker, address sender) public {

@@ -172,14 +172,12 @@ contract Midnight is IMidnight {
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(UtilsLib.atMostOneNonZero(offer.obligationUnits, offer.obligationShares), "INCONSISTENT_INPUT");
-        require(offer.session == session[offer.maker], "invalid session");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(offer.session == session[offer.maker], "invalid session");
         address offerSigner = signer(root, sig);
-        require(
-            offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner]
-                || isAuthorized[offer.maker][offer.callback] || ratified[offer.maker][root],
-            "unauthorized"
-        );
+        bool offerPreValidated =
+            offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner] || ratified[offer.maker][root];
+        require(offerPreValidated || isAuthorized[offer.maker][offer.callback], "unauthorized");
 
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -283,7 +281,7 @@ contract Midnight is IMidnight {
                 ICallbacks(buyerCallback)
                     .onBuy(
                         offer,
-                        offer.buy ? offerSigner : address(0),
+                        (offer.buy && !offerPreValidated) ? offerSigner : address(1),
                         buyer,
                         buyerAssets,
                         sellerAssets,
@@ -305,7 +303,7 @@ contract Midnight is IMidnight {
                 ICallbacks(sellerCallback)
                     .onSell(
                         offer,
-                        offer.buy ? address(0) : offerSigner,
+                        (!offer.buy && !offerPreValidated) ? offerSigner : address(1),
                         seller,
                         buyerAssets,
                         sellerAssets,

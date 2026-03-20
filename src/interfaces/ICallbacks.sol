@@ -5,6 +5,8 @@ pragma solidity >=0.5.0;
 import {Obligation, Offer} from "./IMidnight.sol";
 
 interface ICallbacks {
+    /// @dev The signer is address(1) if the offer is already validate or the callback is for the taker.
+    /// @dev Otherwise, the callback must validate the offer.
     function onBuy(
         Offer memory offer,
         address signer,
@@ -15,6 +17,9 @@ interface ICallbacks {
         uint256 obligationShares,
         bytes memory data
     ) external returns (bytes32);
+
+    /// @dev The signer is address(1) if the offer is already validate or the callback is for the taker.
+    /// @dev Otherwise, the callback must validate the offer.
     function onSell(
         Offer memory offer,
         address signer,
