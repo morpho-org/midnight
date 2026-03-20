@@ -25,16 +25,11 @@ persistent ghost summaryPrice(address) returns uint256;
 
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
 
-
 /// INVARIANTS ///
 
 /// Proven in BitmapSummaries.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 idx)
-    idx < 128 => (
-        collateralOf(id, user, idx) != 0 <=>
-        to_mathint(currentContract.position[id][user].activatedCollaterals) / (2 ^ to_mathint(idx)) % 2 == 1
-    );
-
+    idx < 128 => (collateralOf(id, user, idx) != 0 <=> to_mathint(currentContract.position[id][user].activatedCollaterals) / (2 ^ to_mathint(idx)) % 2 == 1);
 
 /// LIF BOUNDARIES ///
 
