@@ -5,30 +5,28 @@ methods {
 
     function _.price() external => NONDET;
 
-    // Deterministic id: every obligation maps to the same ghostId.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
-    // Deterministic price: same tick always gives the same offerPrice.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CVL_tickToPrice();
 
     function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
 
-    // same inputs always return the same value across all 3 take calls.
+    // Merkle proof: irrelevant to asset computation, removes hashing loop.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+
+    // Output feeds into CONSTANT-summarized tradingFee, so its value doesn't matter.
+    function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
+
+    // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
+    function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
+
     function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
-    // Deterministic signer: must return the same address across all 3 take calls.
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => CVL_signer();
 
-    // Always healthy: irrelevant to the split property, avoids oracle + collateral loop complexity.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CVL_isHealthy();
-
-    // No reentrancy: token transfers and callbacks summarized away.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
 }
 
 /// GHOSTS ///
