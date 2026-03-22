@@ -29,6 +29,7 @@ import {
     Position
 } from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
+import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
@@ -50,6 +51,13 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
 /// afterwards (bad debt can no longer be realized).
+///
+/// GATES
+/// @dev Gates can restrict increasing exposure in an obligation and who may liquidate positions.
+/// @dev The entry gate can gate entry actions (increasing credit or debt) in the obligation.
+/// @dev In particular, it does not prevent the user from exiting the obligation
+/// @dev even when the entry gate is reverting.
+/// @dev The liquidator gate prevents the user from liquidating the obligation (and realizing bad debt).
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
@@ -217,6 +225,7 @@ contract Midnight is IMidnight {
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
+
         uint256 oldBuyerDebt = buyerPos.debt;
         uint256 oldSellerDebt = sellerPos.debt;
         uint256 buyerDebtReduction = UtilsLib.min(oldBuyerDebt, units);
@@ -230,6 +239,17 @@ contract Midnight is IMidnight {
         );
 
         if (offer.exitOnly) require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "crossed");
+
+        require(
+            offer.obligation.enterGate == address(0) || buyerPos.credit == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
+            "buyer gated from increasing credit"
+        );
+        require(
+            offer.obligation.enterGate == address(0) || sellerPos.debt == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
+            "seller gated from increasing debt"
+        );
 
         emit EventsLib.Take(
             msg.sender,
@@ -367,6 +387,11 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        require(
+            obligation.liquidatorGate == address(0)
+                || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
+            "liquidator gated from liquidating"
+        );
         Position storage _position = position[id][borrower];
 
         uint256 maxDebt;
