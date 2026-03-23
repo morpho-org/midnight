@@ -251,7 +251,6 @@ contract Midnight is IMidnight {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 _continuousFee = _obligationState.continuousFee;
         uint256 _lossIndex = _obligationState.lossIndex;
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
@@ -265,14 +264,9 @@ contract Midnight is IMidnight {
                 .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
 
             uint256 currentTradingFee = tradingFee(id, timeToMaturity);
-            uint256 currentContinuousFee = _obligationState.continuousFee;
             uint256 currentLossIndex = _obligationState.lossIndex;
 
-            require(
-                currentTradingFee == _tradingFee && currentContinuousFee == _continuousFee
-                    && currentLossIndex == _lossIndex,
-                "callback did not send the correct fees"
-            );
+            require(currentTradingFee == _tradingFee && currentLossIndex == _lossIndex, "callback changed the state");
         }
 
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
@@ -283,14 +277,9 @@ contract Midnight is IMidnight {
                 .onSell(offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
 
             uint256 currentTradingFee = tradingFee(id, timeToMaturity);
-            uint256 currentContinuousFee = _obligationState.continuousFee;
             uint256 currentLossIndex = _obligationState.lossIndex;
 
-            require(
-                currentTradingFee == _tradingFee && currentContinuousFee == _continuousFee
-                    && currentLossIndex == _lossIndex,
-                "callback did not send the correct fees"
-            );
+            require(currentTradingFee == _tradingFee && currentLossIndex == _lossIndex, "callback changed the state");
         }
 
         Position storage buyerPos = position[id][buyer];
