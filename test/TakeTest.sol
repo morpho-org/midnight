@@ -604,7 +604,7 @@ contract TakeTest is BaseTest {
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, sign([lenderOffer]), invalidRoot, new bytes32[](0)
+            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), invalidRoot, new bytes32[](0)
         );
     }
 
@@ -637,24 +637,24 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer], authorizedSigner),
+            sig(root([lenderOffer]), privateKey[authorizedSigner]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
     }
 
-    function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
+    function testTakeInvalidPathOneLeaf(bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, sign([lenderOffer]), root([lenderOffer]), _path
+            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), _proof
         );
     }
 
-    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
-        vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
+    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
+        vm.assume(_proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
@@ -664,9 +664,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            sign([lenderOffer, otherOffer]),
+            sig([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
-            _path
+            _proof
         );
     }
 
@@ -685,7 +685,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            sign([lenderOffer, otherOffer]),
+            sig([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
             proof([lenderOffer, otherOffer])
         );
@@ -712,7 +712,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -749,7 +749,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer], vm.addr(otherSecretKey)),
+            sig(root([lenderOffer]), otherSecretKey),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -773,7 +773,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -796,7 +796,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -819,7 +819,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -838,7 +838,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -854,7 +854,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -873,7 +873,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -921,7 +921,7 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral),
             borrower,
             lenderOffer,
-            sign([lenderOffer]),
+            sig([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -967,7 +967,7 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets),
             address(0),
             borrowerOffer,
-            sign([borrowerOffer]),
+            sig([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );

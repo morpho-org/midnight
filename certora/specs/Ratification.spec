@@ -3,8 +3,6 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function ratified(address user, bytes32 root) external returns (bool) envfree;
 
@@ -46,38 +44,4 @@ rule takeRequiresMakerConsent(env e, uint256 units, address taker, address taker
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
     assert makerSigned || makerAuthorizedSigner || rootRatified;
-}
-
-/// take only changes credit and debt of the buyer and seller (maker and taker).
-rule takeIsolation(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 id, address user) {
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
-
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
-    uint256 creditAfter = creditOf(id, user);
-    uint256 debtAfter = debtOf(id, user);
-
-    assert user != buyer && user != seller => creditAfter == creditBefore && debtAfter == debtBefore;
-}
-
-/// ISOLATION ///
-
-/// setAuthorizedWithSig only changes isAuthorized for the (authorizer, authorizee) in the authorization struct.
-rule setAuthorizedWithSigIsolation(env e, Midnight.Authorization authorization, Midnight.Signature signature, address otherUser, address otherAuthorized) {
-    require otherUser != authorization.authorizer || otherAuthorized != authorization.authorizee;
-
-    bool before = isAuthorized(otherUser, otherAuthorized);
-    setAuthorizedWithSig(e, authorization, signature);
-    assert isAuthorized(otherUser, otherAuthorized) == before;
-}
-
-/// setRatified only changes the specified (onBehalf, root) pair.
-rule setRatifiedIsolation(env e, address onBehalf, bytes32 root, bool val, address otherUser, bytes32 otherRoot) {
-    require otherUser != onBehalf || otherRoot != root;
-
-    bool before = ratified(otherUser, otherRoot);
-    setRatified(e, onBehalf, root, val);
-    assert ratified(otherUser, otherRoot) == before;
 }

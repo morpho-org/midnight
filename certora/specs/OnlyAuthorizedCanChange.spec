@@ -188,3 +188,21 @@ rule setIsAuthorizedIsolation(env e, address onBehalf, address authorized, bool 
     setIsAuthorized(e, onBehalf, authorized, val);
     assert isAuthorized(otherUser, otherAuthorized) == before;
 }
+
+/// setAuthorizedWithSig only changes isAuthorized for the (authorizer, authorizee) in the authorization struct.
+rule setAuthorizedWithSigIsolation(env e, Midnight.Authorization authorization, Midnight.Signature signature, address otherUser, address otherAuthorized) {
+    require otherUser != authorization.authorizer || otherAuthorized != authorization.authorizee;
+
+    bool before = isAuthorized(otherUser, otherAuthorized);
+    setAuthorizedWithSig(e, authorization, signature);
+    assert isAuthorized(otherUser, otherAuthorized) == before;
+}
+
+/// setRatified only changes the specified (onBehalf, root) pair.
+rule setRatifiedIsolation(env e, address onBehalf, bytes32 root, bool val, address otherUser, bytes32 otherRoot) {
+    require otherUser != onBehalf || otherRoot != root;
+
+    bool before = ratified(otherUser, otherRoot);
+    setRatified(e, onBehalf, root, val);
+    assert ratified(otherUser, otherRoot) == before;
+}
