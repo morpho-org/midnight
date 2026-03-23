@@ -1,98 +1,99 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+using Midnight as Midnight;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes20 id) external returns (uint256) envfree;
-    function totalUnits(bytes20 id) external returns (uint256) envfree;
-    function totalShares(bytes20 id) external returns (uint256) envfree;
+    function withdrawable(bytes32 id) external returns (uint256) envfree;
+    function totalUnits(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function sharesOf(bytes20 id, address owner) external returns (uint256) envfree;
-    function debtOf(bytes20 id, address user) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
+    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function Utils.passiveFeeRecipient() external returns (address) envfree;
+    function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function _.price() external => NONDET;
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes20) => NONDET;
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    // Tokens are assumed to not reenter.
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
 }
 
 /// HELPERS ///
 
-persistent ghost mapping(bytes20 => mathint) sumSharesOf {
-    init_state axiom (forall bytes20 id. sumSharesOf[id] == 0);
+definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+
+function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
+    return Utils.hashObligation(obligation);
 }
 
-hook Sstore sharesOf[KEY bytes20 id][KEY address owner] uint256 newShares (uint256 oldShares) {
-    sumSharesOf[id] = sumSharesOf[id] - oldShares + newShares;
+function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
+    return Midnight.obligationCreated(summaryToId(obligation));
 }
 
-persistent ghost mapping(bytes20 => mathint) sumDebtOf {
-    init_state axiom (forall bytes20 id. sumDebtOf[id] == 0);
+persistent ghost mapping(bytes32 => mathint) sumDebt {
+    init_state axiom (forall bytes32 id. sumDebt[id] == 0);
 }
 
-hook Sstore borrowerState[KEY bytes20 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
-    sumDebtOf[id] = sumDebtOf[id] - oldDebt + newDebt;
+hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
+    sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (x == 0 || y == 0) return 0;
-    uint256 res;
-    return res;
+    uint256 r;
+    require x == 0 => r == 0;
+    require d > 0 && y <= d => r <= x;
+    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
-    uint256 obligationUnitsOutput;
-    uint256 obligationSharesOutput;
+    uint256 unitsOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    // At most one of the input arguments can be zero.
-    mathint buyerAssetsIsNonZero = buyerAssets > 0 ? 1 : 0;
-    mathint sellerAssetsIsNonZero = sellerAssets > 0 ? 1 : 0;
-    mathint obligationUnitsIsNonZero = obligationUnits > 0 ? 1 : 0;
-    mathint obligationSharesIsNonZero = obligationShares > 0 ? 1 : 0;
-    assert buyerAssetsIsNonZero + sellerAssetsIsNonZero + obligationUnitsIsNonZero + obligationSharesIsNonZero <= 1;
+    // The output units is equal to the input.
+    assert unitsOutput == unitsInput;
 
-    // The output arguments are equal to the input arguments if the input arguments are non-zero.
-    assert buyerAssets == 0 || buyerAssetsOutput == buyerAssets;
-    assert sellerAssets == 0 || sellerAssetsOutput == sellerAssets;
-    assert obligationUnits == 0 || obligationUnitsOutput == obligationUnits;
-    assert obligationShares == 0 || obligationSharesOutput == obligationShares;
-
-    // If all the input arguments are zero, all the output arguments are zero.
-    assert buyerAssets == 0 && sellerAssets == 0 && obligationUnits == 0 && obligationShares == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && obligationUnitsOutput == 0 && obligationSharesOutput == 0;
+    // If the input is zero, all the output arguments are zero.
+    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
 }
 
-rule offerInputsConsumed(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsConsumed(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    uint256 buyerAssetsOutput;
-    uint256 sellerAssetsOutput;
-    uint256 obligationUnitsOutput;
-    uint256 obligationSharesOutput;
+    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
-
-    assert offer.assets == 0 || consumed(offer.maker, offer.group) == consumedBefore + (offer.buy ? buyerAssetsOutput : sellerAssetsOutput);
-    assert offer.obligationUnits == 0 || consumed(offer.maker, offer.group) == consumedBefore + obligationUnitsOutput;
-    assert offer.obligationShares == 0 || consumed(offer.maker, offer.group) == consumedBefore + obligationSharesOutput;
+    assert consumed(offer.maker, offer.group) == consumedBefore + unitsInput;
 }
 
-rule offerInputsLimit(env e, uint256 buyerAssets, uint256 sellerAssets, uint256 obligationUnits, uint256 obligationShares, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule offerInputsLimit(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    uint256 buyerAssetsOutput;
-    uint256 sellerAssetsOutput;
-    uint256 obligationUnitsOutput;
-    uint256 obligationSharesOutput;
+    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    buyerAssetsOutput, sellerAssetsOutput, obligationUnitsOutput, obligationSharesOutput = take(e, buyerAssets, sellerAssets, obligationUnits, obligationShares, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
-
-    assert offer.assets == 0 || (offer.buy ? buyerAssetsOutput : sellerAssetsOutput) <= offer.assets - consumedBefore;
-    assert offer.obligationUnits == 0 || obligationUnitsOutput <= offer.obligationUnits - consumedBefore;
-    assert offer.obligationShares == 0 || obligationSharesOutput <= offer.obligationShares - consumedBefore;
+    assert unitsInput <= offer.maxUnits - consumedBefore;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
@@ -112,13 +113,38 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
+rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+    f(e, args);
+    uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
+    assert lossIndexAfter >= lossIndexBefore;
+}
+
+rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
+    uint128 lossIndexBefore = userLossIndex(id, user);
+    f(e, args);
+    uint128 lossIndexAfter = userLossIndex(id, user);
+    assert lossIndexAfter >= lossIndexBefore;
+}
+
 /// INVARIANTS ///
 
-strong invariant notBorrowerAndLender(bytes20 id, address user)
-    sharesOf(id, user) == 0 || debtOf(id, user) == 0;
+strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
+    to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
-strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes20 id)
-    totalUnits(id) == sumDebtOf[id] + withdrawable(id);
+strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
+    pendingFee(id, user) <= creditOf(id, user);
 
-strong invariant totalSharesEqualsSumSharesOf(bytes20 id)
-    totalShares(id) == sumSharesOf[id];
+rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
+    requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
+    assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
+}
+
+strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
+    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+
+/// A user cannot have both credit and debt, excluding PASSIVE_FEE_RECIPIENT who receives
+/// credit from fee accrual and could theoretically be a trade participant.
+strong invariant noCreditAndDebt(bytes32 id, address user)
+    user != Utils.passiveFeeRecipient() => (creditOf(id, user) == 0 || debtOf(id, user) == 0);

@@ -10,20 +10,6 @@ library UtilsLib {
         }
     }
 
-    /// @dev Returns true if at most one of `x`, `y`, `z` is nonzero.
-    function atMostOneNonZero(uint256 a, uint256 b, uint256 c) internal pure returns (bool z) {
-        assembly {
-            z := gt(add(add(iszero(a), iszero(b)), iszero(c)), 1)
-        }
-    }
-
-    /// @dev Returns true if at most one of `a`, `b`, `c`, `d` is nonzero.
-    function atMostOneNonZero(uint256 a, uint256 b, uint256 c, uint256 d) internal pure returns (bool z) {
-        assembly {
-            z := gt(add(add(add(iszero(a), iszero(b)), iszero(c)), iszero(d)), 2)
-        }
-    }
-
     /// @dev Returns min(a, b).
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
@@ -47,24 +33,24 @@ library UtilsLib {
         return (x * y + (d - 1)) / d;
     }
 
-    /// @dev Returns (`x` * `y`) / `d` rounded up or down.
-    function mulDiv(uint256 x, uint256 y, uint256 d, bool roundDown) internal pure returns (uint256) {
-        return roundDown ? mulDivDown(x, y, d) : mulDivUp(x, y, d);
-    }
-
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
     /// @dev Hash sorts the inputs lexicographically.
     function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = keccak256(sort(currentHash, proof[i]));
+            currentHash = commutativeHash(currentHash, proof[i]);
         }
         return currentHash == root;
     }
 
-    /// @dev Returns the concatenation of x and y, sorted lexicographically.
-    function sort(bytes32 x, bytes32 y) internal pure returns (bytes memory) {
-        return x < y ? abi.encodePacked(x, y) : abi.encodePacked(y, x);
+    /// @dev Returns the keccak256 hash of the sorted concatenation of `a` and `b`.
+    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
+        if (a > b) (a, b) = (b, a);
+        assembly ("memory-safe") {
+            mstore(0x00, a)
+            mstore(0x20, b)
+            value := keccak256(0x00, 0x40)
+        }
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
@@ -82,13 +68,9 @@ library UtilsLib {
         }
     }
 
-    function msb(uint256 bitmap) internal pure returns (uint256) {
-        // Temporary workaround for the Certora pipeline.
-        // TODO: restore the clz-based implementation once the pipeline issue is fixed.
-        for (uint256 i = 256; i > 0; i--) {
-            uint256 bit = i - 1;
-            if ((bitmap & (1 << bit)) != 0) return bit;
+    function msb(uint256 bitmap) internal pure returns (uint256 res) {
+        assembly {
+            res := sub(255, clz(bitmap))
         }
-        return 0;
     }
 }

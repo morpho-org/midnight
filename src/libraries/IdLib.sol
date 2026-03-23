@@ -20,19 +20,12 @@ library IdLib {
     /// f3        RETURN          []                 mem[0:len] is returned
     bytes constant SSTORE2_PREFIX = hex"600b380380600b5f395ff3";
 
-    function toId(Obligation memory obligation, uint256 chainId, address midnight) internal pure returns (bytes20) {
-        bytes32 create2Hash = keccak256(
+    function toId(Obligation memory obligation, uint256 chainId, address midnight) internal pure returns (bytes32) {
+        return keccak256(
             abi.encodePacked(
                 uint8(0xff), midnight, chainId, keccak256(abi.encodePacked(SSTORE2_PREFIX, abi.encode(obligation)))
             )
         );
-        // forge-lint: disable-next-line(unsafe-typecast) unsafe casting made on purpose.
-        return bytes20(uint160(uint256(create2Hash)));
-    }
-
-    /// @dev Attempts to decode the data at address(id) into an obligation.
-    function toObligation(bytes20 id) internal view returns (Obligation memory) {
-        return abi.decode(address(id).code, (Obligation));
     }
 
     /// @dev Stores the data in the code of the contract at the given address.

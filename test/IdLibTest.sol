@@ -21,14 +21,15 @@ contract IdLibTest is Test {
             for (uint256 i = 0; i < obligation1.collaterals.length; i++) {
                 if (obligation1.collaterals[i].token != obligation2.collaterals[i].token) sameCollaterals = false;
                 if (obligation1.collaterals[i].lltv != obligation2.collaterals[i].lltv) sameCollaterals = false;
+                if (obligation1.collaterals[i].maxLif != obligation2.collaterals[i].maxLif) sameCollaterals = false;
                 if (obligation1.collaterals[i].oracle != obligation2.collaterals[i].oracle) sameCollaterals = false;
             }
         }
 
         vm.assume(!(sameLoanToken && sameMaturity && sameCollaterals && sameRcfThreshold));
 
-        bytes20 id1 = IdLib.toId(obligation1, chainid, midnight);
-        bytes20 id2 = IdLib.toId(obligation2, chainid, midnight);
+        bytes32 id1 = IdLib.toId(obligation1, chainid, midnight);
+        bytes32 id2 = IdLib.toId(obligation2, chainid, midnight);
         assertNotEq(id1, id2);
     }
 
@@ -39,8 +40,8 @@ contract IdLibTest is Test {
         address midnight
     ) public pure {
         vm.assume(chainid1 != chainid2);
-        bytes20 id1 = IdLib.toId(obligation, chainid1, midnight);
-        bytes20 id2 = IdLib.toId(obligation, chainid2, midnight);
+        bytes32 id1 = IdLib.toId(obligation, chainid1, midnight);
+        bytes32 id2 = IdLib.toId(obligation, chainid2, midnight);
         assertNotEq(id1, id2);
     }
 
@@ -51,8 +52,8 @@ contract IdLibTest is Test {
         address midnightTwo
     ) public pure {
         vm.assume(midnightOne != midnightTwo);
-        bytes20 id1 = IdLib.toId(obligation, chainid, midnightOne);
-        bytes20 id2 = IdLib.toId(obligation, chainid, midnightTwo);
+        bytes32 id1 = IdLib.toId(obligation, chainid, midnightOne);
+        bytes32 id2 = IdLib.toId(obligation, chainid, midnightTwo);
         assertNotEq(id1, id2);
     }
 }

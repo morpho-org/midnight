@@ -5,7 +5,7 @@ import {BaseTest} from "./BaseTest.sol";
 import {console} from "forge-std/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TICK_RANGE} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract TickLibTest is BaseTest {
     using UtilsLib for uint256;
@@ -15,19 +15,13 @@ contract TickLibTest is BaseTest {
     function testTickToPriceMinMax() public pure {
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
         assertEq(TickLib.tickToPrice(1), 1e13, "tick 1");
-        assertEq(TickLib.tickToPrice(TICK_RANGE - 1), 0.99999e18, "tick max - 1");
-        assertEq(TickLib.tickToPrice(TICK_RANGE), 1e18, "tick max");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 0.99999e18, "tick max - 1");
+        assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
     function testTickMonotonicity() public pure {
-        for (uint256 i = 0; i < TICK_RANGE; i++) {
+        for (uint256 i = 0; i < MAX_TICK; i++) {
             assertGe(TickLib.tickToPrice(i + 1), TickLib.tickToPrice(i));
-        }
-    }
-
-    function testTickToPriceRange() public pure {
-        for (uint256 i = 0; i <= TICK_RANGE; i++) {
-            console.log(TickLib.tickToPrice(i));
         }
     }
 
@@ -51,18 +45,25 @@ contract TickLibTest is BaseTest {
     }
 
     function testGasTickToPrice(uint256 tick) public pure {
-        tick = bound(tick, 0, TICK_RANGE);
+        tick = bound(tick, 0, MAX_TICK);
         TickLib.tickToPrice(tick);
     }
 
     /// forge-config: default.allow_internal_expect_revert = true
     function testTickToPriceOutOfRange(uint256 tick) public {
-        tick = bound(tick, TICK_RANGE + 1, type(uint256).max);
+        tick = bound(tick, MAX_TICK + 1, type(uint256).max);
         vm.expectRevert("tick out of range");
         TickLib.tickToPrice(tick);
     }
 
     // Price to tick
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testPriceToTickGreaterThanOne(uint256 price) public {
+        price = bound(price, 1 ether + 1, type(uint256).max);
+        vm.expectRevert("Price is greater than one");
+        TickLib.priceToTick(price);
+    }
 
     function testPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
@@ -72,7 +73,7 @@ contract TickLibTest is BaseTest {
     }
 
     function testPriceToTickConsistency() public pure {
-        for (uint256 tick = 0; tick <= TICK_RANGE; tick++) {
+        for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 price = TickLib.tickToPrice(tick);
             uint256 recoveredTick = TickLib.priceToTick(price);
             assertEq(TickLib.tickToPrice(recoveredTick), price);
@@ -85,15 +86,8 @@ contract TickLibTest is BaseTest {
         TickLib.priceToTick(price);
     }
 
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testPriceToTickPriceGreaterThanOne(uint256 price) public {
-        price = bound(price, 1e18 + 1, type(uint256).max);
-        vm.expectRevert("Price is greater than one");
-        TickLib.priceToTick(price);
-    }
-
     function loadExactPrices() internal view returns (uint256[] memory) {
-        uint256[] memory exactPrices = new uint256[](TICK_RANGE + 1);
+        uint256[] memory exactPrices = new uint256[](MAX_TICK + 1);
         string memory json = vm.readFile("test/ticks_exact.json");
         string[] memory priceStrings = vm.parseJsonStringArray(json, ".prices");
         for (uint256 i = 0; i < priceStrings.length; i++) {
@@ -109,7 +103,7 @@ contract TickLibTest is BaseTest {
         uint256 totalAbsErrorWad;
         uint256 totalRelErrorWad;
 
-        for (uint256 tick = 0; tick <= TICK_RANGE; tick++) {
+        for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 solPrice = TickLib.tickToPrice(tick);
             uint256 exactPrice = exactPrices[tick];
 
@@ -126,7 +120,7 @@ contract TickLibTest is BaseTest {
             }
 
             // Check exact price is bracketed by adjacent sol prices (only where prices vary per-tick)
-            if (tick > 0 && tick < TICK_RANGE) {
+            if (tick > 0 && tick < MAX_TICK) {
                 uint256 prevSolPrice = TickLib.tickToPrice(tick - 1);
                 uint256 nextSolPrice = TickLib.tickToPrice(tick + 1);
                 if (prevSolPrice < solPrice && solPrice < nextSolPrice) {
@@ -137,8 +131,8 @@ contract TickLibTest is BaseTest {
         }
 
         console.log("Max absolute error (wad):", maxAbsErrorWad);
-        console.log("Avg absolute error (wad):", totalAbsErrorWad / TICK_RANGE);
+        console.log("Avg absolute error (wad):", totalAbsErrorWad / MAX_TICK);
         console.log("Max relative error (wad):", maxRelErrorWad);
-        console.log("Avg relative error (wad):", totalRelErrorWad / TICK_RANGE);
+        console.log("Avg relative error (wad):", totalRelErrorWad / MAX_TICK);
     }
 }

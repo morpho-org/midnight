@@ -10,3 +10,4 @@ wrap_comments = true
 
 [lint]
 exclude_lints = ["asm-keccak256", "unsafe-cheatcode", "incorrect-shift"]
+ignore = ['test/**/*.sol']
