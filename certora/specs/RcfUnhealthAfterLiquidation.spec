@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-/// Proves that an RCF-limited liquidation (actualRepaid == maxRepaid) leaves the
-/// position healthy.
-///
-/// This rule requires exact mathint arithmetic for mulDivDown/mulDivUp because
-/// the proof depends on algebraic cancellation across state changes — the
-/// uninterpreted ghost approach used in RecoveryCloseFactor.spec is insufficient.
+// Proves that an RCF-limited liquidation (actualRepaid == maxRepaid) leaves the
+// position unhealthy.
 
 methods {
     function _.price() external => CVL_price(calledContract) expect(uint256);
@@ -98,7 +94,7 @@ rule rcfLiquidationRestoresHealth(env e, Midnight.Obligation obligation, uint256
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
     uint256 _maxRepaid = CVL_mulDivUp(assert_uint256(effectiveDebt - _maxDebt), WAD(), denom);
 
-    // RCF was the binding constraint
+    // Maxed out the RCF liquidation.
     require actualRepaid == _maxRepaid;
 
     // Position is healthy after the liquidation
