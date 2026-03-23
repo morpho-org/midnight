@@ -11,6 +11,7 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
+    MAX_CONTINUOUS_FEE,
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF
@@ -195,12 +196,19 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(_obligation.collaterals.length > 0);
         _obligation = validObligation(_obligation);
 
+        midnight.setDefaultContinuousFee(_obligation.loanToken, MAX_CONTINUOUS_FEE);
+        for (uint256 i = 0; i < 7; i++) {
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+        }
+
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
         uint16[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
-            assertEq(fees[i], midnight.defaultFees(_obligation.loanToken, i), "fees");
+            assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
+            assertGt(fees[i], 0, "fee nonzero");
         }
+        assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
     }
 
     function testToObligation(Obligation memory _obligation) public {
