@@ -74,7 +74,7 @@ contract LenderCallbackTest is BaseTest {
     }
 
     function testConstructor() public view {
-        assertEq(lenderCallback.midnight(), address(midnight));
+        assertEq(lenderCallback.MIDNIGHT(), address(midnight));
     }
 
     function testOnBuyVaultV2Maker(uint256 units) public {
@@ -140,10 +140,7 @@ contract LenderCallbackTest is BaseTest {
     }
 
     /// @dev Helper to set up obligation2 with lender credit and withdrawable funds.
-    function _setupMidnightSource(uint256 buyerAssets)
-        internal
-        returns (Obligation memory obligation2, bytes32 id2)
-    {
+    function _setupMidnightSource(uint256 buyerAssets) internal returns (Obligation memory obligation2, bytes32 id2) {
         obligation2.loanToken = address(loanToken);
         obligation2.maturity = block.timestamp + 200;
         obligation2.collaterals = obligation.collaterals;

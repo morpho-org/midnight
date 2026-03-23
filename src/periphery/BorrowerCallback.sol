@@ -4,56 +4,38 @@ pragma solidity 0.8.31;
 
 import {Obligation} from "../interfaces/IMidnight.sol";
 import {Midnight} from "../Midnight.sol";
+import {ICallbacks} from "../interfaces/ICallbacks.sol";
 
 struct CollateralData {
     uint256 collateralIndex;
     uint256 amount;
 }
 
-contract BorrowerCallback {
-    address public immutable midnight;
+contract BorrowerCallback is ICallbacks {
+    address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
-        midnight = _midnight;
+        MIDNIGHT = _midnight;
     }
 
     /// @dev Callback to supply collateral on behalf of borrower.
     /// @dev The callback contract should be authorized to supply collateral on behalf of the borrower.
-    function onSell(
-        Obligation memory obligation,
-        address seller,
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 units,
-        bytes memory data
-    ) external {
-        require(msg.sender == midnight, "unauthorized");
+    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, bytes memory data)
+        external
+    {
+        require(msg.sender == MIDNIGHT, "unauthorized");
         CollateralData[] memory collateralData = abi.decode(data, (CollateralData[]));
         for (uint256 i = 0; i < collateralData.length; i++) {
-            Midnight(midnight)
+            Midnight(MIDNIGHT)
                 .supplyCollateral(obligation, collateralData[i].collateralIndex, collateralData[i].amount, seller);
         }
     }
 
-    function onBuy(
-        Obligation memory obligation,
-        address buyer,
-        uint256 buyerAssets,
-        uint256 sellerAssets,
-        uint256 units,
-        bytes memory data
-    ) external {
+    function onBuy(Obligation memory, address, uint256, uint256, uint256, bytes memory) external pure {
         revert("not implemented");
     }
 
-    function onLiquidate(
-        Obligation memory obligation,
-        uint256 collateralIndex,
-        uint256 seizedAssets,
-        uint256 repaidUnits,
-        address borrower,
-        bytes memory data
-    ) external {
+    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
         revert("not implemented");
     }
 }
