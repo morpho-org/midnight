@@ -97,6 +97,6 @@ rule rcfLiquidationRestoresHealth(env e, Midnight.Obligation obligation, uint256
     // Maxed out the RCF liquidation.
     require actualRepaid == _maxRepaid;
 
-    // Position is healthy after the liquidation
+    // Position is unhealthy after the liquidation
     assert !isHealthy(obligation, id, borrower), "RCF-limited liquidation must leave position unhealthy";
 }
