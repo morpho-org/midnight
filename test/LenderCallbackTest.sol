@@ -91,7 +91,7 @@ contract LenderCallbackTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.callback = address(lenderCallback);
-        lenderOffer.callbackData = abi.encode(bytes32(bytes20(address(vault))), WithdrawType.VaultV2);
+        lenderOffer.callbackData = abi.encode(uint256(uint160(address(vault))), WithdrawType.VaultV2);
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
@@ -126,7 +126,7 @@ contract LenderCallbackTest is BaseTest {
             units,
             lender,
             address(lenderCallback),
-            abi.encode(bytes32(bytes20(address(vault))), WithdrawType.VaultV2),
+            abi.encode(bytes32(uint256(uint160(address(vault)))), WithdrawType.VaultV2),
             address(0),
             borrowerOffer,
             sig([borrowerOffer]),
