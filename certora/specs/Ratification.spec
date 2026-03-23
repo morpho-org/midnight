@@ -9,8 +9,8 @@ methods {
     function ratified(address user, bytes32 root) external returns (bool) envfree;
 
     function _.price() external => NONDET;
-    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 
@@ -37,17 +37,15 @@ function signerSummary(bytes32 root, Midnight.Signature s) returns address {
 /// Every successful take requires maker consent via at least one of:
 ///   1. Maker signed directly (offerSigner == offer.maker)
 ///   2. Maker authorized the signer (isAuthorized[offer.maker][offerSigner])
-///   3. Maker authorized the callback (isAuthorized[offer.maker][offer.callback])
-///   4. Maker pre-ratified the root (ratified[offer.maker][root])
+///   3. Maker pre-ratified the root (ratified[offer.maker][root]) — requires offerSigner == address(0)
 rule takeRequiresMakerConsent(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     bool makerSigned = ghostSigner(root) == offer.maker;
     bool makerAuthorizedSigner = isAuthorized(offer.maker, ghostSigner(root));
-    bool makerAuthorizedCallback = isAuthorized(offer.maker, offer.callback);
     bool rootRatified = ratified(offer.maker, root);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
-    assert makerSigned || makerAuthorizedSigner || makerAuthorizedCallback || rootRatified;
+    assert makerSigned || makerAuthorizedSigner || rootRatified;
 }
 
 /// take only changes credit and debt of the buyer and seller (maker and taker).

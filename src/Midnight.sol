@@ -176,9 +176,11 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         address offerSigner = signer(root, sig);
-        bool offerPreRatified =
-            offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner] || ratified[offer.maker][root];
-        require(offerPreRatified || isAuthorized[offer.maker][offer.callback], "unauthorized");
+        if (offerSigner == address(0)) {
+            require(ratified[offer.maker][root], "unauthorized");
+        } else {
+            require(offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner]);
+        }
 
         bytes32 id = touchObligation(offer.obligation);
         slash(id, offer.maker);
@@ -257,16 +259,8 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             require(
-                ICallbacks(buyerCallback)
-                    .onBuy(
-                        offer,
-                        (offer.buy && !offerPreRatified) ? offerSigner : address(1),
-                        buyer,
-                        buyerAssets,
-                        sellerAssets,
-                        units,
-                        buyerCallbackData
-                    ) == CALLBACK_SUCCESS,
+                ICallbacks(buyerCallback).onBuy(offer, buyer, buyerAssets, sellerAssets, units, buyerCallbackData)
+                    == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }
@@ -278,16 +272,8 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback)
-                    .onSell(
-                        offer,
-                        (!offer.buy && !offerPreRatified) ? offerSigner : address(1),
-                        seller,
-                        buyerAssets,
-                        sellerAssets,
-                        units,
-                        sellerCallbackData
-                    ) == CALLBACK_SUCCESS,
+                ICallbacks(sellerCallback).onSell(offer, seller, buyerAssets, sellerAssets, units, sellerCallbackData)
+                    == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }

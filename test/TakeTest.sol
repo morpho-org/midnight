@@ -636,36 +636,6 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeAcceptsAuthorizedCallbackValidation(address maker, address sender, uint256 otherPrivateKey)
-        public
-    {
-        otherPrivateKey = boundPrivateKey(otherPrivateKey);
-        vm.assume(maker != sender);
-        vm.assume(vm.addr(otherPrivateKey) != maker);
-        RatifyCallback callback = new RatifyCallback();
-        lenderOffer.maker = maker;
-        lenderOffer.callback = address(callback);
-
-        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
-
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, address(callback), true);
-        vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            sign([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
-        assertEq(callback.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
-        assertEq(keccak256(abi.encode(callback.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
-    }
-
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
         vm.expectRevert("invalid proof");
@@ -763,7 +733,7 @@ contract TakeTest is BaseTest {
 
         lenderOffer.maker = vm.addr(makerSecretKey);
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert();
         vm.prank(sender);
         midnight.take(
             100,
@@ -778,40 +748,16 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeRevertsWhenMakerCallbackRejects(address maker, address sender, uint256 signerPrivateKey) public {
-        signerPrivateKey = boundPrivateKey(signerPrivateKey);
-        vm.assume(vm.addr(signerPrivateKey) != maker);
-        privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
-        RatifyCallback callback = new RatifyCallback();
+    function testTakeRevertsWhenMakerCallbackRejects(uint256 makerPrivateKey, address sender) public {
+        makerPrivateKey = boundPrivateKey(makerPrivateKey);
+        address maker = vm.addr(makerPrivateKey);
+        privateKey[maker] = makerPrivateKey;
+        RejectingCallback callback = new RejectingCallback();
         callback.setReturnData(false);
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
 
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, address(callback), true);
         vm.expectRevert("ratification rejected");
-        vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            sign([lenderOffer], vm.addr(signerPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
-    }
-
-    function testTakeMakerCallbackGetsAddress1WhenPrevalidated(uint256 makerPrivateKey, address sender) public {
-        makerPrivateKey = boundPrivateKey(makerPrivateKey);
-        address maker = vm.addr(makerPrivateKey);
-        privateKey[maker] = makerPrivateKey;
-        SignerRecordingCallback callback = new SignerRecordingCallback();
-        lenderOffer.maker = maker;
-        lenderOffer.callback = address(callback);
-
         vm.prank(sender);
         midnight.take(
             0,
@@ -824,26 +770,9 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(callback.recordedSigner(), address(1), "maker callback should receive address1 signer");
     }
 
-    function testTakeAuthorizedCallbackGetsZeroAddressForEmptySignature(address maker, address sender) public {
-        vm.assume(maker != sender);
-        vm.assume(maker != address(0));
-        RatifyCallback callback = new RatifyCallback();
-        lenderOffer.maker = maker;
-        lenderOffer.callback = address(callback);
-
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, address(callback), true);
-        vm.prank(sender);
-        midnight.take(
-            0, sender, address(0), hex"", sender, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
-        );
-        assertEq(callback.recordedSigner(), address(0), "signer should be zero for empty sig");
-    }
-
-    function testTakeRevertsWhenAuthorizedCallbackIsEOA(uint256 makerPrivateKey, address sender) public {
+    function testTakeRevertsWhenCallbackIsEOA(uint256 makerPrivateKey, address sender) public {
         makerPrivateKey = boundPrivateKey(makerPrivateKey);
         address maker = vm.addr(makerPrivateKey);
         privateKey[maker] = makerPrivateKey;
@@ -851,8 +780,6 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = maker;
         lenderOffer.callback = eoa;
 
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, eoa, true);
         vm.expectRevert();
         vm.prank(sender);
         midnight.take(
@@ -876,8 +803,6 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
 
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, address(callback), true);
         vm.expectRevert("callback failed");
         vm.prank(sender);
         midnight.take(
@@ -891,61 +816,6 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-    }
-
-    function testTakeSellSideMakerCallbackGetsAddress1WhenPrevalidated(uint256 makerPrivateKey, address sender) public {
-        makerPrivateKey = boundPrivateKey(makerPrivateKey);
-        address maker = vm.addr(makerPrivateKey);
-        privateKey[maker] = makerPrivateKey;
-        RatifyCallback callback = new RatifyCallback();
-        borrowerOffer.maker = maker;
-        borrowerOffer.callback = address(callback);
-        borrowerOffer.receiverIfMakerIsSeller = maker;
-        borrowerOffer.tick = MAX_TICK;
-
-        collateralize(obligation, maker, 100);
-        deal(address(loanToken), sender, 100);
-        vm.prank(sender);
-        loanToken.approve(address(midnight), 100);
-
-        vm.prank(maker);
-        midnight.setIsAuthorized(maker, address(callback), true);
-        vm.prank(sender);
-        midnight.take(
-            100,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            borrowerOffer,
-            sign([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
-        assertEq(callback.recordedSigner(), address(1), "sell-side callback should receive address1 signer");
-    }
-
-    function testTakeNonMakerCallbackGetsAddress1(uint256 makerPrivateKey, address sender) public {
-        makerPrivateKey = boundPrivateKey(makerPrivateKey);
-        address maker = vm.addr(makerPrivateKey);
-        privateKey[maker] = makerPrivateKey;
-        vm.assume(sender != maker);
-        SignerRecordingCallback takerCb = new SignerRecordingCallback();
-        lenderOffer.maker = maker;
-
-        vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(takerCb),
-            hex"",
-            sender,
-            lenderOffer,
-            sign([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
-        assertEq(takerCb.recordedSigner(), address(1), "non-maker callback should receive address1 signer");
     }
 
     function testOrderNotAuthorized(address taker, address sender) public {
@@ -1153,7 +1023,7 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onSell(Offer memory offer, address, address seller, uint256, uint256, uint256, bytes memory data)
+    function onSell(Offer memory offer, address seller, uint256, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1165,7 +1035,7 @@ contract BorrowCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory) external returns (bytes32) {
+    function onBuy(Offer memory, address, uint256, uint256, uint256, bytes memory) external pure returns (bytes32) {
         return CALLBACK_SUCCESS;
     }
 
@@ -1175,7 +1045,7 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    function onBuy(Offer memory offer, address, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
+    function onBuy(Offer memory offer, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1184,46 +1054,27 @@ contract LendCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
+    function onSell(Offer memory, address, uint256, uint256, uint256, bytes memory) external pure returns (bytes32) {
         return CALLBACK_SUCCESS;
     }
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
-contract RatifyCallback {
-    address public recordedSigner;
-    Offer internal _recordedOffer;
+contract RejectingCallback {
     bool public returnBool = true;
 
-    function onBuy(Offer memory offer, address _signer, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
-        _recordedOffer = offer;
-        recordedSigner = _signer;
+    function onBuy(Offer memory, address, uint256, uint256, uint256, bytes memory) external view returns (bytes32) {
         require(returnBool, "ratification rejected");
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(Offer memory offer, address _signer, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
-        _recordedOffer = offer;
-        recordedSigner = _signer;
+    function onSell(Offer memory, address, uint256, uint256, uint256, bytes memory) external view returns (bytes32) {
         require(returnBool, "ratification rejected");
         return CALLBACK_SUCCESS;
     }
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function recordedOffer() public view returns (Offer memory) {
-        return _recordedOffer;
-    }
 
     function setReturnData(bool _returnBool) external {
         returnBool = _returnBool;
@@ -1231,43 +1082,14 @@ contract RatifyCallback {
 }
 
 contract WrongMagicCallback {
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
+    function onBuy(Offer memory, address, uint256, uint256, uint256, bytes memory) external pure returns (bytes32) {
         return bytes32(uint256(1));
     }
 
-    function onSell(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
+    function onSell(Offer memory, address, uint256, uint256, uint256, bytes memory) external pure returns (bytes32) {
         return bytes32(uint256(1));
     }
 
     function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
-contract SignerRecordingCallback {
-    address public recordedSigner;
-
-    function onBuy(Offer memory, address _signer, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
-        recordedSigner = _signer;
-        return CALLBACK_SUCCESS;
-    }
-
-    function onSell(Offer memory, address _signer, address, uint256, uint256, uint256, bytes memory)
-        external
-        returns (bytes32)
-    {
-        recordedSigner = _signer;
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-}

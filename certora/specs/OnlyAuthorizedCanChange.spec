@@ -25,8 +25,8 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy: callbacks do not re-enter Midnight.
-    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
 
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => CVL_signer();
