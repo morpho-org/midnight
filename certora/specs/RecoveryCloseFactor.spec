@@ -47,7 +47,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
-// For any rcfThreshold, the RCF condition holds on all non-reverting pre-maturity liquidations:
+// For any rcfThreshold, the RCF condition holds on all pre-maturity liquidations:
 // repaidUnits <= maxRepaid || collateralValue.zeroFloorSub(maxRepaid) < rcfThreshold.
 // As a special, shows that RCF is always active pre-maturity if rcfThreshold is zero.
 // Proven for obligations with a single collateral.
