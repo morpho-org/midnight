@@ -11,6 +11,8 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function consumed(address user, bytes32 group) external returns (uint256) envfree;
+    function session(address user) external returns (bytes32) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function ratified(address user, bytes32 root) external returns (bool) envfree;
     function authorizationNonce(address user) external returns (uint256) envfree;
@@ -91,6 +93,33 @@ rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataa
     uint256 collateralAfter = collateralOf(id, user, collateralIndex);
 
     assert collateralAfter == collateralBefore || userIsAuthorized;
+}
+
+/// CONSUMED CHANGE RULES ///
+
+/// An unauthorized or unsigned caller cannot change a user's consumed.
+/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant consumed changes are not covered.
+rule onlyAuthorizedCanChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView } {
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+
+    uint256 consumedBefore = consumed(user, group);
+    f(e, args);
+    uint256 consumedAfter = consumed(user, group);
+
+    assert consumedAfter == consumedBefore || userIsAuthorized || signed[user];
+}
+
+/// SESSION CHANGE RULES ///
+
+/// An unauthorized caller cannot change a user's session.
+rule onlyAuthorizedCanChangeSession(env e, method f, calldataarg args, address user) filtered { f -> !f.isView } {
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+
+    bytes32 sessionBefore = session(user);
+    f(e, args);
+    bytes32 sessionAfter = session(user);
+
+    assert sessionAfter == sessionBefore || userIsAuthorized;
 }
 
 /// AUTHORIZATION CHANGE RULES ///
