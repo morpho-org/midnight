@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
-import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
