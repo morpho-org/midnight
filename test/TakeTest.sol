@@ -550,7 +550,7 @@ contract TakeTest is BaseTest {
         take(units, lender, borrowerOffer);
     }
 
-    function testSell_RevertsWhenSellerIsUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
+    function testSellUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 0, MAX_TICK);
@@ -572,7 +572,7 @@ contract TakeTest is BaseTest {
         take(100, borrower, lenderOffer);
     }
 
-    function testTake_RevertsWhenOfferHasNotStarted(uint256 start) public {
+    function testTakeOfferNotStarted(uint256 start) public {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
@@ -580,7 +580,7 @@ contract TakeTest is BaseTest {
         take(0, borrower, badOffer);
     }
 
-    function testTake_RevertsWhenOfferHasExpired(uint256 elapsed) public {
+    function testTakeOfferExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
         vm.expectRevert("offer expired");
@@ -599,7 +599,7 @@ contract TakeTest is BaseTest {
 
     // test tree / signatures.
 
-    function testTakeInvalidRoot(bytes32 invalidRoot) public {
+    function testTakeWrongRoot(bytes32 invalidRoot) public {
         vm.assume(invalidRoot != root([lenderOffer]));
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
@@ -643,7 +643,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeInvalidPathOneLeaf(bytes32[] memory _proof) public {
+    function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
         vm.assume(_proof.length >= 1);
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
@@ -652,7 +652,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _proof) public {
+    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory _proof) public {
         vm.assume(_proof.length >= 1);
         vm.assume(_proof[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");

@@ -165,6 +165,23 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
+    function authorize(address from, address to) internal {
+        vm.prank(from);
+        midnight.setIsAuthorized(from, to, true);
+    }
+
+    function root(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
+    }
+
+    function root(Offer[1] memory offers) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offers[0]));
+    }
+
+    function root(Offer[2] memory offers) internal pure returns (bytes32) {
+        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
+    }
+
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
         return new bytes32[](0);
     }
@@ -174,23 +191,6 @@ abstract contract BaseTest is Test {
         bytes32[] memory _proof = new bytes32[](1);
         _proof[0] = keccak256(abi.encode(offers[1]));
         return _proof;
-    }
-
-    function root(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offer));
-    }
-
-    function authorize(address from, address to) internal {
-        vm.prank(from);
-        midnight.setIsAuthorized(from, to, true);
-    }
-
-    function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offers[0]));
-    }
-
-    function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
     }
 
     function domainSeparator() internal view returns (bytes32) {
