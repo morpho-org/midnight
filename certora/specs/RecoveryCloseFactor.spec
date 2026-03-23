@@ -87,19 +87,19 @@ rule liquidationRespectsRcfBound(env e, Midnight.Obligation obligation, uint256 
     uint256 _maxDebt = CVL_mulDivDown(collatValueDown, lltv, WAD());
 
     // Mirror bad-debt deduction
-    uint256 collatValue = CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE());
-    uint256 maxSupportedDebt = CVL_mulDivUp(collatValue, WAD(), maxLif);
+    uint256 collatValueUp = CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE());
+    uint256 maxSupportedDebt = CVL_mulDivUp(collatValueUp, WAD(), maxLif);
     uint256 badDebt = debtBefore > maxSupportedDebt ? assert_uint256(debtBefore - maxSupportedDebt) : 0;
     uint256 effectiveDebt = assert_uint256(debtBefore - badDebt);
 
     // Mirror maxRepaid: (effectiveDebt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
     uint256 _maxRepaid = CVL_mulDivUp(assert_uint256(effectiveDebt - _maxDebt), WAD(), assert_uint256(WAD() - lifTimesLltv));
 
-    // // Mirror rcfValue computation
-    uint256 maxSupportedDebt = CVL_mulDivDown(CVL_mulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
-    uint256 rcfValue = maxSupportedDebt > _maxRepaid ? assert_uint256(maxSupportedDebt - _maxRepaid) : 0;
+    // Mirror remaining collat computed to compare against rcfThreshold.
+    uint256 collatValueForRcf = CVL_mulDivDown(CVL_mulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+    uint256 remainingCollat = collatValueForRcf > _maxRepaid ? assert_uint256(collatValueForRcf - _maxRepaid) : 0;
 
-    assert actualRepaid <= _maxRepaid || rcfValue < obligation.rcfThreshold, "RCF conditions must hold on all pre-maturity liquidations";
+    assert actualRepaid <= _maxRepaid || remainingCollat < obligation.rcfThreshold, "RCF conditions must hold on all pre-maturity liquidations";
 
     //special case: if rcfThreshold is zero then RCF is always activated.
     assert obligation.rcfThreshold != 0 || actualRepaid <= _maxRepaid, "rcfThreshold=0 must enforce repaidUnits <= maxRepaid on all pre-maturity liquidations";
@@ -144,8 +144,8 @@ rule maxRcfThresholdNeverEnforcesRcf(env e, Midnight.Obligation obligation, uint
     uint256 _maxDebt = CVL_mulDivDown(collatValueDown, lltv, WAD());
 
     // Mirror bad-debt deduction
-    uint256 collatValue = CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE());
-    uint256 maxSupportedDebt = CVL_mulDivUp(collatValue, WAD(), maxLif);
+    uint256 collatValueUp = CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE());
+    uint256 maxSupportedDebt = CVL_mulDivUp(collatValueUp, WAD(), maxLif);
     uint256 badDebt = debtBefore > maxSupportedDebt ? assert_uint256(debtBefore - maxSupportedDebt) : 0;
     uint256 effectiveDebt = assert_uint256(debtBefore - badDebt);
 
