@@ -7,12 +7,12 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32);
 }
 
-rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
+rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf) {
     bytes32 id = toId(e, obligation);
     uint256 withdrawableBefore = withdrawable(id);
-    repay(e, obligation, obligationUnits, onBehalf);
+    repay(e, obligation, units, onBehalf);
     uint256 withdrawableAfter = withdrawable(id);
-    assert withdrawableAfter == withdrawableBefore + obligationUnits;
+    assert withdrawableAfter == withdrawableBefore + units;
 }
 
 rule liquidateIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
@@ -25,12 +25,12 @@ rule liquidateIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint2
     assert withdrawableAfter == withdrawableBefore + repaidResult;
 }
 
-rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Obligation obligation, uint256 obligationUnitsInput, address onBehalf, address receiver) {
+rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Obligation obligation, uint256 unitsInput, address onBehalf, address receiver) {
     bytes32 id = toId(e, obligation);
     uint256 withdrawableBefore = withdrawable(id);
-    withdraw(e, obligation, obligationUnitsInput, onBehalf, receiver);
+    withdraw(e, obligation, unitsInput, onBehalf, receiver);
     uint256 withdrawableAfter = withdrawable(id);
-    assert withdrawableAfter == withdrawableBefore - obligationUnitsInput;
+    assert withdrawableAfter == withdrawableBefore - unitsInput;
 }
 
 rule withdrawableUnchanged(method f, env e, calldataarg args, bytes32 id)
