@@ -7,7 +7,7 @@ methods {
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
-    function toId(Midnight.Obligation) external returns (bytes32);
+    function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
@@ -23,7 +23,7 @@ definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 
 
 definition FEE_STEP() returns uint256 = 1000000000000;
 
-definition defaultFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultFees[loanToken][index] * FEE_STEP());
+definition defaultFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
 definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].fees[index] * FEE_STEP());
 

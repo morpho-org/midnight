@@ -241,7 +241,7 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
-    /// @dev Returns an obligation with sorted, unique collaterals and valid lltv/maxLif.
+    /// @dev Returns an obligation with sorted, unique collaterals, valid lltv/maxLif, and a creatable TTM.
     function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
         uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
         Collateral[] memory collaterals = new Collateral[](len);
