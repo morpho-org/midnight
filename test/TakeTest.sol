@@ -609,7 +609,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("unauthorized");
+        vm.expectRevert("invalid signature");
         Signature memory _sig = Signature({v: 1, r: 0, s: 0});
         vm.prank(borrower);
         midnight.take(
@@ -692,7 +692,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeRevertsWhenOfferIsNotRatified() public {
-        vm.expectRevert("unauthorized");
+        vm.expectRevert("not ratified");
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
@@ -740,7 +740,7 @@ contract TakeTest is BaseTest {
 
         lenderOffer.maker = vm.addr(makerSecretKey);
 
-        vm.expectRevert();
+        vm.expectRevert("unauthorized");
         vm.prank(sender);
         midnight.take(
             100,

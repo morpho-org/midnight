@@ -276,9 +276,7 @@ contract OtherFunctionsTest is BaseTest {
         (_sig.v, _sig.r, _sig.s) = vm.sign(authorizerPrivateKey, _authorizationDigest(authorization));
 
         vm.expectEmit(true, true, false, true);
-        emit EventsLib.SetIsAuthorized(address(this), authorizer, authorizee, _isAuthorized);
-        vm.expectEmit(true, false, false, true);
-        emit EventsLib.AuthorizationNonceUsed(authorizer, 0);
+        emit EventsLib.SetIsAuthorized(address(this), authorizer, authorizee, _isAuthorized, 1);
         midnight.setAuthorizedWithSig(authorization, _sig);
     }
 

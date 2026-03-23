@@ -219,11 +219,11 @@ contract Midnight is IMidnight {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        address offerSigner = signer(root, sig);
-        if (offerSigner == address(0)) {
-            require(ratified[offer.maker][root], "unauthorized");
+        if (sig.v == 0) {
+            require(ratified[offer.maker][root], "not ratified");
         } else {
-            require(offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner]);
+            address _signer = signer(root, sig);
+            require(_signer == offer.maker || isAuthorized[offer.maker][_signer], "unauthorized");
         }
 
         bytes32 id = touchObligation(offer.obligation);
@@ -562,9 +562,12 @@ contract Midnight is IMidnight {
 
         isAuthorized[authorization.authorizer][authorization.authorizee] = authorization.isAuthorized;
         emit EventsLib.SetIsAuthorized(
-            msg.sender, authorization.authorizer, authorization.authorizee, authorization.isAuthorized
+            msg.sender,
+            authorization.authorizer,
+            authorization.authorizee,
+            authorization.isAuthorized,
+            authorization.nonce
         );
-        emit EventsLib.AuthorizationNonceUsed(authorization.authorizer, authorization.nonce);
     }
 
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
@@ -589,7 +592,7 @@ contract Midnight is IMidnight {
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
+        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized, authorizationNonce[onBehalf]);
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
@@ -767,11 +770,11 @@ contract Midnight is IMidnight {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
-    /// @dev Does not revert if the signature is invalid.
     function signer(bytes32 root, Signature memory signature) internal view returns (address) {
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
     }
 

@@ -95,16 +95,17 @@ rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataa
 
 /// CONSUMED CHANGE RULES ///
 
-/// An unauthorized or unsigned caller cannot change a user's consumed.
+/// An unauthorized caller cannot change a user's consumed except via take.
+/// takeOnlyAffectsMakerConsumed + takeRequiresMakerConsent show that only authorized can change consumed through take.
 /// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant consumed changes are not covered.
-rule onlyAuthorizedCanChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView } {
+rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
     uint256 consumedBefore = consumed(user, group);
     f(e, args);
     uint256 consumedAfter = consumed(user, group);
 
-    assert consumedAfter == consumedBefore || userIsAuthorized || signed[user];
+    assert consumedAfter == consumedBefore || userIsAuthorized;
 }
 
 /// SESSION CHANGE RULES ///
