@@ -35,7 +35,7 @@ function signerSummary(bytes32 root, Midnight.Signature s) returns address {
 /// Every successful take requires maker consent via at least one of:
 ///   1. Maker signed directly (offerSigner == offer.maker)
 ///   2. Maker authorized the signer (isAuthorized[offer.maker][offerSigner])
-///   3. Maker pre-ratified the root (ratified[offer.maker][root]) — requires offerSigner == address(0)
+///   3. Maker pre-ratified the root (ratified[offer.maker][root]) — requires sig.v == 0 (no signature)
 rule takeRequiresMakerConsent(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     bool makerSigned = ghostSigner(root) == offer.maker;
     bool makerAuthorizedSigner = isAuthorized(offer.maker, ghostSigner(root));
