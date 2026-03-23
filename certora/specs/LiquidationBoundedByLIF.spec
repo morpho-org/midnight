@@ -11,6 +11,20 @@ methods {
     // Deterministic toId summary using a ghost that takes simple types (no struct).
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
 
+    // Skip obligation creation logic: removes the collateral-validation loop.
+    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
+
+    // zeroFloorSub feeds only into badDebt, which doesn't affect the repaid/seized computation.
+    function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
+
+    // Token transfers happen after return values are computed; irrelevant to the assertion.
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+
+    // Not on the liquidation path; remove unnecessary complexity.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
 }
