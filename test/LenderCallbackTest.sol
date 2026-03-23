@@ -1,0 +1,253 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2025 Morpho Association
+pragma solidity ^0.8.0;
+
+import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Midnight} from "../src/Midnight.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {LenderCallback, WithdrawType} from "../src/periphery/LenderCallback.sol";
+
+import {BaseTest} from "./BaseTest.sol";
+import {ERC20} from "./helpers/ERC20.sol";
+
+// TODO: deploy vault v2
+contract MockVault {
+    address public asset;
+
+    constructor(address _asset) {
+        asset = _asset;
+    }
+
+    function withdraw(uint256 assets, address receiver, address) external returns (uint256) {
+        ERC20(asset).transfer(receiver, assets);
+        return assets;
+    }
+}
+
+contract LenderCallbackTest is BaseTest {
+    using UtilsLib for uint256;
+
+    LenderCallback internal lenderCallback;
+    Obligation internal obligation;
+    bytes32 internal id;
+    Offer internal borrowerOffer;
+
+    function setUp() public override {
+        super.setUp();
+
+        lenderCallback = new LenderCallback(address(midnight));
+
+        obligation.loanToken = address(loanToken);
+        obligation.maturity = block.timestamp + 100;
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle1)
+                })
+            );
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken2),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle2)
+                })
+            );
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.rcfThreshold = 0;
+
+        id = toId(obligation);
+
+        borrowerOffer.buy = false;
+        borrowerOffer.maker = borrower;
+        borrowerOffer.receiverIfMakerIsSeller = borrower;
+        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.obligation = obligation;
+        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.tick = MAX_TICK;
+    }
+
+    function testConstructor() public view {
+        assertEq(lenderCallback.midnight(), address(midnight));
+    }
+
+    function testOnBuyVaultV2Maker(uint256 units) public {
+        units = bound(units, 1, 1e33);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 buyerAssets = units.mulDivUp(price, WAD);
+
+        // Deploy mock vault with loan tokens.
+        MockVault vault = new MockVault(address(loanToken));
+        deal(address(loanToken), address(vault), buyerAssets);
+
+        // Lender makes a buy offer with callback.
+        Offer memory lenderOffer;
+        lenderOffer.buy = true;
+        lenderOffer.maker = lender;
+        lenderOffer.callback = address(lenderCallback);
+        lenderOffer.callbackData = abi.encode(bytes32(bytes20(address(vault))), WithdrawType.VaultV2);
+        lenderOffer.maxUnits = units;
+        lenderOffer.obligation = obligation;
+        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.tick = MAX_TICK;
+
+        // Collateralize borrower and take.
+        collateralize(obligation, borrower, units);
+
+        take(units, borrower, lenderOffer);
+
+        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(loanToken.balanceOf(address(vault)), 0);
+    }
+
+    function testOnBuyVaultV2Taker(uint256 units) public {
+        units = bound(units, 1, 1e33);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 buyerAssets = units.mulDivUp(price, WAD);
+
+        // Deploy mock vault with loan tokens.
+        MockVault vault = new MockVault(address(loanToken));
+        deal(address(loanToken), address(vault), buyerAssets);
+
+        // Borrower makes a sell offer.
+        borrowerOffer.maxUnits = units;
+        collateralize(obligation, borrower, units);
+
+        // Lender takes via taker callback.
+        vm.prank(lender);
+        midnight.take(
+            units,
+            lender,
+            address(lenderCallback),
+            abi.encode(bytes32(bytes20(address(vault))), WithdrawType.VaultV2),
+            address(0),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer])
+        );
+
+        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(loanToken.balanceOf(address(vault)), 0);
+    }
+
+    /// @dev Helper to set up obligation2 with lender credit and withdrawable funds.
+    function _setupMidnightSource(uint256 buyerAssets)
+        internal
+        returns (Obligation memory obligation2, bytes32 id2)
+    {
+        obligation2.loanToken = address(loanToken);
+        obligation2.maturity = block.timestamp + 200;
+        obligation2.collaterals = obligation.collaterals;
+        obligation2.rcfThreshold = 0;
+        id2 = toId(obligation2);
+
+        // Collateralize borrower on obligation2 and lend.
+        collateralize(obligation2, borrower, buyerAssets);
+        deal(address(loanToken), lender, buyerAssets);
+
+        Offer memory lenderOffer2;
+        lenderOffer2.buy = true;
+        lenderOffer2.maker = lender;
+        lenderOffer2.maxUnits = buyerAssets;
+        lenderOffer2.obligation = obligation2;
+        lenderOffer2.expiry = block.timestamp + 300;
+        lenderOffer2.tick = MAX_TICK;
+        lenderOffer2.group = keccak256("obligation2");
+
+        take(buyerAssets, borrower, lenderOffer2);
+
+        // Borrower repays to create withdrawable funds.
+        deal(address(loanToken), borrower, buyerAssets);
+        vm.prank(borrower);
+        midnight.repay(obligation2, buyerAssets, borrower);
+
+        // Authorize callback to withdraw on behalf of lender.
+        authorize(lender, address(lenderCallback));
+    }
+
+    function testOnBuyMidnightMaker(uint256 units) public {
+        units = bound(units, 1, 1e33);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 buyerAssets = units.mulDivUp(price, WAD);
+
+        (, bytes32 id2) = _setupMidnightSource(buyerAssets);
+
+        // Lender makes a buy offer on obligation with callback.
+        Offer memory lenderOffer;
+        lenderOffer.buy = true;
+        lenderOffer.maker = lender;
+        lenderOffer.callback = address(lenderCallback);
+        lenderOffer.callbackData = abi.encode(id2, WithdrawType.Midnight);
+        lenderOffer.maxUnits = units;
+        lenderOffer.obligation = obligation;
+        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.tick = MAX_TICK;
+
+        // Collateralize borrower on obligation and take.
+        collateralize(obligation, borrower, units);
+
+        take(units, borrower, lenderOffer);
+
+        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.creditOf(id2, lender), 0);
+    }
+
+    function testOnBuyMidnightTaker(uint256 units) public {
+        units = bound(units, 1, 1e33);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 buyerAssets = units.mulDivUp(price, WAD);
+
+        (, bytes32 id2) = _setupMidnightSource(buyerAssets);
+
+        // Borrower makes a sell offer.
+        borrowerOffer.maxUnits = units;
+        collateralize(obligation, borrower, units);
+
+        // Lender takes via taker callback.
+        vm.prank(lender);
+        midnight.take(
+            units,
+            lender,
+            address(lenderCallback),
+            abi.encode(id2, WithdrawType.Midnight),
+            address(0),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer])
+        );
+
+        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.creditOf(id2, lender), 0);
+    }
+
+    function testOnBuyUnauthorized() public {
+        Obligation memory ob;
+        vm.prank(makeAddr("attacker"));
+        vm.expectRevert("unauthorized");
+        lenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
+    }
+
+    function testOnSellReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        lenderCallback.onSell(ob, address(0), 0, 0, 0, "");
+    }
+
+    function testOnLiquidateReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        lenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+    }
+}
