@@ -3,20 +3,12 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function _.price() external => NONDET;
-
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
-
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => CVL_tickToPrice();
-
-    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
-    // Output feeds into CONSTANT-summarized tradingFee, so its value doesn't matter.
+    // zeroFloorSub Output do not affects buyerAssets or sellerAssets, so NONDET is safe for this property.
     function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
 
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
@@ -33,18 +25,12 @@ methods {
 
 persistent ghost bytes32 ghostId;
 
-persistent ghost uint256 ghostTickPrice;
-
 persistent ghost address ghostSignerResult;
 
 /// SUMMARY FUNCTIONS ///
 
 function CVL_toId() returns bytes32 {
     return ghostId;
-}
-
-function CVL_tickToPrice() returns uint256 {
-    return ghostTickPrice;
 }
 
 function CVL_signer() returns address {

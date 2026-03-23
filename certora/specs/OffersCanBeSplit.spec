@@ -7,10 +7,6 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
-
-    // Deterministic id: every obligation maps to the same ghostId.
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
     // Deterministic price: same tick always gives the same offerPrice.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CVL_tickToPrice();
@@ -21,16 +17,19 @@ methods {
     // Always healthy: irrelevant to the split property, avoids oracle + collateral loop complexity.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CVL_isHealthy();
 
-    // same inputs always return the same value across all 3 take calls.
+    // Same inputs always return the same value across all 3 take calls.
     function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
+    // Skip obligation creation logic: only sets created/fees/continuousFee which don't affect credit/debt/totalUnits/consumed.
+    function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
+
+    // Merkle proof: irrelevant to position state, removes hashing loop.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+
     // No reentrancy: token transfers and callbacks summarized away.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-
-    function _.price() external => NONDET;
 }
 
 /// GHOSTS ///
