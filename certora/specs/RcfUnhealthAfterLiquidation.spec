@@ -55,29 +55,24 @@ function CVL_mulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
+
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 /// Proves that an RCF-limited liquidation (actualRepaid == maxRepaid) leaves the
 /// position healthy — isHealthy returns true after the liquidation.
-rule rcfLiquidationRestoresHealth(
-    env e,
-    Midnight.Obligation obligation,
-    uint256 seizedAssets,
-    uint256 repaidUnits,
-    address borrower,
-    bytes data
-) {
+rule rcfLiquidationRestoresHealth(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     require obligation.collaterals.length == 1;
     uint256 collateralIndex = 0;
 
-    uint256 lltv   = obligation.collaterals[0].lltv;
+    uint256 lltv = obligation.collaterals[0].lltv;
     uint256 maxLif = obligation.collaterals[0].maxLif;
+    uint256 lifTimesLltv = CVL_mulDivUp(maxLif, lltv, WAD());
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
-    uint256 price  = CVL_price(obligation.collaterals[0].oracle);
+    uint256 price = CVL_price(obligation.collaterals[0].oracle);
 
     bytes32 id;
     uint256 collatBefore = collateralOf(id, borrower, 0);
-    uint256 debtBefore   = debtOf(id, borrower);
+    uint256 debtBefore = debtOf(id, borrower);
 
     require collatBefore > 0;
     require activatedCollaterals(id, borrower) == 1;
@@ -88,7 +83,7 @@ rule rcfLiquidationRestoresHealth(
 
     // First liquidation succeeds
     uint256 actualRepaid;
-    (_, actualRepaid) = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     require id == lastId;
 
@@ -98,12 +93,8 @@ rule rcfLiquidationRestoresHealth(
 
     uint256 collatValueUp = CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE());
     uint256 collatValuePerMaxLif = CVL_mulDivUp(collatValueUp, WAD(), maxLif);
-    uint256 badDebt = debtBefore > collatValuePerMaxLif
-        ? assert_uint256(debtBefore - collatValuePerMaxLif)
-        : 0;
+    uint256 badDebt = debtBefore > collatValuePerMaxLif ? assert_uint256(debtBefore - collatValuePerMaxLif) : 0;
     uint256 effectiveDebt = assert_uint256(debtBefore - badDebt);
-
-    uint256 lifTimesLltv = CVL_mulDivUp(maxLif, lltv, WAD());
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
     uint256 _maxRepaid = CVL_mulDivUp(assert_uint256(effectiveDebt - _maxDebt), WAD(), denom);
 
@@ -111,6 +102,5 @@ rule rcfLiquidationRestoresHealth(
     require actualRepaid == _maxRepaid;
 
     // Position is healthy after the liquidation
-    assert !isHealthy(obligation, id, borrower),
-        "RCF-limited liquidation must leave position unhealthy";
+    assert !isHealthy(obligation, id, borrower), "RCF-limited liquidation must leave position unhealthy";
 }

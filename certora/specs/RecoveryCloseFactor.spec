@@ -96,8 +96,8 @@ rule liquidationRespectsRcfBound(env e, Midnight.Obligation obligation, uint256 
     uint256 _maxRepaid = CVL_mulDivUp(assert_uint256(effectiveDebt - _maxDebt), WAD(), assert_uint256(WAD() - lifTimesLltv));
 
     // // Mirror rcfValue computation
-    uint256 collatValueForRcf = CVL_mulDivDown(CVL_mulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
-    uint256 rcfValue = collatValueForRcf > _maxRepaid ? assert_uint256(collatValueForRcf - _maxRepaid) : 0;
+    uint256 maxSupportedDebt = CVL_mulDivDown(CVL_mulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+    uint256 rcfValue = maxSupportedDebt > _maxRepaid ? assert_uint256(maxSupportedDebt - _maxRepaid) : 0;
 
     assert actualRepaid <= _maxRepaid || rcfValue < obligation.rcfThreshold, "RCF conditions must hold on all pre-maturity liquidations";
 
