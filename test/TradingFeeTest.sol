@@ -76,7 +76,7 @@ contract TradingFeeTest is BaseTest {
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 10000);
 
-        midnight.setTradingFeeRecipient(feeRecipient);
+        midnight.setFeeRecipient(feeRecipient);
     }
 
     function testBuyUnits(uint256 tradingFee, uint256 sellerTick, uint256 units) public {
