@@ -566,7 +566,7 @@ contract Midnight is IMidnight {
             authorization.authorizer,
             authorization.authorizee,
             authorization.isAuthorized,
-            authorization.nonce
+            authorization.nonce + 1
         );
     }
 
