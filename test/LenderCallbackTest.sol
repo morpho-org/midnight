@@ -7,12 +7,13 @@ import {Midnight} from "../src/Midnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {LenderCallback, WithdrawType} from "../src/periphery/LenderCallback.sol";
+import {VaultLenderCallback} from "../src/periphery/VaultLenderCallback.sol";
+import {ObligationLenderCallback} from "../src/periphery/ObligationLenderCallback.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 
-// TODO: deploy vault v2
+// TODO: use real vault v2
 contract MockVault {
     address public asset;
 
@@ -26,10 +27,10 @@ contract MockVault {
     }
 }
 
-contract LenderCallbackTest is BaseTest {
+contract VaultLenderCallbackTest is BaseTest {
     using UtilsLib for uint256;
 
-    LenderCallback internal lenderCallback;
+    VaultLenderCallback internal vaultLenderCallback;
     Obligation internal obligation;
     bytes32 internal id;
     Offer internal borrowerOffer;
@@ -37,7 +38,7 @@ contract LenderCallbackTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        lenderCallback = new LenderCallback(address(midnight));
+        vaultLenderCallback = new VaultLenderCallback(address(midnight));
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
@@ -74,7 +75,7 @@ contract LenderCallbackTest is BaseTest {
     }
 
     function testConstructor() public view {
-        assertEq(lenderCallback.MIDNIGHT(), address(midnight));
+        assertEq(vaultLenderCallback.MIDNIGHT(), address(midnight));
     }
 
     function testOnBuyVaultV2Maker(uint256 units) public {
@@ -90,8 +91,8 @@ contract LenderCallbackTest is BaseTest {
         Offer memory lenderOffer;
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.callback = address(lenderCallback);
-        lenderOffer.callbackData = abi.encode(uint256(uint160(address(vault))), WithdrawType.VaultV2);
+        lenderOffer.callback = address(vaultLenderCallback);
+        lenderOffer.callbackData = abi.encode(address(vault));
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
@@ -125,8 +126,8 @@ contract LenderCallbackTest is BaseTest {
         midnight.take(
             units,
             lender,
-            address(lenderCallback),
-            abi.encode(bytes32(uint256(uint160(address(vault)))), WithdrawType.VaultV2),
+            address(vaultLenderCallback),
+            abi.encode(address(vault)),
             address(0),
             borrowerOffer,
             sig([borrowerOffer]),
@@ -137,6 +138,77 @@ contract LenderCallbackTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), units);
         assertEq(midnight.debtOf(id, borrower), units);
         assertEq(loanToken.balanceOf(address(vault)), 0);
+    }
+
+    function testOnBuyUnauthorized() public {
+        Obligation memory ob;
+        vm.prank(makeAddr("attacker"));
+        vm.expectRevert("unauthorized");
+        vaultLenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
+    }
+
+    function testOnSellReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        vaultLenderCallback.onSell(ob, address(0), 0, 0, 0, "");
+    }
+
+    function testOnLiquidateReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        vaultLenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+    }
+}
+
+contract ObligationLenderCallbackTest is BaseTest {
+    using UtilsLib for uint256;
+
+    ObligationLenderCallback internal obligationLenderCallback;
+    Obligation internal obligation;
+    bytes32 internal id;
+    Offer internal borrowerOffer;
+
+    function setUp() public override {
+        super.setUp();
+
+        obligationLenderCallback = new ObligationLenderCallback(address(midnight));
+
+        obligation.loanToken = address(loanToken);
+        obligation.maturity = block.timestamp + 100;
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle1)
+                })
+            );
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken2),
+                    lltv: 0.75e18,
+                    maxLif: maxLif(0.75e18, 0.25e18),
+                    oracle: address(oracle2)
+                })
+            );
+        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.rcfThreshold = 0;
+
+        id = toId(obligation);
+
+        borrowerOffer.buy = false;
+        borrowerOffer.maker = borrower;
+        borrowerOffer.receiverIfMakerIsSeller = borrower;
+        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.obligation = obligation;
+        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.tick = MAX_TICK;
+    }
+
+    function testConstructor() public view {
+        assertEq(obligationLenderCallback.MIDNIGHT(), address(midnight));
     }
 
     /// @dev Helper to set up obligation2 with lender credit and withdrawable funds.
@@ -168,7 +240,7 @@ contract LenderCallbackTest is BaseTest {
         midnight.repay(obligation2, buyerAssets, borrower);
 
         // Authorize callback to withdraw on behalf of lender.
-        authorize(lender, address(lenderCallback));
+        authorize(lender, address(obligationLenderCallback));
     }
 
     function testOnBuyMidnightMaker(uint256 units) public {
@@ -182,8 +254,8 @@ contract LenderCallbackTest is BaseTest {
         Offer memory lenderOffer;
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.callback = address(lenderCallback);
-        lenderOffer.callbackData = abi.encode(id2, WithdrawType.Midnight);
+        lenderOffer.callback = address(obligationLenderCallback);
+        lenderOffer.callbackData = abi.encode(address(uint160(uint256(id2))));
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
@@ -215,8 +287,8 @@ contract LenderCallbackTest is BaseTest {
         midnight.take(
             units,
             lender,
-            address(lenderCallback),
-            abi.encode(id2, WithdrawType.Midnight),
+            address(obligationLenderCallback),
+            abi.encode(address(uint160(uint256(id2)))),
             address(0),
             borrowerOffer,
             sig([borrowerOffer]),
@@ -233,18 +305,18 @@ contract LenderCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        lenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
     }
 
     function testOnSellReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        lenderCallback.onSell(ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onSell(ob, address(0), 0, 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        lenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+        obligationLenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
     }
 }
