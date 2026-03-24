@@ -76,12 +76,16 @@ function CVL_isHealthy() returns bool {
 }
 
 function CVL_min(uint256 x, uint256 y) returns uint256 {
-    if (x < y) { return x; }
+    if (x < y) {
+        return x;
+    }
     return y;
 }
 
 function CVL_zeroFloorSub(uint256 x, uint256 y) returns uint256 {
-    if (x > y) { return require_uint256(x - y); }
+    if (x > y) {
+        return require_uint256(x - y);
+    }
     return 0;
 }
 
@@ -95,24 +99,27 @@ function CVL_toUint128(uint256 x) returns uint128 {
 persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
     // Identity: a * x / x == a (needed for _updatePosition no-op when lossIndex is synced).
     axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
+
     // Zero 2nd arg: a * 0 / c == 0 (needed for _updatePosition no-op when no slashing delta).
     axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivDown(a, 0, c) == 0;
+
     // Zero 1st arg: 0 * b / c == 0.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivDown(0, b, c) == 0;
+
     // Bounded: floor(a*b/d) <= a when b <= d (prevents toUint128 reverts / vacuity).
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
 }
 
 // ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
 persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
     // Zero 2nd arg: ceil(a * 0 / c) == 0 (needed for _updatePosition no-op).
     axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivUp(a, 0, c) == 0;
+
     // Zero 1st arg: ceil(0 * b / c) == 0.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivUp(0, b, c) == 0;
+
     // Bounded: ceil(a*b/d) <= a when b <= d (prevents pendingFee underflow / vacuity).
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
