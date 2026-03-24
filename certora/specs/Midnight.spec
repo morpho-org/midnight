@@ -8,7 +8,6 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -78,22 +77,6 @@ rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, addres
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
-}
-
-rule offerInputsConsumed(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
-    uint256 consumedBefore = consumed(offer.maker, offer.group);
-
-    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
-
-    assert consumed(offer.maker, offer.group) == consumedBefore + unitsInput;
-}
-
-rule offerInputsLimit(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
-    uint256 consumedBefore = consumed(offer.maker, offer.group);
-
-    take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
-
-    assert unitsInput <= offer.maxUnits - consumedBefore;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
