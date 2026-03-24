@@ -15,6 +15,7 @@ rule pendingFeeScaleSameAsSubtractMulDivUp(uint256 pendingFee, uint256 credit, u
 }
 
 rule pendingFeeScaleDoesntRevert(uint256 pendingFee, uint256 credit, uint256 newCredit) {
+    require credit > 0, "the computation is skipped when credit is zero";
     require pendingFee < 2 ^ 128, "pending fee is stored on 128 bits";
     require newCredit < 2 ^ 128, "credit is stored on 128 bits";
     PendingFeeComputations.scaleDown@withrevert(pendingFee, credit, newCredit);
@@ -22,6 +23,7 @@ rule pendingFeeScaleDoesntRevert(uint256 pendingFee, uint256 credit, uint256 new
 }
 
 rule pendingFeeSubtractProportionalUpDoesntRevert(uint256 pendingFee, uint256 credit, uint256 newCredit) {
+    require credit > 0, "the computation is skipped when credit is zero";
     require pendingFee < 2 ^ 128, "pending fee is stored on 128 bits";
     require credit < 2 ^ 128, "credit is stored on 128 bits";
     require pendingFee <= credit, "see invariant pendingFeeBoundedByCredit";
