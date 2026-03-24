@@ -44,6 +44,7 @@ library EventsLib {
         uint256 units,
         address indexed onBehalf,
         address indexed receiver,
+        uint256 credit,
         uint256 pendingFee
     );
     event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf);

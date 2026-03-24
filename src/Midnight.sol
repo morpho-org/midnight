@@ -349,7 +349,7 @@ contract Midnight is IMidnight {
         _obligationState.withdrawable -= units;
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.pendingFee);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.credit, _position.pendingFee);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
