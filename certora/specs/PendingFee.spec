@@ -12,9 +12,6 @@ methods {
 
 rule pendingFeeScaleSameAsSubtractMulDivUp(uint256 pendingFee, uint256 credit, uint256 newCredit) {
     require credit > 0, "the computation is skipped when credit is zero";
-    require newCredit <= credit, "see invariant pendingFeeIsSmallerThanCredit";
+    require newCredit <= credit, "see invariant pendingFeeBoundedByCredit";
     assert PendingFeeComputations.subtractProportionalUp(pendingFee, credit, newCredit) == PendingFeeComputations.scaleDown(pendingFee, credit, newCredit);
 }
-
-invariant pendingFeeIsSmallerThanCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user);
