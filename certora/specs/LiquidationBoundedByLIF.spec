@@ -17,7 +17,7 @@ methods {
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    
+
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
 }
 
