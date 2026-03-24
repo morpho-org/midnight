@@ -10,43 +10,18 @@ methods {
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationState(bytes32 id) external returns (uint128, uint128, uint256, bool, uint32) envfree;
 
-    // Assembly-free math: avoids bitwise overapproximation in SMT.
-    function UtilsLib.min(uint256 x, uint256 y) internal returns (uint256) => CVL_min(x, y);
-    function UtilsLib.zeroFloorSub(uint256 x, uint256 y) internal returns (uint256) => CVL_zeroFloorSub(x, y);
-    function UtilsLib.toUint128(uint256 x) internal returns (uint128) => CVL_toUint128(x);
-
     // Ghost summaries: removes all nonlinear arithmetic from SMT. Axioms capture only the
     // properties needed for the split proof (identity, zero-input, boundedness).
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
-
-    // No reentrancy: token transfers and callbacks summarized away.
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-
-    function _.price() external => NONDET;
-
-    // Gate functions: irrelevant to split property, CONSTANT ensures deterministic gating across all 3 take calls.
-    function _.canIncreaseCredit(address) external => CONSTANT;
-    function _.canIncreaseDebt(address) external => CONSTANT;
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
-    // Merkle proof: irrelevant to asset computation, removes hashing loop.
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
     function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
-
-    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
-
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => CVL_signer();
-
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CVL_isHealthy();
 }
 
 /// GHOSTS ///
