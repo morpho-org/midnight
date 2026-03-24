@@ -107,6 +107,18 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
         requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
     }
 
+    preserved liquidate(
+        Midnight.Obligation obligation,
+        uint256 collateralIndex,
+        uint256 seizedAssets,
+        uint256 repaidUnits,
+        address borrower,
+        bytes data
+    ) with (env e) {
+        requireInvariant preciseCreditCorrect(id, borrower);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
+    }
+
     preserved take(
         uint256 obligationUnits,
         address taker,
