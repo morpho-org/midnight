@@ -547,6 +547,7 @@ contract Midnight is IMidnight {
         emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
+    /// @dev Authorized addresses can authorize other addresses to act on their behalf so it should be used carefully.
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         isAuthorized[onBehalf][authorized] = newIsAuthorized;

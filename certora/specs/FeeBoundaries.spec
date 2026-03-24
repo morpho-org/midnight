@@ -53,7 +53,7 @@ invariant obligationFeePerIndexBound(bytes32 id, uint256 index)
         preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) with (env e) {
             requireInvariant defaultFeePerIndexBound(obligation.loanToken, index);
         }
-        preserved take(uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
             requireInvariant defaultFeePerIndexBound(offer.obligation.loanToken, index);
         }
     }
