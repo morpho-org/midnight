@@ -5,6 +5,9 @@ methods {
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
+    // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
+    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
+
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
