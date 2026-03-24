@@ -13,3 +13,19 @@ methods {
 rule pendingFeeScaleSameAsSubtractMulDivUp(uint256 pendingFee, uint256 credit, uint256 newCredit) {
     assert PendingFeeComputations.subtractProportionalUp(pendingFee, credit, newCredit) == PendingFeeComputations.scaleDown(pendingFee, credit, newCredit);
 }
+
+rule pendingFeeScaleDoesntRevert(uint256 pendingFee, uint256 credit, uint256 newCredit) {
+    require pendingFee < 2 ^ 128, "pending fee is stored on 128 bits";
+    require newCredit < 2 ^ 128, "credit is stored on 128 bits";
+    PendingFeeComputations.scaleDown@withrevert(pendingFee, credit, newCredit);
+    assert !lastReverted;
+}
+
+rule pendingFeeSubtractProportionalUpDoesntRevert(uint256 pendingFee, uint256 credit, uint256 newCredit) {
+    require pendingFee < 2 ^ 128, "pending fee is stored on 128 bits";
+    require credit < 2 ^ 128, "credit is stored on 128 bits";
+    require pendingFee <= credit, "see invariant pendingFeeBoundedByCredit";
+    require newCredit <= credit, "subtractProportionalUp is used on decreasing credit";
+    PendingFeeComputations.subtractProportionalUp@withrevert(pendingFee, credit, newCredit);
+    assert !lastReverted;
+}
