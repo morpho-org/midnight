@@ -306,7 +306,11 @@ contract Midnight is IMidnight {
             newConsumed,
             _obligationState.totalUnits,
             buyerPos.pendingFee,
-            sellerPos.pendingFee
+            sellerPos.pendingFee,
+            buyerPos.credit,
+            buyerPos.debt,
+            sellerPos.credit,
+            sellerPos.debt
         );
 
         if (buyerCallback != address(0)) {
