@@ -269,8 +269,8 @@ contract Midnight is IMidnight {
         );
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
         if (sellerPos.credit > 0) {
-            sellerPos.pendingFee -= UtilsLib.toUint128(
-                sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit)
+            sellerPos.pendingFee = UtilsLib.toUint128(
+                sellerPos.pendingFee.mulDivDown(sellerPos.credit - sellerCreditDecrease, sellerPos.credit)
             );
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
@@ -340,7 +340,8 @@ contract Midnight is IMidnight {
 
         Position storage _position = position[id][onBehalf];
         if (_position.credit > 0) {
-            _position.pendingFee -= UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
+            _position.pendingFee =
+                UtilsLib.toUint128(_position.pendingFee.mulDivDown(_position.credit - units, _position.credit));
         }
         _position.credit -= UtilsLib.toUint128(units);
         _obligationState.withdrawable -= units;
@@ -610,7 +611,7 @@ contract Midnight is IMidnight {
             ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - lossIndex)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
-        uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
+        uint256 postSlashPending = credit > 0 ? _pendingFee.mulDivDown(postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
         // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
