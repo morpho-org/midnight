@@ -29,6 +29,7 @@ contract FlashLiquidateCallback {
     }
 
     function onLiquidate(
+        bytes32,
         Obligation memory obligation,
         uint256 collateralIndex,
         uint256 seizedAssets,
