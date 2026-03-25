@@ -130,5 +130,3 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert lastAccrualSeller1 == lastAccrual(ghostId, seller);
     assert creditOfPassiveFeeRecipient1 == creditOf(ghostId, passiveFeeRecipient);
 }
-
-
