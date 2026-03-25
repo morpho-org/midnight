@@ -52,7 +52,7 @@ rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 c
     assert lossIndexChanged <=> badDebtOccurred;
 }
 
-/// LOSS INDEX CANNOT CAUSE REVERTS ///
+/// LOSS INDEX: UPDATE POSITION EFFECTS ///
 
 /// `updatePosition` can only decrease the user's credit through slashing and fee accrual.
 /// This implies that the slash computation does not revert from underflow or overflow, given userLossIndex <= obligationLossIndex and  pendingFee <= credit.
@@ -60,7 +60,7 @@ rule updatePositionDecreasesCredit(env e, Midnight.Obligation obligation, addres
     bytes32 id = summaryToId(obligation);
 
     require obligationCreated(id), "obligation must be created";
-    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex,already proved in Midnight.spec";
+    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
 
