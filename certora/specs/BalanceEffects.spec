@@ -41,7 +41,7 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 }
 
 // All rules in this file assume no accrual and no slash.
-definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].pendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
+definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].microPendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
 
 definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex && currentContract.position[id][user].lossIndex < max_uint128;
 

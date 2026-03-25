@@ -6,7 +6,7 @@ import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_CREDIT} from "./BaseTest.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
 contract WhitelistGate is IEnterGate, ILiquidatorGate {
@@ -93,7 +93,7 @@ contract GateTest is BaseTest {
     // --- Enter gate tests ---
 
     function testEnterGateBlocksNonWhitelistedBuyer(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         collateralize(gatedObligation, borrower, units);
 
         gate.setWhitelisted(borrower, true);
@@ -103,7 +103,7 @@ contract GateTest is BaseTest {
     }
 
     function testEnterGateBlocksNonWhitelistedSeller(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         collateralize(gatedObligation, borrower, units);
 
         gate.setWhitelisted(lender, true);
@@ -113,7 +113,7 @@ contract GateTest is BaseTest {
     }
 
     function testEnterGateAllowsWhitelistedUsers(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         collateralize(gatedObligation, borrower, units);
 
         gate.setWhitelisted(lender, true);
@@ -128,7 +128,7 @@ contract GateTest is BaseTest {
     // --- No gate check on exit  ---
 
     function testNoEnterGateCheckWhenBorrowerIsExitingBorrower(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         gate.setWhitelisted(lender, true);
         gate.setWhitelisted(borrower, true);
         gate.setWhitelisted(otherBorrower, true);
@@ -155,7 +155,7 @@ contract GateTest is BaseTest {
     }
 
     function testNoGateCheckWhenBothExit(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT / 2);
+        units = bound(units, 1, MAX_TEST_CREDIT / 2);
 
         gate.setWhitelisted(otherLender, true);
         gate.setWhitelisted(otherBorrower, true);
@@ -193,7 +193,7 @@ contract GateTest is BaseTest {
     }
 
     function testNoGateCheckOnRepay(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         gate.setWhitelisted(lender, true);
         gate.setWhitelisted(borrower, true);
 
@@ -210,7 +210,7 @@ contract GateTest is BaseTest {
     }
 
     function testNoGateCheckOnWithdraw(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         gate.setWhitelisted(lender, true);
         gate.setWhitelisted(borrower, true);
 
@@ -232,7 +232,7 @@ contract GateTest is BaseTest {
     // --- Liquidator gate tests ---
 
     function testLiquidatorGateOnLiquidation(uint256 units, bool isWhitelisted) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         gate.setWhitelisted(lender, true);
         gate.setWhitelisted(borrower, true);
         gate.setWhitelisted(liquidator, isWhitelisted);
@@ -249,7 +249,7 @@ contract GateTest is BaseTest {
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         gate.setWhitelisted(lender, true);
         gate.setWhitelisted(borrower, true);
         gate.setWhitelisted(liquidator, isWhitelisted);
@@ -267,7 +267,7 @@ contract GateTest is BaseTest {
     // --- Default (no gate) tests ---
 
     function testNoGateMeansUnrestricted(uint256 units) public {
-        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        units = bound(units, 1, MAX_TEST_CREDIT * 3 / 4);
         collateralize(obligation, borrower, units);
 
         Offer memory ungatedLenderOffer;

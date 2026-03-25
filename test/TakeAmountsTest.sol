@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
-import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -88,7 +88,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 5e26);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -106,7 +106,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
+        targetSellerAssets = bound(targetSellerAssets, 1, 5e26);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -126,10 +126,10 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 5e26);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
-        _createPosition(1e36);
+        _createPosition(1e32);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -149,10 +149,10 @@ contract TakeAmountsTest is BaseTest {
         uint256 fee1
     ) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
+        targetSellerAssets = bound(targetSellerAssets, 1, 5e26);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
-        _createPosition(1e36);
+        _createPosition(1e32);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -169,7 +169,7 @@ contract TakeAmountsTest is BaseTest {
 
     function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 5e26);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
@@ -186,9 +186,9 @@ contract TakeAmountsTest is BaseTest {
 
     function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 5e26);
 
-        _createPosition(1e36);
+        _createPosition(1e32);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);

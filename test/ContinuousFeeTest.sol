@@ -7,9 +7,9 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_CREDIT} from "./BaseTest.sol";
 
-uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
+uint256 constant MAX_CREDIT = MAX_TEST_CREDIT / 4;
 
 contract ContinuousFeeTest is BaseTest {
     using UtilsLib for uint256;
@@ -97,6 +97,32 @@ contract ContinuousFeeTest is BaseTest {
         if (expectedFee > 0) {
             assertEq(midnight.creditOf(id, PASSIVE_FEE_RECIPIENT), expectedFee, "fee recipient credit");
         }
+    }
+
+    function testFeeAccrualIgnoresPendingFeeDust() public {
+        uint256 credit = 200;
+        uint256 feeRate = MAX_CONTINUOUS_FEE;
+        uint256 ttm = 365 days;
+
+        setupLender(credit, feeRate, ttm);
+
+        uint256 initialMicroPendingFee = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD);
+        assertEq(initialMicroPendingFee, 1_999_999, "initial micro pending fee");
+        assertEq(midnight.pendingFee(id, lender), 1, "initial pending fee");
+
+        vm.warp(block.timestamp + ttm - 1);
+        midnight.updatePosition(obligation, lender);
+
+        assertEq(midnight.creditOf(id, lender), credit, "credit before maturity");
+        assertEq(midnight.pendingFee(id, lender), 1, "pending before maturity");
+        assertEq(midnight.creditOf(id, PASSIVE_FEE_RECIPIENT), 0, "fee recipient before maturity");
+
+        vm.warp(block.timestamp + 1);
+        midnight.updatePosition(obligation, lender);
+
+        assertEq(midnight.creditOf(id, lender), credit - 1, "credit at maturity");
+        assertEq(midnight.pendingFee(id, lender), 0, "pending at maturity");
+        assertEq(midnight.creditOf(id, PASSIVE_FEE_RECIPIENT), 1, "fee recipient at maturity");
     }
 
     function testAccrualPostMaturity(uint256 credit, uint256 feeRate, uint256 ttm, uint256 extraTime) public {
@@ -314,6 +340,29 @@ contract ContinuousFeeTest is BaseTest {
             midnight.updatePosition(obligation, lender);
             assertEq(midnight.pendingFee(id, lender), 0, "full withdraw stays at zero");
         }
+    }
+
+    function testWithdrawOneDoesNotReducePendingFeeByOne() public {
+        uint256 credit = 10_000;
+        uint256 feeRate = MAX_CONTINUOUS_FEE;
+        uint256 ttm = 365 days;
+
+        setupLender(credit, feeRate, ttm);
+
+        uint256 expectedPending = (uint256(feeRate) * credit).mulDivDown(ttm, WAD);
+        uint256 pendingBefore = midnight.pendingFee(id, lender);
+        assertEq(pendingBefore, expectedPending, "pending before");
+        assertGt(pendingBefore, 0, "pending before");
+
+        deal(address(loanToken), borrower, credit);
+        vm.prank(borrower);
+        midnight.repay(obligation, credit, borrower);
+
+        vm.prank(lender);
+        midnight.withdraw(obligation, 1, lender, lender);
+
+        assertEq(midnight.creditOf(id, lender), credit - 1, "credit after withdraw");
+        assertEq(midnight.pendingFee(id, lender), pendingBefore, "pending unchanged");
     }
 
     function testAccrualAfterSlashReducesPendingFee(

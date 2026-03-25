@@ -22,7 +22,7 @@ contract TakeTest is BaseTest {
     Offer internal otherLenderOffer;
     Offer internal otherBorrowerOffer;
 
-    uint256 internal maxAssets = 1e33; // to refine.
+    uint256 internal maxAssets = type(uint128).max / 1e6;
 
     function setUp() public override {
         super.setUp();

@@ -39,13 +39,13 @@ function summaryUpdatePosition(bytes32 id, address user) {
 
 /// HOOKS ///
 
-hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
+hook Sstore position[KEY bytes32 id][KEY address user].microCredit uint128 newVal (uint128 oldVal) {
     if (!updated[id][user]) {
         creditStoredBeforeUpdate[id][user] = true;
     }
 }
 
-hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
+hook Sload uint128 val position[KEY bytes32 id][KEY address user].microCredit {
     if (!updated[id][user]) {
         creditLoadedBeforeUpdate[id][user] = true;
     }

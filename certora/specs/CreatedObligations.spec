@@ -7,7 +7,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
     function _.price() external => NONDET;
 
-    function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
@@ -116,8 +115,8 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that each obligation state field is empty if the obligation is not created.
-strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => Midnight.totalUnits(id) == 0;
+strong invariant obligationtotalMicroUnitsIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => Midnight.totalMicroUnits(id) == 0;
 
 strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.withdrawable(id) == 0;

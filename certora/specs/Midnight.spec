@@ -133,8 +133,16 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
+strong invariant pendingContinuousMicroFeeBoundedByMicroCredit(bytes32 id, address user)
+    currentContract.position[id][user].microPendingFee <= currentContract.position[id][user].microCredit;
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user);
+    pendingFee(id, user) <= creditOf(id, user)
+{
+    preserved {
+        requireInvariant pendingContinuousMicroFeeBoundedByMicroCredit(id, user);
+    }
+}
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);

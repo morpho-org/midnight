@@ -45,7 +45,7 @@ struct Signature {
 }
 
 struct ObligationState {
-    uint128 totalUnits;
+    uint128 totalMicroUnits;
     uint128 lossIndex;
     uint256 withdrawable;
     bool created;
@@ -54,8 +54,8 @@ struct ObligationState {
 }
 
 struct Position {
-    uint128 credit;
-    uint128 pendingFee;
+    uint128 microCredit;
+    uint128 microPendingFee;
     uint128 lossIndex;
     uint128 lastAccrual;
     uint128 debt;
