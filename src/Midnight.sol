@@ -604,13 +604,14 @@ contract Midnight is IMidnight {
         view
         returns (uint128, uint128, uint128)
     {
-        (uint128 newMicroCredit, uint128 newMicroPending, uint128 accruedMicroFee) =
+        (uint128 newMicroCredit, uint128 newMicroPending, uint128 accruedFee) =
             _updatePositionView(obligation, id, user);
-        return (newMicroCredit / 1e6, newMicroPending / 1e6, accruedMicroFee / 1e6);
+        return (newMicroCredit / 1e6, newMicroPending / 1e6, accruedFee);
     }
 
     /// @dev Expects the id to correspond to the obligation's id.
-    /// @dev Returns the new micro credit, new micro pending fee, and accrued micro fee after having updated the
+    /// @dev Returns the new micro credit, new micro pending fee, and accrued fee in whole units after having updated
+    /// the
     /// position.
     /// @dev Only accrues fee on multiples of 1e6.
     function _updatePositionView(Obligation memory obligation, bytes32 id, address user)
@@ -630,15 +631,15 @@ contract Midnight is IMidnight {
             : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
-        // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
-        uint128 microFee = _lastAccrual < obligation.maturity
+        // forge-lint: disable-next-item(unsafe-typecast) as fee <= postSlashMicroPendingFee / 1e6 <= type(uint128).max
+        uint128 fee = _lastAccrual < obligation.maturity
             ? uint128(
                 (postSlashMicroPendingFee / 1e6)
-                    .mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual) * 1e6
+                .mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual)
             )
             : 0;
         // forge-lint: disable-next-item(unsafe-typecast) as credit and pending are <= uint128 position fields
-        return (uint128(postSlashMicroCredit) - microFee, uint128(postSlashMicroPendingFee) - microFee, microFee);
+        return (uint128(postSlashMicroCredit) - fee * 1e6, uint128(postSlashMicroPendingFee) - fee * 1e6, fee);
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
@@ -652,7 +653,7 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the obligation's id.
     function _updatePosition(Obligation memory obligation, bytes32 id, address user) internal {
         Position storage _position = position[id][user];
-        (uint128 newMicroCredit, uint128 newMicroPending, uint128 accruedMicroFee) =
+        (uint128 newMicroCredit, uint128 newMicroPending, uint128 accruedFee) =
             _updatePositionView(obligation, id, user);
 
         _position.microCredit = newMicroCredit;
@@ -661,9 +662,9 @@ contract Midnight is IMidnight {
         _position.lastAccrual = uint128(block.timestamp);
         // The passive fee recipient's credit is increased without slashing them first, meaning that they will get
         // slashed a bit too much later.
-        position[id][PASSIVE_FEE_RECIPIENT].microCredit += accruedMicroFee;
+        position[id][PASSIVE_FEE_RECIPIENT].microCredit += accruedFee * 1e6;
 
-        emit EventsLib.UpdatePosition(id, user, newMicroCredit / 1e6, newMicroPending / 1e6, accruedMicroFee / 1e6);
+        emit EventsLib.UpdatePosition(id, user, newMicroCredit / 1e6, newMicroPending / 1e6, accruedFee);
     }
 
     /// OTHER VIEW FUNCTIONS ///
