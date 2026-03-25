@@ -625,20 +625,19 @@ contract Midnight is IMidnight {
             ? microCredit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - lossIndex)
             : 0;
         uint128 _microPendingFee = _position.microPendingFee;
-        uint256 postSlashMicroPendingFee = microCredit > 0
+        uint256 postSlashMicroPending = microCredit > 0
             ? _microPendingFee - _microPendingFee.mulDivUp(microCredit - postSlashMicroCredit, microCredit)
             : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
-        // forge-lint: disable-next-item(unsafe-typecast) as postSlashMicroPendingFee <= type(uint128).max
+        // forge-lint: disable-next-item(unsafe-typecast) as postSlashMicroPending <= type(uint128).max
         uint128 fee = _lastAccrual < obligation.maturity
             ? uint128(
-                (postSlashMicroPendingFee / 1e6)
-                .mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual)
+                (postSlashMicroPending / 1e6).mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual)
             )
             : 0;
         // forge-lint: disable-next-item(unsafe-typecast) as credit and pending are <= uint128 position fields
-        return (uint128(postSlashMicroCredit) - fee * 1e6, uint128(postSlashMicroPendingFee) - fee * 1e6, fee);
+        return (uint128(postSlashMicroCredit) - fee * 1e6, uint128(postSlashMicroPending) - fee * 1e6, fee);
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
