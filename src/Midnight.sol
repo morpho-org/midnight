@@ -670,17 +670,6 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Obligation));
     }
 
-    function creditAfterSlashing(bytes32 id, address user) public view returns (uint256) {
-        Position storage _position = position[id][user];
-        uint128 _userLossIndex = _position.lossIndex;
-        uint128 lossIndex = obligationState[id].lossIndex;
-        if (_userLossIndex != lossIndex && _userLossIndex != 0) {
-            return _position.credit.mulDivDown(lossIndex, _userLossIndex);
-        } else {
-            return _position.credit;
-        }
-    }
-
     function creditOf(bytes32 id, address user) external view returns (uint256) {
         return position[id][user].credit;
     }
