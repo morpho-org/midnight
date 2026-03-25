@@ -36,8 +36,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral and debt is type(uint128).max (~1e38).
-/// @dev The max amount of microCredit and microPendingFee is type(uint128).max / 1e6 (~1e32).
-///
+/// @dev The max amount of credit and pending fee is type(uint128).max / 1e6 (~1e32) since both are stored in micro
+/// unitns.
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 ///
@@ -611,8 +611,7 @@ contract Midnight is IMidnight {
 
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev Returns the new micro credit, new micro pending fee, and accrued fee in whole units after having updated
-    /// the
-    /// position.
+    /// the position.
     /// @dev Only accrues fee on multiples of 1e6.
     function _updatePositionView(Obligation memory obligation, bytes32 id, address user)
         internal
@@ -631,7 +630,7 @@ contract Midnight is IMidnight {
             : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
-        // forge-lint: disable-next-item(unsafe-typecast) as fee <= postSlashMicroPendingFee / 1e6 <= type(uint128).max
+        // forge-lint: disable-next-item(unsafe-typecast) as postSlashMicroPendingFee <= type(uint128).max
         uint128 fee = _lastAccrual < obligation.maturity
             ? uint128(
                 (postSlashMicroPendingFee / 1e6)
