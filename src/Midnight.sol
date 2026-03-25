@@ -36,7 +36,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of collateral and debt is type(uint128).max (~1e38).
-/// @dev The max amount of microCredit, microPendingFee, and totalMicroUnits is type(uint128).max / 1e6 (~1e32).
+/// @dev The max amount of totalUnits, microCredit, and microPendingFee is type(uint128).max / 1e6 (~1e32).
 ///
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -262,22 +262,22 @@ contract Midnight is IMidnight {
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
-        uint256 buyerMicroCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt) * 1e6;
-        uint256 sellerMicroCreditDecrease = UtilsLib.min(units, sellerPos.microCredit / 1e6) * 1e6;
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerMicroCreditIncrease / 1e6);
+        uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
+        uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.microCredit / 1e6);
+        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         buyerPos.microPendingFee += UtilsLib.toUint128(
-            (buyerMicroCreditIncrease).mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
+            (buyerCreditIncrease * 1e6).mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
         );
-        buyerPos.microCredit += UtilsLib.toUint128(buyerMicroCreditIncrease);
+        buyerPos.microCredit += UtilsLib.toUint128(buyerCreditIncrease * 1e6);
         if (sellerPos.microCredit > 0) {
             sellerPos.microPendingFee -= UtilsLib.toUint128(
-                sellerPos.microPendingFee.mulDivUp(sellerMicroCreditDecrease, sellerPos.microCredit)
+                sellerPos.microPendingFee.mulDivUp(sellerCreditDecrease * 1e6, sellerPos.microCredit)
             );
         }
-        sellerPos.microCredit -= UtilsLib.toUint128(sellerMicroCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(units - sellerMicroCreditDecrease / 1e6);
-        _obligationState.totalMicroUnits =
-            UtilsLib.toUint128(_obligationState.totalMicroUnits + buyerMicroCreditIncrease - sellerMicroCreditDecrease);
+        sellerPos.microCredit -= UtilsLib.toUint128(sellerCreditDecrease * 1e6);
+        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
+        _obligationState.totalUnits =
+            UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.microPendingFee <= buyerPos.microCredit, "buyer pendingFee exceeds credit");
         if (offer.exitOnly) require(offer.buy ? buyerPos.microCredit < 1e6 : sellerPos.debt == 0, "crossed");
@@ -305,7 +305,7 @@ contract Midnight is IMidnight {
             receiver,
             offer.group,
             newConsumed,
-            _obligationState.totalMicroUnits / 1e6,
+            _obligationState.totalUnits,
             buyerPos.microPendingFee / 1e6,
             sellerPos.microPendingFee / 1e6
         );
@@ -347,7 +347,7 @@ contract Midnight is IMidnight {
         }
         _position.microCredit -= UtilsLib.toUint128(units * 1e6);
         _obligationState.withdrawable -= units;
-        _obligationState.totalMicroUnits -= UtilsLib.toUint128(units * 1e6);
+        _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.microPendingFee / 1e6);
 
@@ -467,13 +467,13 @@ contract Midnight is IMidnight {
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
-            uint256 oldtotalMicroUnits = _obligationState.totalMicroUnits;
+            uint256 oldTotalUnits = _obligationState.totalUnits;
             _obligationState.lossIndex = UtilsLib.toUint128(
                 type(uint128).max
                     - (type(uint128).max - _obligationState.lossIndex)
-                    .mulDivDown(oldtotalMicroUnits - badDebt * 1e6, oldtotalMicroUnits)
+                    .mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
             );
-            _obligationState.totalMicroUnits -= UtilsLib.toUint128(badDebt * 1e6);
+            _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
@@ -701,7 +701,7 @@ contract Midnight is IMidnight {
     }
 
     function totalUnits(bytes32 id) external view returns (uint256) {
-        return obligationState[id].totalMicroUnits / 1e6;
+        return obligationState[id].totalUnits;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {

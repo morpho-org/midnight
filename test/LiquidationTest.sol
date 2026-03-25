@@ -293,12 +293,11 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
-        (uint128 oldTotalMicroUnits, uint256 previousLossIndex,,,) = midnight.obligationState(id);
+        (uint128 oldTotalUnits, uint256 previousLossIndex,,,) = midnight.obligationState(id);
         uint256 expectedLossIndex = expectedBadDebt == 0
             ? previousLossIndex
             : type(uint128).max
-                - (type(uint128).max - previousLossIndex)
-                .mulDivDown(oldTotalMicroUnits - expectedBadDebt * 1e6, oldTotalMicroUnits);
+                - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(address(this), id, 0, 0, 0, borrower, expectedBadDebt, expectedLossIndex);

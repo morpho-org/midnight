@@ -45,7 +45,7 @@ struct Signature {
 }
 
 struct ObligationState {
-    uint128 totalMicroUnits;
+    uint128 totalUnits;
     uint128 lossIndex;
     uint256 withdrawable;
     bool created;
