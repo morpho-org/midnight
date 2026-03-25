@@ -26,12 +26,6 @@ methods {
 
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Callbacks and transfers do not affect return values; NONDET removes external call complexity.
-    function _.onBuy(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 /// GHOSTS ///
