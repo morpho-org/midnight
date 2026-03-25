@@ -6,6 +6,7 @@ import {Obligation} from "./IMidnight.sol";
 
 interface ICallbacks {
     function onBuy(
+        bytes32 obligationId,
         Obligation memory obligation,
         address buyer,
         uint256 buyerAssets,
@@ -14,6 +15,7 @@ interface ICallbacks {
         bytes memory data
     ) external;
     function onSell(
+        bytes32 obligationId,
         Obligation memory obligation,
         address seller,
         uint256 buyerAssets,
@@ -22,6 +24,7 @@ interface ICallbacks {
         bytes memory data
     ) external;
     function onLiquidate(
+        bytes32 obligationId,
         Obligation memory obligation,
         uint256 collateralIndex,
         uint256 seizedAssets,

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -835,7 +836,16 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collaterals[0].lltv, WAD);
     }
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256 _repaidUnits, address, bytes memory data) public {
+    function onLiquidate(
+        bytes32 obligationId,
+        Obligation memory _obligation,
+        uint256,
+        uint256,
+        uint256 _repaidUnits,
+        address,
+        bytes memory data
+    ) public {
+        require(obligationId == IdLib.toId(_obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedRepaidUnits = _repaidUnits;
         recordedData = data;
     }
