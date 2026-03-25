@@ -539,49 +539,29 @@ contract TakeTest is BaseTest {
         take(100, borrower, lenderOffer);
     }
 
-    function testBuyUnhealthy(uint256 units, uint256 tick, uint256 collateralAmount) public {
+    function testBuyUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
         units = bound(units, BALANCE_DECIMALS, maxAssets);
+        collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 0, MAX_TICK);
-        // Max collateral that still leaves the position unhealthy.
-        uint256 maxCollateral =
-            (units - 1).mulDivDown(WAD, obligation.collaterals[0].lltv).mulDivDown(1, BALANCE_DECIMALS);
-        collateralAmount = bound(collateralAmount, 0, maxCollateral);
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD).mulDivUp(1, BALANCE_DECIMALS));
-        if (collateralAmount > 0) {
-            address cToken = obligation.collaterals[0].token;
-            deal(cToken, borrower, collateralAmount);
-            vm.prank(borrower);
-            ERC20(cToken).approve(address(midnight), collateralAmount);
-            vm.prank(borrower);
-            midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
-        }
+        collateralize(obligation, borrower, collateralized);
 
         vm.expectRevert("seller is unhealthy");
         take(units, lender, borrowerOffer);
     }
 
-    function testSellUnhealthy(uint256 units, uint256 tick, uint256 collateralAmount) public {
+    function testSellUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
         units = bound(units, BALANCE_DECIMALS, maxAssets);
+        collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 0, MAX_TICK);
-        // Max collateral that still leaves the position unhealthy.
-        uint256 maxCollateral =
-            (units - 1).mulDivDown(WAD, obligation.collaterals[0].lltv).mulDivDown(1, BALANCE_DECIMALS);
-        collateralAmount = bound(collateralAmount, 0, maxCollateral);
         lenderOffer.maxUnits = units;
         lenderOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD).mulDivDown(1, BALANCE_DECIMALS));
-        if (collateralAmount > 0) {
-            address cToken = obligation.collaterals[0].token;
-            deal(cToken, borrower, collateralAmount);
-            vm.prank(borrower);
-            ERC20(cToken).approve(address(midnight), collateralAmount);
-            vm.prank(borrower);
-            midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
-        }
+        collateralize(obligation, borrower, collateralized);
 
         vm.expectRevert("seller is unhealthy");
         take(units, borrower, lenderOffer);

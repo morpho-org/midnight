@@ -6,7 +6,7 @@ import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {WAD, BALANCE_DECIMALS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 
 contract TakeAmountsTest is BaseTest {
@@ -88,7 +88,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, MAX_TEST_AMOUNT);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -106,7 +106,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e24);
+        targetSellerAssets = bound(targetSellerAssets, 1, MAX_TEST_AMOUNT);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -126,7 +126,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e24);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, MAX_TEST_AMOUNT);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
@@ -149,7 +149,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 fee1
     ) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, 1e24);
+        targetSellerAssets = bound(targetSellerAssets, 1, MAX_TEST_AMOUNT);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
