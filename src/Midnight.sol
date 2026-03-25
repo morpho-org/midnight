@@ -279,7 +279,7 @@ contract Midnight is IMidnight {
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
-        require(_obligationState.totalUnits * 1e6 <= type(uint128).max, "pending fee can exceed max credit");
+        require(_obligationState.totalUnits <= type(uint128).max / 1e6, "passive fee could overflow");
         require(buyerPos.microPendingFee <= buyerPos.microCredit, "buyer pendingFee exceeds credit");
         if (offer.exitOnly) require(offer.buy ? buyerPos.microCredit < 1e6 : sellerPos.debt == 0, "crossed");
 

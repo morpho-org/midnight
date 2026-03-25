@@ -130,13 +130,14 @@ contract TakeTest is BaseTest {
 
     function testTakeRevertWhenPassiveFeeCreditCouldOverflow() public {
         borrowerOffer.tick = 0;
-        deal(address(loanToken), lender, maxAssets + 1);
+        deal(address(loanToken), lender, maxAssets);
+        deal(address(loanToken), otherLender, 1);
         collateralize(obligation, borrower, maxAssets + 1);
 
         take(maxAssets, lender, borrowerOffer);
 
-        vm.expectRevert("passive fee credit overflow");
-        take(1, lender, borrowerOffer);
+        vm.expectRevert("passive fee could overflow");
+        take(1, otherLender, borrowerOffer);
     }
 
     // path 2: Lender enters + lender exits.
