@@ -138,11 +138,11 @@ strong invariant pendingContinuousMicroFeeBoundedByMicroCredit(bytes32 id, addre
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= creditOf(id, user)
-{
-    preserved {
-        requireInvariant pendingContinuousMicroFeeBoundedByMicroCredit(id, user);
+    {
+        preserved {
+            requireInvariant pendingContinuousMicroFeeBoundedByMicroCredit(id, user);
+        }
     }
-}
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
