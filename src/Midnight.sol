@@ -35,9 +35,8 @@ import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
-/// @dev The max amount of totalUnits, collateral and debt is type(uint128).max (~1e38).
-/// @dev The max amount of credit and pending fee is type(uint128).max / 1e6 (~1e32) since both are stored in micro
-/// unitns.
+/// @dev The max amount of collateral and debt is type(uint128).max (~1e38).
+/// @dev The max amount of totalUnits, credit and pending fee is type(uint128).max / 1e6 (~1e32).
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
 ///
@@ -308,7 +307,9 @@ contract Midnight is IMidnight {
             newConsumed,
             _obligationState.totalUnits,
             buyerPos.microPendingFee,
-            sellerPos.microPendingFee
+            sellerPos.microPendingFee,
+            buyerCreditIncrease * 1e6,
+            sellerCreditDecrease * 1e6
         );
 
         if (buyerCallback != address(0)) {

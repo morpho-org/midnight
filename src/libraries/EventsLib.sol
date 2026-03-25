@@ -37,7 +37,9 @@ library EventsLib {
         uint256 consumed,
         uint256 totalUnits,
         uint256 buyerMicroPendingFee,
-        uint256 sellerMicroPendingFee
+        uint256 sellerMicroPendingFee,
+        uint256 buyerMicroCreditIncrease,
+        uint256 sellerMicroCreditDecrease
     );
     event Withdraw(
         address caller,

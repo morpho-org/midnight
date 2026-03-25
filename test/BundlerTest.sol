@@ -218,8 +218,13 @@ contract BundlerTest is BaseTest {
 
         _authorizeBundler();
 
-        // Splitting across offers can cause up to 1 extra unit of debt due to rounding.
-        if (fromOffer0 >= units || offerUnits1 >= units + 1 - fromOffer0) {
+        // Mirror the bundler's exact fill logic to derive units needed from offer1.
+        // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
+        // neededFromOffer1 = 0.
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 filledSellerAssets0 = fromOffer0.mulDivDown(sellerPrice, WAD);
+        uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
+        if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
             takeBundler.bundleTakeSellerAssets(
                 midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
