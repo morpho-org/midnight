@@ -5,7 +5,7 @@ methods {
 
     function _.price() external => CVL_price(calledContract) expect(uint256);
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
-    function UtilsLib.msb(uint256 bitmap) internal returns (uint256) => CVL_msb(bitmap);
+    function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => CVL_msb(bitmap);
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
 }
@@ -25,7 +25,7 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 
 // UtilsLib summaries: msb, mulDivDown, and mulDivUp are deterministic
 
-ghost CVL_msb(uint256) returns uint256;
+ghost CVL_msb(uint128) returns uint256;
 
 ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
 
