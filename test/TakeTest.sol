@@ -128,6 +128,17 @@ contract TakeTest is BaseTest {
         assertEq(midnight.consumed(lender, lenderOffer.group), units, "consumed");
     }
 
+    function testTakeRevertWhenPassiveFeeCreditCouldOverflow() public {
+        borrowerOffer.tick = 0;
+        deal(address(loanToken), lender, maxAssets + 1);
+        collateralize(obligation, borrower, maxAssets + 1);
+
+        take(maxAssets, lender, borrowerOffer);
+
+        vm.expectRevert("passive fee credit overflow");
+        take(1, lender, borrowerOffer);
+    }
+
     // path 2: Lender enters + lender exits.
 
     function testBuy2(uint256 units, uint256 tick, uint256 otherLenderUnits) public {

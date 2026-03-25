@@ -279,6 +279,7 @@ contract Midnight is IMidnight {
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
+        require(_obligationState.totalUnits * 1e6 <= type(uint128).max, "pending fee can exceed max credit");
         require(buyerPos.microPendingFee <= buyerPos.microCredit, "buyer pendingFee exceeds credit");
         if (offer.exitOnly) require(offer.buy ? buyerPos.microCredit < 1e6 : sellerPos.debt == 0, "crossed");
 
@@ -306,8 +307,8 @@ contract Midnight is IMidnight {
             offer.group,
             newConsumed,
             _obligationState.totalUnits,
-            buyerPos.microPendingFee / 1e6,
-            sellerPos.microPendingFee / 1e6
+            buyerPos.microPendingFee,
+            sellerPos.microPendingFee
         );
 
         if (buyerCallback != address(0)) {
@@ -349,7 +350,7 @@ contract Midnight is IMidnight {
         _obligationState.withdrawable -= units;
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.microPendingFee / 1e6);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.microPendingFee);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
@@ -662,7 +663,7 @@ contract Midnight is IMidnight {
         // slashed a bit too much later.
         position[id][PASSIVE_FEE_RECIPIENT].microCredit += accruedFee * 1e6;
 
-        emit EventsLib.UpdatePosition(id, user, newMicroCredit / 1e6, newMicroPending / 1e6, accruedFee);
+        emit EventsLib.UpdatePosition(id, user, newMicroCredit, newMicroPending, accruedFee);
     }
 
     /// OTHER VIEW FUNCTIONS ///

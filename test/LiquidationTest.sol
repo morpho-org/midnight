@@ -313,10 +313,11 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
 
         (, uint256 lossIndex,,,) = midnight.obligationState(id);
+        uint256 expectedMicroCredit = (units * 1e6).mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
-        emit EventsLib.UpdatePosition(id, lender, expectedCredit, 0, 0);
+        emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, 0, 0);
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");

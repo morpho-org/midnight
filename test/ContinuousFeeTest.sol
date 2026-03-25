@@ -72,14 +72,17 @@ contract ContinuousFeeTest is BaseTest {
 
         setupLender(credit, feeRate, ttm);
         uint256 remaining = midnight.pendingFee(id, lender);
+        uint256 initialMicroPendingFee = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD);
 
         vm.warp(block.timestamp + elapsed);
         uint256 expectedFee = remaining.mulDivDown(elapsed, ttm);
+        uint256 expectedMicroCredit = credit * 1e6 - expectedFee * 1e6;
+        uint256 expectedMicroPendingFee = initialMicroPendingFee - expectedFee * 1e6;
 
         // Via withdraw(0)
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, credit - expectedFee, remaining - expectedFee, expectedFee);
+        emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, expectedFee);
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after withdraw");
@@ -88,7 +91,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Via direct call
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, credit - expectedFee, remaining - expectedFee, expectedFee);
+        emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, expectedFee);
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
@@ -134,13 +137,16 @@ contract ContinuousFeeTest is BaseTest {
         setupLender(credit, feeRate, ttm);
         uint256 remaining = midnight.pendingFee(id, lender);
         vm.assume(remaining > 0);
+        uint256 initialMicroPendingFee = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD);
+        uint256 expectedMicroCredit = credit * 1e6 - remaining * 1e6;
+        uint256 expectedMicroPendingFee = initialMicroPendingFee - remaining * 1e6;
 
         vm.warp(obligation.maturity + extraTime);
 
         // Via withdraw(0)
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, credit - remaining, 0, remaining);
+        emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, remaining);
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (withdraw)");
@@ -149,7 +155,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Via direct call
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, credit - remaining, 0, remaining);
+        emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, remaining);
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (direct)");
         assertEq(midnight.pendingFee(id, lender), 0, "remaining is zero (direct)");
@@ -281,7 +287,13 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, creditAfterAccrual, remainingAfterAccrual, feeUnits);
+        emit EventsLib.UpdatePosition(
+            id,
+            lender,
+            credit * 1e6 - feeUnits * 1e6,
+            (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6,
+            feeUnits
+        );
         uint256 expectedRemaining = creditAfterAccrual > 0
             ? remainingAfterAccrual - remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual)
             : 0;
