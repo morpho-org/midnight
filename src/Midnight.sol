@@ -311,7 +311,7 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
-                .onBuy(offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
+                .onBuy(id, offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
         }
 
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
@@ -319,7 +319,7 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
-                .onSell(offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
+                .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
@@ -517,7 +517,8 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.collaterals[collateralIndex].token, msg.sender, seizedAssets);
 
         if (data.length > 0) {
-            ICallbacks(msg.sender).onLiquidate(obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+            ICallbacks(msg.sender)
+                .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
         }
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
@@ -563,7 +564,7 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
-        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
+        bytes32 id = toId(obligation);
         if (!obligationState[id].created) {
             require(obligation.collaterals.length > 0, "no collaterals");
             require(obligation.collaterals.length <= MAX_COLLATERALS, "too many collaterals");
@@ -620,7 +621,7 @@ contract Midnight is IMidnight {
 
     /// @dev Slashes the position and accrues the continuous fee.
     function updatePosition(Obligation memory obligation, address user) external {
-        bytes32 id = IdLib.toId(obligation, block.chainid, address(this));
+        bytes32 id = toId(obligation);
         require(obligationState[id].created, "not created");
         _updatePosition(obligation, id, user);
     }
@@ -656,7 +657,7 @@ contract Midnight is IMidnight {
         return position[id][user].collateral[index];
     }
 
-    function toId(Obligation memory obligation) external view returns (bytes32) {
+    function toId(Obligation memory obligation) public view returns (bytes32) {
         return IdLib.toId(obligation, block.chainid, address(this));
     }
 
