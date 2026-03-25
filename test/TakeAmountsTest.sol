@@ -88,7 +88,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, MAX_TEST_AMOUNT);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30 / BALANCE_DECIMALS);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -106,7 +106,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, MAX_TEST_AMOUNT);
+        targetSellerAssets = bound(targetSellerAssets, 1, 1e30 / BALANCE_DECIMALS);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
@@ -126,7 +126,7 @@ contract TakeAmountsTest is BaseTest {
         public
     {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetBuyerAssets = bound(targetBuyerAssets, 1, MAX_TEST_AMOUNT);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30 / BALANCE_DECIMALS);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
@@ -149,7 +149,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 fee1
     ) public {
         uint256 tradingFee = _setFees(fee0, fee1);
-        targetSellerAssets = bound(targetSellerAssets, 1, MAX_TEST_AMOUNT);
+        targetSellerAssets = bound(targetSellerAssets, 1, 1e30 / BALANCE_DECIMALS);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         _createPosition(1e36);
