@@ -26,10 +26,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 /// LOSS INDEX IS ONLY CHANGED WHEN BAD DEBT HAPPENS ///
 
 /// The obligation's lossIndex is only modified by `liquidate`.
-rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args)
-filtered {
-    f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
-} {
+rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
 
     f(e, args);
