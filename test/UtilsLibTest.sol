@@ -107,6 +107,38 @@ contract UtilsLibTest is Test {
         UtilsLib.toUint128(x);
     }
 
+    function _mask(uint256 bit) internal pure returns (uint128 m) {
+        assembly {
+            m := shl(bit, 1)
+        }
+    }
+
+    function testFuzzSetBit(uint128 bitmap, uint256 bit) public pure {
+        bit = bound(bit, 0, 127);
+        uint128 result = UtilsLib.setBit(bitmap, bit);
+        uint128 m = _mask(bit);
+        assertEq(result & m, m);
+        assertEq(result & ~m, bitmap & ~m);
+    }
+
+    function testFuzzClearBit(uint128 bitmap, uint256 bit) public pure {
+        bit = bound(bit, 0, 127);
+        uint128 result = UtilsLib.clearBit(bitmap, bit);
+        uint128 m = _mask(bit);
+        assertEq(result & m, 0);
+        assertEq(result & ~m, bitmap & ~m);
+    }
+
+    function testFuzzSetBitAboveBounds(uint128 bitmap, uint256 bit) public pure {
+        bit = bound(bit, 128, type(uint256).max);
+        assertEq(UtilsLib.setBit(bitmap, bit), bitmap);
+    }
+
+    function testFuzzClearBitAboveBounds(uint128 bitmap, uint256 bit) public pure {
+        bit = bound(bit, 128, type(uint256).max);
+        assertEq(UtilsLib.clearBit(bitmap, bit), bitmap);
+    }
+
     function mulDivDown(uint256 x, uint256 y, uint256 d) external pure {
         UtilsLib.mulDivDown(x, y, d);
     }
