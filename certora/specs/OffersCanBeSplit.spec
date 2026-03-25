@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -8,29 +10,36 @@ methods {
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function obligationState(bytes32 id) external returns (uint128, uint128, uint256, bool, uint32) envfree;
+    function Utils.passiveFeeRecipient() external returns (address) envfree;
 
-    // Ghost summaries: removes all nonlinear arithmetic from SMT. Axioms capture only the
-    // properties needed for the split proof (identity, zero-input, boundedness).
+    // Axioms capture only the properties needed for the split proof (identity, zero-input, boundedness).
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
-
-    // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
+    // Returns a fixed symbolic id; sound because the rule only involves a single obligation.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
-    // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
+    // Replaces obligation lookup/creation with a fixed id; position update arithmetic is independent of obligation initialization.
     function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
+
+    // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
+
+    // Same (root, sig) on all take calls; CONSTANT ensures identical signer and removes ecrecover complexity.
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => CONSTANT;
+
+    // Read-only health check does not affect position state; removes oracle loop.
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    // Same offer.tick across all take calls; CONSTANT ensures identical return value.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 }
 
 /// GHOSTS ///
 
 persistent ghost bytes32 ghostId;
-
-persistent ghost uint256 ghostTickPrice;
-
-persistent ghost address ghostSignerResult;
 
 /// SUMMARY FUNCTIONS ///
 
@@ -38,39 +47,7 @@ function CVL_toId() returns bytes32 {
     return ghostId;
 }
 
-function CVL_tickToPrice() returns uint256 {
-    return ghostTickPrice;
-}
-
-function CVL_signer() returns address {
-    return ghostSignerResult;
-}
-
-function CVL_isHealthy() returns bool {
-    return true;
-}
-
-function CVL_min(uint256 x, uint256 y) returns uint256 {
-    if (x < y) {
-        return x;
-    }
-    return y;
-}
-
-function CVL_zeroFloorSub(uint256 x, uint256 y) returns uint256 {
-    if (x > y) {
-        return require_uint256(x - y);
-    }
-    return 0;
-}
-
-function CVL_toUint128(uint256 x) returns uint128 {
-    require to_mathint(x) <= to_mathint(max_uint128);
-    return require_uint128(x);
-}
-
 // ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
-// Only the axioms below are assumed — no nonlinear arithmetic in the SMT formula.
 persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
     // Identity: a * x / x == a (needed for _updatePosition no-op when lossIndex is synced).
     axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
@@ -98,23 +75,26 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
+/// pendingFee is excluded: ghost_mulDivDown/Up are not additive (floor/ceil rounding), so
+/// pendingFee can differ by a rounding term between the two paths.
 rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
     // block.timestamp must fit in uint128 (Midnight.sol:640 casts it; checked in Solidity 0.8.31).
-    require to_mathint(e.block.timestamp) < 2 ^ 128;
+    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
 
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
+    address passiveFeeRecipient = Utils.passiveFeeRecipient();
 
-    // Valid obligation state: not fully slashed (Midnight.sol:66 documents this limitation).
+    // Valid obligation state: not fully slashed otherwise it would not function correctly.
     uint128 obLossIndex;
     _, obLossIndex, _, _, _ = obligationState(ghostId);
     require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
 
     // Valid position state: position lossIndex <= obligation lossIndex (monotonicity invariant).
-    require to_mathint(userLossIndex(ghostId, buyer)) <= to_mathint(obLossIndex), "buyer lossIndex consistent";
-    require to_mathint(userLossIndex(ghostId, seller)) <= to_mathint(obLossIndex), "seller lossIndex consistent";
+    require to_mathint(userLossIndex(ghostId, buyer)) <= to_mathint(obLossIndex), "buyer lossIndex consistent, proved in Midnight.spec";
+    require to_mathint(userLossIndex(ghostId, seller)) <= to_mathint(obLossIndex), "seller lossIndex consistent, proved in Midnight.spec";
 
     storage initState = lastStorage;
 
@@ -127,6 +107,11 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint256 debtOfSeller1 = debtOf(ghostId, seller);
     uint256 totalUnits1 = totalUnits(ghostId);
     uint256 consumed1 = consumed(offer.maker, offer.group);
+    uint128 userLossIndexBuyer1 = userLossIndex(ghostId, buyer);
+    uint128 userLossIndexSeller1 = userLossIndex(ghostId, seller);
+    uint128 lastAccrualBuyer1 = lastAccrual(ghostId, buyer);
+    uint128 lastAccrualSeller1 = lastAccrual(ghostId, seller);
+    uint256 creditOfPassiveFeeRecipient1 = creditOf(ghostId, passiveFeeRecipient);
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof) at initState;
@@ -139,4 +124,11 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert debtOfSeller1 == debtOf(ghostId, seller);
     assert totalUnits1 == totalUnits(ghostId);
     assert consumed1 == consumed(offer.maker, offer.group);
+    assert userLossIndexBuyer1 == userLossIndex(ghostId, buyer);
+    assert userLossIndexSeller1 == userLossIndex(ghostId, seller);
+    assert lastAccrualBuyer1 == lastAccrual(ghostId, buyer);
+    assert lastAccrualSeller1 == lastAccrual(ghostId, seller);
+    assert creditOfPassiveFeeRecipient1 == creditOf(ghostId, passiveFeeRecipient);
 }
+
+
