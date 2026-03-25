@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import "BitmapSummaries.spec";
+
 using Utils as Utils;
 
 methods {
@@ -19,11 +21,6 @@ methods {
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-
-    // Bitmap operation summaries (proven in Bitmap.spec, modeled in BitmapSummaries.spec).
-    function UtilsLib.setBit(uint128 bitmap, uint256 bit) internal returns (uint128) => summarySetBit(bitmap, bit);
-    function UtilsLib.clearBit(uint128 bitmap, uint256 bit) internal returns (uint128) => summaryClearBit(bitmap, bit);
-    function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => summaryMsb(bitmap);
 }
 
 /// SUMMARIES ///
@@ -35,37 +32,6 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 persistent ghost summaryPrice(address) returns uint256;
 
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
-
-// Bitmap abstraction (see BitmapSummaries.spec for the proven invariant).
-persistent ghost summaryGetBit(uint128, uint256) returns bool {
-    axiom forall uint256 bit. !summaryGetBit(0, bit);
-}
-
-function summarySetBit(uint128 bitmap, uint256 bit) returns (uint128) {
-    uint128 result;
-    assert bit < 128;
-    require summaryGetBit(result, bit), "see Bitmap.spec";
-    require forall uint256 otherBit. otherBit != bit && otherBit < 128 => summaryGetBit(result, otherBit) == summaryGetBit(bitmap, otherBit), "see Bitmap.spec";
-    return result;
-}
-
-function summaryClearBit(uint128 bitmap, uint256 bit) returns (uint128) {
-    uint128 result;
-    assert bit < 128;
-    require !summaryGetBit(result, bit), "see Bitmap.spec";
-    require forall uint256 otherBit. otherBit != bit && otherBit < 128 => summaryGetBit(result, otherBit) == summaryGetBit(bitmap, otherBit), "see Bitmap.spec";
-    return result;
-}
-
-function summaryMsb(uint128 bitmap) returns (uint256) {
-    uint256 bit;
-    assert bitmap != 0;
-
-    require bit < 128, "see Bitmap.spec";
-    require summaryGetBit(bitmap, bit), "see Bitmap.spec";
-    require forall uint256 otherBit. summaryGetBit(bitmap, otherBit) => otherBit <= bit, "see Bitmap.spec";
-    return bit;
-}
 
 /// INVARIANTS ///
 
