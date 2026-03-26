@@ -33,7 +33,9 @@ library EventsLib {
         uint256 consumed,
         uint256 totalUnits,
         uint256 buyerPendingFee,
-        uint256 sellerPendingFee
+        uint256 sellerPendingFee,
+        uint256 buyerCreditIncrease,
+        uint256 sellerCreditDecrease
     );
     event Withdraw(
         address caller,
