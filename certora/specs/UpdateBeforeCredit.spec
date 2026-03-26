@@ -58,6 +58,7 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
 /// RULES ///
 
 /// Check that credit is never stored before _updatePosition is called.
+/// The SSTOREs of _updatePosition are ignored (see summary above).
 rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> !f.isView } {
     require !creditStoredBeforeUpdate[id][user], "initialize the ghost variable";
 
@@ -67,6 +68,7 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 }
 
 /// Check that credit is never loaded before _updatePosition is called.
+/// The SLOADs of _updatePosition are ignored (see summary above).
 rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
