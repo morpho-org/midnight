@@ -2,6 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
 
     function tradingFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;

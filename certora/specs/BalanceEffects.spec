@@ -2,6 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;

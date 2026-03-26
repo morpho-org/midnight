@@ -2,6 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
 
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
 

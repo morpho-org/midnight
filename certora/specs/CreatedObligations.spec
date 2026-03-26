@@ -5,6 +5,7 @@ using Midnight as Midnight;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
     function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;

@@ -63,4 +63,7 @@ struct Position {
     uint128[128] collateral;
 }
 
-interface IMidnight {}
+interface IMidnight {
+    /// @notice Returns the data stored on the different `slots`.
+    function extSloads(bytes32[] calldata slots) external view returns (bytes32[] memory);
+}

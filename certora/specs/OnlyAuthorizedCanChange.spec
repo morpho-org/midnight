@@ -4,6 +4,7 @@ using Utils as Utils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
 
     function feeRecipient() external returns (address) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;

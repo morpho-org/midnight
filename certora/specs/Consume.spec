@@ -2,6 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
     function _.price() external => NONDET;
 
     function consumed(address user, bytes32 group) external returns (uint256) envfree;

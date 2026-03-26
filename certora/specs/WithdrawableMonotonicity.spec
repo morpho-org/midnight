@@ -2,6 +2,7 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+    function extSloads(bytes32[]) external returns (bytes32[]) => NONDET DELETE;
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
