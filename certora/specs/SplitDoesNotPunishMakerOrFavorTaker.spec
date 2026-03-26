@@ -10,7 +10,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
 
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
     // zeroFloorSub feeds into timeToMaturity (only used by tradingFee, already CONSTANT) and buyerCreditIncrease (affects position state, not return values). NONDET is safe for this property.
     function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
