@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -9,11 +7,9 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
-    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -39,10 +35,6 @@ methods {
 }
 
 /// HELPERS ///
-
-function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
-    return Utils.hashObligation(obligation);
-}
 
 // Under noSlash, all mulDiv calls in _updatePosition hit y == d (identity) or y == 0.
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
