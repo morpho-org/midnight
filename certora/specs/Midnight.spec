@@ -12,6 +12,7 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
@@ -22,7 +23,7 @@ methods {
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
 
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -47,6 +48,12 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
     return Midnight.obligationCreated(summaryToId(obligation));
+}
+
+function signerSummary() returns address {
+    address returnedSigner;
+    require returnedSigner != Utils.passiveFeeRecipient(), "passive fee recipient can't sign";
+    return returnedSigner;
 }
 
 persistent ghost mapping(bytes32 => mathint) sumDebt {
@@ -127,7 +134,49 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
     userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
 
-/// A user cannot have both credit and debt, excluding PASSIVE_FEE_RECIPIENT who receives
-/// credit from fee accrual and could theoretically be a trade participant.
+/// PASSIVE FEE RECIPIENT INVARIANTS ///
+
+/// The passive fee recipient can't authorize another account, because it can't sign
+/// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
+strong invariant feeRecipientCantAuthorize(address authorized)
+    !isAuthorized(Utils.passiveFeeRecipient(), authorized)
+    {
+        preserved with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
+
+/// The passive fee recipient has no pending fee, because they only receive credit via fee accrual
+/// and never participate in take.
+strong invariant feeRecipientHasNoPendingFee(bytes32 id)
+    pendingFee(id, Utils.passiveFeeRecipient()) == 0
+    {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
+
+/// The passive fee recipient has no debt, because they only receive credit via fee accrual
+/// and never participate in take.
+strong invariant feeRecipientHasNoDebt(bytes32 id)
+    debtOf(id, Utils.passiveFeeRecipient()) == 0
+    {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
+
+/// A user cannot have both credit and debt.
+/// This now covers all users including PASSIVE_FEE_RECIPIENT, because we prove
+/// the fee recipient has no debt (feeRecipientHasNoDebt) and can't participate in take.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    user != Utils.passiveFeeRecipient() => (creditOf(id, user) == 0 || debtOf(id, user) == 0);
+    creditOf(id, user) == 0 || debtOf(id, user) == 0
+    {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
