@@ -49,11 +49,12 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 // Under noSlash, all mulDiv calls in _updatePosition hit y == d (identity) or y == 0.
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (x == 0 || y == 0) return 0;
-    if (d > 0 && y == d) return x;
-    uint256 res;
-    require d > 0 && y < d => res <= x;
-    return res;
+    uint256 r;
+    require x == 0 || y == 0 => r == 0;
+    require d > 0 && y == d => r == x;
+    require d > 0 && y <= d => r <= x;
+    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    return r;
 }
 
 // All rules in this file assume no accrual and no slash.
