@@ -636,8 +636,7 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][user];
         (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
 
-        uint128 creditDecrease = _position.credit - newCredit;
-        uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
+        emit EventsLib.UpdatePosition(id, user, _position.credit - newCredit, _position.pendingFee - newPendingFee, accruedFee);
 
         _position.credit = newCredit;
         _position.lossIndex = obligationState[id].lossIndex;
@@ -646,8 +645,6 @@ contract Midnight is IMidnight {
         // The passive fee recipient's credit is increased without slashing them first, meaning that they will get
         // slashed a bit too much later.
         position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
-
-        emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
     }
 
     /// OTHER VIEW FUNCTIONS ///
