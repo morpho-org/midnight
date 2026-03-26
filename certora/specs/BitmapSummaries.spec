@@ -10,7 +10,7 @@ methods {
     function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => summaryMsb(bitmap);
 
     // Summarize internals irrelevant to the properties.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => HAVOC_ECF;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
