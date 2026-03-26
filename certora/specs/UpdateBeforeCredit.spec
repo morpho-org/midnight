@@ -31,22 +31,26 @@ persistent ghost mapping(bytes32 => mapping(address => bool)) creditLoadedBefore
 
 /// SUMMARIES ///
 
-/// Summary for _updatePosition: just sets the updated ghost flag.
-/// The original function body is replaced, so its internal credit reads/writes do not fire hooks.
+/// Summary for _updatePosition: sets the updated ghost flag and resets the SLOAD flag to allow the "guard-then-update" pattern.
 function summaryUpdatePosition(bytes32 id, address user) {
     updated[id][user] = true;
+    creditLoadedBeforeUpdate[id][user] = false;
 }
 
 /// HOOKS ///
 
+/// Credit must not be written before _updatePosition, unless both old and new values are 0.
+/// This flag is never reset: any meaningful write before update is permanently caught.
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && (oldVal != 0 || newVal != 0)) {
         creditStoredBeforeUpdate[id][user] = true;
     }
 }
 
+/// Credit must not be loaded as non-zero before _updatePosition.
+/// If a non-zero credit is loaded and _updatePosition follows, the flag is reset in the summary.
 hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && val != 0) {
         creditLoadedBeforeUpdate[id][user] = true;
     }
 }
@@ -54,7 +58,6 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
 /// RULES ///
 
 /// Check that credit is never stored before _updatePosition is called.
-/// The SSTOREs of _updatePosition are ignored (see summary above).
 rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> !f.isView } {
     require !creditStoredBeforeUpdate[id][user], "initialize the ghost variable";
 
@@ -64,7 +67,6 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 }
 
 /// Check that credit is never loaded before _updatePosition is called.
-/// The SLOADs of _updatePosition are ignored (see summary above).
 rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
