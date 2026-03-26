@@ -20,6 +20,8 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+    function UtilsLib.setBit(uint128, uint256) internal returns (uint128) => NONDET;
+    function UtilsLib.clearBit(uint128, uint256) internal returns (uint128) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -58,7 +60,7 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 // All rules in this file assume no accrual and no slash.
 definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].pendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
 
-definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex && currentContract.obligationState[id].lossIndex > 0;
+definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex || currentContract.position[id][user].lossIndex == 0;
 
 /// REPAY ///
 
