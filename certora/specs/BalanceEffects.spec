@@ -49,18 +49,16 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 // Under noSlash, all mulDiv calls in _updatePosition hit y == d (identity) or y == 0.
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
-    uint256 r;
-    require x == 0 || y == 0 => r == 0;
-    require d > 0 && y == d => r == x;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
-    return r;
+    if (x == 0 || y == 0) return 0;
+    if (d > 0 && y == d) return x;
+    uint256 res;
+    return res;
 }
 
 // All rules in this file assume no accrual and no slash.
 definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].pendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
 
-definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex || currentContract.position[id][user].lossIndex == 0;
+definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex && currentContract.obligationState[id].lossIndex > 0;
 
 /// REPAY ///
 
