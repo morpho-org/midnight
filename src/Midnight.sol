@@ -293,14 +293,15 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.pendingFee += UtilsLib.toUint128(
-            buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
-        );
+        uint128 buyerPendingFeeIncrease =
+            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+        buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
+        uint128 sellerPendingFeeDecrease;
         if (sellerPos.credit > 0) {
-            sellerPos.pendingFee -= UtilsLib.toUint128(
-                sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit)
-            );
+            sellerPendingFeeDecrease =
+                UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
+            sellerPos.pendingFee -= sellerPendingFeeDecrease;
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
@@ -333,9 +334,8 @@ contract Midnight is IMidnight {
             receiver,
             offer.group,
             newConsumed,
-            _obligationState.totalUnits,
-            buyerPos.pendingFee,
-            sellerPos.pendingFee,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
             buyerCreditIncrease,
             sellerCreditDecrease
         );
@@ -374,14 +374,16 @@ contract Midnight is IMidnight {
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
+        uint128 pendingFeeDecrease;
         if (_position.credit > 0) {
-            _position.pendingFee -= UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
+            pendingFeeDecrease = UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
+            _position.pendingFee -= pendingFeeDecrease;
         }
         _position.credit -= UtilsLib.toUint128(units);
         _obligationState.withdrawable -= units;
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.pendingFee);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
@@ -670,17 +672,20 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the obligation's id.
     function _updatePosition(Obligation memory obligation, bytes32 id, address user) internal {
         Position storage _position = position[id][user];
-        (uint128 newCredit, uint128 newPending, uint128 accruedFee) = updatePositionView(obligation, id, user);
+        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
+
+        uint128 creditDecrease = _position.credit - newCredit;
+        uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
         _position.lossIndex = obligationState[id].lossIndex;
-        _position.pendingFee = newPending;
+        _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         // The passive fee recipient's credit is increased without slashing them first, meaning that they will get
         // slashed a bit too much later.
         position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
 
-        emit EventsLib.UpdatePosition(id, user, newCredit, newPending, accruedFee);
+        emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
     }
 
     /// OTHER VIEW FUNCTIONS ///

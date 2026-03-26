@@ -316,7 +316,7 @@ contract LiquidationTest is BaseTest {
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
-        emit EventsLib.UpdatePosition(id, lender, expectedCredit, 0, 0);
+        emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");
