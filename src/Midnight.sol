@@ -636,7 +636,9 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][user];
         (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
 
-        emit EventsLib.UpdatePosition(id, user, _position.credit - newCredit, _position.pendingFee - newPendingFee, accruedFee);
+        emit EventsLib.UpdatePosition(
+            id, user, _position.credit - newCredit, _position.pendingFee - newPendingFee, accruedFee
+        );
 
         _position.credit = newCredit;
         _position.lossIndex = obligationState[id].lossIndex;
