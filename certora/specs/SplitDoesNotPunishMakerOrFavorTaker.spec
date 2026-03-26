@@ -45,7 +45,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
     storage initState = lastStorage;
-    
+
     // block.timestamp must fit in uint128 (Midnight.sol:640 casts it; checked in Solidity 0.8.31).
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
 
