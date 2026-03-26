@@ -5,8 +5,11 @@ pragma solidity >=0.5.0;
 import {Obligation, Offer} from "./IMidnight.sol";
 
 interface ICallbacks {
+    /// @dev The signer is address(1) if the offer does not need to be ratified.
+    /// @dev Otherwise, the callback must ratify the offer.
     function onBuy(
         Offer memory offer,
+        address signer,
         address buyer,
         uint256 buyerAssets,
         uint256 sellerAssets,
@@ -14,8 +17,11 @@ interface ICallbacks {
         bytes memory data
     ) external returns (bytes32);
 
+    /// @dev The signer is address(1) if the offer does not need to be ratified.
+    /// @dev Otherwise, the callback must ratify the offer.
     function onSell(
         Offer memory offer,
+        address signer,
         address seller,
         uint256 buyerAssets,
         uint256 sellerAssets,

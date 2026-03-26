@@ -219,12 +219,14 @@ contract Midnight is IMidnight {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        if (sig.v == 0) {
-            require(ratified[offer.maker][root], "not ratified");
+        address offerSigner = signer(root, sig);
+        bool offerPreRatified;
+        if (offerSigner == address(0)) {
+            offerPreRatified = ratified[offer.maker][root];
         } else {
-            address _signer = signer(root, sig);
-            require(_signer == offer.maker || isAuthorized[offer.maker][_signer], "unauthorized");
+            offerPreRatified = offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner];
         }
+        require(offerPreRatified || isAuthorized[offer.maker][offer.callback], "unauthorized");
 
         bytes32 id = touchObligation(offer.obligation);
         _updatePosition(offer.obligation, id, offer.maker);
@@ -322,8 +324,16 @@ contract Midnight is IMidnight {
 
         if (buyerCallback != address(0)) {
             require(
-                ICallbacks(buyerCallback).onBuy(offer, buyer, buyerAssets, sellerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(buyerCallback)
+                    .onBuy(
+                        offer,
+                        (offer.buy && !offerPreRatified) ? offerSigner : address(1),
+                        buyer,
+                        buyerAssets,
+                        sellerAssets,
+                        units,
+                        buyerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }
@@ -333,8 +343,16 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback).onSell(offer, seller, buyerAssets, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(sellerCallback)
+                    .onSell(
+                        offer,
+                        (!offer.buy && !offerPreRatified) ? offerSigner : address(1),
+                        seller,
+                        buyerAssets,
+                        sellerAssets,
+                        units,
+                        sellerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }
@@ -770,12 +788,17 @@ contract Midnight is IMidnight {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
+    /// @dev Returns address(0) if the signature is invalid.
     function signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
+        // Short-circuit to save ecrecover gas on unsigned offers.
+        if (signature.v == 0) {
+            return address(0);
+        } else {
+            bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+            address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+            return tentativeSigner;
+        }
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {

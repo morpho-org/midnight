@@ -7,8 +7,8 @@ methods {
     function ratified(address user, bytes32 root) external returns (bool) envfree;
 
     function _.price() external => NONDET;
-    function _.onBuy(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 
@@ -29,19 +29,22 @@ methods {
 persistent ghost ghostSigner(bytes32) returns address;
 
 function signerSummary(bytes32 root, Midnight.Signature s) returns address {
+    if (s.v == 0) return 0;
     return ghostSigner(root);
 }
 
 /// Every successful take requires maker consent via at least one of:
 ///   1. Maker signed directly (offerSigner == offer.maker)
 ///   2. Maker authorized the signer (isAuthorized[offer.maker][offerSigner])
-///   3. Maker pre-ratified the root (ratified[offer.maker][root]) — requires sig.v == 0 (no signature)
+///   3. Maker pre-ratified the root (ratified[offer.maker][root])
+///   4. Maker authorized the callback (isAuthorized[offer.maker][offer.callback])
 rule takeRequiresMakerConsent(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     bool makerSigned = ghostSigner(root) == offer.maker;
     bool makerAuthorizedSigner = isAuthorized(offer.maker, ghostSigner(root));
     bool rootRatified = ratified(offer.maker, root);
+    bool makerAuthorizedCallback = isAuthorized(offer.maker, offer.callback);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
 
-    assert makerSigned || makerAuthorizedSigner || rootRatified;
+    assert makerSigned || makerAuthorizedSigner || rootRatified || makerAuthorizedCallback;
 }

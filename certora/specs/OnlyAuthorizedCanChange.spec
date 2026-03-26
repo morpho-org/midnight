@@ -37,8 +37,8 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
-    function _.onBuy(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Offer, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
