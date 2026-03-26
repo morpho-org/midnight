@@ -50,7 +50,7 @@ methods {
 
 definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastAccrual;
 
-ghost mapping(address => bool) signed {
+persistent ghost mapping(address => bool) signed {
     init_state axiom forall address a. signed[a] == false;
 }
 
