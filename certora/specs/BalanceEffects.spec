@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+// storeInCode uses CREATE2 to deploy obligation data as runtime bytecode.
+// A persistent ghost function is the sound summary: it returns a nondeterministic
+// address (models the unpredictable CREATE2 result) without havocing any external
+// contract storage (CREATE2 creates a new contract, it does not modify existing ones).
+// HAVOC_ECF would be overly conservative here — it havocs all external storage,
+// which breaks proofs that rely on stable oracle/callback summaries.
+persistent ghost ghostStoreInCode(uint256) returns address;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -10,7 +18,7 @@ methods {
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => HAVOC_ECF;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => ghostStoreInCode(0);
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;

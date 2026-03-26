@@ -3,6 +3,14 @@
 using Utils as Utils;
 using Midnight as Midnight;
 
+// storeInCode uses CREATE2 to deploy obligation data as runtime bytecode.
+// A persistent ghost function is the sound summary: it returns a nondeterministic
+// address (models the unpredictable CREATE2 result) without havocing any external
+// contract storage (CREATE2 creates a new contract, it does not modify existing ones).
+// HAVOC_ECF would be overly conservative here — it havocs all external storage,
+// which breaks proofs that rely on stable oracle/callback summaries.
+persistent ghost ghostStoreInCode(uint256) returns address;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -18,7 +26,7 @@ methods {
 
     function _.price() external => NONDET;
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => HAVOC_ECF;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => ghostStoreInCode(0);
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
