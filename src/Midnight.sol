@@ -18,7 +18,8 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
-    PASSIVE_FEE_RECIPIENT
+    PASSIVE_FEE_RECIPIENT,
+    isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -615,7 +616,7 @@ contract Midnight is IMidnight {
                 address collateralToken = obligation.collaterals[i].token;
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 lltv = obligation.collaterals[i].lltv;
-                require(lltv <= WAD, "lltv too high");
+                require(isLltvAllowed(lltv), "lltv not allowed");
                 require(
                     obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
                         || obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
