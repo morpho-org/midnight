@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD, MAX_CONTINUOUS_FEE, PASSIVE_FEE_RECIPIENT} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_CREDIT} from "./BaseTest.sol";
 
@@ -356,8 +356,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(obligation, withdrawAmount, lender, lender);
 
-        uint256 expectedRemaining =
-            creditAfterAccrual > 0 ? remainingAfterAccrual - expectedPendingFeeDecrease : 0;
+        uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - expectedPendingFeeDecrease : 0;
 
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - withdrawAmount, "credit after withdraw");
         assertApproxEqAbs(midnight.pendingFee(id, lender), expectedRemaining, 1, "remaining after withdraw");

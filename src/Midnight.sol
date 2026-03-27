@@ -635,9 +635,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 microCredit = _position.microCredit;
-        uint128 lossIndex = _position.lossIndex;
-        uint256 postSlashMicroCredit = lossIndex < type(uint128).max
-            ? microCredit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - lossIndex)
+        uint128 _lossIndex = _position.lossIndex;
+        uint256 postSlashMicroCredit = _lossIndex < type(uint128).max
+            ? microCredit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
             : 0;
         uint128 _microPendingFee = _position.microPendingFee;
         uint256 postSlashMicroPending = microCredit > 0
