@@ -10,6 +10,9 @@ struct Obligation {
     // The recovery close factor is deactivated for a collateral if the liquidation could leave a collateral value that
     // would not be enough to repay rcfThreshold units.
     uint256 rcfThreshold;
+    // Optional gates (address(0) = unrestricted).
+    address enterGate;
+    address liquidatorGate;
 }
 
 struct Collateral {
@@ -23,8 +26,7 @@ struct Offer {
     Obligation obligation;
     bool buy;
     address maker;
-    uint256 obligationUnits;
-    uint256 obligationShares;
+    uint256 maxUnits;
     uint256 start;
     uint256 expiry;
     uint256 tick;
@@ -33,6 +35,7 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
+    bool exitOnly;
 }
 
 struct Signature {
@@ -41,17 +44,23 @@ struct Signature {
     bytes32 s;
 }
 
-struct BorrowerState {
-    uint128 debt;
-    uint128 activatedCollaterals;
-}
-
 struct ObligationState {
     uint128 totalUnits;
-    uint128 totalShares;
+    uint128 lossIndex;
     uint256 withdrawable;
     bool created;
     uint16[7] fees;
+    uint32 continuousFee;
+}
+
+struct Position {
+    uint128 credit;
+    uint128 pendingFee;
+    uint128 lossIndex;
+    uint128 lastAccrual;
+    uint128 debt;
+    uint128 activatedCollaterals;
+    uint128[128] collateral;
 }
 
 interface IMidnight {}

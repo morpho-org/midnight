@@ -8,16 +8,22 @@ methods {
     function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
-    function Midnight.totalShares(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
-    function Midnight.sharesOf(bytes32, address) external returns (uint256) envfree;
+    function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
+    function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
+    function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
+    function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
+    function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -25,6 +31,18 @@ methods {
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+
+    // Summarize CREATE2 opcode used by IdLib.storeInCode.
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
+    // Tokens are assumed to not reenter.
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
+    // Gate functions are view and cannot modify state.
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -38,19 +56,19 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 }
 
 // Show that a created obligation has at least one collateral.
-invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
+strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
     obligationIsCreated(obligation) => obligation.collaterals.length > 0;
 
 // Show that a created obligation has sorted collaterals.
-invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
+strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
     obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
 
 // Show that a created obligation do not have address(0) collaterals.
-invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
+strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
 
 // Show that a created obligation has lltv <= WAD.
-invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
+strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
@@ -67,18 +85,18 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 obligationShares, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, obligationShares, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
-rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 obligationUnits, uint256 shares, address onBehalf, address receiver) {
-    Midnight.withdraw(e, obligation, obligationUnits, shares, onBehalf, receiver);
+rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
+    Midnight.withdraw(e, obligation, units, onBehalf, receiver);
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf) {
-    Midnight.repay(e, obligation, obligationUnits, onBehalf);
+rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf) {
+    Midnight.repay(e, obligation, units, onBehalf);
     assert obligationIsCreated(obligation);
 }
 
@@ -97,19 +115,58 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
     assert obligationIsCreated(obligation);
 }
 
-// Show that an obligation state is empty if it is not created.
-invariant obligationStateIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => obligationStateIsEmpty(id, user);
+// Show that each obligation state field is empty if the obligation is not created.
+strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => Midnight.totalUnits(id) == 0;
 
-definition obligationStateIsEmpty(bytes32 id, address user) returns bool = Midnight.totalUnits(id) == 0 && Midnight.totalShares(id) == 0 && Midnight.withdrawable(id) == 0 && noFeesAreSet(id) && Midnight.sharesOf(id, user) == 0 && userHasNoDebt(id, user) && userHasNoActivatedCollaterals(id, user) && userHasNoCollateral(id, user);
+strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => Midnight.withdrawable(id) == 0;
+
+strong invariant obligationFeesAreEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => noFeesAreSet(id);
+
+strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
+
+strong invariant obligationLossIndexIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossIndex == 0;
+
+strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0;
+
+strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => Midnight.debtOf(id, user) == 0;
+
+strong invariant obligationActivatedCollateralsAreEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasNoActivatedCollaterals(id, user);
+
+strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasNoRemainingContinuousFee(id, user);
+
+strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasNoLastAccrual(id, user);
+
+strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
+    !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
+
+strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.fees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
-definition userHasNoDebt(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].debt == 0;
+definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.position[id][user].activatedCollaterals == 0;
 
-definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.borrowerState[id][user].activatedCollaterals == 0;
+definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = Midnight.pendingFee(id, user) == 0;
 
-definition userHasNoCollateral(bytes32 id, address user) returns bool = forall uint256 collateralIndex. collateralIndex < 128 => currentContract.collateralOf[id][user][collateralIndex] == 0;
+definition userHasNoLastAccrual(bytes32 id, address user) returns bool = Midnight.lastAccrual(id, user) == 0;
+
+definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
+
+definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385000000000000000 || lltv == 625000000000000000 || lltv == 770000000000000000 || lltv == 860000000000000000 || lltv == 915000000000000000 || lltv == 945000000000000000 || lltv == 965000000000000000 || lltv == 980000000000000000 || lltv == 1000000000000000000;
+
+// Show that a created obligation only has allowed LLTV tiers.
+strong invariant createdObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
+    obligationIsCreated(obligation) => i < obligation.collaterals.length => isLltvAllowed(obligation.collaterals[i].lltv);
