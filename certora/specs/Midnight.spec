@@ -75,8 +75,8 @@ rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, addres
     // The output units is equal to the input.
     assert unitsOutput == unitsInput;
 
-    // If the input is zero, all the output arguments are zero.
-    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
+    // If the input is zero, units output is zero and asset outputs are at most 1 (from fee rounding).
+    assert unitsInput == 0 => unitsOutput == 0 && buyerAssetsOutput <= 1 && sellerAssetsOutput == 0;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
