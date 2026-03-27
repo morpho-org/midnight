@@ -36,8 +36,8 @@ contract LiquidationTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -45,8 +45,8 @@ contract LiquidationTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.85e18,
-                    maxLif: maxLif(0.85e18, 0.25e18),
+                    lltv: 0.86e18,
+                    maxLif: maxLif(0.86e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -300,7 +300,9 @@ contract LiquidationTest is BaseTest {
                 - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
-        emit EventsLib.Liquidate(address(this), id, 0, 0, 0, borrower, expectedBadDebt, expectedLossIndex);
+        emit EventsLib.Liquidate(
+            address(this), id, obligation.collaterals[0].token, 0, 0, borrower, expectedBadDebt, expectedLossIndex
+        );
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 

@@ -48,9 +48,9 @@ contract GateTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
+                    lltv: 0.77e18,
                     oracle: address(oracle1),
-                    maxLif: maxLif(0.75e18, LIQUIDATION_CURSOR_LOW)
+                    maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
         obligation.collaterals = sortCollaterals(obligation.collaterals);
@@ -61,9 +61,9 @@ contract GateTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
+                    lltv: 0.77e18,
                     oracle: address(oracle1),
-                    maxLif: maxLif(0.75e18, LIQUIDATION_CURSOR_LOW)
+                    maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
         gatedObligation.collaterals = sortCollaterals(gatedObligation.collaterals);

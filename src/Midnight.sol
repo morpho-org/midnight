@@ -18,7 +18,8 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
-    PASSIVE_FEE_RECIPIENT
+    PASSIVE_FEE_RECIPIENT,
+    isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {
@@ -78,7 +79,7 @@ contract Midnight is IMidnight {
 
     /// STORAGE ///
 
-    mapping(bytes32 id => mapping(address user => Position)) internal position;
+    mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
@@ -516,7 +517,14 @@ contract Midnight is IMidnight {
         }
 
         emit EventsLib.Liquidate(
-            msg.sender, id, collateralIndex, seizedAssets, repaidUnits, borrower, badDebt, _obligationState.lossIndex
+            msg.sender,
+            id,
+            obligation.collaterals[collateralIndex].token,
+            seizedAssets,
+            repaidUnits,
+            borrower,
+            badDebt,
+            _obligationState.lossIndex
         );
 
         SafeTransferLib.safeTransfer(obligation.collaterals[collateralIndex].token, msg.sender, seizedAssets);
@@ -578,7 +586,7 @@ contract Midnight is IMidnight {
                 address collateralToken = obligation.collaterals[i].token;
                 require(collateralToken > previousCollateralToken, "collaterals not sorted");
                 uint256 lltv = obligation.collaterals[i].lltv;
-                require(lltv <= WAD, "lltv too high");
+                require(isLltvAllowed(lltv), "lltv not allowed");
                 require(
                     obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
                         || obligation.collaterals[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
@@ -703,6 +711,10 @@ contract Midnight is IMidnight {
 
     function totalUnits(bytes32 id) external view returns (uint256) {
         return obligationState[id].totalUnits;
+    }
+
+    function lossIndex(bytes32 id) external view returns (uint128) {
+        return obligationState[id].lossIndex;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
