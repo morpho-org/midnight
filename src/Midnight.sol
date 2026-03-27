@@ -83,7 +83,8 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same units and loan token.
+    /// @dev To work as expected, all offers in a same group should have the same maxs and loan token.
+    /// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` should be nonzero per offer.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
     /// @dev Offers should have the current session to be valid.
@@ -209,6 +210,7 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
+        require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
@@ -257,8 +259,17 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed = consumed[offer.maker][offer.group] += units;
-        require(newConsumed <= offer.maxUnits, "consumed");
+        uint256 newConsumed;
+        if (offer.maxSellerAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
+            require(newConsumed <= offer.maxSellerAssets, "consumed seller assets");
+        } else if (offer.maxBuyerAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
+            require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
+        } else {
+            newConsumed = consumed[offer.maker][offer.group] += units;
+            require(newConsumed <= offer.maxUnits, "consumed");
+        }
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
