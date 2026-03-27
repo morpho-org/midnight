@@ -151,7 +151,7 @@ abstract contract BaseTest is Test {
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), false);
 
-        deal(address(loanToken), unluckyLender, 100);
+        deal(address(loanToken), unluckyLender, 101);
 
         take(100, unluckyLender, badBorrowerOffer);
 
@@ -253,7 +253,7 @@ abstract contract BaseTest is Test {
     }
 
     function setupObligation(Obligation memory obligation, uint256 units) internal {
-        deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
+        deal(address(loanToken), lender, units + 1); // at tick MAX_TICK, price is 1. +1 for sell-offer rounding.
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;

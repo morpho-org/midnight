@@ -90,7 +90,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
+        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
@@ -111,7 +111,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 sellerPrice = buyerPrice - tradingFee;
         uint256 expectedBuyerAssets = units.mulDivDown(buyerPrice, WAD);
-        uint256 expectedSellerAssets = units.mulDivDown(sellerPrice, WAD);
+        uint256 expectedSellerAssets = UtilsLib.zeroFloorSub(units.mulDivDown(sellerPrice, WAD), 1);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -131,7 +131,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
+        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
@@ -165,7 +165,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
+        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
@@ -194,7 +194,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
+        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
@@ -224,7 +224,7 @@ contract TradingFeeTest is BaseTest {
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
+        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 

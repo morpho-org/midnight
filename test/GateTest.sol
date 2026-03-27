@@ -148,6 +148,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, otherBorrower, units);
 
         gate.setWhitelisted(borrower, false);
+        deal(address(loanToken), borrower, loanToken.balanceOf(borrower) + 1);
 
         take(units, borrower, otherBorrowerOffer);
 
@@ -186,7 +187,7 @@ contract GateTest is BaseTest {
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
 
-        deal(address(loanToken), otherBorrower, units);
+        deal(address(loanToken), otherBorrower, units + 1);
         take(units, otherBorrower, exitOffer);
 
         assertEq(midnight.debtOf(gatedId, otherBorrower), 0, "otherBorrower should have exited");

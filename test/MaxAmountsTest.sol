@@ -44,7 +44,7 @@ contract MaxAmountsTest is BaseTest {
     function testTakeMaxAmount() public {
         uint256 amount = MAX_AMOUNT;
 
-        deal(address(loanToken), lender, amount);
+        deal(address(loanToken), lender, amount + 1); // +1 for sell-offer rounding.
 
         authorize(borrower, address(this));
 

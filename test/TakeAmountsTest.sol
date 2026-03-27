@@ -181,7 +181,9 @@ contract TakeAmountsTest is BaseTest {
 
         (uint256 buyerAssets,,) = take(targetUnits, lender, offer);
 
-        assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
+        assertEq(
+            buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD) + 1, "e2e buyerAssets"
+        );
     }
 
     function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
@@ -199,6 +201,8 @@ contract TakeAmountsTest is BaseTest {
 
         (uint256 buyerAssets,,) = take(targetUnits, borrower, offer);
 
-        assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
+        assertEq(
+            buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD) + 1, "e2e buyerAssets"
+        );
     }
 }

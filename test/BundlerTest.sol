@@ -194,11 +194,12 @@ contract BundlerTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchObligation(obligation);
         uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
-        uint256 units = targetSellerAssets.mulDivUp(WAD, price - _tradingFee);
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 units = (targetSellerAssets + 1).mulDivUp(WAD, sellerPrice);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
-        // Extra collateral headroom for the potential extra unit of debt.
-        collateralize(obligation, borrower, units + 1);
+        // Extra collateral headroom for the potential extra units of debt (up to +1 per take).
+        collateralize(obligation, borrower, units + 2);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
         takes[0] = TakeBundler.Take({
@@ -221,9 +222,9 @@ contract BundlerTest is BaseTest {
         // Mirror the bundler's exact fill logic to derive units needed from offer1.
         // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
         // neededFromOffer1 = 0.
-        uint256 sellerPrice = price - _tradingFee;
-        uint256 filledSellerAssets0 = fromOffer0.mulDivDown(sellerPrice, WAD);
-        uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
+        uint256 filledSellerAssets0 = fromOffer0.mulDivDown(sellerPrice, WAD).zeroFloorSub(1);
+        uint256 remaining = targetSellerAssets.zeroFloorSub(filledSellerAssets0);
+        uint256 neededFromOffer1 = remaining > 0 ? (remaining + 1).mulDivUp(WAD, sellerPrice) : 0;
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
             takeBundler.bundleTakeSellerAssets(

@@ -217,7 +217,7 @@ contract ContinuousFeeTest is BaseTest {
         // Change rate, lender adds more credit at rate2
         midnight.setObligationContinuousFee(id, rate2);
         collateralize(obligation, otherBorrower, credit2 * 2);
-        deal(address(loanToken), lender, credit2);
+        deal(address(loanToken), lender, credit2 + 1); // +1 for sell-offer rounding.
         take(credit2, lender, _makeBorrowOffer(credit2));
 
         uint256 blendedRemaining = midnight.pendingFee(id, lender);
@@ -276,7 +276,7 @@ contract ContinuousFeeTest is BaseTest {
             lender,
             true,
             takeAssets,
-            takeAssets,
+            takeAssets.zeroFloorSub(1),
             exitAmount,
             lender,
             keccak256("lender-exit"),
