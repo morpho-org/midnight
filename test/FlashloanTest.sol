@@ -35,7 +35,7 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(address(loanToken), amount, address(this), data);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external {
+    function onMidnightFlashLoan(address token, uint256 amount, bytes memory data) external {
         assertEq(token, address(loanToken), "wrong token");
         assertEq(amount, amountStored, "wrong amount");
         assertEq(data, dataStored, "wrong data");

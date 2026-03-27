@@ -5,7 +5,7 @@ pragma solidity >=0.5.0;
 import {Obligation} from "./IMidnight.sol";
 
 interface ICallbacks {
-    function onBuy(
+    function onMidnightBuy(
         bytes32 obligationId,
         Obligation memory obligation,
         address buyer,
@@ -14,7 +14,7 @@ interface ICallbacks {
         uint256 units,
         bytes memory data
     ) external;
-    function onSell(
+    function onMidnightSell(
         bytes32 obligationId,
         Obligation memory obligation,
         address seller,
@@ -23,7 +23,7 @@ interface ICallbacks {
         uint256 units,
         bytes memory data
     ) external;
-    function onLiquidate(
+    function onMidnightLiquidate(
         bytes32 obligationId,
         Obligation memory obligation,
         uint256 collateralIndex,
@@ -35,5 +35,5 @@ interface ICallbacks {
 }
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external;
+    function onMidnightFlashLoan(address token, uint256 amount, bytes memory data) external;
 }

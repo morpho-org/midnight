@@ -832,7 +832,7 @@ contract BorrowCallback is ICallbacks {
     bytes public recordedData;
     bytes32 public recordedObligationId;
 
-    function onSell(
+    function onMidnightSell(
         bytes32 obligationId,
         Obligation memory obligation,
         address seller,
@@ -850,9 +850,9 @@ contract BorrowCallback is ICallbacks {
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onMidnightBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
 
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+    function onMidnightLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -860,7 +860,7 @@ contract LendCallback is ICallbacks {
 
     bytes32 public recordedObligationId;
 
-    function onBuy(
+    function onMidnightBuy(
         bytes32 obligationId,
         Obligation memory obligation,
         address buyer,
@@ -875,7 +875,7 @@ contract LendCallback is ICallbacks {
         require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onMidnightSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
 
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+    function onMidnightLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }

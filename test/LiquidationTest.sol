@@ -838,7 +838,7 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collaterals[0].lltv, WAD);
     }
 
-    function onLiquidate(
+    function onMidnightLiquidate(
         bytes32 obligationId,
         Obligation memory _obligation,
         uint256,
