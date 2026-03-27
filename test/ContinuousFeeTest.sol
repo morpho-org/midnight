@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD, MAX_CONTINUOUS_FEE, PASSIVE_FEE_RECIPIENT} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_CREDIT} from "./BaseTest.sol";
 
@@ -284,9 +284,15 @@ contract ContinuousFeeTest is BaseTest {
         // Lender exits via take (lender is seller, otherLender is buyer)
         deal(address(loanToken), otherLender, exitAmount);
 
-        uint256 expectedBuyerPendingFee = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
-        uint256 expectedSellerPendingFeeDecrease =
-            creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
+        uint256 takeAssets = exitAmount.mulDivDown(TickLib.tickToPrice(MAX_TICK), WAD);
+        uint256 buyerMicroPendingFeeIncrease =
+            (exitAmount * 1e6).mulDivDown(uint256(feeRate) * (ttm - elapsed), WAD);
+        uint256 sellerMicroPendingFeeDecrease =
+            creditAfterAccrual > 0
+                ? ((credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6).mulDivUp(
+                    exitAmount, creditAfterAccrual
+                )
+                : 0;
 
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
@@ -298,18 +304,39 @@ contract ContinuousFeeTest is BaseTest {
             (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6,
             feeUnits
         );
+        vm.expectEmit();
+        emit EventsLib.Take(
+            lender,
+            id,
+            otherLender,
+            lender,
+            true,
+            takeAssets,
+            takeAssets,
+            exitAmount,
+            lender,
+            keccak256("lender-exit"),
+            exitAmount,
+            buyerMicroPendingFeeIncrease,
+            sellerMicroPendingFeeDecrease,
+            exitAmount * 1e6,
+            exitAmount * 1e6
+        );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
-        uint256 expectedRemaining =
-            creditAfterAccrual > 0 ? remainingAfterAccrual - expectedSellerPendingFeeDecrease : 0;
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - exitAmount, "credit after exit");
-        assertApproxEqAbs(midnight.pendingFee(id, lender), expectedRemaining, 1, "remaining after exit");
+        assertApproxEqAbs(
+            midnight.pendingFee(id, lender),
+            remainingAfterAccrual - sellerMicroPendingFeeDecrease / 1e6,
+            1,
+            "remaining after exit"
+        );
 
         if (exitAmount == creditAfterAccrual) {
             assertEq(midnight.pendingFee(id, lender), 0, "full exit zeroes remaining");
         }
 
-        assertEq(midnight.pendingFee(id, otherLender), expectedBuyerPendingFee, "buyer pendingFee after exit");
+        assertEq(midnight.pendingFee(id, otherLender), buyerMicroPendingFeeIncrease / 1e6, "buyer pendingFee after exit");
         assertEq(midnight.creditOf(id, otherLender), exitAmount, "buyer credit after exit");
     }
 
@@ -342,12 +369,9 @@ contract ContinuousFeeTest is BaseTest {
 
         uint256 expectedPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
-        uint256 initialMicroPendingFee = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD);
-        uint256 microPendingAfterAccrual = initialMicroPendingFee - feeUnits * 1e6;
-        uint256 expectedMicroPendingFee = creditAfterAccrual > 0
-            ? microPendingAfterAccrual - microPendingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual)
-            : 0;
-        uint256 expectedMicroPendingFeeDecrease = microPendingAfterAccrual - expectedMicroPendingFee;
+        uint256 microPendingAfterAccrual = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6;
+        uint256 expectedMicroPendingFeeDecrease =
+            creditAfterAccrual > 0 ? microPendingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
 
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, lender, creditAfterAccrual * 1e6, microPendingAfterAccrual, feeUnits);
@@ -368,7 +392,7 @@ contract ContinuousFeeTest is BaseTest {
         }
     }
 
-    function testWithdrawOneDoesNotReducePendingFeeByOne() public {
+    function testWithdrawOneCanLeaveVisiblePendingFeeUnchanged() public {
         uint256 credit = 10_000;
         uint256 feeRate = MAX_CONTINUOUS_FEE;
         uint256 ttm = 365 days;
