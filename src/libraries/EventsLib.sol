@@ -68,7 +68,7 @@ library EventsLib {
     event Liquidate(
         address indexed caller,
         bytes32 indexed id_,
-        uint256 collateralIndex,
+        address collateral,
         uint256 seizedAssets,
         uint256 repaidUnits,
         address indexed borrower,
