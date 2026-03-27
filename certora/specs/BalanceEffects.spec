@@ -39,9 +39,6 @@ function signerSummary() returns address {
     return returnedSigner;
 }
 
-// All rules in this file assume no accrual and no slash.
-definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].microPendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
-
 /// The passive fee recipient can't authorize another account, because it can't sign
 /// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
 strong invariant feeRecipientCantAuthorize(address authorized)

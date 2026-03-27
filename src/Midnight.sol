@@ -264,22 +264,20 @@ contract Midnight is IMidnight {
         Position storage sellerPos = position[id][seller];
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.microCredit / 1e6);
-        uint256 buyerMicroCreditIncrease = buyerCreditIncrease * 1e6;
-        uint256 sellerMicroCreditDecrease = sellerCreditDecrease * 1e6;
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         uint128 buyerMicroPendingFeeIncrease = UtilsLib.toUint128(
-            buyerMicroCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
+            (buyerCreditIncrease * 1e6).mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
         );
         buyerPos.microPendingFee += buyerMicroPendingFeeIncrease;
-        buyerPos.microCredit += UtilsLib.toUint128(buyerMicroCreditIncrease);
+        buyerPos.microCredit += UtilsLib.toUint128(buyerCreditIncrease * 1e6);
         uint128 sellerMicroPendingFeeDecrease;
         if (sellerPos.microCredit > 0) {
             sellerMicroPendingFeeDecrease = UtilsLib.toUint128(
-                sellerPos.microPendingFee.mulDivUp(sellerMicroCreditDecrease, sellerPos.microCredit)
+                sellerPos.microPendingFee.mulDivUp(sellerCreditDecrease * 1e6, sellerPos.microCredit)
             );
             sellerPos.microPendingFee -= sellerMicroPendingFeeDecrease;
         }
-        sellerPos.microCredit -= UtilsLib.toUint128(sellerMicroCreditDecrease);
+        sellerPos.microCredit -= UtilsLib.toUint128(sellerCreditDecrease * 1e6);
         sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
@@ -313,8 +311,8 @@ contract Midnight is IMidnight {
             newConsumed,
             buyerMicroPendingFeeIncrease,
             sellerMicroPendingFeeDecrease,
-            buyerMicroCreditIncrease,
-            sellerMicroCreditDecrease
+            buyerCreditIncrease * 1e6,
+            sellerCreditDecrease * 1e6
         );
 
         if (buyerCallback != address(0)) {
