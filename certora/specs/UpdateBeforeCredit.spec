@@ -9,7 +9,7 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -65,7 +65,7 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 
 /// Check that credit is never loaded before _updatePosition is called.
 /// The SLOADs of _updatePosition are ignored (see summary above).
-rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector } {
+rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
     f(e, args);

@@ -16,7 +16,11 @@ library EventsLib {
     event SetObligationContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
     event UpdatePosition(
-        bytes32 indexed id_, address indexed user, uint256 newCredit, uint256 newPendingFee, uint256 accruedFee
+        bytes32 indexed id_,
+        address indexed user,
+        uint256 creditDecrease,
+        uint256 pendingFeeDecrease,
+        uint256 accruedFee
     );
     event ObligationCreated(bytes32 indexed id_, Obligation obligation);
     event Take(
@@ -31,9 +35,10 @@ library EventsLib {
         address sellerReceiver,
         bytes32 group,
         uint256 consumed,
-        uint256 totalUnits,
-        uint256 buyerPendingFee,
-        uint256 sellerPendingFee
+        uint256 buyerPendingFeeIncrease,
+        uint256 sellerPendingFeeDecrease,
+        uint256 buyerCreditIncrease,
+        uint256 sellerCreditDecrease
     );
     event Withdraw(
         address caller,
@@ -41,7 +46,7 @@ library EventsLib {
         uint256 units,
         address indexed onBehalf,
         address indexed receiver,
-        uint256 pendingFee
+        uint256 pendingFeeDecrease
     );
     event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf);
     event SupplyCollateral(
@@ -60,7 +65,7 @@ library EventsLib {
     event Liquidate(
         address indexed caller,
         bytes32 indexed id_,
-        uint256 collateralIndex,
+        address collateral,
         uint256 seizedAssets,
         uint256 repaidUnits,
         address indexed borrower,

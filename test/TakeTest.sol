@@ -8,6 +8,7 @@ import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./helpers/ERC20.sol";
@@ -33,8 +34,8 @@ contract TakeTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -42,8 +43,8 @@ contract TakeTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -599,6 +600,144 @@ contract TakeTest is BaseTest {
         take(0, taker, lenderOffer);
     }
 
+    // maxSellerAssets / maxBuyerAssets tests.
+
+    function testMaxSellerAssetsRevert() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxSellerAssets = 1;
+
+        vm.expectRevert("consumed seller assets");
+        take(units, borrower, lenderOffer);
+    }
+
+    function testMaxSellerAssetsPass(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxSellerAssets = type(uint256).max;
+
+        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
+
+        assertTrue(sellerAssets > 0);
+    }
+
+    function testMaxBuyerAssetsRevert() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxBuyerAssets = 1;
+
+        vm.expectRevert("consumed buyer assets");
+        take(units, lender, borrowerOffer);
+    }
+
+    function testMaxBuyerAssetsPass(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxBuyerAssets = type(uint256).max;
+
+        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+
+        assertTrue(buyerAssets > 0);
+    }
+
+    function testMaxSellerAssetsExact() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 expectedSellerAssets = units.mulDivDown(price, WAD);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxSellerAssets = expectedSellerAssets;
+
+        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
+        assertEq(sellerAssets, expectedSellerAssets);
+    }
+
+    function testMaxBuyerAssetsExact() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 expectedBuyerAssets = units.mulDivUp(price, WAD);
+
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxBuyerAssets = expectedBuyerAssets;
+
+        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+        assertEq(buyerAssets, expectedBuyerAssets);
+    }
+
+    function testMaxSellerAssetsZeroMeansNoLimit(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxSellerAssets = 0;
+
+        take(units, borrower, lenderOffer);
+    }
+
+    function testMaxBuyerAssetsZeroMeansNoLimit(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        borrowerOffer.maxBuyerAssets = 0;
+
+        take(units, lender, borrowerOffer);
+    }
+
+    function testMultipleMaxRevert() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxSellerAssets = 1e18;
+        lenderOffer.maxBuyerAssets = 1e18;
+        lenderOffer.maxUnits = 0;
+
+        vm.expectRevert("multiple max");
+        take(units, borrower, lenderOffer);
+    }
+
+    function testMultipleMaxRevertUnitsAndSeller() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxSellerAssets = 1e18;
+        lenderOffer.maxUnits = 1e18;
+
+        vm.expectRevert("multiple max");
+        take(units, borrower, lenderOffer);
+    }
+
+    function testMultipleMaxRevertAllThree() public {
+        uint256 units = 100e18;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxSellerAssets = 1e18;
+        lenderOffer.maxBuyerAssets = 1e18;
+        lenderOffer.maxUnits = 1e18;
+
+        vm.expectRevert("multiple max");
+        take(units, borrower, lenderOffer);
+    }
+
     // test tree / signatures.
 
     function testTakeWrongRoot() public {
@@ -831,10 +970,19 @@ contract TakeTest is BaseTest {
 
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
+    bytes32 public recordedObligationId;
 
-    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, bytes memory data)
-        external
-    {
+    function onSell(
+        bytes32 obligationId,
+        Obligation memory obligation,
+        address seller,
+        uint256,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external {
+        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
+        recordedObligationId = obligationId;
         recordedData = data;
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
         address collateralToken = obligation.collaterals[collateralIndex].token;
@@ -842,15 +990,18 @@ contract BorrowCallback is ICallbacks {
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
     }
 
-    function onBuy(Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
+    bytes32 public recordedObligationId;
+
     function onBuy(
+        bytes32 obligationId,
         Obligation memory obligation,
         address buyer,
         uint256 buyerAssets,
@@ -858,11 +1009,13 @@ contract LendCallback is ICallbacks {
         uint256,
         bytes memory data
     ) external {
+        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
+        recordedObligationId = obligationId;
         recordedData = data;
         require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
     }
 
-    function onSell(Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
