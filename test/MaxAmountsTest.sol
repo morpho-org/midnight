@@ -74,7 +74,7 @@ contract MaxAmountsTest is BaseTest {
     }
 
     function testTakeAboveMaxAmountReverts() public {
-        uint256 amount = uint256(MAX_CREDIT) + 1;
+        uint256 amount = uint256(MAX_AMOUNT) + 1;
 
         deal(address(loanToken), lender, amount);
 

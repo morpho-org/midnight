@@ -39,14 +39,8 @@ methods {
 
 /// HELPERS ///
 
-definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
-
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
-}
-
-function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
-    return Midnight.obligationCreated(summaryToId(obligation));
 }
 
 persistent ghost mapping(bytes32 => mathint) sumDebt {

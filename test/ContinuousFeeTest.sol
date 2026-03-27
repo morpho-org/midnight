@@ -83,6 +83,8 @@ contract ContinuousFeeTest is BaseTest {
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, expectedFee);
+        vm.expectEmit();
+        emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after withdraw");
@@ -147,6 +149,8 @@ contract ContinuousFeeTest is BaseTest {
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, lender, expectedMicroCredit, expectedMicroPendingFee, remaining);
+        vm.expectEmit();
+        emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
         midnight.withdraw(obligation, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (withdraw)");
@@ -285,14 +289,11 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), otherLender, exitAmount);
 
         uint256 takeAssets = exitAmount.mulDivDown(TickLib.tickToPrice(MAX_TICK), WAD);
-        uint256 buyerMicroPendingFeeIncrease =
-            (exitAmount * 1e6).mulDivDown(uint256(feeRate) * (ttm - elapsed), WAD);
-        uint256 sellerMicroPendingFeeDecrease =
-            creditAfterAccrual > 0
-                ? ((credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6).mulDivUp(
-                    exitAmount, creditAfterAccrual
-                )
-                : 0;
+        uint256 buyerMicroPendingFeeIncrease = (exitAmount * 1e6).mulDivDown(uint256(feeRate) * (ttm - elapsed), WAD);
+        uint256 sellerMicroPendingFeeDecrease = creditAfterAccrual > 0
+            ? ((credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD) - feeUnits * 1e6)
+            .mulDivUp(exitAmount, creditAfterAccrual)
+            : 0;
 
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
@@ -336,7 +337,9 @@ contract ContinuousFeeTest is BaseTest {
             assertEq(midnight.pendingFee(id, lender), 0, "full exit zeroes remaining");
         }
 
-        assertEq(midnight.pendingFee(id, otherLender), buyerMicroPendingFeeIncrease / 1e6, "buyer pendingFee after exit");
+        assertEq(
+            midnight.pendingFee(id, otherLender), buyerMicroPendingFeeIncrease / 1e6, "buyer pendingFee after exit"
+        );
         assertEq(midnight.creditOf(id, otherLender), exitAmount, "buyer credit after exit");
     }
 
