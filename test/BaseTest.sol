@@ -29,6 +29,9 @@ import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidni
 import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+/// @dev Conservative whole-unit credit bound for generic tests.
+/// @dev With max continuous fee, it keeps micro pending fee within uint128 for maturities up to ~100 years.
+uint256 constant MAX_TEST_CREDIT = type(uint128).max / 1e6;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;

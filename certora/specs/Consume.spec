@@ -5,7 +5,6 @@ methods {
     function _.price() external => NONDET;
 
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
 
     // Summaries for complex internals irrelevant to consumed-mapping properties.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;

@@ -7,20 +7,18 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
 
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, MAX_TEST_CREDIT} from "./BaseTest.sol";
 
-// The maximum debt from a trade must fit in uint128, and the required collateral (debt / lltv)
-// must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3.
-// So debt <= type(uint128).max * 3/4.
-uint256 constant MAX_DEBT = MAX_TEST_AMOUNT * 3 / 4;
+// Trade-created credit uses the shared conservative test credit cap from BaseTest.
+// This is also far below the collateralization helper's practical limit (~MAX_TEST_AMOUNT * 3 / 4).
+uint256 constant MAX_DEBT = MAX_TEST_CREDIT;
 
 uint256 constant MIN_SELLER_PRICE = 0.5e18;
 
 // In sell tests, sellerPrice = buyerPrice - tradingFee, so the minimum effective price is
 // MIN_SELLER_PRICE - maxTradingFee. Price conversion amplifies assets by up to WAD / minPrice.
-// Combined with the collateral constraint: assets * WAD / minPrice * 4/3 <= type(uint128).max.
 // Uses 0.005e18 which is maxTradingFee(6), the biggest max trading fee.
-uint256 constant MAX_ASSETS = MAX_TEST_AMOUNT * (MIN_SELLER_PRICE - 0.005e18) / WAD * 3 / 4;
+uint256 constant MAX_ASSETS = MAX_TEST_CREDIT * (MIN_SELLER_PRICE - 0.005e18) / WAD;
 
 contract TradingFeeTest is BaseTest {
     using UtilsLib for uint256;

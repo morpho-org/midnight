@@ -37,6 +37,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev The max amount of pending fee is type(uint128).max / 1e6 (~1e32).
 ///
 /// OBLIGATIONS
 /// @dev Obligations' collaterals must be sorted by token address.
@@ -52,9 +53,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// CONTINUOUS FEES
 /// @dev A default continuous fee is set per loan token and applied when obligations are created. Then, the fee setter
 /// can override the continuous fee per obligation.
-/// @dev The fee is tracked per lender via `pendingFee` in each position. If the obligation's continuous fee changes,
-/// the pending fee of existing lenders is not updated (=> their fee is fixed).
-/// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
+/// @dev The fee is tracked per lender via `microPendingFee` in each position. If the obligation's continuous fee
+/// changes, the micro pending fee of existing lenders is not updated (=> their fee is fixed).
+/// @dev Absent bad debt, the face value of a lender's position is `credit - microPendingFee/1e6`.
 ///
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
@@ -276,22 +277,23 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        buyerPos.pendingFee += buyerPendingFeeIncrease;
+        uint128 buyerMicroPendingFeeIncrease = UtilsLib.toUint128(
+            (buyerCreditIncrease * 1e6).mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
+        );
+        buyerPos.microPendingFee += buyerMicroPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
-        uint128 sellerPendingFeeDecrease;
+        uint128 sellerMicroPendingFeeDecrease;
         if (sellerPos.credit > 0) {
-            sellerPendingFeeDecrease =
-                UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
-            sellerPos.pendingFee -= sellerPendingFeeDecrease;
+            sellerMicroPendingFeeDecrease =
+                UtilsLib.toUint128(sellerPos.microPendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
+            sellerPos.microPendingFee -= sellerMicroPendingFeeDecrease;
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
-        require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
+        require(buyerPos.microPendingFee <= uint256(buyerPos.credit) * 1e6, "buyer pendingFee exceeds credit");
         if (offer.exitOnly) require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "crossed");
 
         require(
@@ -317,10 +319,10 @@ contract Midnight is IMidnight {
             receiver,
             offer.group,
             newConsumed,
-            buyerPendingFeeIncrease,
-            sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease
+            buyerMicroPendingFeeIncrease,
+            sellerMicroPendingFeeDecrease,
+            buyerCreditIncrease * 1e6,
+            sellerCreditDecrease * 1e6
         );
 
         if (buyerCallback != address(0)) {
@@ -353,16 +355,16 @@ contract Midnight is IMidnight {
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
-        uint128 pendingFeeDecrease;
+        uint128 microPendingFeeDecrease;
         if (_position.credit > 0) {
-            pendingFeeDecrease = UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
-            _position.pendingFee -= pendingFeeDecrease;
+            microPendingFeeDecrease = UtilsLib.toUint128(_position.microPendingFee.mulDivUp(units, _position.credit));
+            _position.microPendingFee -= microPendingFeeDecrease;
         }
         _position.credit -= UtilsLib.toUint128(units);
         _obligationState.withdrawable -= units;
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, microPendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
@@ -618,7 +620,8 @@ contract Midnight is IMidnight {
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
 
     /// @dev Expects the id to correspond to the obligation's id.
-    /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
+    /// @dev Returns the new credit, new micro pending fee, and accrued fee after having updated the position.
+    /// @dev Only accrues fee on multiples of 1e6.
     function updatePositionView(Obligation memory obligation, bytes32 id, address user)
         public
         view
@@ -630,16 +633,19 @@ contract Midnight is IMidnight {
         uint256 postSlashCredit = _lossIndex < type(uint128).max
             ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
             : 0;
-        uint128 _pendingFee = _position.pendingFee;
-        uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
+        uint128 _microPendingFee = _position.microPendingFee;
+        uint256 postSlashMicroPending =
+            credit > 0 ? _microPendingFee - _microPendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
-        // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
+        // forge-lint: disable-next-item(unsafe-typecast) as postSlashMicroPending <= type(uint128).max
         uint128 fee = _lastAccrual < obligation.maturity
-            ? uint128(postSlashPending.mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual))
+            ? uint128(
+                (postSlashMicroPending / 1e6).mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual)
+            )
             : 0;
         // forge-lint: disable-next-item(unsafe-typecast) as credit and pending are <= uint128 position fields
-        return (uint128(postSlashCredit) - fee, uint128(postSlashPending) - fee, fee);
+        return (uint128(postSlashCredit) - fee, uint128(postSlashMicroPending) - fee * 1e6, fee);
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
@@ -653,20 +659,20 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the obligation's id.
     function _updatePosition(Obligation memory obligation, bytes32 id, address user) internal {
         Position storage _position = position[id][user];
-        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
+        (uint128 newCredit, uint128 newMicroPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
 
         uint128 creditDecrease = _position.credit - newCredit;
-        uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
+        uint128 microPendingFeeDecrease = _position.microPendingFee - newMicroPendingFee;
 
         _position.credit = newCredit;
         _position.lossIndex = obligationState[id].lossIndex;
-        _position.pendingFee = newPendingFee;
+        _position.microPendingFee = newMicroPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         // The passive fee recipient's credit is increased without slashing them first, meaning that they will get
         // slashed a bit too much later.
         position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
 
-        emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
+        emit EventsLib.UpdatePosition(id, user, creditDecrease, microPendingFeeDecrease, accruedFee);
     }
 
     /// OTHER VIEW FUNCTIONS ///
@@ -728,7 +734,7 @@ contract Midnight is IMidnight {
     }
 
     function pendingFee(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].pendingFee;
+        return position[id][user].microPendingFee / 1e6;
     }
 
     function lastAccrual(bytes32 id, address user) external view returns (uint128) {

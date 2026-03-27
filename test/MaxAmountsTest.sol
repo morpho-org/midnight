@@ -9,6 +9,7 @@ import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 uint256 constant MAX_AMOUNT = type(uint128).max;
+uint256 constant MAX_CREDIT = type(uint128).max;
 
 contract MaxAmountsTest is BaseTest {
     using UtilsLib for uint256;
@@ -42,7 +43,7 @@ contract MaxAmountsTest is BaseTest {
     }
 
     function testTakeMaxAmount() public {
-        uint256 amount = MAX_AMOUNT;
+        uint256 amount = MAX_CREDIT;
 
         deal(address(loanToken), lender, amount);
 
@@ -50,7 +51,7 @@ contract MaxAmountsTest is BaseTest {
 
         // Set a very high oracle price so a small collateral amount is sufficient.
         // With price = ORACLE_PRICE_SCALE * 1e36, 1 collateral token = 1e36 loan tokens.
-        // maxDebt = collateral * 1e36 * 0.75, so ~454 tokens covers MAX_AMOUNT.
+        // maxDebt = collateral * 1e36 * 0.75, so ~454 tokens covers MAX_CREDIT.
         oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);

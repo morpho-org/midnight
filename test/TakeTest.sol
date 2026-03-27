@@ -23,7 +23,7 @@ contract TakeTest is BaseTest {
     Offer internal otherLenderOffer;
     Offer internal otherBorrowerOffer;
 
-    uint256 internal maxAssets = 1e33; // to refine.
+    uint256 internal maxAssets = type(uint128).max / 1e6;
 
     function setUp() public override {
         super.setUp();
@@ -126,6 +126,17 @@ contract TakeTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), expectedAssets, "borrower balance");
         assertEq(loanToken.balanceOf(lender), 0, "lender balance");
         assertEq(midnight.consumed(lender, lenderOffer.group), units, "consumed");
+    }
+
+    function testTakeAtLegacyPassiveFeeLimitSucceeds() public {
+        borrowerOffer.tick = 0;
+        deal(address(loanToken), lender, maxAssets);
+        deal(address(loanToken), otherLender, 1);
+        collateralize(obligation, borrower, maxAssets + 1);
+
+        take(maxAssets, lender, borrowerOffer);
+        take(1, otherLender, borrowerOffer);
+        assertEq(midnight.totalUnits(id), maxAssets + 1, "total units");
     }
 
     // path 2: Lender enters + lender exits.

@@ -9,13 +9,13 @@ import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {ERC20} from "./helpers/ERC20.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, MAX_TEST_CREDIT} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 // Collateral = units / lltv (up to ~1.33x for lltv=0.75).
 // To keep collateral within uint128, we cap amounts at type(uint128).max / 2.
-uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 2;
+uint256 constant MAX_UNITS = MAX_TEST_CREDIT / 2;
 
 contract LiquidationTest is BaseTest {
     using UtilsLib for uint256;
@@ -756,6 +756,62 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, lender), creditAfterFirstSlash, "credit unchanged");
         assertEq(midnight.userLossIndex(id, lender), lossIndexAfterFirstSlash, "loss index unchanged");
+    }
+
+    function testOneUnitBadDebtCanMakeMinorityLenderLoseOneTwiceInARow() public {
+        uint256 units = uint256(type(uint128).max) / 1e6 / 3;
+        uint256 collateralAmount = 1000;
+        obligation.maturity = block.timestamp + 1;
+        id = toId(obligation);
+
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE * 1e36);
+
+        authorize(borrower, address(this));
+        address collateralToken = obligation.collaterals[0].token;
+        deal(collateralToken, address(this), collateralAmount);
+        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
+        setupObligation(obligation, units);
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+        setupOtherUsers(obligation, 2 * units);
+
+        assertLt(2 * units, midnight.totalUnits(id), "lender owns less than half the credit");
+
+        vm.warp(block.timestamp + 2);
+
+        uint256 repayableDebt = (units - 1).mulDivDown(obligation.collaterals[0].maxLif, WAD);
+        uint256 minimalBadDebtPrice = (repayableDebt - 1).mulDivDown(ORACLE_PRICE_SCALE, collateralAmount) + 1;
+        Oracle(obligation.collaterals[0].oracle).setPrice(minimalBadDebtPrice);
+
+        assertEq(_badDebt(), 1, "minimal bad debt");
+        assertEq(midnight.creditOf(id, lender), units, "credit before slash");
+        assertEq(midnight.userLossIndex(id, lender), 0, "user loss index before");
+
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+
+        (, uint128 lossIndexAfterFirst,,,) = midnight.obligationState(id);
+        assertGt(lossIndexAfterFirst, 1, "loss index increase is more than one");
+        assertEq(midnight.userLossIndex(id, lender), 0, "stale user loss index");
+
+        uint256 creditBefore = midnight.creditOf(id, lender);
+        midnight.updatePosition(obligation, lender);
+        uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
+        assertEq(creditBefore - creditAfterFirstSlash, 1, "first slash reduces visible credit by one");
+        assertEq(midnight.userLossIndex(id, lender), lossIndexAfterFirst, "user loss index resynced after first slash");
+
+        uint256 debtAfterFirstSlash = midnight.debtOf(id, borrower);
+        uint256 repayableDebtAfterFirstSlash =
+            (debtAfterFirstSlash - 1).mulDivDown(obligation.collaterals[0].maxLif, WAD);
+        uint256 minimalBadDebtPriceAfterFirstSlash =
+            (repayableDebtAfterFirstSlash - 1).mulDivDown(ORACLE_PRICE_SCALE, collateralAmount) + 1;
+        Oracle(obligation.collaterals[0].oracle).setPrice(minimalBadDebtPriceAfterFirstSlash);
+
+        assertEq(_badDebt(), 1, "second minimal bad debt");
+
+        midnight.liquidate(obligation, 0, 0, 0, borrower, "");
+        midnight.updatePosition(obligation, lender);
+
+        assertEq(creditAfterFirstSlash - midnight.creditOf(id, lender), 1, "second slash reduces visible credit by one");
     }
 
     // full bad debt test.

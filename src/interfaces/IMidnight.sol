@@ -57,7 +57,7 @@ struct ObligationState {
 
 struct Position {
     uint128 credit;
-    uint128 pendingFee;
+    uint128 microPendingFee;
     uint128 lossIndex;
     uint128 lastAccrual;
     uint128 debt;

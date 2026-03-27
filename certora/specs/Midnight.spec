@@ -33,8 +33,8 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
 /// HELPERS ///
@@ -57,11 +57,17 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
-function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
-    require x == 0 => r == 0;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    require d > 0 => r * d <= x * y;
+    require d > 0 => r * d > x * y - d;
+    return r;
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
+    uint256 r;
+    require d > 0 => r * d >= x * y;
+    require d > 0 => r * d < x * y + d;
     return r;
 }
 
@@ -116,8 +122,16 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
+strong invariant pendingMicroFeeBoundedByCredit(bytes32 id, address user)
+    currentContract.position[id][user].microPendingFee <= currentContract.position[id][user].credit * 1000000;
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user);
+    pendingFee(id, user) <= creditOf(id, user)
+    {
+        preserved {
+            requireInvariant pendingMicroFeeBoundedByCredit(id, user);
+        }
+    }
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);

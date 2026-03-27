@@ -7,7 +7,7 @@ import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 import {ERC20} from "./helpers/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, MAX_TEST_CREDIT} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -20,7 +20,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Collateral = units / lltv (~1.33x). Some tests add additional collateral on top.
 // To keep total collateral within uint128, we cap amounts at type(uint128).max / 3.
-uint256 constant MAX_UNITS = MAX_TEST_AMOUNT / 3;
+uint256 constant MAX_UNITS = MAX_TEST_CREDIT / 3;
 
 contract OtherFunctionsTest is BaseTest {
     using UtilsLib for uint256;
