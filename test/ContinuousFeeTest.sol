@@ -284,10 +284,8 @@ contract ContinuousFeeTest is BaseTest {
         // Lender exits via take (lender is seller, otherLender is buyer)
         deal(address(loanToken), otherLender, exitAmount);
 
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        uint256 takeAssets = exitAmount.mulDivDown(price, WAD);
-        uint256 buyerPendingFeeIncrease = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
-        uint256 sellerPendingFeeDecrease =
+        uint256 expectedBuyerPendingFee = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
+        uint256 expectedSellerPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
 
         vm.expectEmit();
@@ -302,7 +300,8 @@ contract ContinuousFeeTest is BaseTest {
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
-        uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
+        uint256 expectedRemaining =
+            creditAfterAccrual > 0 ? remainingAfterAccrual - expectedSellerPendingFeeDecrease : 0;
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - exitAmount, "credit after exit");
         assertApproxEqAbs(midnight.pendingFee(id, lender), expectedRemaining, 1, "remaining after exit");
 
@@ -310,7 +309,7 @@ contract ContinuousFeeTest is BaseTest {
             assertEq(midnight.pendingFee(id, lender), 0, "full exit zeroes remaining");
         }
 
-        assertEq(midnight.pendingFee(id, otherLender), buyerPendingFeeIncrease, "buyer pendingFee after exit");
+        assertEq(midnight.pendingFee(id, otherLender), expectedBuyerPendingFee, "buyer pendingFee after exit");
         assertEq(midnight.creditOf(id, otherLender), exitAmount, "buyer credit after exit");
     }
 
@@ -341,24 +340,24 @@ contract ContinuousFeeTest is BaseTest {
         vm.prank(borrower);
         midnight.repay(obligation, credit, borrower);
 
-        uint256 pendingFeeDecrease =
+        uint256 expectedPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
         uint256 initialMicroPendingFee = (credit * 1e6).mulDivDown(uint256(feeRate) * ttm, WAD);
         uint256 microPendingAfterAccrual = initialMicroPendingFee - feeUnits * 1e6;
         uint256 expectedMicroPendingFee = creditAfterAccrual > 0
             ? microPendingAfterAccrual - microPendingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual)
             : 0;
+        uint256 expectedMicroPendingFeeDecrease = microPendingAfterAccrual - expectedMicroPendingFee;
 
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(
-            id, lender, creditAfterAccrual * 1e6, microPendingAfterAccrual, feeUnits
-        );
+        emit EventsLib.UpdatePosition(id, lender, creditAfterAccrual * 1e6, microPendingAfterAccrual, feeUnits);
         vm.expectEmit();
-        emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, expectedMicroPendingFee);
+        emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, expectedMicroPendingFeeDecrease);
         vm.prank(lender);
         midnight.withdraw(obligation, withdrawAmount, lender, lender);
 
-        uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - pendingFeeDecrease : 0;
+        uint256 expectedRemaining =
+            creditAfterAccrual > 0 ? remainingAfterAccrual - expectedPendingFeeDecrease : 0;
 
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - withdrawAmount, "credit after withdraw");
         assertApproxEqAbs(midnight.pendingFee(id, lender), expectedRemaining, 1, "remaining after withdraw");

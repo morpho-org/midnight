@@ -264,17 +264,22 @@ contract Midnight is IMidnight {
         Position storage sellerPos = position[id][seller];
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.microCredit / 1e6);
+        uint256 buyerMicroCreditIncrease = buyerCreditIncrease * 1e6;
+        uint256 sellerMicroCreditDecrease = sellerCreditDecrease * 1e6;
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.microPendingFee += UtilsLib.toUint128(
-            (buyerCreditIncrease * 1e6).mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
+        uint128 buyerMicroPendingFeeIncrease = UtilsLib.toUint128(
+            buyerMicroCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
         );
-        buyerPos.microCredit += UtilsLib.toUint128(buyerCreditIncrease * 1e6);
+        buyerPos.microPendingFee += buyerMicroPendingFeeIncrease;
+        buyerPos.microCredit += UtilsLib.toUint128(buyerMicroCreditIncrease);
+        uint128 sellerMicroPendingFeeDecrease;
         if (sellerPos.microCredit > 0) {
-            sellerPos.microPendingFee -= UtilsLib.toUint128(
-                sellerPos.microPendingFee.mulDivUp(sellerCreditDecrease * 1e6, sellerPos.microCredit)
+            sellerMicroPendingFeeDecrease = UtilsLib.toUint128(
+                sellerPos.microPendingFee.mulDivUp(sellerMicroCreditDecrease, sellerPos.microCredit)
             );
+            sellerPos.microPendingFee -= sellerMicroPendingFeeDecrease;
         }
-        sellerPos.microCredit -= UtilsLib.toUint128(sellerCreditDecrease * 1e6);
+        sellerPos.microCredit -= UtilsLib.toUint128(sellerMicroCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
@@ -306,11 +311,10 @@ contract Midnight is IMidnight {
             receiver,
             offer.group,
             newConsumed,
-            _obligationState.totalUnits,
-            buyerPos.microPendingFee,
-            sellerPos.microPendingFee,
-            buyerCreditIncrease * 1e6,
-            sellerCreditDecrease * 1e6
+            buyerMicroPendingFeeIncrease,
+            sellerMicroPendingFeeDecrease,
+            buyerMicroCreditIncrease,
+            sellerMicroCreditDecrease
         );
 
         if (buyerCallback != address(0)) {
@@ -343,16 +347,17 @@ contract Midnight is IMidnight {
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
+        uint128 microPendingFeeDecrease;
         if (_position.microCredit > 0) {
-            _position.microPendingFee -= UtilsLib.toUint128(
-                _position.microPendingFee.mulDivUp(units * 1e6, _position.microCredit)
-            );
+            microPendingFeeDecrease =
+                UtilsLib.toUint128(_position.microPendingFee.mulDivUp(units * 1e6, _position.microCredit));
+            _position.microPendingFee -= microPendingFeeDecrease;
         }
         _position.microCredit -= UtilsLib.toUint128(units * 1e6);
         _obligationState.withdrawable -= units;
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, _position.microPendingFee);
+        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, microPendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
