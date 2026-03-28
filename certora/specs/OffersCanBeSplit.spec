@@ -60,9 +60,6 @@ persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
 
     // Bounded: floor(a*b/d) <= a when b <= d (prevents toUint128 reverts / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
-
-    // Sub-additivity: floor(a*b/d) = floor(x*b/d) + floor(y*b/d) + {0 or 1} when a = x + y (needed for consumed split bound).
-    axiom forall uint256 a. forall uint256 x. forall uint256 y. forall uint256 b. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(x) + to_mathint(y) => ghost_mulDivDown(a, b, d) >= ghost_mulDivDown(x, b, d) + ghost_mulDivDown(y, b, d) && ghost_mulDivDown(a, b, d) <= ghost_mulDivDown(x, b, d) + ghost_mulDivDown(y, b, d) + 1;
 }
 
 // ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
@@ -75,9 +72,6 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 
     // Bounded: ceil(a*b/d) <= a when b <= d (prevents pendingFee underflow / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
-
-    // Super-additivity: ceil(x*b/d) + ceil(y*b/d) = ceil(a*b/d) + {0 or 1} when a = x + y (needed for consumed split bound).
-    axiom forall uint256 a. forall uint256 x. forall uint256 y. forall uint256 b. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(x) + to_mathint(y) => ghost_mulDivUp(a, b, d) <= ghost_mulDivUp(x, b, d) + ghost_mulDivUp(y, b, d) && ghost_mulDivUp(a, b, d) + 1 >= ghost_mulDivUp(x, b, d) + ghost_mulDivUp(y, b, d);
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
@@ -101,6 +95,12 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     // Valid position state: position lossIndex <= obligation lossIndex (monotonicity invariant).
     require to_mathint(userLossIndex(ghostId, buyer)) <= to_mathint(obLossIndex), "buyer lossIndex consistent, proved in Midnight.spec";
     require to_mathint(userLossIndex(ghostId, seller)) <= to_mathint(obLossIndex), "seller lossIndex consistent, proved in Midnight.spec";
+
+    // Sub-additivity of mulDivDown for this specific split: floor((B+C)*b/d) ∈ [floor(B*b/d)+floor(C*b/d), floor(B*b/d)+floor(C*b/d)+1].
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1;
+
+    // Super-additivity of mulDivUp for this specific split: ceil((B+C)*b/d) ∈ [ceil(B*b/d)+ceil(C*b/d)-1, ceil(B*b/d)+ceil(C*b/d)].
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d));
 
     storage initState = lastStorage;
 
