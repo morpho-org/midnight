@@ -99,7 +99,7 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     // Sub-additivity of mulDivDown for this specific split: floor((B+C)*b/d) ∈ [floor(B*b/d)+floor(C*b/d), floor(B*b/d)+floor(C*b/d)+1].
     require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1;
 
-    // Super-additivity of mulDivUp for this specific split: ceil((B+C)*b/d) ∈ [ceil(B*b/d)+ceil(C*b/d)-1, ceil(B*b/d)+ceil(C*b/d)].
+    // Super-additivity of mulDivUp for this specific split: ceil((B+C)*b/d) ∈ [ceil(B*b/d)+ceil(C*b/d)-1, ceil(B*b/d)+ceil(C*b/d)]. 
     require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d));
 
     storage initState = lastStorage;
