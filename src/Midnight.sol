@@ -292,7 +292,9 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
-        if (offer.exitOnly) require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "crossed");
+        if (offer.reduceOnly) {
+            require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "maker credit or debt increased");
+        }
 
         require(
             offer.obligation.enterGate == address(0) || buyerPos.credit == 0
