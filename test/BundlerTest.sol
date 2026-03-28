@@ -35,8 +35,8 @@ contract BundlerTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -44,8 +44,8 @@ contract BundlerTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );

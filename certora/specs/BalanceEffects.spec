@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -7,6 +9,9 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
+    function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
+    function Utils.passiveFeeRecipient() external returns (address) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
@@ -16,8 +21,6 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
 
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own
@@ -27,23 +30,138 @@ methods {
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+    function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
 }
 
-/// HELPERS ///
-
-// Under noSlash, all mulDiv calls in _updatePosition hit y == d (identity) or y == 0.
-function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (x == 0 || y == 0) return 0;
-    if (d > 0 && y == d) return x;
-    uint256 res;
-    return res;
+function signerSummary() returns address {
+    address returnedSigner;
+    require returnedSigner != Utils.passiveFeeRecipient(), "passive fee recipient can't sign";
+    return returnedSigner;
 }
 
-// All rules in this file assume no accrual and no slash.
-definition noAccrual(env e, bytes32 id, address user) returns bool = currentContract.position[id][user].pendingFee == 0 || e.block.timestamp == currentContract.position[id][user].lastAccrual;
+/// The passive fee recipient can't authorize another account, because it can't sign
+/// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
+strong invariant feeRecipientCantAuthorize(address authorized)
+    !isAuthorized(Utils.passiveFeeRecipient(), authorized)
+    {
+        preserved with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
 
-definition noSlash(bytes32 id, address user) returns bool = currentContract.position[id][user].lossIndex == currentContract.obligationState[id].lossIndex && currentContract.position[id][user].lossIndex < max_uint128;
+/// The passive fee recipient has no pending fee, because they only receive credit via fee accrual
+/// and never participate in take.
+strong invariant feeRecipientHasNoPendingFee(bytes32 id)
+    pendingFee(id, Utils.passiveFeeRecipient()) == 0
+    {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
+
+/// The passive fee recipient has no debt, because they only receive credit via fee accrual
+/// and never participate in take.
+strong invariant feeRecipientHasNoDebt(bytes32 id)
+    debtOf(id, Utils.passiveFeeRecipient()) == 0
+    {
+        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
+            require e.msg.sender != Utils.passiveFeeRecipient(), "passive fee recipient can't sign or call";
+            requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+        }
+    }
+
+/// UPDATE POSITION ///
+
+/// updatePosition sets user's credit to the post-update value
+/// and only changes credit of user and passive fee recipient at the obligation id.
+rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
+    bytes32 id = toId(e, obligation);
+    address passiveFeeRecipient = Utils.passiveFeeRecipient();
+
+    requireInvariant feeRecipientHasNoPendingFee(id);
+
+    uint128 updatedUserCredit;
+    uint128 userFee;
+    updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, user);
+
+    uint256 anyCredit = creditOf(anyId, anyUser);
+    uint256 anyDebt = debtOf(anyId, anyUser);
+    uint256 feeRecipientCredit = creditOf(id, passiveFeeRecipient);
+
+    updatePosition(e, obligation, user);
+
+    assert debtOf(anyId, anyUser) == anyDebt;
+    assert (anyId != id) || (anyUser != passiveFeeRecipient && anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
+    assert creditOf(id, user) == updatedUserCredit;
+
+    // When the fee recipient is the user he is slashed so his pre-call balance is too high.
+    assert user != passiveFeeRecipient => creditOf(id, passiveFeeRecipient) == feeRecipientCredit + userFee;
+    assert user == passiveFeeRecipient => userFee == 0;
+}
+
+/// WITHDRAW ///
+
+/// withdraw decreases onBehalf's post-update credit by exactly units
+/// and only changes credit of onBehalf and passive fee recipient at the obligation id.
+rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
+    bytes32 id = toId(e, obligation);
+    address passiveFeeRecipient = Utils.passiveFeeRecipient();
+
+    requireInvariant feeRecipientHasNoPendingFee(id);
+
+    uint128 updatedUserCredit;
+    uint128 userFee;
+    updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, onBehalf);
+
+    uint256 anyCredit = creditOf(anyId, anyUser);
+    uint256 anyDebt = debtOf(anyId, anyUser);
+    uint256 feeRecipientCredit = creditOf(id, passiveFeeRecipient);
+
+    withdraw(e, obligation, units, onBehalf, receiver);
+
+    assert creditOf(id, onBehalf) == updatedUserCredit - units;
+    assert debtOf(anyId, anyUser) == anyDebt;
+    assert (anyId != id) || (anyUser != passiveFeeRecipient && anyUser != onBehalf) => creditOf(anyId, anyUser) == anyCredit;
+
+    // When feeRecipient is onBehalf he is slashed & loses his withdrawn amount.
+    assert onBehalf != passiveFeeRecipient => creditOf(id, passiveFeeRecipient) == feeRecipientCredit + userFee;
+}
+
+/// TAKE ///
+
+/// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
+/// and only changes credit of maker, taker, and passive fee recipient and debt of maker and taker at the obligation id.
+/// Assumes the passive fee recipient can't sign or call since its address derives from the hash of a human readable string.
+rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
+    bytes32 id = toId(e, offer.obligation);
+    address passiveFeeRecipient = Utils.passiveFeeRecipient();
+
+    require e.msg.sender != passiveFeeRecipient, "passive fee recipient can't sign or call";
+    requireInvariant feeRecipientCantAuthorize(e.msg.sender);
+
+    uint128 makerCreditBefore;
+    makerCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, offer.maker);
+    uint128 takerCreditBefore;
+    takerCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, taker);
+    mathint makerNetBefore = to_mathint(makerCreditBefore) - to_mathint(debtOf(id, offer.maker));
+    mathint takerNetBefore = to_mathint(takerCreditBefore) - to_mathint(debtOf(id, taker));
+    uint256 otherCreditBefore = creditOf(anyId, anyUser);
+    uint256 otherDebtBefore = debtOf(anyId, anyUser);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+
+    mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
+    mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
+
+    mathint makerDelta = offer.buy ? units : -units;
+    assert makerNetAfter == makerNetBefore + makerDelta;
+    mathint takerDelta = offer.buy ? -units : units;
+    assert takerNetAfter == takerNetBefore + takerDelta;
+    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
+    assert anyId != id || (anyUser != offer.maker && anyUser != taker && anyUser != passiveFeeRecipient) => creditOf(anyId, anyUser) == otherCreditBefore;
+}
 
 /// REPAY ///
 
@@ -62,57 +180,9 @@ rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address 
     assert anyUser != onBehalf || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
 }
 
-/// WITHDRAW ///
-
-/// When no slash or accrual occurs, withdraw decreases onBehalf's credit by exactly units
-/// and only changes position[id][onBehalf].
-rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, obligation);
-    require noSlash(id, onBehalf);
-    require noAccrual(e, id, onBehalf);
-
-    uint256 creditBefore = creditOf(id, onBehalf);
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
-
-    withdraw(e, obligation, units, onBehalf, receiver);
-
-    assert creditOf(id, onBehalf) == creditBefore - units;
-    assert debtOf(anyId, anyUser) == otherDebtBefore;
-    assert anyUser != onBehalf || anyId != id => creditOf(anyId, anyUser) == otherCreditBefore;
-}
-
-/// TAKE ///
-
-/// When no slash or accrual occurs, take changes maker's and taker's net credit-debt by +/- units
-/// and only changes credit and debt of maker and taker at the obligation id.
-rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, offer.obligation);
-    require noSlash(id, offer.maker);
-    require noSlash(id, taker);
-    require noAccrual(e, id, offer.maker);
-    require noAccrual(e, id, taker);
-
-    mathint makerNetBefore = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
-    mathint takerNetBefore = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-
-    mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
-    mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
-
-    mathint makerDelta = offer.buy ? units : -units;
-    assert makerNetAfter == makerNetBefore + makerDelta;
-    mathint takerDelta = offer.buy ? -units : units;
-    assert takerNetAfter == takerNetBefore + takerDelta;
-    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore && debtOf(anyId, anyUser) == otherDebtBefore;
-}
-
 /// LIQUIDATE ///
 
-/// When no fee accrual occurs, liquidate decreases the borrower's debt by at least repaidUnits,
+/// Liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
 rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
@@ -128,25 +198,6 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
     assert anyUser != borrower || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
-}
-
-/// SLASH AND ACCRUE ///
-
-/// When no slash or accrual occurs, updatePosition does not change credit or debt.
-rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
-    bytes32 id = toId(e, obligation);
-    require noSlash(id, user);
-    require noAccrual(e, id, user);
-
-    uint256 creditBefore = creditOf(id, user);
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
-
-    updatePosition(e, obligation, user);
-
-    assert creditOf(id, user) == creditBefore;
-    assert debtOf(anyId, anyUser) == otherDebtBefore;
-    assert anyUser != user || anyId != id => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
 /// ALL OTHER FUNCTIONS ///

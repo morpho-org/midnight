@@ -14,7 +14,16 @@ import {
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
+    ROOT_TYPEHASH,
+    LLTV_0,
+    LLTV_1,
+    LLTV_2,
+    LLTV_3,
+    LLTV_4,
+    LLTV_5,
+    LLTV_6,
+    LLTV_7,
+    LLTV_8
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
@@ -222,13 +231,19 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
+    /// @dev Returns an allowed LLTV tier based on a seed value.
+    function allowedLltv(uint256 seed) internal pure returns (uint256) {
+        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
+        return tiers[seed % 9];
+    }
+
     /// @dev Returns an obligation with sorted, unique collaterals, valid lltv/maxLif, and a creatable TTM.
     function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
         uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
         Collateral[] memory collaterals = new Collateral[](len);
         for (uint256 i = 0; i < len; i++) {
             collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
-            uint256 lltv = obligation.collaterals[i].lltv > WAD ? WAD : obligation.collaterals[i].lltv;
+            uint256 lltv = allowedLltv(obligation.collaterals[i].lltv);
             collaterals[i].lltv = lltv;
             collaterals[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
