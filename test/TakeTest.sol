@@ -306,15 +306,15 @@ contract TakeTest is BaseTest {
         assertEq(loanToken.balanceOf(otherLender), buyerAssets, "otherLender balance");
     }
 
-    // exitOnly tests.
+    // reduceOnly tests.
 
-    function testExitOnlyBuySuccess(uint256 existingUnits, uint256 exitUnits) public {
+    function testReduceOnlyBuySuccess(uint256 existingUnits, uint256 exitUnits) public {
         existingUnits = bound(existingUnits, 1, maxAssets);
         exitUnits = bound(exitUnits, 1, existingUnits);
         setupOtherUsers(obligation, existingUnits);
 
         otherBorrowerOffer.maxUnits = exitUnits;
-        otherBorrowerOffer.exitOnly = true;
+        otherBorrowerOffer.reduceOnly = true;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), otherBorrower, exitUnits.mulDivUp(price, WAD));
@@ -331,25 +331,25 @@ contract TakeTest is BaseTest {
         assertEq(midnight.totalUnits(id), totalUnitsBefore, "total units");
     }
 
-    function testExitOnlyBuyRevert(uint256 existingUnits, uint256 exitUnits) public {
+    function testReduceOnlyBuyRevert(uint256 existingUnits, uint256 exitUnits) public {
         existingUnits = bound(existingUnits, 1, maxAssets - 1);
         exitUnits = bound(exitUnits, existingUnits + 1, maxAssets);
         setupOtherUsers(obligation, existingUnits);
 
         otherBorrowerOffer.maxUnits = exitUnits;
-        otherBorrowerOffer.exitOnly = true;
+        otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert("crossed");
+        vm.expectRevert("maker credit or debt increased");
         take(exitUnits, borrower, otherBorrowerOffer);
     }
 
-    function testExitOnlySellSuccess(uint256 existingUnits, uint256 exitUnits) public {
+    function testReduceOnlySellSuccess(uint256 existingUnits, uint256 exitUnits) public {
         existingUnits = bound(existingUnits, 1, maxAssets);
         exitUnits = bound(exitUnits, 1, existingUnits);
         setupOtherUsers(obligation, existingUnits);
 
         otherLenderOffer.maxUnits = exitUnits;
-        otherLenderOffer.exitOnly = true;
+        otherLenderOffer.reduceOnly = true;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, exitUnits.mulDivUp(price, WAD));
@@ -366,15 +366,15 @@ contract TakeTest is BaseTest {
         assertEq(midnight.totalUnits(id), totalUnitsBefore, "total units");
     }
 
-    function testExitOnlySellRevert(uint256 existingUnits, uint256 exitUnits) public {
+    function testReduceOnlySellRevert(uint256 existingUnits, uint256 exitUnits) public {
         existingUnits = bound(existingUnits, 1, maxAssets - 1);
         exitUnits = bound(exitUnits, existingUnits + 1, maxAssets);
         setupOtherUsers(obligation, existingUnits);
 
         otherLenderOffer.maxUnits = exitUnits;
-        otherLenderOffer.exitOnly = true;
+        otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert("crossed");
+        vm.expectRevert("maker credit or debt increased");
         take(exitUnits, lender, otherLenderOffer);
     }
 

@@ -34,7 +34,7 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
-    bool exitOnly;
+    bool reduceOnly;
     uint256 maxUnits;
     uint256 maxSellerAssets;
     uint256 maxBuyerAssets;
