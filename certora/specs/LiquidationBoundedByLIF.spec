@@ -21,6 +21,9 @@ methods {
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
 /// SUMMARIES ///
@@ -33,9 +36,35 @@ persistent ghost summaryPrice(address) returns uint256;
 
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
 
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d.
+        d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d.
+        d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+}
+
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d.
+        d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d.
+        d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+}
+
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) { revert(); }
+    return ghostMulDivDown(x, y, d);
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) { revert(); }
+    return ghostMulDivUp(x, y, d);
+}
+
 /// INVARIANTS ///
 
-/// Proven in BitmapSummaries.spec; assumed here via requireInvariant (not re-proven in this spec).
+/// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 idx)
     idx < 128 => (collateralOf(id, user, idx) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, idx));
 
@@ -64,7 +93,9 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
 
-    require collateralIndex < 128, "collateralIndex must be less than 128";
+    // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec,
+    // which validates the bitmap abstraction from BitmapSummaries.spec against Bitmap.spec.
+    // liquidate reverts when collateralIndex >= 128, so the invariant is a no-op in that case.
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
     requireInvariant nonZeroCollateralsAreActivated(id0, borrower, collateralIndex);
 
