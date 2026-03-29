@@ -26,7 +26,6 @@ struct Offer {
     Obligation obligation;
     bool buy;
     address maker;
-    uint256 maxUnits;
     uint256 start;
     uint256 expiry;
     uint256 tick;
@@ -35,7 +34,10 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
-    bool exitOnly;
+    bool reduceOnly;
+    uint256 maxUnits;
+    uint256 maxSellerAssets;
+    uint256 maxBuyerAssets;
 }
 
 struct Signature {

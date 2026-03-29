@@ -798,6 +798,7 @@ contract LiquidationTest is BaseTest {
                     .mulDivUp(WAD, _collateral.maxLif)
             );
             require(i < 128, "i is too large");
+            // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
             bitmap ^= uint128(1 << i);
         }
         return badDebt;
