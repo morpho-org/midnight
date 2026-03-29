@@ -244,6 +244,118 @@ contract BundlerTest is BaseTest {
         }
     }
 
+    // Partially consumed offers.
+
+    function testBundleTakeUnitsPartiallyConsumed() public {
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+
+        collateralize(obligation, borrower, 130);
+        _authorizeBundler();
+
+        // Pre-consume 30 from offer 0.
+        midnight.take(
+            30, borrower, address(0), "", address(0), offers[0], sig([offers[0]]), root([offers[0]]), proof([offers[0]])
+        );
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+        takes[1] = TakeBundler.Take({
+            offer: offers[1], units: 100, sig: sig([offers[1]]), root: root([offers[1]]), proof: proof([offers[1]])
+        });
+
+        // Offer 0 has 70 available; bundler caps and fills 30 from offer 1.
+        vm.prank(borrower);
+        takeBundler.bundleTakeUnits(
+            midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
+        );
+
+        assertEq(midnight.consumed(offers[0].maker, offers[0].group), 100, "consumed offer 0");
+        assertEq(midnight.consumed(offers[1].maker, offers[1].group), 30, "consumed offer 1");
+        assertEq(midnight.debtOf(id, borrower), 130, "debt");
+    }
+
+    function testBundleTakeBuyerAssetsPartiallyConsumed() public {
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 targetBuyerAssets = uint256(100).mulDivDown(price, WAD);
+
+        collateralize(obligation, borrower, 130);
+        _authorizeBundler();
+
+        // Pre-consume 30 from offer 0.
+        midnight.take(
+            30, borrower, address(0), "", address(0), offers[0], sig([offers[0]]), root([offers[0]]), proof([offers[0]])
+        );
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+        takes[1] = TakeBundler.Take({
+            offer: offers[1], units: 100, sig: sig([offers[1]]), root: root([offers[1]]), proof: proof([offers[1]])
+        });
+
+        vm.prank(borrower);
+        takeBundler.bundleTakeBuyerAssets(
+            midnight, targetBuyerAssets, borrower, address(0), takes, 0, type(uint256).max
+        );
+
+        uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+        uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+        assertEq(consumed0 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+        assertEq(
+            loanToken.balanceOf(lender),
+            type(uint256).max - targetBuyerAssets - uint256(30).mulDivDown(price, WAD),
+            "lender balance"
+        );
+    }
+
+    function testBundleTakeSellerAssetsPartiallyConsumed() public {
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 targetSellerAssets = uint256(100).mulDivDown(sellerPrice, WAD);
+
+        // Extra collateral headroom for the potential extra unit of debt.
+        collateralize(obligation, borrower, 131);
+        _authorizeBundler();
+
+        // Pre-consume 30 from offer 0.
+        midnight.take(
+            30, borrower, address(0), "", borrower, offers[0], sig([offers[0]]), root([offers[0]]), proof([offers[0]])
+        );
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+        takes[1] = TakeBundler.Take({
+            offer: offers[1], units: 100, sig: sig([offers[1]]), root: root([offers[1]]), proof: proof([offers[1]])
+        });
+
+        vm.prank(borrower);
+        takeBundler.bundleTakeSellerAssets(
+            midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
+        );
+
+        uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+        uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+        assertEq(consumed0 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+        assertEq(
+            loanToken.balanceOf(borrower),
+            targetSellerAssets + uint256(30).mulDivDown(sellerPrice, WAD),
+            "borrower balance"
+        );
+    }
+
     // Average prices.
 
     function _minTick() internal view returns (uint256) {

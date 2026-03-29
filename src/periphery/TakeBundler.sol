@@ -5,6 +5,8 @@ pragma solidity 0.8.31;
 import {Midnight} from "../Midnight.sol";
 import {Offer, Signature} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {TickLib} from "../libraries/TickLib.sol";
+import {WAD} from "../libraries/ConstantsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 contract TakeBundler {
@@ -35,13 +37,15 @@ contract TakeBundler {
         uint256 maxSellerAssets
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
+        bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
 
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            uint256 available = _availableUnits(midnight, id, takes[i].offer);
             try midnight.take(
-                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                UtilsLib.min(targetUnits - totalFilledUnits, UtilsLib.min(takes[i].units, available)),
                 taker,
                 address(0),
                 "",
@@ -86,12 +90,13 @@ contract TakeBundler {
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+            uint256 available = _availableUnits(midnight, id, takes[i].offer);
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.buyerAssetsToUnits(
                         midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
                     ),
-                    takes[i].units
+                    UtilsLib.min(takes[i].units, available)
                 ),
                 taker,
                 address(0),
@@ -133,12 +138,13 @@ contract TakeBundler {
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+            uint256 available = _availableUnits(midnight, id, takes[i].offer);
             try midnight.take(
                 UtilsLib.min(
                     TakeAmountsLib.sellerAssetsToUnits(
                         midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
                     ),
-                    takes[i].units
+                    UtilsLib.min(takes[i].units, available)
                 ),
                 taker,
                 address(0),
@@ -159,5 +165,26 @@ contract TakeBundler {
         require(totalFilledSellerAssets == targetSellerAssets, "insufficient liquidity");
         require(totalUnits >= minUnits, "units below min");
         require(totalUnits <= maxUnits, "units above max");
+    }
+
+    function _availableUnits(Midnight midnight, bytes32 id, Offer memory offer) private view returns (uint256) {
+        uint256 currentConsumed = midnight.consumed(offer.maker, offer.group);
+        if (offer.maxSellerAssets > 0) {
+            uint256 remaining = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
+            uint256 offerPrice = TickLib.tickToPrice(offer.tick);
+            uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+            uint256 sellerPrice = offer.buy ? offerPrice - midnight.tradingFee(id, timeToMaturity) : offerPrice;
+            return remaining.mulDivDown(WAD, sellerPrice);
+        } else if (offer.maxBuyerAssets > 0) {
+            uint256 remaining = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
+            uint256 offerPrice = TickLib.tickToPrice(offer.tick);
+            uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+            uint256 _tradingFee = midnight.tradingFee(id, timeToMaturity);
+            uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + _tradingFee;
+            return remaining.mulDivDown(WAD, buyerPrice);
+        } else if (offer.maxUnits > 0) {
+            return offer.maxUnits.zeroFloorSub(currentConsumed);
+        }
+        return type(uint256).max;
     }
 }
