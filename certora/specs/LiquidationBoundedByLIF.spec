@@ -37,28 +37,28 @@ persistent ghost summaryPrice(address) returns uint256;
 persistent ghost summaryObligationId(address, uint256) returns bytes32;
 
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
 
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
 }
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     bool overflow;
-    if (overflow || d == 0) { revert(); }
+    if (overflow || d == 0) {
+        revert();
+    }
     return ghostMulDivDown(x, y, d);
 }
 
 function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     bool overflow;
-    if (overflow || d == 0) { revert(); }
+    if (overflow || d == 0) {
+        revert();
+    }
     return ghostMulDivUp(x, y, d);
 }
 
