@@ -96,19 +96,22 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
-rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+rule obligationLossIndexMonotonicallyDecreases(bytes32 id, method f, env e, calldataarg args) {
+    require Midnight.obligationCreated(id);
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
     uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter >= lossIndexBefore;
+    assert lossIndexAfter <= lossIndexBefore;
 }
 
-rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
-    uint128 lossIndexBefore = userLossIndex(id, user);
+rule userLossIndexMonotonicallyDecreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant userLossIndexGeqObligationLossIndex(id, user);
+    requireInvariant positionLossIndexIsZeroIfNotCreated(id, user);
+    uint128 lossIndexBefore = currentContract.position[id][user].lossIndex;
+    require lossIndexBefore > 0;
     f(e, args);
-    uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter >= lossIndexBefore;
+    uint128 lossIndexAfter = currentContract.position[id][user].lossIndex;
+    assert lossIndexAfter <= lossIndexBefore;
 }
 
 /// INVARIANTS ///
@@ -124,8 +127,18 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
-strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+/// Position lossIndex is zero for obligations that have not been created yet.
+strong invariant positionLossIndexIsZeroIfNotCreated(bytes32 id, address user)
+    !currentContract.obligationState[id].created => currentContract.position[id][user].lossIndex == 0;
+
+/// 1 - userLossIndex <= 1 - obligationLossIndex, i.e. obligation lossIndex <= user lossIndex for initialized positions.
+strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
+    !currentContract.obligationState[id].created || currentContract.position[id][user].lossIndex == 0 || currentContract.position[id][user].lossIndex >= currentContract.obligationState[id].lossIndex
+    {
+        preserved with (env e) {
+            requireInvariant positionLossIndexIsZeroIfNotCreated(id, user);
+        }
+    }
 
 /// A user cannot have both credit and debt, excluding PASSIVE_FEE_RECIPIENT who receives
 /// credit from fee accrual and could theoretically be a trade participant.

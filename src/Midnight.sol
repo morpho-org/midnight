@@ -62,7 +62,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The fee recipient is not slashed when receiving fees, so it will be slashed a bit too much later.
 ///
 /// ROUNDINGS
-/// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev lossIndex is rounded down so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
 /// afterwards (bad debt can no longer be realized).
@@ -481,11 +481,8 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            _obligationState.lossIndex = UtilsLib.toUint128(
-                type(uint128).max
-                    - (type(uint128).max - _obligationState.lossIndex)
-                    .mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
-            );
+            _obligationState.lossIndex =
+                UtilsLib.toUint128(_obligationState.lossIndex.mulDivDown(oldTotalUnits - badDebt, oldTotalUnits));
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
         }
 
@@ -606,6 +603,7 @@ contract Midnight is IMidnight {
             }
 
             obligationState[id].created = true;
+            obligationState[id].lossIndex = type(uint128).max;
             obligationState[id].fees = defaultTradingFees[obligation.loanToken];
             obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
@@ -627,9 +625,7 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
         uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
-            : 0;
+        uint256 postSlashCredit = _lossIndex > 0 ? credit.mulDivDown(obligationState[id].lossIndex, _lossIndex) : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
