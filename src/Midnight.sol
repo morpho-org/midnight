@@ -224,11 +224,11 @@ contract Midnight is IMidnight {
             (bytes32 root, bytes32[] memory proof, Signature memory sig) =
                 abi.decode(ratificationData, (bytes32, bytes32[], Signature));
             require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-            address recoveredSigner = signer(root, sig);
-            if (recoveredSigner == address(0)) {
+            address _signer = signer(root, sig);
+            if (_signer == address(0)) {
                 require(ratified[offer.maker][root], "offer not ratified");
             } else {
-                require(recoveredSigner == offer.maker, "invalid signature");
+                require(_signer == offer.maker || isAuthorized[offer.maker][_signer], "invalid signature");
             }
         } else {
             require(
@@ -803,13 +803,16 @@ contract Midnight is IMidnight {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
+    /// @dev Returns 0 if the signature is not valid.
     function signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        if (signature.v == 0) return address(0);
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
+        if (signature.v == 0) {
+            return address(0);
+        } else {
+            bytes32 hashStruct = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), hashStruct));
+            address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+            return tentativeSigner;
+        }
     }
 
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {

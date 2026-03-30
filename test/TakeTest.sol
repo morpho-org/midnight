@@ -860,6 +860,23 @@ contract TakeTest is BaseTest {
         );
     }
 
+    function testOfferAuthorizationAuthorizedSigner(uint256 makerSecretKey, address sender, uint256 otherSecretKey)
+        public
+    {
+        makerSecretKey = boundPrivateKey(makerSecretKey);
+        otherSecretKey = boundPrivateKey(otherSecretKey);
+        vm.assume(otherSecretKey != makerSecretKey);
+        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
+        privateKey[vm.addr(otherSecretKey)] = otherSecretKey;
+        lenderOffer.maker = vm.addr(makerSecretKey);
+        vm.prank(lenderOffer.maker);
+        midnight.setIsAuthorized(lenderOffer.maker, vm.addr(otherSecretKey), true);
+        vm.prank(sender);
+        midnight.take(
+            0, sender, address(0), hex"", sender, lenderOffer, signProof([lenderOffer], vm.addr(otherSecretKey))
+        );
+    }
+
     function testTakeOfferNotAuthorized(address taker, address sender) public {
         vm.assume(taker != lenderOffer.maker);
         vm.assume(taker != sender);
