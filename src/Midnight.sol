@@ -268,6 +268,7 @@ contract Midnight is IMidnight {
             buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
             sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
             newConsumed = currentConsumed + sellerAssets;
+            assert(newConsumed <= offer.maxSellerAssets);
         } else if (offer.maxBuyerAssets > 0) {
             uint256 remaining = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
             if (remaining <= type(uint256).max / WAD) {
@@ -276,11 +277,13 @@ contract Midnight is IMidnight {
             buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
             sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
             newConsumed = currentConsumed + buyerAssets;
+            assert(newConsumed <= offer.maxBuyerAssets);
         } else {
             units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
             buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
             sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
             newConsumed = currentConsumed + units;
+            assert(newConsumed <= offer.maxUnits);
         }
         consumed[offer.maker][offer.group] = newConsumed;
 
