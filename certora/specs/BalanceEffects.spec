@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
+using Midnight as Midnight;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -12,6 +13,7 @@ methods {
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
+    function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
@@ -109,6 +111,8 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, addre
     bytes32 id = toId(e, obligation);
     address passiveFeeRecipient = Utils.passiveFeeRecipient();
 
+    // The obligation must be created for updatePositionView to reflect the post-touchObligation state.
+    require Midnight.obligationCreated(id);
     requireInvariant feeRecipientHasNoPendingFee(id);
 
     uint128 updatedUserCredit;
@@ -138,6 +142,8 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     bytes32 id = toId(e, offer.obligation);
     address passiveFeeRecipient = Utils.passiveFeeRecipient();
 
+    // The obligation must be created for updatePositionView to reflect the post-touchObligation state.
+    require Midnight.obligationCreated(id);
     require e.msg.sender != passiveFeeRecipient, "passive fee recipient can't sign or call";
     requireInvariant feeRecipientCantAuthorize(e.msg.sender);
 

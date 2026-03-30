@@ -627,7 +627,8 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
         uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex > 0 ? credit.mulDivDown(obligationState[id].lossIndex, _lossIndex) : 0;
+        uint256 postSlashCredit =
+            credit.mulDivDown(obligationState[id].lossIndex, _lossIndex > 0 ? _lossIndex : type(uint128).max);
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
