@@ -7,8 +7,8 @@ methods {
     function ratified(address user, bytes32 root) external returns (bool) envfree;
 
     function _.price() external => NONDET;
-    function _.onBuy(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(Midnight.Offer, address, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(Midnight.Offer, bool, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(Midnight.Offer, bool, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 

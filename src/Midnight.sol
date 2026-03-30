@@ -219,12 +219,12 @@ contract Midnight is IMidnight {
         require(offer.maker != taker, "buyer and seller cannot be the same");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
-        address offerSigner = signer(root, sig);
+        address _signer = signer(root, sig);
         bool offerPreRatified;
-        if (offerSigner == address(0)) {
+        if (_signer == address(0)) {
             offerPreRatified = ratified[offer.maker][root];
         } else {
-            offerPreRatified = offerSigner == offer.maker || isAuthorized[offer.maker][offerSigner];
+            offerPreRatified = _signer == offer.maker || isAuthorized[offer.maker][_signer];
         }
         require(offerPreRatified || isAuthorized[offer.maker][offer.callback], "unauthorized");
 
@@ -325,15 +325,8 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             require(
                 ICallbacks(buyerCallback)
-                    .onBuy(
-                        offer,
-                        (offer.buy && !offerPreRatified) ? offerSigner : address(1),
-                        buyer,
-                        buyerAssets,
-                        sellerAssets,
-                        units,
-                        buyerCallbackData
-                    ) == CALLBACK_SUCCESS,
+                    .onBuy(offer, offerPreRatified, buyer, buyerAssets, sellerAssets, units, buyerCallbackData)
+                == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }
@@ -344,15 +337,8 @@ contract Midnight is IMidnight {
         if (sellerCallback != address(0)) {
             require(
                 ICallbacks(sellerCallback)
-                    .onSell(
-                        offer,
-                        (!offer.buy && !offerPreRatified) ? offerSigner : address(1),
-                        seller,
-                        buyerAssets,
-                        sellerAssets,
-                        units,
-                        sellerCallbackData
-                    ) == CALLBACK_SUCCESS,
+                    .onSell(offer, offerPreRatified, seller, buyerAssets, sellerAssets, units, sellerCallbackData)
+                == CALLBACK_SUCCESS,
                 "callback failed"
             );
         }

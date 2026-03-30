@@ -649,7 +649,7 @@ contract TakeTest is BaseTest {
         signerPrivateKey = boundPrivateKey(signerPrivateKey);
         vm.assume(maker != sender);
         vm.assume(vm.addr(signerPrivateKey) != maker);
-        SignerRecordingCallback callback = new SignerRecordingCallback();
+        RatifiedRecordingCallback callback = new RatifiedRecordingCallback();
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
         privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
@@ -668,7 +668,7 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(callback.recordedSigner(), vm.addr(signerPrivateKey), "recorded signer");
+        assertEq(callback.recordedRatified(), false, "recorded ratified");
     }
 
     function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
@@ -757,11 +757,11 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeMakerCallbackGetsAddress1WhenPreRatified(uint256 makerPrivateKey, address sender) public {
+    function testTakeMakerCallbackGetsTrueWhenPreRatified(uint256 makerPrivateKey, address sender) public {
         makerPrivateKey = boundPrivateKey(makerPrivateKey);
         address maker = vm.addr(makerPrivateKey);
         privateKey[maker] = makerPrivateKey;
-        SignerRecordingCallback callback = new SignerRecordingCallback();
+        RatifiedRecordingCallback callback = new RatifiedRecordingCallback();
         lenderOffer.maker = maker;
         lenderOffer.callback = address(callback);
 
@@ -777,7 +777,7 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(callback.recordedSigner(), address(1), "recorded signer");
+        assertEq(callback.recordedRatified(), true, "recorded ratified");
     }
 
     function testTakeRevertsOnUnauthorizedSigner(uint256 makerSecretKey, address sender, uint256 otherSecretKey)
@@ -1081,7 +1081,7 @@ contract TakeTest is BaseTest {
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
 
-    function onSell(Offer memory offer, address, address seller, uint256, uint256, uint256, bytes memory data)
+    function onSell(Offer memory offer, bool, address seller, uint256, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1093,7 +1093,7 @@ contract BorrowCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onBuy(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1107,7 +1107,7 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    function onBuy(Offer memory offer, address, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
+    function onBuy(Offer memory offer, bool, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1116,7 +1116,7 @@ contract LendCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onSell(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1130,7 +1130,7 @@ contract LendCallback is ICallbacks {
 contract RejectingCallback {
     bool public returnBool = true;
 
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onBuy(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         view
         returns (bytes32)
@@ -1139,7 +1139,7 @@ contract RejectingCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onSell(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         view
         returns (bytes32)
@@ -1156,7 +1156,7 @@ contract RejectingCallback {
 }
 
 contract WrongMagicCallback {
-    function onBuy(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onBuy(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1164,7 +1164,7 @@ contract WrongMagicCallback {
         return bytes32(uint256(1));
     }
 
-    function onSell(Offer memory, address, address, uint256, uint256, uint256, bytes memory)
+    function onSell(Offer memory, bool, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1175,22 +1175,22 @@ contract WrongMagicCallback {
     function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 }
 
-contract SignerRecordingCallback {
-    address public recordedSigner;
+contract RatifiedRecordingCallback {
+    bool public recordedRatified;
 
-    function onBuy(Offer memory, address _signer, address, uint256, uint256, uint256, bytes memory)
+    function onBuy(Offer memory, bool _ratified, address, uint256, uint256, uint256, bytes memory)
         external
         returns (bytes32)
     {
-        recordedSigner = _signer;
+        recordedRatified = _ratified;
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(Offer memory, address _signer, address, uint256, uint256, uint256, bytes memory)
+    function onSell(Offer memory, bool _ratified, address, uint256, uint256, uint256, bytes memory)
         external
         returns (bytes32)
     {
-        recordedSigner = _signer;
+        recordedRatified = _ratified;
         return CALLBACK_SUCCESS;
     }
 
