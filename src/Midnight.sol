@@ -62,6 +62,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The fee recipient is not slashed when receiving fees, so it will be slashed a bit too much later.
 ///
 /// ROUNDINGS
+/// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
+/// for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
@@ -248,8 +250,6 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        _updatePosition(offer.obligation, id, offer.maker);
-        _updatePosition(offer.obligation, id, taker);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -302,6 +302,10 @@ contract Midnight is IMidnight {
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
+
+        if (buyerPos.credit > 0 || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
+        if (sellerPos.credit > 0) _updatePosition(offer.obligation, id, seller);
+
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);

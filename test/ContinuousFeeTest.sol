@@ -262,8 +262,10 @@ contract ContinuousFeeTest is BaseTest {
         uint256 sellerPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
 
-        vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
+        if (exitAmount > 0) {
+            vm.expectEmit();
+            emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
+        }
         vm.expectEmit();
         emit EventsLib.UpdatePosition(
             id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
