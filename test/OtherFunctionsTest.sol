@@ -11,6 +11,7 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
+    MAX_CONTINUOUS_FEE,
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF
@@ -36,8 +37,8 @@ contract OtherFunctionsTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -45,8 +46,8 @@ contract OtherFunctionsTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -195,12 +196,19 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(_obligation.collaterals.length > 0);
         _obligation = validObligation(_obligation);
 
+        midnight.setDefaultContinuousFee(_obligation.loanToken, MAX_CONTINUOUS_FEE);
+        for (uint256 i = 0; i < 7; i++) {
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+        }
+
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
         uint16[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
-            assertEq(fees[i], midnight.defaultFees(_obligation.loanToken, i), "fees");
+            assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
+            assertGt(fees[i], 0, "fee nonzero");
         }
+        assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
     }
 
     function testToObligation(Obligation memory _obligation) public {
@@ -256,8 +264,8 @@ contract OtherFunctionsTest is BaseTest {
         Collateral[] memory collaterals = new Collateral[](1);
         collaterals[0] = Collateral({
             token: address(collateralToken1),
-            lltv: 0.75e18,
-            maxLif: maxLif(0.75e18, 0.25e18),
+            lltv: 0.77e18,
+            maxLif: maxLif(0.77e18, 0.25e18),
             oracle: address(revertingOracle)
         });
 
@@ -280,8 +288,8 @@ contract OtherFunctionsTest is BaseTest {
         Collateral[] memory collaterals = new Collateral[](1);
         collaterals[0] = Collateral({
             token: address(collateralToken1),
-            lltv: 0.75e18,
-            maxLif: maxLif(0.75e18, 0.25e18),
+            lltv: 0.77e18,
+            maxLif: maxLif(0.77e18, 0.25e18),
             oracle: address(revertingOracle)
         });
 
@@ -310,7 +318,7 @@ contract OtherFunctionsTest is BaseTest {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
             collaterals[i] = Collateral({
-                token: address(token), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(_oracle)
+                token: address(token), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(_oracle)
             });
         }
         collaterals = sortCollaterals(collaterals);
@@ -343,27 +351,42 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.maturity = block.timestamp + 100;
         Collateral[] memory collaterals = new Collateral[](2);
         collaterals[0] = Collateral({
-            token: address(uint160(2)), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+            token: address(uint160(2)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         collaterals[1] = Collateral({
-            token: address(uint160(1)), lltv: 0.75e18, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle2)
+            token: address(uint160(1)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle2)
         });
         _obligation.collaterals = collaterals;
         vm.expectRevert("collaterals not sorted");
         midnight.touchObligation(_obligation);
     }
 
-    function testLltvTooHigh(uint256 lltv) public {
+    function testLltvNotAllowedAboveWad(uint256 lltv) public {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
         Collateral[] memory collaterals = new Collateral[](1);
         collaterals[0] = Collateral({
-            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.75e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         _obligation.collaterals = collaterals;
-        vm.expectRevert("lltv too high");
+        vm.expectRevert("lltv not allowed");
+        midnight.touchObligation(_obligation);
+    }
+
+    function testLltvNotAllowedBelowWad() public {
+        // 0.5e18 is not an allowed LLTV tier
+        uint256 lltv = 0.5e18;
+        Obligation memory _obligation;
+        _obligation.loanToken = address(loanToken);
+        _obligation.maturity = block.timestamp + 100;
+        Collateral[] memory collaterals = new Collateral[](1);
+        collaterals[0] = Collateral({
+            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+        });
+        _obligation.collaterals = collaterals;
+        vm.expectRevert("lltv not allowed");
         midnight.touchObligation(_obligation);
     }
 
@@ -487,7 +510,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testInvalidLif(uint256 lif) public {
         lif = bound(lif, 0, type(uint256).max);
-        uint256 lltv = 0.75e18;
+        uint256 lltv = 0.77e18;
         vm.assume(lif != maxLif(lltv, 0.25e18));
         vm.assume(lif != maxLif(lltv, 0.5e18));
 
@@ -504,7 +527,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testValidLifCursor025() public {
-        uint256 lltv = 0.75e18;
+        uint256 lltv = 0.77e18;
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
@@ -519,7 +542,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testValidLifCursor05() public {
-        uint256 lltv = 0.75e18;
+        uint256 lltv = 0.77e18;
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 200;
