@@ -74,6 +74,10 @@ strong invariant feeRecipientHasNoDebt(bytes32 id)
         }
     }
 
+/// Credit is zero for obligations that have not been created yet.
+strong invariant creditIsZeroIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => creditOf(id, user) == 0;
+
 /// UPDATE POSITION ///
 
 /// updatePosition sets user's credit to the post-update value
@@ -111,8 +115,7 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, addre
     bytes32 id = toId(e, obligation);
     address passiveFeeRecipient = Utils.passiveFeeRecipient();
 
-    // The obligation must be created for updatePositionView to reflect the post-touchObligation state.
-    require Midnight.obligationCreated(id);
+    requireInvariant creditIsZeroIfNotCreated(id, onBehalf);
     requireInvariant feeRecipientHasNoPendingFee(id);
 
     uint128 updatedUserCredit;
@@ -142,8 +145,8 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     bytes32 id = toId(e, offer.obligation);
     address passiveFeeRecipient = Utils.passiveFeeRecipient();
 
-    // The obligation must be created for updatePositionView to reflect the post-touchObligation state.
-    require Midnight.obligationCreated(id);
+    requireInvariant creditIsZeroIfNotCreated(id, offer.maker);
+    requireInvariant creditIsZeroIfNotCreated(id, taker);
     require e.msg.sender != passiveFeeRecipient, "passive fee recipient can't sign or call";
     requireInvariant feeRecipientCantAuthorize(e.msg.sender);
 

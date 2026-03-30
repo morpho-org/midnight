@@ -131,9 +131,11 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 strong invariant positionLossIndexIsZeroIfNotCreated(bytes32 id, address user)
     !currentContract.obligationState[id].created => currentContract.position[id][user].lossIndex == 0;
 
-/// 1 - userLossIndex <= 1 - obligationLossIndex, i.e. obligation lossIndex <= user lossIndex for initialized positions.
+/// 1 - userLossIndex <= 1 - obligationLossIndex, i.e. obligation lossIndex <= user lossIndex for synced positions.
+/// The passive fee recipient is excluded because it receives credit without being synced.
+/// Unsynced non-fee-recipient positions must have zero credit.
 strong invariant userLossIndexGeqObligationLossIndex(bytes32 id, address user)
-    !currentContract.obligationState[id].created || currentContract.position[id][user].lossIndex == 0 || currentContract.position[id][user].lossIndex >= currentContract.obligationState[id].lossIndex
+    !currentContract.obligationState[id].created || user == Utils.passiveFeeRecipient() || (currentContract.position[id][user].lossIndex == 0 && currentContract.position[id][user].credit == 0) || currentContract.position[id][user].lossIndex >= currentContract.obligationState[id].lossIndex
     {
         preserved with (env e) {
             requireInvariant positionLossIndexIsZeroIfNotCreated(id, user);
