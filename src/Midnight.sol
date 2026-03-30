@@ -195,8 +195,6 @@ contract Midnight is IMidnight {
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
-    /// buyerPrice <= WAD.
     function take(
         uint256 units,
         address taker,
@@ -251,10 +249,19 @@ contract Midnight is IMidnight {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets;
+        uint256 sellerAssets;
+        if (offer.buy) {
+            uint256 sellerPrice = offerPrice - _tradingFee;
+            buyerAssets = units.mulDivDown(offerPrice, WAD);
+            if (_tradingFee == 0) sellerAssets = buyerAssets;
+            else sellerAssets = units.mulDivDown(sellerPrice, WAD).zeroFloorSub(1);
+        } else {
+            uint256 buyerPrice = offerPrice + _tradingFee;
+            sellerAssets = units.mulDivUp(offerPrice, WAD);
+            if (units == 0 || _tradingFee == 0) buyerAssets = sellerAssets;
+            else buyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
+        }
 
         uint256 newConsumed = consumed[offer.maker][offer.group] += units;
         require(newConsumed <= offer.maxUnits, "consumed");
