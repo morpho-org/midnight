@@ -252,15 +252,19 @@ contract Midnight is IMidnight {
         uint256 buyerAssets;
         uint256 sellerAssets;
         if (offer.buy) {
-            uint256 sellerPrice = offerPrice - _tradingFee;
             buyerAssets = units.mulDivDown(offerPrice, WAD);
-            if (_tradingFee == 0) sellerAssets = buyerAssets;
-            else sellerAssets = units.mulDivDown(sellerPrice, WAD).zeroFloorSub(1);
+            if (_tradingFee == 0) {
+                sellerAssets = buyerAssets;
+            } else {
+                sellerAssets = units.mulDivDown(offerPrice - _tradingFee, WAD).zeroFloorSub(1);
+            }
         } else {
-            uint256 buyerPrice = offerPrice + _tradingFee;
             sellerAssets = units.mulDivUp(offerPrice, WAD);
-            if (units == 0 || _tradingFee == 0) buyerAssets = sellerAssets;
-            else buyerAssets = units.mulDivUp(buyerPrice, WAD) + 1;
+            if (units == 0 || _tradingFee == 0) {
+                buyerAssets = sellerAssets;
+            } else {
+                buyerAssets = units.mulDivUp(offerPrice + _tradingFee, WAD) + 1;
+            }
         }
 
         uint256 newConsumed = consumed[offer.maker][offer.group] += units;
