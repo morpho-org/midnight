@@ -67,7 +67,7 @@ contract TakeBundler {
     }
 
     /// @dev Same as bundleTakeUnits but targets buyer assets.
-    /// @dev Not usable if buyerPrice > WAD, because not all buyerAssets are reachable then.
+    /// @dev Reverts if buyerAssetsToUnits cannot find an exact unit amount for the requested buyer assets.
     /// @dev buyerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
     /// @dev Requires a non-empty takes array.

@@ -79,6 +79,14 @@ contract TakeAmountsTest is BaseTest {
         take(positionUnits, lender, offer);
     }
 
+    function buyerAssetsToUnitsExternal(Offer memory _offer, uint256 targetBuyerAssets)
+        external
+        view
+        returns (uint256)
+    {
+        return TakeAmountsLib.buyerAssetsToUnits(midnight, id, _offer, targetBuyerAssets);
+    }
+
     // All tests use a sell offer (offer.buy = false).
     // sellerPrice = price, buyerPrice = price + fee.
 
@@ -92,6 +100,11 @@ contract TakeAmountsTest is BaseTest {
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
+        if (tradingFee > 0 && targetBuyerAssets == 1) {
+            vm.expectRevert("buyerAssets");
+            this.buyerAssetsToUnitsExternal(offer, targetBuyerAssets);
+            return;
+        }
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, targetBuyerAssets);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, units);
@@ -134,6 +147,11 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
         offer.tick = tick;
+        if (tradingFee > 0 && targetBuyerAssets == 1) {
+            vm.expectRevert("buyerAssets");
+            this.buyerAssetsToUnitsExternal(offer, targetBuyerAssets);
+            return;
+        }
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, targetBuyerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 

@@ -31,6 +31,15 @@ contract TradingFeeTest is BaseTest {
     Offer internal borrowerOffer;
     address internal feeRecipient = makeAddr("feeRecipient");
 
+    function _expectedFee(uint256 units, uint256 tradingFee, uint256 expectedBuyerAssets, uint256 expectedSellerAssets)
+        internal
+        pure
+        returns (uint256 expected)
+    {
+        expected = expectedBuyerAssets - expectedSellerAssets;
+        if (units > 0 && tradingFee > 0 && expected == 0 && expectedSellerAssets > 0) expected = 1;
+    }
+
     function setUp() public override {
         super.setUp();
 
@@ -92,7 +101,7 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice <= WAD);
         uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
@@ -112,7 +121,7 @@ contract TradingFeeTest is BaseTest {
         uint256 sellerPrice = buyerPrice - tradingFee;
         uint256 expectedBuyerAssets = units.mulDivDown(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivDown(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, borrower, lenderOffer);
@@ -133,7 +142,7 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice <= WAD);
         uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
@@ -167,7 +176,7 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice <= WAD);
         uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
@@ -196,7 +205,7 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice <= WAD);
         uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
@@ -226,7 +235,7 @@ contract TradingFeeTest is BaseTest {
         vm.assume(buyerPrice <= WAD);
         uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
+        uint256 expectedFee = _expectedFee(units, tradingFee, expectedBuyerAssets, expectedSellerAssets);
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);

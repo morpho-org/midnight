@@ -286,6 +286,10 @@ contract BundlerTest is BaseTest {
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
+        vm.assume(fromOffer0 == 0 || fromOffer0.mulDivDown(TickLib.tickToPrice(tick0), WAD) > 0);
+        vm.assume(
+            targetUnits == fromOffer0 || (targetUnits - fromOffer0).mulDivDown(TickLib.tickToPrice(tick1), WAD) > 0
+        );
 
         uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
         vm.assume(expected > 0);
@@ -337,6 +341,10 @@ contract BundlerTest is BaseTest {
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
+        vm.assume(fromOffer0 == 0 || fromOffer0.mulDivDown(TickLib.tickToPrice(tick0), WAD) > 0);
+        vm.assume(
+            targetUnits == fromOffer0 || (targetUnits - fromOffer0).mulDivDown(TickLib.tickToPrice(tick1), WAD) > 0
+        );
 
         uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
         minBuyerAssets = bound(minBuyerAssets, expected + 1, type(uint256).max);
