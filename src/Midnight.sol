@@ -316,7 +316,9 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
-        if (offer.exitOnly) require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "crossed");
+        if (offer.reduceOnly) {
+            require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "maker credit or debt increased");
+        }
 
         require(
             offer.obligation.enterGate == address(0) || buyerPos.credit == 0
@@ -448,7 +450,6 @@ contract Midnight is IMidnight {
     /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
     /// TIME_TO_MAX_LIF.
-    /// @dev Liquidating non zero amounts reverts if LLTV = 1.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
@@ -519,7 +520,9 @@ contract Midnight is IMidnight {
                 // Rounded up to avoid consecutive max liquidations.
                 // Acknowledged that the position could be slightly healthy after a liquidation.
                 // Note that debt >= maxDebt in this branch.
-                uint256 maxRepaid = (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD));
+                uint256 maxRepaid = lltv < WAD
+                    ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
+                    : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
