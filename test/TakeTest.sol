@@ -380,13 +380,11 @@ contract TakeTest is BaseTest {
 
     // group tests.
 
-    function testBuyConsumed(uint256 units, uint256 offerUnits, uint256 secondRevertingTake, uint256 secondPassingTake)
-        public
-    {
+    function testBuyConsumed(uint256 units, uint256 offerUnits, uint256 secondTake, uint256 thirdTake) public {
         units = bound(units, 0, maxAssets - 1);
         offerUnits = bound(offerUnits, units, maxAssets - 1);
-        secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
-        secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
+        secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
+        thirdTake = bound(thirdTake, 0, maxAssets);
         borrowerOffer.maxUnits = offerUnits;
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerUnits);
@@ -394,19 +392,20 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
-        take(secondRevertingTake, lender, borrowerOffer);
+        // Capped to available (offerUnits - units).
+        (,, uint256 filledUnits) = take(secondTake, lender, borrowerOffer);
+        assertEq(filledUnits, offerUnits - units, "capped units");
 
-        take(secondPassingTake, lender, borrowerOffer);
+        // Fully consumed; third take fills 0.
+        (,, uint256 filledUnits3) = take(thirdTake, lender, borrowerOffer);
+        assertEq(filledUnits3, 0, "zero fill");
     }
 
-    function testSellConsumed(uint256 units, uint256 offerUnits, uint256 secondRevertingTake, uint256 secondPassingTake)
-        public
-    {
+    function testSellConsumed(uint256 units, uint256 offerUnits, uint256 secondTake, uint256 thirdTake) public {
         units = bound(units, 0, maxAssets - 1);
         offerUnits = bound(offerUnits, units, maxAssets - 1);
-        secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
-        secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
+        secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
+        thirdTake = bound(thirdTake, 0, maxAssets);
         lenderOffer.maxUnits = offerUnits;
         lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerUnits);
@@ -414,10 +413,13 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
-        take(secondRevertingTake, borrower, lenderOffer);
+        // Capped to available (offerUnits - units).
+        (,, uint256 filledUnits) = take(secondTake, borrower, lenderOffer);
+        assertEq(filledUnits, offerUnits - units, "capped units");
 
-        take(secondPassingTake, borrower, lenderOffer);
+        // Fully consumed; third take fills 0.
+        (,, uint256 filledUnits3) = take(thirdTake, borrower, lenderOffer);
+        assertEq(filledUnits3, 0, "zero fill");
     }
 
     function testBuyGroup(uint256 firstFill, uint256 secondFill) public {
@@ -433,10 +435,9 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
-        take(secondFill + 1, lender, borrowerOffer2);
-
-        take(secondFill, lender, borrowerOffer2);
+        // Capped to available (secondFill).
+        (,, uint256 filledUnits) = take(secondFill + 1, lender, borrowerOffer2);
+        assertEq(filledUnits, secondFill, "capped units");
     }
 
     function testSellGroup(uint256 firstFill, uint256 secondFill) public {
@@ -452,10 +453,9 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
-        take(secondFill + 1, borrower, lenderOffer2);
-
-        take(secondFill, borrower, lenderOffer2);
+        // Capped to available (secondFill).
+        (,, uint256 filledUnits) = take(secondFill + 1, borrower, lenderOffer2);
+        assertEq(filledUnits, secondFill, "capped units");
     }
 
     // other tests.
@@ -600,7 +600,7 @@ contract TakeTest is BaseTest {
 
     // maxSellerAssets / maxBuyerAssets tests.
 
-    function testMaxSellerAssetsRevert() public {
+    function testMaxSellerAssetsCapped() public {
         uint256 units = 100e18;
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
@@ -608,8 +608,9 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
 
-        vm.expectRevert("consumed seller assets");
-        take(units, borrower, lenderOffer);
+        // Units capped to fit within maxSellerAssets.
+        (,, uint256 filledUnits) = take(units, borrower, lenderOffer);
+        assertTrue(filledUnits < units, "units capped");
     }
 
     function testMaxSellerAssetsPass(uint256 units) public {
@@ -625,7 +626,7 @@ contract TakeTest is BaseTest {
         assertTrue(sellerAssets > 0);
     }
 
-    function testMaxBuyerAssetsRevert() public {
+    function testMaxBuyerAssetsCapped() public {
         uint256 units = 100e18;
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
@@ -633,8 +634,9 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
 
-        vm.expectRevert("consumed buyer assets");
-        take(units, lender, borrowerOffer);
+        // Units capped to fit within maxBuyerAssets.
+        (,, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        assertTrue(filledUnits < units, "units capped");
     }
 
     function testMaxBuyerAssetsPass(uint256 units) public {

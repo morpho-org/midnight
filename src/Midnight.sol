@@ -256,20 +256,33 @@ contract Midnight is IMidnight {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-
+        uint256 currentConsumed = consumed[offer.maker][offer.group];
+        uint256 buyerAssets;
+        uint256 sellerAssets;
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, "consumed seller assets");
+            uint256 remaining = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
+            if (remaining <= type(uint256).max / WAD) {
+                units = UtilsLib.min(units, remaining.mulDivDown(WAD, sellerPrice));
+            }
+            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+            newConsumed = currentConsumed + sellerAssets;
         } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
+            uint256 remaining = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
+            if (remaining <= type(uint256).max / WAD) {
+                units = UtilsLib.min(units, remaining.mulDivDown(WAD, buyerPrice));
+            }
+            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+            newConsumed = currentConsumed + buyerAssets;
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, "consumed");
+            units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
+            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+            newConsumed = currentConsumed + units;
         }
+        consumed[offer.maker][offer.group] = newConsumed;
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
