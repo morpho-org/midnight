@@ -102,10 +102,9 @@ abstract contract BaseTest is Test {
 
     // hardcodes the right root, signature, proof, and callback (no callback)
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256, uint256) {
-        // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
-        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
+        offer.ratifier = address(0);
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer]));
+        return midnight.take(units, taker, address(0), hex"", taker, offer, signProof([offer]));
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -170,6 +169,30 @@ abstract contract BaseTest is Test {
 
     function toId(Obligation memory obligation) internal view returns (bytes32) {
         return IdLib.toId(obligation, block.chainid, address(midnight));
+    }
+
+    function signProof(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        return abi.encode(_root, new bytes32[](0), sig(_root, privateKey[_signer]));
+    }
+
+    function signProof(Offer[1] memory offers) internal view returns (bytes memory) {
+        return signProof(offers, offers[0].maker);
+    }
+
+    function signProof(Offer[2] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32[] memory path = new bytes32[](1);
+        path[0] = keccak256(abi.encode(offers[1]));
+        bytes32 _root = root(offers);
+        return abi.encode(_root, path, sig(_root, privateKey[_signer]));
+    }
+
+    function signProof(Offer[2] memory offers) internal view returns (bytes memory) {
+        return signProof(offers, offers[0].maker);
+    }
+
+    function root(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
     }
 
     function authorize(address from, address to) internal {
@@ -261,22 +284,13 @@ abstract contract BaseTest is Test {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
+        borrowerOffer.ratifier = address(0);
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;
 
         vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            address(0),
-            hex"",
-            borrower,
-            borrowerOffer,
-            sig([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
+        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, signProof([borrowerOffer]));
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

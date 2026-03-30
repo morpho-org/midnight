@@ -80,4 +80,6 @@ library EventsLib {
     event SetIsAuthorized(
         address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized
     );
+    event AuthorizationNonceUsed(address indexed authorizer, uint256 nonce);
+    event SetRatified(address indexed authorizer, bytes32 indexed root, bool newRatified);
 }

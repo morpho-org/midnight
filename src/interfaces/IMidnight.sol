@@ -34,6 +34,7 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
+    address ratifier;
     bool reduceOnly;
     uint256 maxUnits;
     uint256 maxSellerAssets;
@@ -44,6 +45,14 @@ struct Signature {
     uint8 v;
     bytes32 r;
     bytes32 s;
+}
+
+struct Authorization {
+    address authorizer;
+    address authorizee;
+    bool isAuthorized;
+    uint256 nonce;
+    uint256 deadline;
 }
 
 struct ObligationState {

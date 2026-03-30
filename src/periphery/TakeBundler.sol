@@ -3,7 +3,7 @@
 pragma solidity 0.8.31;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer, Signature} from "../interfaces/IMidnight.sol";
+import {Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
@@ -13,9 +13,7 @@ contract TakeBundler {
     struct Take {
         uint256 units;
         Offer offer;
-        Signature sig;
-        bytes32 root;
-        bytes32[] proof;
+        bytes ratificationData;
     }
 
     /// @dev Iterates through orders, filling up to targetUnits units total.
@@ -47,9 +45,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
+                takes[i].ratificationData
             ) returns (
                 uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits
             ) {
@@ -98,9 +94,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
+                takes[i].ratificationData
             ) returns (
                 uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
@@ -145,9 +139,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
+                takes[i].ratificationData
             ) returns (
                 uint256, uint256 filledSellerAssets, uint256 filledUnits
             ) {

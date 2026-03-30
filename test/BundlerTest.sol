@@ -57,6 +57,7 @@ contract BundlerTest is BaseTest {
         offers.push();
         offers[0].buy = true;
         offers[0].maker = lender;
+        offers[0].ratifier = address(0);
         offers[0].obligation = obligation;
         offers[0].expiry = block.timestamp + 200;
         offers[0].tick = MAX_TICK;
@@ -64,6 +65,7 @@ contract BundlerTest is BaseTest {
         offers.push();
         offers[1].buy = true;
         offers[1].maker = lender;
+        offers[1].ratifier = address(0);
         offers[1].obligation = obligation;
         offers[1].expiry = block.timestamp + 200;
         offers[1].tick = MAX_TICK;
@@ -79,9 +81,7 @@ contract BundlerTest is BaseTest {
 
     function testUnauthorized() public {
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: 100, ratificationData: signProof([offers[0]])});
 
         vm.prank(address(0xdead));
         vm.expectRevert("unauthorized");
@@ -99,20 +99,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            units: offerUnits0,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = TakeBundler.Take({
-            offer: offers[1],
-            units: offerUnits1,
-            sig: sig([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: offerUnits0, ratificationData: signProof([offers[0]])});
+        takes[1] = TakeBundler.Take({offer: offers[1], units: offerUnits1, ratificationData: signProof([offers[1]])});
 
         _authorizeBundler();
 
@@ -149,20 +137,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            units: offerUnits0,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = TakeBundler.Take({
-            offer: offers[1],
-            units: offerUnits1,
-            sig: sig([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: offerUnits0, ratificationData: signProof([offers[0]])});
+        takes[1] = TakeBundler.Take({offer: offers[1], units: offerUnits1, ratificationData: signProof([offers[1]])});
 
         _authorizeBundler();
 
@@ -201,20 +177,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units + 1);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            units: offerUnits0,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = TakeBundler.Take({
-            offer: offers[1],
-            units: offerUnits1,
-            sig: sig([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: offerUnits0, ratificationData: signProof([offers[0]])});
+        takes[1] = TakeBundler.Take({offer: offers[1], units: offerUnits1, ratificationData: signProof([offers[1]])});
 
         _authorizeBundler();
 
@@ -294,20 +258,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, targetUnits);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            units: offerUnits0,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = TakeBundler.Take({
-            offer: offers[1],
-            units: offerUnits1,
-            sig: sig([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: offerUnits0, ratificationData: signProof([offers[0]])});
+        takes[1] = TakeBundler.Take({offer: offers[1], units: offerUnits1, ratificationData: signProof([offers[1]])});
 
         _authorizeBundler();
 
@@ -344,20 +296,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, targetUnits);
 
         TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0],
-            units: offerUnits0,
-            sig: sig([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = TakeBundler.Take({
-            offer: offers[1],
-            units: offerUnits1,
-            sig: sig([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = TakeBundler.Take({offer: offers[0], units: offerUnits0, ratificationData: signProof([offers[0]])});
+        takes[1] = TakeBundler.Take({offer: offers[1], units: offerUnits1, ratificationData: signProof([offers[1]])});
 
         _authorizeBundler();
 

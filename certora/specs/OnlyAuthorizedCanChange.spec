@@ -14,6 +14,8 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function session(address user) external returns (bytes32) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
+    function ratified(address user, bytes32 root) external returns (bool) envfree;
+    function authorizationNonce(address user) external returns (uint256) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
@@ -39,6 +41,7 @@ methods {
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -122,7 +125,7 @@ rule onlyAuthorizedCanChangeSession(env e, method f, calldataarg args, address u
 /// AUTHORIZATION CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's isAuthorized mapping.
-rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, address authorizer, address authorized) filtered { f -> !f.isView } {
+rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, address authorizer, address authorized) filtered { f -> !f.isView && f.selector != sig:setAuthorizedWithSig(Midnight.Authorization memory, Midnight.Signature calldata).selector } {
     bool authorizerIsAuthorized = authorizer == e.msg.sender || isAuthorized(authorizer, e.msg.sender);
 
     bool isAuthorizedBefore = isAuthorized(authorizer, authorized);
@@ -130,4 +133,39 @@ rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, addr
     bool isAuthorizedAfter = isAuthorized(authorizer, authorized);
 
     assert isAuthorizedAfter == isAuthorizedBefore || authorizerIsAuthorized;
+}
+
+/// AUTHORIZATION CHANGE RULES ///
+
+/// No function (except setAuthorizedWithSig) can change isAuthorized(user, someone) unless the caller is the user or authorized by the user.
+rule onlyAuthorizedCanChangeAuthorization(env e, method f, calldataarg data) filtered { f -> !f.isView && f.selector != sig:setAuthorizedWithSig(Midnight.Authorization memory, Midnight.Signature calldata).selector } {
+    address user;
+    address someone;
+
+    require user != e.msg.sender;
+    require !isAuthorized(user, e.msg.sender);
+
+    bool authorizedBefore = isAuthorized(user, someone);
+
+    f(e, data);
+
+    bool authorizedAfter = isAuthorized(user, someone);
+
+    assert authorizedAfter == authorizedBefore;
+}
+
+/// Only an authorized caller can change ratified(user, root).
+rule onlyAuthorizedCanChangeRatified(env e, method f, calldataarg data, address user, bytes32 root) filtered { f -> !f.isView } {
+    bool callerIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+
+    bool before = ratified(user, root);
+    f(e, data);
+    assert callerIsAuthorized || ratified(user, root) == before;
+}
+
+/// Only setAuthorizedWithSig can change authorizationNonce.
+rule nonceOnlyChangedBySetAuthorizedWithSig(env e, method f, calldataarg data, address user) filtered { f -> !f.isView && f.selector != sig:setAuthorizedWithSig(Midnight.Authorization memory, Midnight.Signature calldata).selector } {
+    uint256 before = authorizationNonce(user);
+    f(e, data);
+    assert authorizationNonce(user) == before;
 }

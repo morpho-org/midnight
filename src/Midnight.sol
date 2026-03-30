@@ -18,6 +18,7 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
+    AUTHORIZATION_TYPEHASH,
     PASSIVE_FEE_RECIPIENT,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
@@ -29,6 +30,7 @@ import {
     Signature,
     Collateral,
     ObligationState,
+    Authorization,
     Position
 } from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
@@ -93,6 +95,9 @@ contract Midnight is IMidnight {
 
     /// @dev Whether an address is authorized to act on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
+
+    mapping(address => uint256) public authorizationNonce;
+    mapping(address => mapping(bytes32 => bool)) public ratified;
 
     /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overriden by the
     /// feeSetter.
@@ -206,18 +211,32 @@ contract Midnight is IMidnight {
         bytes memory takerCallbackData,
         address receiverIfTakerIsSeller,
         Offer memory offer,
-        Signature memory sig,
-        bytes32 root,
-        bytes32[] memory proof
+        bytes memory ratificationData
     ) external returns (uint256, uint256, uint256) {
         require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(signer(root, sig) == offer.maker, "invalid signature");
-        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
+
+        if (offer.ratifier == address(0)) {
+            (bytes32 root, bytes32[] memory proof, Signature memory sig) =
+                abi.decode(ratificationData, (bytes32, bytes32[], Signature));
+            require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+            address recoveredSigner = signer(root, sig);
+            if (recoveredSigner == address(0)) {
+                require(ratified[offer.maker][root], "offer not ratified");
+            } else {
+                require(recoveredSigner == offer.maker, "invalid signature");
+            }
+        } else {
+            require(
+                isAuthorized[offer.maker][offer.ratifier]
+                    && ICallbacks(offer.ratifier).onRatify(offer, ratificationData),
+                "offer ratification failed"
+            );
+        }
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
 
@@ -580,6 +599,28 @@ contract Midnight is IMidnight {
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
+    function setRatified(address onBehalf, bytes32 root, bool newRatified) external {
+        require(msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender], "ratification not authorized");
+        ratified[onBehalf][root] = newRatified;
+        emit EventsLib.SetRatified(onBehalf, root, newRatified);
+    }
+
+    function setAuthorizedWithSig(Authorization memory authorization, Signature calldata signature) external {
+        require(block.timestamp <= authorization.deadline, "expired");
+        require(authorization.nonce == authorizationNonce[authorization.authorizer]++, "invalid nonce");
+
+        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), hashStruct));
+        address signatory = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signatory != address(0) && signatory == authorization.authorizer, "invalid signature");
+
+        isAuthorized[authorization.authorizer][authorization.authorizee] = authorization.isAuthorized;
+        emit EventsLib.SetIsAuthorized(
+            msg.sender, authorization.authorizer, authorization.authorizee, authorization.isAuthorized
+        );
+        emit EventsLib.AuthorizationNonceUsed(authorization.authorizer, authorization.nonce);
+    }
+
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
 
@@ -763,6 +804,7 @@ contract Midnight is IMidnight {
     }
 
     function signer(bytes32 root, Signature memory signature) internal view returns (address) {
+        if (signature.v == 0) return address(0);
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
         address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
