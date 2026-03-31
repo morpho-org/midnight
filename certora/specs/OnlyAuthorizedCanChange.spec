@@ -136,7 +136,7 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptSlashAndLiquidate(env e, method f
     uint256 debtAfter = debtOf(id, user);
 
     assert creditAfter == creditBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
-    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
+    assert debtAfter == debtBefore || userIsAuthorized || signed[user];
 }
 
 // Proven separately for liquidate to avoid polluting the previous rule with additional assumptions.
@@ -159,7 +159,7 @@ rule onlyAuthorizedCanChangeCreditAndDebtForLiquidate(env e, address user, uint2
     uint256 debtAfter = debtOf(id, user);
 
     assert creditAfter == creditBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
-    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient || !isHealthyBefore || obligation.maturity < e.block.timestamp;
+    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || !isHealthyBefore || obligation.maturity < e.block.timestamp;
 }
 
 /// COLLATERAL CHANGE RULES ///
