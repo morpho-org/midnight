@@ -119,16 +119,15 @@ function CVL_signer() returns address {
 
 /// CREDIT AND DEBT CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's credit and debt except via updatePosition.
+/// An unauthorized caller cannot change a user's credit and debt except via updatePosition. This property is proven separately for liquidate as it requires more assumptions.
 /// PASSIVE_FEE_RECIPIENT's credit can increase via fee accrual without authorization.
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
-rule onlyAuthorizedCanChangeCreditAndDebtExceptSlashAndLiquidate(env e, method f, calldataarg args, address user) filtered { f -> f.selector != sig:updatePosition(Midnight.Obligation, address).selector } {
+rule onlyAuthorizedCanChangeCreditAndDebtExceptSlashAndLiquidate(env e, method f, calldataarg args, address user) filtered { f -> f.selector != sig:updatePosition(Midnight.Obligation, address).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
     Midnight.Obligation obligation = getGlobalObligation();
     bytes32 id = globalId;
 
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
     bool isPassiveFeeRecipient = user == Utils.passiveFeeRecipient();
-    bool isHealthyBefore = isHealthy(e, obligation, id, user);
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
@@ -137,10 +136,12 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptSlashAndLiquidate(env e, method f
     uint256 debtAfter = debtOf(id, user);
 
     assert creditAfter == creditBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
-    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient || !isHealthyBefore || obligation.maturity < e.block.timestamp;
+    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
 }
 
-rule onlyAuthorizedCanChangeCreditAndDebtInLiquidate(env e, address user, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+// Proven separately for liquidate to avoid polluting the previous rule with additional assumptions.
+// An unauthorized caller cannot change a user's credit and debt via liquidate unless the user is already unhealthy or the obligation has matured.
+rule onlyAuthorizedCanChangeCreditAndDebtForLiquidate(env e, address user, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     Midnight.Obligation obligation = getGlobalObligation();
     bytes32 id = globalId;
 
@@ -173,6 +174,19 @@ rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataa
     uint256 collateralAfter = collateralOf(id, user, collateralIndex);
 
     assert collateralAfter == collateralBefore || userIsAuthorized;
+}
+
+/// An unauthorized caller cannot change a user's collateral via liquidate unless the user is already unhealthy or the obligation has matured.
+/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
+rule onlyAuthorizedCanChangeCollateralForLiquidate(env e, Midnight.Obligation obligation, bytes32 id, address user, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+    bool isHealthyBefore = isHealthy(e, obligation, id, user);
+
+    uint256 collateralBefore = collateralOf(id, user, collateralIndex);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    uint256 collateralAfter = collateralOf(id, user, collateralIndex);
+
+    assert collateralAfter == collateralBefore || userIsAuthorized || !isHealthyBefore || obligation.maturity < e.block.timestamp;
 }
 
 /// CONSUMED CHANGE RULES ///
