@@ -83,16 +83,16 @@ function equalsGlobalObligation(Midnight.Obligation obligation) returns bool {
 
 function getGlobalObligation() returns Midnight.Obligation {
     Midnight.Obligation obligation;
-    require equalsGlobalObligation(obligation);
+    require equalsGlobalObligation(obligation), "constrain the obligation to the tracked market parameters";
     return obligation;
 }
 
 function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
     bytes32 id;
     if (equalsGlobalObligation(obligation) && midnight == currentContract) {
-        require id == globalId;
+        require id == globalId, "obligation matches the tracked market — bind id to globalId'";
     } else {
-        require id != globalId;
+        require id != globalId, "obligation is a different market — exclude globalId ";
     }
     return id;
 }
@@ -124,7 +124,7 @@ function CVL_signer() returns address {
 /// An unauthorized caller cannot change a user's credit and debt except via updatePosition.
 /// PASSIVE_FEE_RECIPIENT's credit can increase via fee accrual without authorization.
 /// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
-rule onlyAuthorizedCanChangeCreditAndDebtExceptSlash(env e, method f, calldataarg args, address user) filtered { f -> f.selector != sig:updatePosition(Midnight.Obligation, address).selector } {
+rule onlyAuthorizedCanChangeCreditAndDebtExceptSlashAndLiquidate(env e, method f, calldataarg args, address user) filtered { f -> f.selector != sig:updatePosition(Midnight.Obligation, address).selector } {
     Midnight.Obligation obligation = getGlobalObligation();
     bytes32 id = globalId;
 
@@ -135,6 +135,27 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptSlash(env e, method f, calldataar
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     f(e, args);
+    uint256 creditAfter = creditOf(id, user);
+    uint256 debtAfter = debtOf(id, user);
+
+    assert creditAfter == creditBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient;
+    assert debtAfter == debtBefore || userIsAuthorized || signed[user] || isPassiveFeeRecipient || !isHealthyBefore || obligation.maturity < e.block.timestamp;
+}
+
+rule onlyAuthorizedCanChangeCreditAndDebtInLiquidate(env e, address user, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+    Midnight.Obligation obligation = getGlobalObligation();
+    bytes32 id = globalId;
+
+    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
+    bool isPassiveFeeRecipient = user == Utils.passiveFeeRecipient();
+    bool isHealthyBefore = isHealthy(e, obligation, id, user);
+
+    uint256 creditBefore = creditOf(id, user);
+    uint256 debtBefore = debtOf(id, user);
+    uint256 collateralIndex;
+
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
 
