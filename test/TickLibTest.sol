@@ -14,8 +14,8 @@ contract TickLibTest is BaseTest {
 
     function testTickToPriceMinMax() public pure {
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(1), 1e13, "tick 1");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 0.99999e18, "tick max - 1");
+        assertEq(TickLib.tickToPrice(1), 5e12, "tick 1");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 0.999995e18, "tick max - 1");
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
@@ -26,7 +26,7 @@ contract TickLibTest is BaseTest {
     }
 
     function testReturnJumps() public pure {
-        for (uint256 i = 207; i <= 729; i++) {
+        for (uint256 i = 220; i <= 770; i++) {
             uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(

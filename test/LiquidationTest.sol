@@ -2,7 +2,13 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    TIME_TO_MAX_LIF,
+    LLTV_8,
+    LIQUIDATION_CURSOR_LOW
+} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
@@ -837,6 +843,35 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collaterals[0].oracle).setPrice(liquidationOraclePrice);
         _maxDebt = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
             .mulDivDown(obligation.collaterals[0].lltv, WAD);
+    }
+
+    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18).
+    /// Before the fix, this reverted with a division-by-zero in the recovery close factor check.
+    function testLiquidatePreMaturityLltvWad(uint256 units) public {
+        units = bound(units, 2, MAX_UNITS);
+
+        // Override obligation to use LLTV_8 = WAD on collateral 0.
+        delete obligation.collaterals;
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: LLTV_8,
+                    maxLif: maxLif(LLTV_8, LIQUIDATION_CURSOR_LOW),
+                    oracle: address(oracle1)
+                })
+            );
+        id = toId(obligation);
+
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        // Drop price so position is unhealthy.
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+
+        uint256 debtBefore = midnight.debtOf(id, borrower);
+        // Non-zero seizedAssets exercises the recovery close factor path.
+        midnight.liquidate(obligation, 0, 1, 0, borrower, "");
+        assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
     }
 
     function onLiquidate(

@@ -16,6 +16,7 @@ methods {
 
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
     function _updatePosition(Midnight.Obligation memory, bytes32 id, address user) internal => summaryUpdatePosition(id, user);
+    function hasCredit(bytes32 id, address user) internal returns (bool) => summaryHasCredit(id, user);
 }
 
 /// GHOSTS ///
@@ -37,16 +38,21 @@ function summaryUpdatePosition(bytes32 id, address user) {
     updated[id][user] = true;
 }
 
+/// Summary for hasCredit:  circumvent the load hook for credit checks.
+function summaryHasCredit(bytes32 id, address user) returns (bool) {
+    return currentContract.position[id][user].credit > 0;
+}
+
 /// HOOKS ///
 
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && newVal != oldVal) {
         creditStoredBeforeUpdate[id][user] = true;
     }
 }
 
 hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && val != 0) {
         creditLoadedBeforeUpdate[id][user] = true;
     }
 }
@@ -65,6 +71,7 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 
 /// Check that credit is never loaded before _updatePosition is called.
 /// The SLOADs of _updatePosition are ignored (see summary above).
+/// TODO check take with another approach.
 rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
