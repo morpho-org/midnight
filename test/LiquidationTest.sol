@@ -2,8 +2,15 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, ORACLE_PRICE_SCALE, TIME_TO_MAX_LIF} from "../src/libraries/ConstantsLib.sol";
+import {
+    WAD,
+    ORACLE_PRICE_SCALE,
+    TIME_TO_MAX_LIF,
+    LLTV_8,
+    LIQUIDATION_CURSOR_LOW
+} from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -35,8 +42,8 @@ contract LiquidationTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: 0.77e18,
+                    maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -44,8 +51,8 @@ contract LiquidationTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.85e18,
-                    maxLif: maxLif(0.85e18, 0.25e18),
+                    lltv: 0.86e18,
+                    maxLif: maxLif(0.86e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -299,7 +306,9 @@ contract LiquidationTest is BaseTest {
                 - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
-        emit EventsLib.Liquidate(address(this), id, 0, 0, 0, borrower, expectedBadDebt, expectedLossIndex);
+        emit EventsLib.Liquidate(
+            address(this), id, obligation.collaterals[0].token, 0, 0, borrower, expectedBadDebt, expectedLossIndex
+        );
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
@@ -315,7 +324,7 @@ contract LiquidationTest is BaseTest {
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
-        emit EventsLib.UpdatePosition(id, lender, expectedCredit, 0, 0);
+        emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");
@@ -785,7 +794,7 @@ contract LiquidationTest is BaseTest {
     /// @dev Bad debt as computed in liquidate
     function _badDebt() internal view returns (uint256) {
         uint256 badDebt = midnight.debtOf(id, borrower);
-        uint256 bitmap = midnight.activatedCollaterals(id, borrower);
+        uint128 bitmap = midnight.activatedCollaterals(id, borrower);
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory _collateral = obligation.collaterals[i];
@@ -794,7 +803,9 @@ contract LiquidationTest is BaseTest {
                 midnight.collateralOf(id, borrower, i).mulDivUp(price, ORACLE_PRICE_SCALE)
                     .mulDivUp(WAD, _collateral.maxLif)
             );
-            bitmap ^= (1 << i);
+            require(i < 128, "i is too large");
+            // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
+            bitmap ^= uint128(1 << i);
         }
         return badDebt;
     }
@@ -834,7 +845,45 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collaterals[0].lltv, WAD);
     }
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256 _repaidUnits, address, bytes memory data) public {
+    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18).
+    /// Before the fix, this reverted with a division-by-zero in the recovery close factor check.
+    function testLiquidatePreMaturityLltvWad(uint256 units) public {
+        units = bound(units, 2, MAX_UNITS);
+
+        // Override obligation to use LLTV_8 = WAD on collateral 0.
+        delete obligation.collaterals;
+        obligation.collaterals
+            .push(
+                Collateral({
+                    token: address(collateralToken1),
+                    lltv: LLTV_8,
+                    maxLif: maxLif(LLTV_8, LIQUIDATION_CURSOR_LOW),
+                    oracle: address(oracle1)
+                })
+            );
+        id = toId(obligation);
+
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        // Drop price so position is unhealthy.
+        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+
+        uint256 debtBefore = midnight.debtOf(id, borrower);
+        // Non-zero seizedAssets exercises the recovery close factor path.
+        midnight.liquidate(obligation, 0, 1, 0, borrower, "");
+        assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
+    }
+
+    function onLiquidate(
+        bytes32 obligationId,
+        Obligation memory _obligation,
+        uint256,
+        uint256,
+        uint256 _repaidUnits,
+        address,
+        bytes memory data
+    ) public {
+        require(obligationId == IdLib.toId(_obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedRepaidUnits = _repaidUnits;
         recordedData = data;
     }

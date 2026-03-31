@@ -23,7 +23,7 @@ methods {
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -164,3 +164,9 @@ definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns boo
 definition userHasNoLastAccrual(bytes32 id, address user) returns bool = Midnight.lastAccrual(id, user) == 0;
 
 definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
+
+definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385000000000000000 || lltv == 625000000000000000 || lltv == 770000000000000000 || lltv == 860000000000000000 || lltv == 915000000000000000 || lltv == 945000000000000000 || lltv == 965000000000000000 || lltv == 980000000000000000 || lltv == 1000000000000000000;
+
+// Show that a created obligation only has allowed LLTV tiers.
+strong invariant createdObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
+    obligationIsCreated(obligation) => i < obligation.collaterals.length => isLltvAllowed(obligation.collaterals[i].lltv);
