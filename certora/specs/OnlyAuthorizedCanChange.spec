@@ -3,8 +3,6 @@
 using Utils as Utils;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function feeRecipient() external returns (address) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
@@ -29,7 +27,6 @@ methods {
 
     // Summarize TickLib functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
     // Summarize UtilsLib functions.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
