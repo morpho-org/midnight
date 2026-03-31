@@ -16,7 +16,7 @@ rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 cursor) {
     assert lltv * maxLif(lltv, cursor) <= WAD() * WAD();
 }
 
-/// @dev maxLif >= WAD. Used in NoDivisionByZero.spec (assumption 4) to prove that the nested
+/// @dev maxLif >= WAD. Used in NoDivisionByZero.spec to prove that the nested
 /// mulDivDown divisor in maxLif is positive, without assuming it.
 /// Proof: maxLif = WAD^2 / (WAD - cursor*(WAD-lltv)/WAD). The denominator <= WAD (since
 /// cursor*(WAD-lltv)/WAD >= 0), so the result >= WAD^2/WAD = WAD.
@@ -24,4 +24,13 @@ rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
     require lltv <= WAD(), "see rule createdObligationsHaveLltvLessThanOrEqualToOne";
     require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
     assert maxLif(lltv, cursor) >= WAD();
+}
+
+/// @dev maxLif <= 2*WAD for valid cursor values. Used in NoMultiplicationOverflow.spec.
+/// Proof: the denominator WAD - cursor*(WAD-lltv)/WAD is minimized at cursor=0.5e18, lltv=0,
+/// giving WAD - 0.5*WAD = 0.5*WAD, so the maximum result is WAD^2/(0.5*WAD) = 2*WAD.
+rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 cursor) {
+    require lltv <= WAD(), "see rule createdObligationsHaveLltvLessThanOrEqualToOne";
+    require cursor <= WAD() / 2, "see LIQUIDATION_CURSOR_HIGH in ConstantsLib";
+    assert maxLif(lltv, cursor) <= 2 * WAD();
 }
