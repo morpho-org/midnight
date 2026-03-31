@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import json
 
-MAX_TICK = 1046
+MAX_TICK = 2600
 
 def exact_price(tick):
     """Reference tick to price implementation."""
-    return int(1e18 / (1 + 1.025 ** (MAX_TICK / 2 - tick)))
+    return int(1e18 / (1 + 1.01 ** (MAX_TICK / 2 - tick)))
 
 if __name__ == "__main__":
     prices = [str(exact_price(tick)) for tick in range(MAX_TICK + 1)]

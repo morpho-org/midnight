@@ -5,6 +5,7 @@ pragma solidity 0.8.31;
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
+import {AccessibleTickLib, MAX_LEVEL} from "./libraries/AccessibleTickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
     WAD,
@@ -120,6 +121,12 @@ contract Midnight is IMidnight {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    /// @dev Address that can set tick accessibility levels.
+    address public tickSetter;
+
+    /// @dev Default tick level per loan token. Applied when obligations are created.
+    mapping(address loanToken => uint8) public defaultTickLevel;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -152,6 +159,34 @@ contract Midnight is IMidnight {
         require(msg.sender == owner, "only owner");
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
+    }
+
+    function setTickSetter(address newTickSetter) external {
+        require(msg.sender == owner, "only owner");
+        tickSetter = newTickSetter;
+        emit EventsLib.SetTickSetter(newTickSetter);
+    }
+
+    /// @dev Increases the tick level of a specific obligation. Can only increase, never decrease.
+    function setObligationTickLevel(bytes32 id, uint256 newTickLevel) external {
+        require(msg.sender == tickSetter, "only tick setter");
+        require(newTickLevel <= MAX_LEVEL, "level out of range");
+        require(obligationState[id].created, "obligation not created");
+        require(newTickLevel > obligationState[id].tickLevel, "can only increase tick level");
+        // forge-lint: disable-next-line(unsafe-typecast) as newTickLevel <= MAX_LEVEL < type(uint8).max
+        obligationState[id].tickLevel = uint8(newTickLevel);
+        emit EventsLib.SetObligationTickLevel(id, newTickLevel);
+    }
+
+    /// @dev Sets the default tick level for new obligations with the given loan token.
+    /// @dev Unlike per-obligation levels (which can only increase), the default can be freely changed because it only
+    /// affects future obligations at creation time. Existing obligations and their signed offers are never impacted.
+    function setDefaultTickLevel(address loanToken, uint256 newTickLevel) external {
+        require(msg.sender == tickSetter, "only tick setter");
+        require(newTickLevel <= MAX_LEVEL, "level out of range");
+        // forge-lint: disable-next-line(unsafe-typecast) as newTickLevel <= MAX_LEVEL < type(uint8).max
+        defaultTickLevel[loanToken] = uint8(newTickLevel);
+        emit EventsLib.SetDefaultTickLevel(loanToken, newTickLevel);
     }
 
     /// @dev Overrides the fee of a specific obligation.
@@ -258,6 +293,11 @@ contract Midnight is IMidnight {
                 offer.callbackData,
                 offer.receiverIfMakerIsSeller
             );
+
+        require(
+            AccessibleTickLib.isAccessible(offer.tick, _obligationState.tickLevel),
+            "tick not accessible at obligation level"
+        );
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -621,6 +661,7 @@ contract Midnight is IMidnight {
             }
 
             obligationState[id].created = true;
+            obligationState[id].tickLevel = defaultTickLevel[obligation.loanToken];
             obligationState[id].fees = defaultTradingFees[obligation.loanToken];
             obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
@@ -732,6 +773,10 @@ contract Midnight is IMidnight {
 
     function obligationCreated(bytes32 id) external view returns (bool) {
         return obligationState[id].created;
+    }
+
+    function tickLevel(bytes32 id) external view returns (uint8) {
+        return obligationState[id].tickLevel;
     }
 
     function withdrawable(bytes32 id) external view returns (uint256) {

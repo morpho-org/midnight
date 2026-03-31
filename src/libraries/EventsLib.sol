@@ -10,6 +10,9 @@ library EventsLib {
 
     event SetOwner(address indexed owner);
     event SetFeeSetter(address indexed feeSetter);
+    event SetTickSetter(address indexed tickSetter);
+    event SetObligationTickLevel(bytes32 indexed id_, uint256 newTickLevel);
+    event SetDefaultTickLevel(address indexed loanToken, uint256 newTickLevel);
     event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
     event SetFeeRecipient(address indexed feeRecipient);

@@ -8,6 +8,7 @@ import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MAX_LEVEL} from "../src/libraries/AccessibleTickLib.sol";
 import {
     WAD,
     ORACLE_PRICE_SCALE,
@@ -51,6 +52,7 @@ abstract contract BaseTest is Test {
         midnight = new Midnight();
 
         midnight.setFeeSetter(address(this));
+        midnight.setTickSetter(address(this));
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -65,6 +67,8 @@ abstract contract BaseTest is Test {
         loanToken = new ERC20("loan", "loan");
         collateralToken1 = new ERC20("collat1", "collat1");
         collateralToken2 = new ERC20("collat2", "collat2");
+
+        midnight.setDefaultTickLevel(address(loanToken), MAX_LEVEL);
 
         oracle1 = new Oracle();
         oracle2 = new Oracle();

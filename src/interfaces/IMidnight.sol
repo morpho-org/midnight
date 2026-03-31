@@ -51,6 +51,7 @@ struct ObligationState {
     uint128 lossIndex;
     uint256 withdrawable;
     bool created;
+    uint8 tickLevel;
     uint16[7] fees;
     uint32 continuousFee;
 }

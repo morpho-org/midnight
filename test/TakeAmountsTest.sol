@@ -75,7 +75,7 @@ contract TakeAmountsTest is BaseTest {
         collateralize(obligation, borrower, positionUnits);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
-        offer.tick = 1; // Use a low tick to ensure buyerPrice <= WAD even with fees.
+        offer.tick = 8; // Low tick with a small positive price.
         take(positionUnits, lender, offer);
     }
 
@@ -89,7 +89,7 @@ contract TakeAmountsTest is BaseTest {
     {
         uint256 tradingFee = _setFees(fee0, fee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        tick = bound(tick, 8, _maxTick(tradingFee));
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, targetBuyerAssets);
@@ -107,7 +107,7 @@ contract TakeAmountsTest is BaseTest {
     {
         uint256 tradingFee = _setFees(fee0, fee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        tick = bound(tick, 8, _maxTick(tradingFee));
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(midnight, id, offer, targetSellerAssets);
@@ -127,7 +127,7 @@ contract TakeAmountsTest is BaseTest {
     {
         uint256 tradingFee = _setFees(fee0, fee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        tick = bound(tick, 8, _maxTick(tradingFee));
 
         _createPosition(1e36);
 
@@ -150,7 +150,7 @@ contract TakeAmountsTest is BaseTest {
     ) public {
         uint256 tradingFee = _setFees(fee0, fee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        tick = bound(tick, 8, _maxTick(tradingFee));
 
         _createPosition(1e36);
 

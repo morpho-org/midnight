@@ -132,7 +132,7 @@ contract TakeTest is BaseTest {
 
     function testBuy2(uint256 units, uint256 tick, uint256 otherLenderUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, 600);
+        tick = bound(tick, 0, MAX_TICK);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivDown(price, WAD);
@@ -156,7 +156,7 @@ contract TakeTest is BaseTest {
 
     function testSell2(uint256 units, uint256 tick, uint256 otherLenderUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, 600);
+        tick = bound(tick, 0, MAX_TICK);
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivDown(price, WAD);
@@ -913,24 +913,27 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
 
-    // Summary of zero price tests:
+    // Summary of lowest-price tick tests:
     //
-    // Trading at 0 succeeds in those cases:
+    // Trading at the minimum rounded tick price succeeds in those cases:
     // - any offer / unit take input / 0 trading fee.
     // - sell offer / unit take input / > 0 trading fee.
     //
     // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by underflow when the trading fee is > offerPrice, and the offer is a buy offer.
 
     // fee=0, sell, units
     function testPriceZero_NoTradingFee_sell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
+        uint256 price = TickLib.tickToPrice(0);
+        uint256 expectedAssets = units.mulDivUp(price, WAD);
+        deal(address(loanToken), lender, expectedAssets);
         collateralize(obligation, borrower, units);
         (uint256 buyerAssets, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
-        assertEq(buyerAssets, 0, "buyerAssets");
-        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(buyerAssets, expectedAssets, "buyerAssets");
+        assertEq(sellerAssets, expectedAssets, "sellerAssets");
         assertEq(midnight.creditOf(id, lender), units, "creditOf");
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
@@ -938,7 +941,8 @@ contract TakeTest is BaseTest {
     // fee>0, buy, units
     function testPriceZero_WithTradingFee_buy() public {
         midnight.touchObligation(obligation);
-        midnight.setObligationTradingFee(id, 1, 1e12);
+        uint256 price = TickLib.tickToPrice(0);
+        midnight.setObligationTradingFee(id, 1, price + 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
@@ -955,12 +959,14 @@ contract TakeTest is BaseTest {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
-        uint256 expectedBuyerAssets = units.mulDivUp(fee, WAD);
+        uint256 price = TickLib.tickToPrice(0);
+        uint256 expectedBuyerAssets = units.mulDivUp(price + fee, WAD);
+        uint256 expectedSellerAssets = units.mulDivUp(price, WAD);
         deal(address(loanToken), lender, expectedBuyerAssets);
         collateralize(obligation, borrower, units);
         (uint256 buyerAssets, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
         assertEq(buyerAssets, expectedBuyerAssets, "buyerAssets");
-        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(sellerAssets, expectedSellerAssets, "sellerAssets");
         assertEq(midnight.creditOf(id, lender), units, "creditOf");
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
