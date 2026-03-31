@@ -3,12 +3,13 @@
 pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.024692612590371501e18; // ln(1 + 0.025)
-uint256 constant MAX_TICK = 990;
+uint256 constant MAX_TICK = 1046;
 
 library TickLib {
     using TickLib for uint256;
 
-    /// @dev Returns (`x` + `d` - 1) / `d` rounded up, without checking for overflow.
+    /// @dev Returns (`x` + `d` - 1) / `d` rounded to the nearest integer with ties rounded down, without checking for
+    /// overflow.
     function divHalfDownUnchecked(uint256 x, uint256 d) internal pure returns (uint256) {
         unchecked {
             return (x + (d - 1) / 2) / d;
@@ -40,7 +41,7 @@ library TickLib {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
                     .divHalfDownUnchecked(1e18 + wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick))))
-                    .divHalfDownUnchecked(1e13) * 1e13;
+                    .divHalfDownUnchecked(5e12) * 5e12;
         }
     }
 

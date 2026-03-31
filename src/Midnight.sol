@@ -39,7 +39,15 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 ///
 /// OBLIGATIONS
-/// @dev Obligations' collaterals must be sorted by token address.
+/// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
+/// - `collaterals.length > 0`: at least one collateral is required.
+/// - `collaterals.length <= MAX_COLLATERALS` (128): at most 128 collaterals per obligation.
+/// - Collateral tokens must be non-zero and strictly sorted by address (ascending, no duplicates).
+/// - Each collateral's `lltv` must be one of the allowed tiers (see `isLltvAllowed` in ConstantsLib).
+/// - Each collateral's `maxLif` must equal `maxLif(lltv, LIQUIDATION_CURSOR_LOW)` or
+///   `maxLif(lltv, LIQUIDATION_CURSOR_HIGH)`.
+/// @dev Additionally, a borrower can have collateral in at most `MAX_COLLATERALS_PER_BORROWER` (10) collaterals
+/// simultaneously within a single obligation.
 ///
 /// TRADING FEES
 /// @dev The trading fee is computed using piecewise linear interpolation between breakpoints.
@@ -62,6 +70,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The fee recipient is not slashed when receiving fees, so it will be slashed a bit too much later.
 ///
 /// ROUNDINGS
+/// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
+/// for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
@@ -219,8 +229,6 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
-        _updatePosition(offer.obligation, id, offer.maker);
-        _updatePosition(offer.obligation, id, taker);
         ObligationState storage _obligationState = obligationState[id];
 
         (
@@ -273,6 +281,10 @@ contract Midnight is IMidnight {
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
+
+        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
+        if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
+
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
@@ -670,6 +682,10 @@ contract Midnight is IMidnight {
         position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
+    }
+
+    function hasCredit(bytes32 id, address user) internal view returns (bool) {
+        return position[id][user].credit > 0;
     }
 
     /// OTHER VIEW FUNCTIONS ///
