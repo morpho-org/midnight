@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using ERC20 as standardToken;
+using ERC20NoRevert as noRevertToken;
+using ERC20USDT as usdtToken;
+using ERC20RevertToZero as revertToZeroToken;
+using ERC20NoReturn as noReturnToken;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -27,30 +33,47 @@ methods {
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
-    // Assume ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
-    function _.transfer(address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, a, v) expect(bool);
-    function _.transferFrom(address src, address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, src, a, v) expect(bool);
+    function standardToken.balanceOf(address) external returns (uint256) envfree;
+    function noRevertToken.balanceOf(address) external returns (uint256) envfree;
+    function usdtToken.balanceOf(address) external returns (uint256) envfree;
+    function revertToZeroToken.balanceOf(address) external returns (uint256) envfree;
+    function noReturnToken.balanceOf(address) external returns (uint256) envfree;
+
+    // Dispatch ERC20 calls through the concrete weird token implementations in the scene.
+    function _.transfer(address a, uint256 v) external => DISPATCH(optimistic=true)[
+        ERC20.transfer(address,uint256),
+        ERC20NoRevert.transfer(address,uint256),
+        ERC20USDT.transfer(address,uint256),
+        ERC20RevertToZero.transfer(address,uint256),
+        ERC20NoReturn.transfer(address,uint256)
+    ];
+    function _.transferFrom(address src, address a, uint256 v) external => DISPATCH(optimistic=true)[
+        ERC20.transferFrom(address,address,uint256),
+        ERC20NoRevert.transferFrom(address,address,uint256),
+        ERC20USDT.transferFrom(address,address,uint256),
+        ERC20RevertToZero.transferFrom(address,address,uint256),
+        ERC20NoReturn.transferFrom(address,address,uint256)
+    ];
 }
 
 /// HELPERS ///
 
-// ERC20 summaries.
+// ERC20 helpers.
 
-// Token balances: token => user => balance.
-ghost mapping(address => mapping(address => uint256)) tokenBalances;
+definition isSupportedToken(address token) returns bool =
+    token == standardToken
+    || token == noRevertToken
+    || token == usdtToken
+    || token == revertToZeroToken
+    || token == noReturnToken;
 
-function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
-    if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
-        revert();
-    }
-
-    // Non-deterministically set success, which allows to simulate permissions.
-    bool success;
-    if (success) {
-        tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
-        tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
-    }
-    return success;
+function tokenBalance(address token) returns mathint {
+    if (token == standardToken) return standardToken.balanceOf(currentContract);
+    if (token == noRevertToken) return noRevertToken.balanceOf(currentContract);
+    if (token == usdtToken) return usdtToken.balanceOf(currentContract);
+    if (token == revertToZeroToken) return revertToZeroToken.balanceOf(currentContract);
+    if (token == noReturnToken) return noReturnToken.balanceOf(currentContract);
+    return 0;
 }
 
 // UtilsLib summaries.
@@ -72,6 +95,14 @@ ghost hash(address, uint256, uint256, address) returns bytes32;
 function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
     // Deterministically derive the obligation id.
     bytes32 id = hash(obligation.loanToken, obligation.maturity, chainId, midnight);
+
+    // Restrict obligations to the token implementations in the scene so token calls dispatch concretely.
+    require(isSupportedToken(obligation.loanToken), "supported loan token");
+    require(
+        forall uint128 collateralIndex.
+            collateralIndex < obligation.collaterals.length => isSupportedToken(obligation.collaterals[collateralIndex].token),
+        "supported collateral tokens"
+    );
 
     // Assume the obligation id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
@@ -136,7 +167,7 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint256 newWithdrawable
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) - flashloans[token]
+    tokenBalance(token) >= collateralSum(token) + withdrawableSum(token) - flashloans[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
