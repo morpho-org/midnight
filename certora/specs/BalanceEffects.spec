@@ -150,14 +150,15 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 filledUnits;
+    _, _, filledUnits = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
 
-    mathint makerDelta = offer.buy ? units : -units;
+    mathint makerDelta = offer.buy ? filledUnits : -filledUnits;
     assert makerNetAfter == makerNetBefore + makerDelta;
-    mathint takerDelta = offer.buy ? -units : units;
+    mathint takerDelta = offer.buy ? -filledUnits : filledUnits;
     assert takerNetAfter == takerNetBefore + takerDelta;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker && anyUser != passiveFeeRecipient) => creditOf(anyId, anyUser) == otherCreditBefore;

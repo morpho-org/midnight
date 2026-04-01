@@ -257,35 +257,26 @@ contract Midnight is IMidnight {
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 currentConsumed = consumed[offer.maker][offer.group];
-        uint256 buyerAssets;
-        uint256 sellerAssets;
-        uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
-            uint256 remaining = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
-            if (remaining <= type(uint256).max / WAD) {
-                units = UtilsLib.min(units, remaining.mulDivDown(WAD, sellerPrice));
-            }
-            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-            newConsumed = currentConsumed + sellerAssets;
-            assert(newConsumed <= offer.maxSellerAssets);
+            units =
+                UtilsLib.min(units, offer.maxSellerAssets.zeroFloorSub(currentConsumed).mulDivDown(WAD, sellerPrice));
         } else if (offer.maxBuyerAssets > 0) {
-            uint256 remaining = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
-            if (remaining <= type(uint256).max / WAD) {
-                units = UtilsLib.min(units, remaining.mulDivDown(WAD, buyerPrice));
-            }
-            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-            newConsumed = currentConsumed + buyerAssets;
-            assert(newConsumed <= offer.maxBuyerAssets);
+            units = UtilsLib.min(units, offer.maxBuyerAssets.zeroFloorSub(currentConsumed).mulDivDown(WAD, buyerPrice));
         } else {
             units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
-            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-            newConsumed = currentConsumed + units;
-            assert(newConsumed <= offer.maxUnits);
         }
-        consumed[offer.maker][offer.group] = newConsumed;
+
+        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+
+        uint256 newConsumed;
+        if (offer.maxSellerAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + sellerAssets;
+        } else if (offer.maxBuyerAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + buyerAssets;
+        } else {
+            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + units;
+        }
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
