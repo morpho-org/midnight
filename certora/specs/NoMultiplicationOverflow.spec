@@ -65,7 +65,7 @@ definition WAD() returns uint256 = 1000000000000000000;
 
 // Proven in CreatedObligations.spec (createdObligationsHaveLltvLessThanOrEqualToOne)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
-// Maturity bounded to uint64: max_uint128 * max_uint32 * max_uint64 = 2^224 < 2^256.
+// Maturity bounded to uint64: max_uint128 * max_uint32 * max_uint64 = 2^224 < 2^256 (realistic timestamps, not enforced on-chain).
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD() && obligation.collaterals[i].maxLif <= 2 * WAD();
@@ -125,8 +125,7 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     return result;
 }
 
-// Proven in CreatedObligations.spec and ExactMath.spec.
-// Maturity bounded to uint64: max_uint128 * max_uint32 * max_uint64 = 2^224 < 2^256.
+// See summaryToId for full justification of each bound.
 function requireObligationBounds(Midnight.Obligation obligation) {
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD() && obligation.collaterals[i].maxLif <= 2 * WAD();
