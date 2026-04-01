@@ -59,7 +59,8 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
-    require id == lastId;
+    // it's okay to check only after the call that the prover chose the correct id.
+    require id == lastId, "id should be derived from obligation";
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
