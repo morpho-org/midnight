@@ -299,13 +299,13 @@ contract Midnight is IMidnight {
             sellerPos.pendingFee -= sellerPendingFeeDecrease;
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
+        uint128 newSellerDebt = sellerPos.debt + UtilsLib.toUint128(units - sellerCreditDecrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
         if (offer.reduceOnly) {
-            require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "maker credit or debt increased");
+            require(offer.buy ? buyerPos.credit == 0 : newSellerDebt == 0, "maker credit or debt increased");
         }
 
         require(
@@ -314,7 +314,7 @@ contract Midnight is IMidnight {
             "buyer gated from increasing credit"
         );
         require(
-            offer.obligation.enterGate == address(0) || sellerPos.debt == 0
+            offer.obligation.enterGate == address(0) || newSellerDebt == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
             "seller gated from increasing debt"
         );
@@ -350,6 +350,8 @@ contract Midnight is IMidnight {
                 .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
 
+        sellerPos.debt = newSellerDebt;
+        require(sellerPos.debt == 0 || sellerPos.credit == 0, "debt and credit");
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
