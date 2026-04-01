@@ -11,6 +11,7 @@ methods {
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function obligationState(bytes32 id) external returns (uint128, uint128, uint256, bool, uint32) envfree;
     function Utils.passiveFeeRecipient() external returns (address) envfree;
 
@@ -60,6 +61,13 @@ persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
 
     // Bounded: floor(a*b/d) <= a when b <= d (prevents toUint128 reverts / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
+
+    // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
+    // Needed for pendingFee split proof where the first arg is buyerCreditIncrease (not obligationUnits).
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
+        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
+        to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d))
+        && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
 }
 
 // ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
@@ -72,11 +80,17 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 
     // Bounded: ceil(a*b/d) <= a when b <= d (prevents pendingFee underflow / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
+
+    // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
+    // Needed for pendingFee split proof where the first arg is sellerCreditDecrease (not obligationUnits).
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
+        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
+        to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d))
+        && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
-/// pendingFee is excluded: ghost_mulDivDown/Up are not additive (floor/ceil rounding), so
-/// pendingFee can differ by a rounding term between the two paths.
+/// pendingFee and consumed can differ by at most 1 between the two paths due to floor/ceil rounding in mulDivDown/mulDivUp.
 rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
@@ -86,6 +100,11 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
     address passiveFeeRecipient = Utils.passiveFeeRecipient();
+
+    // Exclude passive fee recipient aliasing: _updatePosition writes to position[id][PFR].credit (Midnight.sol:682),
+    // so if buyer or seller coincides with PFR, cross-position side-effects break the split-invariance property.
+    require buyer != passiveFeeRecipient, "buyer must not be passive fee recipient";
+    require seller != passiveFeeRecipient, "seller must not be passive fee recipient";
 
     // Valid obligation state: not fully slashed otherwise it would not function correctly.
     uint128 obLossIndex;
@@ -117,6 +136,8 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint128 userLossIndexSeller1 = userLossIndex(ghostId, seller);
     uint128 lastAccrualBuyer1 = lastAccrual(ghostId, buyer);
     uint128 lastAccrualSeller1 = lastAccrual(ghostId, seller);
+    uint128 pendingFeeBuyer1 = pendingFee(ghostId, buyer);
+    uint128 pendingFeeSeller1 = pendingFee(ghostId, seller);
     uint256 creditOfPassiveFeeRecipient1 = creditOf(ghostId, passiveFeeRecipient);
 
     // Path 2: take B then C from the initial state.
@@ -135,5 +156,9 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert userLossIndexSeller1 == userLossIndex(ghostId, seller);
     assert lastAccrualBuyer1 == lastAccrual(ghostId, buyer);
     assert lastAccrualSeller1 == lastAccrual(ghostId, seller);
+    mathint pendingFeeBuyerDiff = to_mathint(pendingFeeBuyer1) - to_mathint(pendingFee(ghostId, buyer));
+    assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1;
+    mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(ghostId, seller));
+    assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1;
     assert creditOfPassiveFeeRecipient1 == creditOf(ghostId, passiveFeeRecipient);
 }
