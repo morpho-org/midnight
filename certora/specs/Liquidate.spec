@@ -68,7 +68,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 borrowerDebtAfter = debtOf(id, borrower);
     uint256 borrowerCollateralAfter = collateralOf(id, borrower, collateralIndex);
 
-    assert creditAfter == creditBefore || user == Utils.passiveFeeRecipient();
+    assert creditAfter == creditBefore;
     assert debtAfter == debtBefore || (user == borrower && liquidatable);
     assert collateralAfter == collateralBefore || (user == borrower && liquidatable);
     assert borrowerDebtAfter <= borrowerDebtBefore;
