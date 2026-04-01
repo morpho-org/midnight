@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BorrowerCallback, CollateralData} from "../src/periphery/BorrowerCallback.sol";
@@ -31,8 +31,8 @@ contract BorrowerCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -40,8 +40,8 @@ contract BorrowerCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -179,18 +179,18 @@ contract BorrowerCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        borrowerCallback.onSell(ob, address(0), 0, 0, 0, "");
+        borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnBuyReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        borrowerCallback.onBuy(ob, address(0), 0, 0, 0, "");
+        borrowerCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        borrowerCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+        borrowerCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
     }
 }

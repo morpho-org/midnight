@@ -15,20 +15,20 @@ contract ObligationLenderCallback is ICallbacks {
 
     /// @dev Callback to withdraw funds from another Midnight obligation.
     /// @dev The callback contract should be authorized to withdraw funds on behalf of the lender.
-    function onBuy(Obligation memory, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
+    function onBuy(bytes32, Obligation memory, address buyer, uint256 buyerAssets, uint256, uint256, bytes memory data)
         external
     {
         require(msg.sender == MIDNIGHT, "unauthorized");
-        bytes32 id = abi.decode(data, (bytes32));
-        Obligation memory otherObligation = abi.decode(address(uint160(uint256(id))).code, (Obligation));
+        bytes32 otherObligationId = abi.decode(data, (bytes32));
+        Obligation memory otherObligation = abi.decode(address(uint160(uint256(otherObligationId))).code, (Obligation));
         Midnight(MIDNIGHT).withdraw(otherObligation, buyerAssets, buyer, buyer);
     }
 
-    function onSell(Obligation memory, address, uint256, uint256, uint256, bytes memory) external pure {
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external pure {
         revert("not implemented");
     }
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
         revert("not implemented");
     }
 }

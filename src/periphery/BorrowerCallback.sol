@@ -20,7 +20,7 @@ contract BorrowerCallback is ICallbacks {
 
     /// @dev Callback to supply collateral on behalf of borrower.
     /// @dev The callback contract should be authorized to supply collateral on behalf of the borrower.
-    function onSell(Obligation memory obligation, address seller, uint256, uint256, uint256, bytes memory data)
+    function onSell(bytes32, Obligation memory obligation, address seller, uint256, uint256, uint256, bytes memory data)
         external
     {
         require(msg.sender == MIDNIGHT, "unauthorized");
@@ -31,11 +31,11 @@ contract BorrowerCallback is ICallbacks {
         }
     }
 
-    function onBuy(Obligation memory, address, uint256, uint256, uint256, bytes memory) external pure {
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external pure {
         revert("not implemented");
     }
 
-    function onLiquidate(Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
         revert("not implemented");
     }
 }

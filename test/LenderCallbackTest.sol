@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {VaultLenderCallback} from "../src/periphery/VaultLenderCallback.sol";
@@ -46,8 +46,8 @@ contract VaultLenderCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -55,8 +55,8 @@ contract VaultLenderCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -144,19 +144,19 @@ contract VaultLenderCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        vaultLenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
+        vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnSellReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        vaultLenderCallback.onSell(ob, address(0), 0, 0, 0, "");
+        vaultLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        vaultLenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+        vaultLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
     }
 }
 
@@ -179,8 +179,8 @@ contract ObligationLenderCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken1),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
@@ -188,8 +188,8 @@ contract ObligationLenderCallbackTest is BaseTest {
             .push(
                 Collateral({
                     token: address(collateralToken2),
-                    lltv: 0.75e18,
-                    maxLif: maxLif(0.75e18, 0.25e18),
+                    lltv: LLTV_2,
+                    maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
@@ -305,18 +305,18 @@ contract ObligationLenderCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        obligationLenderCallback.onBuy(ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnSellReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        obligationLenderCallback.onSell(ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        obligationLenderCallback.onLiquidate(ob, 0, 0, 0, address(0), "");
+        obligationLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
     }
 }
