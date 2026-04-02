@@ -25,9 +25,9 @@ contract MidnightWrapper is Midnight {
         for (uint256 i = len; i > 0;) {
             i--;
             Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price();
-            if (i == collateralIndex) collatPrice = price;
             uint256 _collateral = _position.collateral[i];
+            uint256 price = IOracle(collateral.oracle).price();
+            if (i == collateralIndex && _collateral != 0) collatPrice = price;
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
             badDebt =
                 badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
