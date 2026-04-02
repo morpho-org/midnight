@@ -24,7 +24,9 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+
+    // Sound: tickToPrice requires tick > 0 and always returns a positive value.
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => tickToPriceSummary(tick);
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
@@ -32,6 +34,10 @@ methods {
 }
 
 /// GHOSTS ///
+
+ghost tickToPriceSummary(uint256) returns uint256 {
+    axiom forall uint256 t. tickToPriceSummary(t) > 0;
+}
 
 persistent ghost bool divisionByZero {
     init_state axiom !divisionByZero;

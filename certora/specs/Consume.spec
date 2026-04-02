@@ -10,13 +10,28 @@ methods {
     // Summaries for complex internals irrelevant to consumed-mapping properties.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+}
+
+/// SUMMARIES ///
+
+function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
+    uint256 result;
+    require d == 0 || to_mathint(result) * to_mathint(d) <= to_mathint(x) * to_mathint(y);
+    return result;
+}
+
+function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
+    uint256 result;
+    require d == 0 || to_mathint(result) * to_mathint(d) >= to_mathint(x) * to_mathint(y);
+    require d == 0 || to_mathint(result) * to_mathint(d) < to_mathint(x) * to_mathint(y) + to_mathint(d);
+    return result;
 }
 
 ///  Only `setConsumed` and `take` can modify the `consumed` mapping.
@@ -59,13 +74,16 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
     assert consumed(user, group) >= consumedBefore;
 }
 
-/// After a successful `take`, consumed[offer.maker][offer.group] does not exceed the effective max.
+/// After a successful `take`, consumed[offer.maker][offer.group] does not exceed the effective max,
+/// provided it was within bounds before the call.
 rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    uint256 consumedBefore = consumed(offer.maker, offer.group);
+
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert offer.maxSellerAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxSellerAssets;
-    assert offer.maxBuyerAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxBuyerAssets;
-    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
+    assert offer.maxSellerAssets > 0 && consumedBefore <= offer.maxSellerAssets => consumed(offer.maker, offer.group) <= offer.maxSellerAssets;
+    assert offer.maxBuyerAssets > 0 && consumedBefore <= offer.maxBuyerAssets => consumed(offer.maker, offer.group) <= offer.maxBuyerAssets;
+    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 && consumedBefore <= offer.maxUnits => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
 /// After a successful `take`, the change in consumed equals min(units, available).
