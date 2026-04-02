@@ -24,10 +24,11 @@ contract MidnightWrapper is Midnight {
         uint256 len = obligation.collaterals.length;
         for (uint256 i = len; i > 0;) {
             i--;
-            Collateral memory collateral = obligation.collaterals[i];
             uint256 _collateral = _position.collateral[i];
+            if (_collateral == 0) continue;
+            Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
-            if (i == collateralIndex && _collateral != 0) collatPrice = price;
+            if (i == collateralIndex) collatPrice = price;
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
             badDebt =
                 badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
@@ -35,7 +36,11 @@ contract MidnightWrapper is Midnight {
     }
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
-        return maxDebt >= position[id][borrower].debt;
+        if (position[id][borrower].debt == 0) {
+            return true;
+        } else {
+            (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
+            return maxDebt >= position[id][borrower].debt;
+        }
     }
 }
