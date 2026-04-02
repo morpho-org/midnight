@@ -754,7 +754,6 @@ contract Midnight is IMidnight {
 
     /// @dev Computes health-related data for a position.
     /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
-    /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
         public
@@ -763,7 +762,6 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
-        if (badDebt == 0) return (0, 0, 0);
         uint128 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
@@ -782,8 +780,12 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
-        return maxDebt >= position[id][borrower].debt;
+        if (position[id][borrower].debt == 0) {
+            return true;
+        } else {
+            (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
+            return maxDebt >= position[id][borrower].debt;
+        }
     }
 
     function domainSeparator() internal view returns (bytes32) {
