@@ -10,7 +10,6 @@ interface ICallbacks {
         Obligation memory obligation,
         address buyer,
         uint256 buyerAssets,
-        uint256 sellerAssets,
         uint256 units,
         bytes memory data
     ) external;
@@ -18,7 +17,6 @@ interface ICallbacks {
         bytes32 obligationId,
         Obligation memory obligation,
         address seller,
-        uint256 buyerAssets,
         uint256 sellerAssets,
         uint256 units,
         bytes memory data
