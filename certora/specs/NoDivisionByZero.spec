@@ -11,7 +11,7 @@
 // maxLif(uint256, uint256) is excluded: it is a pure function callable with arbitrary inputs.
 // A standalone call with cursor >= WAD causes a safe revert (Solidity checked arithmetic).
 //
-// liquidate, isHealthy, and healthData are verified in separate rules below.
+// liquidate, isHealthy, and healthData are verified in separate rules below (they need extra assumptions).
 // The toId summary follows the approach from PR #388: a ghost-backed deterministic function.
 
 import "BitmapSummaries.spec";
@@ -85,6 +85,8 @@ function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
 }
 
 function summaryToId(Midnight.Obligation obligation, uint256 chainId, address morpho) returns (bytes32) {
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
     bytes32 id;
     if (equalsGlobalObligation(obligation) && morpho == currentContract) {
         require id == globalId, "toId() is deterministic";
@@ -124,8 +126,6 @@ filtered {
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
         && f.selector != sig:healthData(Midnight.Obligation, bytes32, address, uint256).selector
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
-        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
 } {
     require !divisionByZero;
     f(e, args);
@@ -159,10 +159,6 @@ rule noDivisionByZeroIsHealthy(env e, Midnight.Obligation obligation, bytes32 id
 rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     require equalsGlobalObligation(obligation);
 
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
-
     // Sound: ExactMath.spec proves maxLif * lltv <= WAD * (WAD - 1) when lltv < WAD (lifTimesLltvStrictBound).
     require obligation.collaterals[collateralIndex].lltv < WAD() => to_mathint(obligation.collaterals[collateralIndex].maxLif) * to_mathint(obligation.collaterals[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
 
@@ -175,24 +171,3 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
 
-rule noDivisionByZeroTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require equalsGlobalObligation(offer.obligation);
-
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < offer.obligation.collaterals.length => offer.obligation.collaterals[i].maxLif >= WAD();
-
-    require !divisionByZero;
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
-}
-
-rule noDivisionByZeroWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
-    require equalsGlobalObligation(obligation);
-
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
-
-    require !divisionByZero;
-    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
-    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
-}
