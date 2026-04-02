@@ -120,6 +120,9 @@ contract Midnight is IMidnight {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    /// @dev When set, isHealthy returns true unconditionally. Used to defer health checks until after callbacks.
+    bool transient deferredCheck;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -337,6 +340,8 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
+        deferredCheck = true;
+
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
                 .onBuy(id, offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
@@ -350,6 +355,7 @@ contract Midnight is IMidnight {
                 .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
 
+        deferredCheck = false;
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
@@ -469,24 +475,10 @@ contract Midnight is IMidnight {
             "liquidator gated from liquidating"
         );
         Position storage _position = position[id][borrower];
-
-        uint256 maxDebt;
-        uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
-        uint256 badDebt = originalDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = IOracle(_collateral.oracle).price();
-            if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 _collateralOf = _position.collateral[i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
-            );
-            bitmap = bitmap.clearBit(i);
-        }
+
+        (uint256 maxDebt, uint256 badDebt, uint256 liquidatedCollatPrice) =
+            _isHealthy(obligation, _position, collateralIndex);
 
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
@@ -758,18 +750,35 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+        if (deferredCheck) return true;
         Position storage _position = position[id][borrower];
-        uint256 debt = _position.debt;
-        uint256 maxDebt;
+        (uint256 maxDebt,,) = _isHealthy(obligation, _position, type(uint256).max);
+        return maxDebt >= _position.debt;
+    }
+
+    /// @dev Returns (maxDebt, badDebt, collatPrice) iterating all active collaterals.
+    /// @dev Pass `type(uint256).max` as collateralIndex when collatPrice is not needed.
+    /// @dev Does not call any oracle if debt is 0.
+    function _isHealthy(Obligation memory obligation, Position storage _position, uint256 collateralIndex)
+        internal
+        view
+        returns (uint256 maxDebt, uint256 badDebt, uint256 collatPrice)
+    {
+        badDebt = _position.debt;
+        if (badDebt == 0) return (0, 0, collatPrice);
         uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
+        while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            if (i == collateralIndex) collatPrice = price;
+            uint256 _collateralOf = _position.collateral[i];
+            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            badDebt = badDebt.zeroFloorSub(
+                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif)
+            );
             bitmap = bitmap.clearBit(i);
         }
-        return maxDebt >= debt;
     }
 
     function domainSeparator() internal view returns (bytes32) {

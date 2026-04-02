@@ -145,9 +145,9 @@ function summaryToId(Midnight.Obligation obligation, uint256 chainId, address mo
     return id;
 }
 
-// Call either isHealthy() or isHealthyNoBitmap() depending on global setting. 
+// Call either isHealthy() or isHealthyNoBitmap() depending on global setting.
 // We show in CollateralBitmap.spec that both functions return the same value, so calling any of them is okay.
-// To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsHealthyNoBitmap. 
+// To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsHealthyNoBitmap.
 function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
     if (useIsHealthyNoBitmap) {
         return isHealthyNoBitmap(obligation, id, borrower);
@@ -187,7 +187,7 @@ function genericCallbackBool() returns (bool) {
 // The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
 // Since we have a ghost summary for price(), we assume the price will not change during the call.
 
-// To avoid timeouts, we split out two cases for liquidate: 
+// To avoid timeouts, we split out two cases for liquidate:
 //  1) the borrower under consideration is the one that is liquidated on the obligation under consideration.
 //  2) the borrower is different from the liquidated user, or the obligation is different.
 // and then we have a final rule for all other functions of the contract.
@@ -254,7 +254,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector} {
     // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 
