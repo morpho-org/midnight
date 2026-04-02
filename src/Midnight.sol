@@ -120,8 +120,23 @@ contract Midnight is IMidnight {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
-    /// @dev When set, isHealthy returns true unconditionally. Used to defer health checks until after callbacks.
-    bool transient deferredCheck;
+    /// @dev When set for a user, isHealthy returns true unconditionally. Used to defer health checks until after
+    /// callbacks. Stored in transient storage (mapping(address => bool) equivalent).
+    uint256 private constant DEFERRED_CHECK_SLOT = uint256(keccak256("midnight.deferredCheck"));
+
+    function _setDeferredCheck(address user, bool value) internal {
+        uint256 slot = uint256(keccak256(abi.encode(user, DEFERRED_CHECK_SLOT)));
+        assembly ("memory-safe") {
+            tstore(slot, value)
+        }
+    }
+
+    function _getDeferredCheck(address user) internal view returns (bool value) {
+        uint256 slot = uint256(keccak256(abi.encode(user, DEFERRED_CHECK_SLOT)));
+        assembly ("memory-safe") {
+            value := tload(slot)
+        }
+    }
 
     /// CONSTRUCTOR ///
 
@@ -340,7 +355,7 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
-        deferredCheck = true;
+        _setDeferredCheck(seller, true);
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
@@ -355,7 +370,7 @@ contract Midnight is IMidnight {
                 .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
 
-        deferredCheck = false;
+        _setDeferredCheck(seller, false);
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
@@ -478,7 +493,7 @@ contract Midnight is IMidnight {
         uint256 originalDebt = _position.debt;
 
         (uint256 maxDebt, uint256 badDebt, uint256 liquidatedCollatPrice) =
-            _isHealthy(obligation, _position, collateralIndex);
+            _isHealthy(obligation, _position, collateralIndex, borrower);
 
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
@@ -751,19 +766,20 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
-        (uint256 maxDebt,,) = _isHealthy(obligation, _position, type(uint256).max);
+        (uint256 maxDebt,,) = _isHealthy(obligation, _position, type(uint256).max, borrower);
         return maxDebt >= _position.debt;
     }
 
     /// @dev Returns (maxDebt, badDebt, collatPrice) iterating all active collaterals.
     /// @dev Pass `type(uint256).max` as collateralIndex when collatPrice is not needed.
     /// @dev Does not call any oracle if debt is 0.
-    function _isHealthy(Obligation memory obligation, Position storage _position, uint256 collateralIndex)
-        internal
-        view
-        returns (uint256 maxDebt, uint256 badDebt, uint256 collatPrice)
-    {
-        if (deferredCheck) return (type(uint256).max, 0, collatPrice);
+    function _isHealthy(
+        Obligation memory obligation,
+        Position storage _position,
+        uint256 collateralIndex,
+        address borrower
+    ) internal view returns (uint256 maxDebt, uint256 badDebt, uint256 collatPrice) {
+        if (_getDeferredCheck(borrower)) return (type(uint256).max, 0, collatPrice);
         badDebt = _position.debt;
         if (badDebt == 0) return (0, 0, collatPrice);
         uint128 bitmap = _position.activatedCollaterals;

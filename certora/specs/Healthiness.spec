@@ -254,7 +254,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector} {
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
     // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 

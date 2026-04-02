@@ -15,7 +15,7 @@ contract MidnightWrapper is Midnight {
     /* This isHealthy function iterates over all collaterals, it doesn't use the collateral bitmap. */
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (deferredCheck) return true;
+        if (_getDeferredCheck(borrower)) return true;
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
