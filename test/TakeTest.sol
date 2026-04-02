@@ -339,7 +339,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maxUnits = exitUnits;
         otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        vm.expectRevert("maker credit increased");
         take(exitUnits, borrower, otherBorrowerOffer);
     }
 
@@ -374,7 +374,8 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maxUnits = exitUnits;
         otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        deal(address(loanToken), lender, maxAssets);
+        vm.expectRevert("maker debt increased");
         take(exitUnits, lender, otherLenderOffer);
     }
 
@@ -389,8 +390,8 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         borrowerOffer.maxUnits = offerUnits;
         borrowerOffer.tick = MAX_TICK;
-        deal(address(loanToken), lender, offerUnits);
-        collateralize(obligation, borrower, offerUnits);
+        deal(address(loanToken), lender, units + secondRevertingTake);
+        collateralize(obligation, borrower, units + secondRevertingTake);
 
         take(units, lender, borrowerOffer);
 
@@ -409,8 +410,8 @@ contract TakeTest is BaseTest {
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         lenderOffer.maxUnits = offerUnits;
         lenderOffer.tick = MAX_TICK;
-        deal(address(loanToken), lender, offerUnits);
-        collateralize(obligation, borrower, offerUnits);
+        deal(address(loanToken), lender, units + secondRevertingTake);
+        collateralize(obligation, borrower, units + secondRevertingTake);
 
         take(units, borrower, lenderOffer);
 
@@ -427,9 +428,9 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
-        collateralize(borrowerOffer2.obligation, borrower, secondFill);
+        collateralize(borrowerOffer2.obligation, borrower, secondFill + 1);
 
         take(firstFill, lender, borrowerOffer);
 
@@ -446,9 +447,9 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
-        deal(address(loanToken), lender, firstFill + secondFill);
+        deal(address(loanToken), lender, firstFill + secondFill + 1);
         collateralize(obligation, borrower, firstFill);
-        collateralize(lenderOffer2.obligation, borrower, secondFill);
+        collateralize(lenderOffer2.obligation, borrower, secondFill + 1);
 
         take(firstFill, borrower, lenderOffer);
 
