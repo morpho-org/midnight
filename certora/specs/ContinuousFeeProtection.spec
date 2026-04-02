@@ -17,7 +17,6 @@ methods {
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function lossIndex(bytes32 id) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
-    function updatePositionView(Midnight.Obligation memory obligation, bytes32 id, address user) external returns (uint128, uint128, uint128);
 
     function _.price() external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
@@ -58,70 +57,42 @@ function passiveFeeRecipient() returns address {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-// The continuous fee is never overcharged: when a lender's credit increases via a buy-offer
-// take, their pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
-// This is a rounding-favors-maker guarantee: mulDivDown means the lender pays the floor, never the ceiling.
-// Pending accrual is not required: time-based fee drainage inside _updatePosition only
-// reduces pendingFeeDelta, never raises it. Pending slash and lossIndex saturation must still
-// be excluded because they wipe credit without proportionally reducing pendingFee, breaking the inequality.
-rule continuousFeeNotOvercharged(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address lender) {
+rule continuousFeeNotOvercharged(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     require offer.buy;
-
-    // PASSIVE_FEE_RECIPIENT receives extra credit from every _updatePosition call on other
-    // positions (line 682 of Midnight.sol), so their credit change is not governed solely
-    // by the continuousFee formula.
-    require lender != passiveFeeRecipient();
+    require offer.maker != passiveFeeRecipient();
 
     bytes32 id;
-    uint256 creditBefore = creditOf(id, lender);
-    uint256 pendingFeeBefore = pendingFee(id, lender);
-    require pendingFeeBefore <= creditBefore;
-    require userLossIndex(id, lender) == lossIndex(id); // no pending slash: slashing reduces creditDelta without proportionally reducing pendingFeeDelta, which can push pendingFeeDelta above the formula
-    require lossIndex(id) < max_uint128; // excludes lossIndex saturation: same risk as pending slash — credit is wiped unconditionally, shrinking creditDelta without a matching reduction in pendingFeeDelta
-
-    // Read contFee and timeToMaturity before take so the prover can use these constraints to
-    // prune execution paths inside take(). timeToMaturity is a pure function of the offer fields
-    // (which don't change), so it's consistent before and after. contFee requires an extra
-    // post-take consistency check (see below).
-    uint256 contFee = continuousFee(id);
-    uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
-    // Economic viability constraint: the total continuous fee cannot exceed 100% of credit
-    // (contFee * timeToMaturity / WAD <= 1). Without this, accrual inside _updatePosition
-    // inflates buyerCreditIncrease above creditDelta, pushing pendingFeeDelta above the formula.
-    // In practice MAX_CONTINUOUS_FEE = 317097919 (~1% APR) with realistic maturities keeps r << 1.
-    require to_mathint(contFee) * to_mathint(timeToMaturity) <= WAD();
+    uint128 postUpdateCredit;
+    uint128 postUpdatePendingFee;
+    uint128 accruedFee;
+    postUpdateCredit, postUpdatePendingFee, accruedFee = updatePositionView(e, offer.obligation, id, offer.maker);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     require id == lastId;
-    // touchObligation sets continuousFee = defaultContinuousFee[loanToken] on first creation, so
-    // the pre-take storage value could differ from the value actually used inside take. Requiring
-    // equality pins the pre-read to the post-take value, ensuring our formula uses the same contFee
-    // that the Solidity code applied. For already-created obligations this is trivially satisfied.
-    require continuousFee(id) == contFee;
 
-    uint256 creditAfter = creditOf(id, lender);
-    uint256 pendingFeeAfter = pendingFee(id, lender);
+    uint256 contFee = continuousFee(id);
+    uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = to_mathint(creditAfter) - to_mathint(creditBefore);
-    mathint pendingFeeDelta = to_mathint(pendingFeeAfter) - to_mathint(pendingFeeBefore);
+    mathint creditDelta = to_mathint(creditOf(id, offer.maker)) - to_mathint(postUpdateCredit);
+    mathint pendingFeeDelta = to_mathint(pendingFee(id, offer.maker)) - to_mathint(postUpdatePendingFee);
 
-    require creditDelta >= 0; // scope to buyers gaining credit
+    require creditDelta >= 0;
     assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by
 // exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
 // updatePositionView accounts for slash and accrual before the proportional formula runs.
-rule sellerPendingFeeDecreasesProportionally(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address seller) {
+rule sellerPendingFeeDecreasesProportionally(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     require !offer.buy;
-    require seller != passiveFeeRecipient();
+    require offer.maker != passiveFeeRecipient();
 
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
     uint128 accruedFee;
-    postUpdateCredit, postUpdatePendingFee, accruedFee = updatePositionView(e, offer.obligation, id, seller);
+    postUpdateCredit, postUpdatePendingFee, accruedFee = updatePositionView(e, offer.obligation, id, offer.maker);
 
     // The Solidity mulDivUp is skipped when sellerPos.credit == 0 after _updatePosition,
     // leaving pendingFee unchanged. Require credit > 0 to stay in the proportional branch.
@@ -131,8 +102,8 @@ rule sellerPendingFeeDecreasesProportionally(env e, uint256 units, address taker
 
     require id == lastId;
 
-    uint256 creditAfter = creditOf(id, seller);
-    uint256 pendingFeeAfter = pendingFee(id, seller);
+    uint256 creditAfter = creditOf(id, offer.maker);
+    uint256 pendingFeeAfter = pendingFee(id, offer.maker);
 
     mathint creditDelta = to_mathint(creditAfter) - to_mathint(postUpdateCredit);
     mathint pendingFeeDelta = to_mathint(pendingFeeAfter) - to_mathint(postUpdatePendingFee);
