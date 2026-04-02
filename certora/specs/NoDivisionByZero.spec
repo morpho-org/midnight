@@ -170,4 +170,3 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
-
