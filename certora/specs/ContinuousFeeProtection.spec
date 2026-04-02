@@ -79,21 +79,26 @@ rule continuousFeeNotOvercharged(env e, uint256 units, address taker, address ta
     require userLossIndex(id, lender) == lossIndex(id); // no pending slash: slashing reduces creditDelta without proportionally reducing pendingFeeDelta, which can push pendingFeeDelta above the formula
     require lossIndex(id) < max_uint128; // excludes lossIndex saturation: same risk as pending slash — credit is wiped unconditionally, shrinking creditDelta without a matching reduction in pendingFeeDelta
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-
-    require id == lastId;
-
-    // Read contFee AFTER take so it matches the value actually used by take: touchObligation
-    // initializes continuousFee = defaultContinuousFee[loanToken] on the first touch, so a
-    // pre-take read would see stale storage if the obligation was just created during this call.
+    // Read contFee and timeToMaturity before take so the prover can use these constraints to
+    // prune execution paths inside take(). timeToMaturity is a pure function of the offer fields
+    // (which don't change), so it's consistent before and after. contFee requires an extra
+    // post-take consistency check (see below).
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
-
     // Economic viability constraint: the total continuous fee cannot exceed 100% of credit
     // (contFee * timeToMaturity / WAD <= 1). Without this, accrual inside _updatePosition
     // inflates buyerCreditIncrease above creditDelta, pushing pendingFeeDelta above the formula.
     // In practice MAX_CONTINUOUS_FEE = 317097919 (~1% APR) with realistic maturities keeps r << 1.
     require to_mathint(contFee) * to_mathint(timeToMaturity) <= WAD();
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+
+    require id == lastId;
+    // touchObligation sets continuousFee = defaultContinuousFee[loanToken] on first creation, so
+    // the pre-take storage value could differ from the value actually used inside take. Requiring
+    // equality pins the pre-read to the post-take value, ensuring our formula uses the same contFee
+    // that the Solidity code applied. For already-created obligations this is trivially satisfied.
+    require continuousFee(id) == contFee;
 
     uint256 creditAfter = creditOf(id, lender);
     uint256 pendingFeeAfter = pendingFee(id, lender);
