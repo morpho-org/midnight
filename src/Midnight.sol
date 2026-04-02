@@ -274,6 +274,7 @@ contract Midnight is IMidnight {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        require(sellerPrice > 0, "seller price is zero");
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 currentConsumed = consumed[offer.maker][offer.group];
         if (offer.maxSellerAssets > 0) {

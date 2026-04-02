@@ -72,6 +72,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.tick = 1;
         borrowerOffer.expiry = block.timestamp + 200;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 10000);
@@ -276,7 +277,7 @@ contract TradingFeeTest is BaseTest {
     function testClaimTradingFeeExcessReverts() public {
         uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        borrowerOffer.tick = 0;
+        borrowerOffer.tick = 1;
 
         collateralize(obligation, borrower, MAX_DEBT);
         take(1000, lender, borrowerOffer);
@@ -291,7 +292,7 @@ contract TradingFeeTest is BaseTest {
     function testTradingFeesAccumulate() public {
         uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
-        borrowerOffer.tick = 0;
+        borrowerOffer.tick = 1;
         borrowerOffer.group = keccak256("g1");
 
         uint256 balanceBefore = loanToken.balanceOf(address(midnight));
