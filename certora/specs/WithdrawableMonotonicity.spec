@@ -8,10 +8,10 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32);
 }
 
-rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf) {
+rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
     bytes32 id = toId(e, obligation);
     uint256 withdrawableBefore = withdrawable(id);
-    repay(e, obligation, units, onBehalf);
+    repay(e, obligation, units, onBehalf, data);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore + units;
 }
@@ -37,7 +37,7 @@ rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Obligation obligation,
 rule withdrawableUnchanged(method f, env e, calldataarg args, bytes32 id)
 filtered {
     f -> !f.isView
-        && f.selector != sig:repay(Midnight.Obligation, uint256, address).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
 } {

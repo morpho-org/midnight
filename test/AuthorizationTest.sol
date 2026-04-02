@@ -58,7 +58,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Attacker tries to withdraw lender's units
         address attacker = makeAddr("attacker");
@@ -95,7 +95,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Lender authorizes operator
         address operator = makeAddr("operator");
@@ -167,7 +167,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Lender can withdraw their own units (no authorization needed)
         vm.prank(lender);
@@ -251,17 +251,19 @@ contract AuthorizationTest is BaseTest {
 
         deal(address(loanToken), authorized, units);
         vm.prank(authorized);
+        loanToken.approve(address(midnight), 0);
+        vm.prank(authorized);
         loanToken.approve(address(midnight), units);
 
         vm.prank(authorized);
         vm.expectRevert("unauthorized");
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         vm.prank(borrower);
         midnight.setIsAuthorized(borrower, authorized, true);
 
         vm.prank(authorized);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         assertEq(midnight.debtOf(id, borrower), 0);
     }

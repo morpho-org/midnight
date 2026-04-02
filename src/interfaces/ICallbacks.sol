@@ -30,6 +30,13 @@ interface ICallbacks {
         address borrower,
         bytes memory data
     ) external;
+    function onRepay(
+        bytes32 obligationId,
+        Obligation memory obligation,
+        uint256 units,
+        address onBehalf,
+        bytes memory data
+    ) external;
 }
 
 interface IFlashLoanCallback {

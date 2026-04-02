@@ -990,6 +990,8 @@ contract BorrowCallback is ICallbacks {
     function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1014,4 +1016,6 @@ contract LendCallback is ICallbacks {
     function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }

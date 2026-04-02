@@ -3,6 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Midnight} from "../src/Midnight.sol";
+import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -110,12 +112,32 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        midnight.repay(obligation, repaid, borrower);
+        midnight.repay(obligation, repaid, borrower, hex"");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
         assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
+    }
+
+    function testRepayCallback(uint256 units, uint256 repaid) public {
+        units = bound(units, 1, MAX_UNITS);
+        repaid = bound(repaid, 1, units);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        skip(99);
+
+        RepayCallback callback = new RepayCallback();
+        deal(address(loanToken), address(callback), repaid);
+        authorize(borrower, address(callback));
+
+        callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
+
+        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(callback.recordedObligationId(), id);
+        assertEq(callback.recordedData(), hex"deadbeef");
+        assertEq(callback.recordedUnits(), repaid);
+        assertEq(callback.recordedOnBehalf(), borrower);
     }
 
     function testWithdraw(uint256 units, uint256 withdraw) public {
@@ -553,5 +575,33 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(toId(_obligation)), true, "obligation created with cursor 0.5");
+    }
+}
+
+contract RepayCallback {
+    bytes32 public recordedObligationId;
+    bytes public recordedData;
+    uint256 public recordedUnits;
+    address public recordedOnBehalf;
+
+    function repay(Midnight midnight, Obligation memory obligation, uint256 units, address onBehalf, bytes memory data)
+        external
+    {
+        ERC20(obligation.loanToken).approve(address(midnight), units);
+        midnight.repay(obligation, units, onBehalf, data);
+    }
+
+    function onRepay(
+        bytes32 obligationId,
+        Obligation memory obligation,
+        uint256 units,
+        address onBehalf,
+        bytes memory data
+    ) external {
+        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
+        recordedObligationId = obligationId;
+        recordedData = data;
+        recordedUnits = units;
+        recordedOnBehalf = onBehalf;
     }
 }

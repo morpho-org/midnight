@@ -391,7 +391,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf) external {
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
@@ -399,6 +399,10 @@ contract Midnight is IMidnight {
         obligationState[id].withdrawable += units;
 
         emit EventsLib.Repay(msg.sender, id, units, onBehalf);
+
+        if (data.length > 0) {
+            ICallbacks(msg.sender).onRepay(id, obligation, units, onBehalf, data);
+        }
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
     }
