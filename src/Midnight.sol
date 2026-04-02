@@ -750,7 +750,6 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (deferredCheck) return true;
         Position storage _position = position[id][borrower];
         (uint256 maxDebt,,) = _isHealthy(obligation, _position, type(uint256).max);
         return maxDebt >= _position.debt;
@@ -764,6 +763,7 @@ contract Midnight is IMidnight {
         view
         returns (uint256 maxDebt, uint256 badDebt, uint256 collatPrice)
     {
+        if (deferredCheck) return (type(uint256).max, 0, collatPrice);
         badDebt = _position.debt;
         if (badDebt == 0) return (0, 0, collatPrice);
         uint128 bitmap = _position.activatedCollaterals;
