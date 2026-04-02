@@ -4,8 +4,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
-    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
-    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -30,25 +28,17 @@ methods {
     function _.canIncreaseDebt(address) external => NONDET;
 }
 
+/// HELPERS ///
+
 // IdLib summary: remember the last id returned by toId.
+
 persistent ghost bytes32 lastId;
 
 function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
+    // non-deterministic id
     bytes32 id;
     lastId = id;
     return id;
-}
-
-// Exact mulDivDown: floor(a * b / d)
-function CVL_mulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    require d > 0, "see NoDivisionByZero.spec";
-    return require_uint256((to_mathint(a) * to_mathint(b)) / to_mathint(d));
-}
-
-// Exact mulDivUp: ceil(a * b / d)
-function CVL_mulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    require d > 0, "see NoDivisionByZero.spec";
-    return require_uint256((to_mathint(a) * to_mathint(b) + to_mathint(d) - 1) / to_mathint(d));
 }
 
 function passiveFeeRecipient() returns address {
@@ -57,19 +47,20 @@ function passiveFeeRecipient() returns address {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-rule continuousFeeNotOvercharged(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require offer.buy;
-    require offer.maker != passiveFeeRecipient();
+// In a buy-offer take, the buyer's pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
+// Measured from the post-update baseline (after slash and accrual) so that only the new-credit fee contribution is bounded.
+rule continuousFeeNotOverchargedInBuyOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    require offer.maker != passiveFeeRecipient(), "Passive Fee Recipient can't call take()";
 
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
-    uint128 accruedFee;
-    postUpdateCredit, postUpdatePendingFee, accruedFee = updatePositionView(e, offer.obligation, id, offer.maker);
+
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    require id == lastId;
+    require id == lastId, "id should be derived from obligation";
 
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
@@ -77,30 +68,25 @@ rule continuousFeeNotOvercharged(env e, uint256 units, address taker, address ta
     mathint creditDelta = to_mathint(creditOf(id, offer.maker)) - to_mathint(postUpdateCredit);
     mathint pendingFeeDelta = to_mathint(pendingFee(id, offer.maker)) - to_mathint(postUpdatePendingFee);
 
-    require creditDelta >= 0;
-    assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    require creditDelta >= 0, "take only adds credit to the maker in a buy-offer";
+
+    assert !offer.buy || pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by
 // exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
-// updatePositionView accounts for slash and accrual before the proportional formula runs.
-rule sellerPendingFeeDecreasesProportionally(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require !offer.buy;
-    require offer.maker != passiveFeeRecipient();
+rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    require offer.maker != passiveFeeRecipient(), "Passive Fee Recipient can't call take()";
 
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
-    uint128 accruedFee;
-    postUpdateCredit, postUpdatePendingFee, accruedFee = updatePositionView(e, offer.obligation, id, offer.maker);
 
-    // The Solidity mulDivUp is skipped when sellerPos.credit == 0 after _updatePosition,
-    // leaving pendingFee unchanged. Require credit > 0 to stay in the proportional branch.
-    require postUpdateCredit > 0;
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    require id == lastId;
+    require id == lastId, "id should be derived from obligation";
 
     uint256 creditAfter = creditOf(id, offer.maker);
     uint256 pendingFeeAfter = pendingFee(id, offer.maker);
@@ -110,19 +96,22 @@ rule sellerPendingFeeDecreasesProportionally(env e, uint256 units, address taker
 
     require creditDelta <= 0; // scope to sellers losing credit
     mathint creditDecrease = -creditDelta;
-    assert pendingFeeDelta == -((to_mathint(postUpdatePendingFee) * creditDecrease + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit));
+    require offer.buy == false, "take only removes credit from the maker in a sell-offer";
+
+    // if postUpdateCredit is zero, then pendingFeeDelta is also zero, else equals ceil(creditDecrease * postUpdatePendingFee / postUpdateCredit).
+    assert postUpdateCredit == 0 || pendingFeeDelta == -((to_mathint(postUpdatePendingFee) * creditDecrease + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit));
+    assert postUpdateCredit != 0 || pendingFeeDelta == 0;
 }
 
 // take() must not modify credit or pendingFee of any address other than the buyer, seller,
-// and PASSIVE_FEE_RECIPIENT. This catches accidental writes to wrong positions (e.g. wrong id,
-// wrong user) and callback side-effects.
+// and PASSIVE_FEE_RECIPIENT.
 rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    require user != buyer;
-    require user != seller;
-    require user != passiveFeeRecipient();
+    require user != buyer, "user is a third party, different from buyer";
+    require user != seller, "user is a third party, different from seller";
+    require user != passiveFeeRecipient(), "user is a third party, different from passive fee recipient";
 
     bytes32 id;
     uint256 creditBefore = creditOf(id, user);
@@ -130,7 +119,7 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    require id == lastId;
+    require id == lastId, "id should be derived from obligation";
 
     assert creditOf(id, user) == creditBefore;
     assert pendingFee(id, user) == pendingFeeBefore;
