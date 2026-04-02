@@ -132,16 +132,16 @@ contract SettersTest is BaseTest {
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
-    function testSetFeeRecipientSuccess(address feeRecipient) public {
-        midnight.setFeeRecipient(feeRecipient);
-        assertEq(midnight.feeRecipient(), feeRecipient, "fee recipient set");
+    function testSetFeeClaimerSuccess(address feeClaimer) public {
+        midnight.setFeeClaimer(feeClaimer);
+        assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
 
-    function testSetFeeRecipientOnlyOwner(address rdm) public {
+    function testSetFeeClaimerOnlyOwner(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert("only owner");
-        midnight.setFeeRecipient(makeAddr("newRecipient"));
+        midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
     // Default trading fee tests

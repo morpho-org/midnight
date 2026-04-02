@@ -4,6 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
+    function claimableTradingFee(address token) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
 }
 
@@ -44,4 +45,18 @@ filtered {
     f(e, args);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore;
+}
+
+/// CLAIMABLE TRADING FEE ///
+
+rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, address receiver) {
+    uint256 before = claimableTradingFee(token);
+    claimTradingFee(e, token, amount, receiver);
+    assert claimableTradingFee(token) == before - amount;
+}
+
+rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
+    uint256 before = claimableTradingFee(token);
+    f(e, args);
+    assert claimableTradingFee(token) == before;
 }
