@@ -29,7 +29,7 @@ contract TradingFeeTest is BaseTest {
     bytes32 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
-    address internal feeRecipient = makeAddr("feeRecipient");
+    address internal feeClaimer = makeAddr("feeClaimer");
 
     function setUp() public override {
         super.setUp();
@@ -76,7 +76,7 @@ contract TradingFeeTest is BaseTest {
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 10000);
 
-        midnight.setFeeRecipient(feeRecipient);
+        midnight.setFeeClaimer(feeClaimer);
     }
 
     function testBuyUnits(uint256 tradingFee, uint256 sellerTick, uint256 units) public {
@@ -94,10 +94,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testSellUnits(uint256 tradingFee, uint256 buyerTick, uint256 units) public {
@@ -114,10 +116,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivDown(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, borrower, lenderOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testDefaultFee(uint256 units, uint256 sellerTick, uint256 tradingFee) public {
@@ -135,10 +139,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testSevenDayTtmFee(uint256 units, uint256 sellerTick, uint256 fee1Day, uint256 fee7Days) public {
@@ -169,10 +175,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testPostMaturityFee(uint256 units, uint256 sellerTick, uint256 fee0Day, uint256 maturity) public {
@@ -198,10 +206,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testEarlyFee(uint256 units, uint256 sellerTick, uint256 fee360Days, uint256 maturity) public {
@@ -228,9 +238,72 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
+    }
+
+    function testClaimTradingFee(uint256 tradingFee, uint256 units, uint256 withdrawAmount) public {
+        units = bound(units, 1, MAX_DEBT);
+        tradingFee = bound(tradingFee, 1e12, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(units, lender, borrowerOffer);
+
+        uint256 fee = midnight.claimableTradingFee(address(loanToken));
+        vm.assume(fee > 0);
+        withdrawAmount = bound(withdrawAmount, 1, fee);
+        address receiver = makeAddr("receiver");
+
+        vm.prank(feeClaimer);
+        midnight.claimTradingFee(address(loanToken), withdrawAmount, receiver);
+
+        assertEq(loanToken.balanceOf(receiver), withdrawAmount, "receiver balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), fee - withdrawAmount, "remaining fee");
+    }
+
+    function testClaimTradingFeeOnlyFeeClaimer(address caller) public {
+        vm.assume(caller != feeClaimer);
+        vm.prank(caller);
+        vm.expectRevert("only fee claimer");
+        midnight.claimTradingFee(address(loanToken), 0, caller);
+    }
+
+    function testClaimTradingFeeExcessReverts() public {
+        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+        borrowerOffer.tick = 0;
+
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(1000, lender, borrowerOffer);
+
+        uint256 fee = midnight.claimableTradingFee(address(loanToken));
+
+        vm.prank(feeClaimer);
+        vm.expectRevert();
+        midnight.claimTradingFee(address(loanToken), fee + 1, feeClaimer);
+    }
+
+    function testTradingFeesAccumulate() public {
+        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+        borrowerOffer.tick = 0;
+        borrowerOffer.group = keccak256("g1");
+
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(1000, lender, borrowerOffer);
+        uint256 feeAfterFirst = midnight.claimableTradingFee(address(loanToken));
+
+        borrowerOffer.group = keccak256("g2");
+        take(1000, lender, borrowerOffer);
+        uint256 feeAfterSecond = midnight.claimableTradingFee(address(loanToken));
+
+        assertEq(feeAfterSecond, feeAfterFirst * 2, "fees accumulated");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, feeAfterSecond, "contract balance increase");
     }
 }

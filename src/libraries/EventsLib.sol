@@ -12,7 +12,7 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
     event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
-    event SetFeeRecipient(address indexed feeRecipient);
+    event SetFeeClaimer(address indexed feeClaimer);
     event SetObligationContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
     event UpdatePosition(
@@ -80,4 +80,6 @@ library EventsLib {
     event SetIsAuthorized(
         address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized
     );
+
+    event ClaimTradingFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);
 }

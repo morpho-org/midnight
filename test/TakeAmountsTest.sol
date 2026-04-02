@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
-import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -96,6 +96,7 @@ contract TakeAmountsTest is BaseTest {
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, units);
         offer.maker = borrower;
+        offer.receiverIfMakerIsSeller = borrower;
 
         (uint256 buyerAssets,,) = take(units, lender, offer);
 
@@ -114,6 +115,7 @@ contract TakeAmountsTest is BaseTest {
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, units);
         offer.maker = borrower;
+        offer.receiverIfMakerIsSeller = borrower;
 
         (, uint256 sellerAssets,) = take(units, lender, offer);
 
@@ -177,6 +179,7 @@ contract TakeAmountsTest is BaseTest {
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, targetUnits);
         offer.maker = borrower;
+        offer.receiverIfMakerIsSeller = borrower;
         offer.tick = MAX_TICK;
 
         (uint256 buyerAssets,,) = take(targetUnits, lender, offer);
