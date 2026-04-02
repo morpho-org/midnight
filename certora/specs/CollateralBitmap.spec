@@ -8,6 +8,8 @@ methods {
     function collateralOf(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
+    function healthData(Midnight.Obligation, bytes32, address, uint256) external returns (uint256, uint256, uint256) envfree;
+    function healthDataNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (uint256, uint256, uint256) envfree;
 
     /* Assumption: price does not change during rules.
      * We want to show that isHealthy() and isHealthyNoBitmap() behaves the same under the
@@ -53,4 +55,26 @@ rule isHealthyEquivalent(Midnight.Obligation obligation, bytes32 id, address bor
     // Assert that isHealthyNoBitmap() does not revert and returns the same value.
     assert !lastReverted;
     assert isHealthy1 == isHealthy2;
+}
+
+// This shows that healthData and healthDataNoBitmap return the same values.
+rule healthDataEquivalent(Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
+    require obligation.collaterals.length <= 3, "restrict to three collaterals";
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 2);
+
+    uint256 maxDebt1;
+    uint256 collatPrice1;
+    uint256 badDebt1;
+    maxDebt1, collatPrice1, badDebt1 = healthData(obligation, id, borrower, collateralIndex);
+    uint256 maxDebt2;
+    uint256 collatPrice2;
+    uint256 badDebt2;
+    maxDebt2, collatPrice2, badDebt2 = healthDataNoBitmap@withrevert(obligation, id, borrower, collateralIndex);
+
+    assert !lastReverted;
+    assert maxDebt1 == maxDebt2;
+    assert collatPrice1 == collatPrice2;
+    assert badDebt1 == badDebt2;
 }

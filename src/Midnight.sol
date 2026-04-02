@@ -482,23 +482,9 @@ contract Midnight is IMidnight {
         );
         Position storage _position = position[id][borrower];
 
-        uint256 maxDebt;
-        uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
-        uint256 badDebt = originalDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            Collateral memory _collateral = obligation.collaterals[i];
-            uint256 price = IOracle(_collateral.oracle).price();
-            if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 _collateralOf = _position.collateral[i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateral.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateral.maxLif)
-            );
-            bitmap = bitmap.clearBit(i);
-        }
+        (uint256 maxDebt, uint256 liquidatedCollatPrice, uint256 badDebt) =
+            healthData(obligation, id, borrower, collateralIndex);
 
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
@@ -766,22 +752,38 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
+    /// @dev Computes health-related data for a position.
+    /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
+    /// @dev This function does not call any oracle if debt is 0.
+    /// @dev Expects the id to correspond to the obligation's id.
+    function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
+        public
+        view
+        returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
+    {
+        Position storage _position = position[id][borrower];
+        badDebt = _position.debt;
+        if (badDebt == 0) return (0, 0, 0);
+        uint128 bitmap = _position.activatedCollaterals;
+        while (bitmap != 0) {
+            uint256 i = UtilsLib.msb(bitmap);
+            Collateral memory collateral = obligation.collaterals[i];
+            uint256 price = IOracle(collateral.oracle).price();
+            if (i == collateralIndex) collatPrice = price;
+            uint256 _collateral = _position.collateral[i];
+            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            badDebt =
+                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
+            bitmap = bitmap.clearBit(i);
+        }
+    }
+
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        Position storage _position = position[id][borrower];
-        uint256 debt = _position.debt;
-        uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
-        }
-        return maxDebt >= debt;
+        (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
+        return maxDebt >= position[id][borrower].debt;
     }
 
     function domainSeparator() internal view returns (bytes32) {

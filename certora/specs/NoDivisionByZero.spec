@@ -11,7 +11,7 @@
 // maxLif(uint256, uint256) is excluded: it is a pure function callable with arbitrary inputs.
 // A standalone call with cursor >= WAD causes a safe revert (Solidity checked arithmetic).
 //
-// The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
+// liquidate, isHealthy, and healthData are verified in separate rules below.
 // The toId summary follows the approach from PR #388: a ghost-backed deterministic function.
 
 import "BitmapSummaries.spec";
@@ -118,9 +118,39 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// RULES ///
 
-rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+rule noDivisionByZero(method f, env e, calldataarg args)
+filtered {
+    f -> f.selector != sig:maxLif(uint256, uint256).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
+        && f.selector != sig:healthData(Midnight.Obligation, bytes32, address, uint256).selector
+} {
     require !divisionByZero;
     f(e, args);
+    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
+}
+
+// isHealthy and healthData can divide by zero when called with arbitrary inputs (mulDivUp(WAD, maxLif) with maxLif = 0).
+// Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+rule noDivisionByZeroHealthData(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
+    require equalsGlobalObligation(obligation);
+
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+
+    require !divisionByZero;
+    healthData(e, obligation, id, borrower, collateralIndex);
+    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
+}
+
+rule noDivisionByZeroIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
+    require equalsGlobalObligation(obligation);
+
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+
+    require !divisionByZero;
+    isHealthy(e, obligation, id, borrower);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
 
