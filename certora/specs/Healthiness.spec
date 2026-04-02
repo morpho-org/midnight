@@ -9,7 +9,6 @@ methods {
 
     function collateralOf(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
-    function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 
     /* Assumption: price does not change during rules.
      * Under this assumption we can prove that a healthy borrower cannot get unhealthy by
@@ -89,10 +88,6 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(summaryMulDivUpM(a, b, d));
 }
 
-// global variable indicating whether to use the optimized isHealthy() or the bitmap-less implementation
-// see callIsHealthy() below.
-persistent ghost bool useIsHealthyNoBitmap;
-
 // global variable to track whether the user was healthy before the callbacks.
 ghost bool healthyBeforeCallback;
 
@@ -145,17 +140,6 @@ function summaryToId(Midnight.Obligation obligation, uint256 chainId, address mo
     return id;
 }
 
-// Call either isHealthy() or isHealthyNoBitmap() depending on global setting.
-// We show in CollateralBitmap.spec that both functions return the same value, so calling any of them is okay.
-// To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsHealthyNoBitmap.
-function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
-    if (useIsHealthyNoBitmap) {
-        return isHealthyNoBitmap(obligation, id, borrower);
-    } else {
-        return isHealthy(obligation, id, borrower);
-    }
-}
-
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
 // we check that the user is healthy before the callback, do some external call (to simulate changes by the callback),
 // and then require that the user is still healthy after the callback.
@@ -194,8 +178,6 @@ function genericCallbackBool() returns (bool) {
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, bytes data) {
-    useIsHealthyNoBitmap = false;
-
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
 
@@ -235,8 +217,6 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
 rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    useIsHealthyNoBitmap = true;
-
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
 
@@ -255,9 +235,6 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
 // Show that the user stays healthy on any other function than liquidate or take.
 rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
-    // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
-
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
 

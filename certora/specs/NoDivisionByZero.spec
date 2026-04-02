@@ -124,6 +124,8 @@ filtered {
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
         && f.selector != sig:healthData(Midnight.Obligation, bytes32, address, uint256).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
 } {
     require !divisionByZero;
     f(e, args);
@@ -170,5 +172,27 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
 
     require !divisionByZero;
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
+}
+
+rule noDivisionByZeroTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    require equalsGlobalObligation(offer.obligation);
+
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    require forall uint256 i. i < offer.obligation.collaterals.length => offer.obligation.collaterals[i].maxLif >= WAD();
+
+    require !divisionByZero;
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
+}
+
+rule noDivisionByZeroWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+    require equalsGlobalObligation(obligation);
+
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+
+    require !divisionByZero;
+    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
