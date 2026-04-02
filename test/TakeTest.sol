@@ -386,7 +386,6 @@ contract TakeTest is BaseTest {
         secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
         thirdTake = bound(thirdTake, 0, maxAssets);
         borrowerOffer.maxUnits = offerUnits;
-        borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerUnits);
         collateralize(obligation, borrower, offerUnits);
 
@@ -407,7 +406,6 @@ contract TakeTest is BaseTest {
         secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
         thirdTake = bound(thirdTake, 0, maxAssets);
         lenderOffer.maxUnits = offerUnits;
-        lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lender, offerUnits);
         collateralize(obligation, borrower, offerUnits);
 
@@ -600,17 +598,15 @@ contract TakeTest is BaseTest {
 
     // maxSellerAssets / maxBuyerAssets tests.
 
-    function testMaxSellerAssetsCapped() public {
-        uint256 units = 100e18;
+    function testMaxSellerAssetsCapped(uint256 units) public {
+        units = bound(units, 2, maxAssets);
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
-
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
-
-        // Units capped to fit within maxSellerAssets.
-        (,, uint256 filledUnits) = take(units, borrower, lenderOffer);
+        (, uint256 sellerAssets, uint256 filledUnits) = take(units, borrower, lenderOffer);
         assertTrue(filledUnits < units, "units capped");
+        assertLe(sellerAssets, 1, "seller assets within limit");
     }
 
     function testMaxSellerAssetsPass(uint256 units) public {
@@ -626,17 +622,15 @@ contract TakeTest is BaseTest {
         assertTrue(sellerAssets > 0);
     }
 
-    function testMaxBuyerAssetsCapped() public {
-        uint256 units = 100e18;
+    function testMaxBuyerAssetsCapped(uint256 units) public {
+        units = bound(units, 2, maxAssets);
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
-
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
-
-        // Units capped to fit within maxBuyerAssets.
-        (,, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets,, uint256 filledUnits) = take(units, lender, borrowerOffer);
         assertTrue(filledUnits < units, "units capped");
+        assertLe(buyerAssets, 1, "buyer assets within limit");
     }
 
     function testMaxBuyerAssetsPass(uint256 units) public {
