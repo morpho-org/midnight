@@ -24,7 +24,7 @@ contract BundlerTest is BaseTest {
         takeBundler = new TakeBundler();
 
         // Set trading fees to max for all breakpoints.
-        midnight.setFeeRecipient(makeAddr("feeRecipient"));
+        midnight.setFeeClaimer(makeAddr("feeClaimer"));
         for (uint256 i; i <= 6; i++) {
             midnight.setDefaultTradingFee(address(loanToken), i, midnight.maxTradingFee(i));
         }

@@ -11,21 +11,37 @@ import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";
 contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
-    
-    /* This isHealthy function iterates over all collaterals, it doesn't use the collateral bitmap. */
+
+    /* This healthData function iterates over all collaterals, it doesn't use the collateral bitmap. */
+
+    function healthDataNoBitmap(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
+        public
+        view
+        returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
+    {
+        Position storage _position = position[id][borrower];
+        badDebt = _position.debt;
+        uint256 len = obligation.collaterals.length;
+        for (uint256 i = len; i > 0;) {
+            i--;
+            uint256 _collateral = _position.collateral[i];
+            if (_collateral == 0) continue;
+            Collateral memory collateral = obligation.collaterals[i];
+            uint256 price = IOracle(collateral.oracle).price();
+            if (i == collateralIndex) collatPrice = price;
+            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            badDebt =
+                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
+        }
+    }
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
         if (_getDeferredCheck(borrower)) return true;
-        Position storage _position = position[id][borrower];
-        uint256 debt = _position.debt;
-        uint256 maxDebt;
-        uint256 len = obligation.collaterals.length;
-        for (uint256 i = len; i > 0 && maxDebt < debt; ) {
-            i--;
-            Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+        if (position[id][borrower].debt == 0) {
+            return true;
+        } else {
+            (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
+            return maxDebt >= position[id][borrower].debt;
         }
-        return maxDebt >= debt;
     }
 }

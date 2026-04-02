@@ -18,7 +18,7 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
-    PASSIVE_FEE_RECIPIENT,
+    CONTINUOUS_FEE_RECIPIENT,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
@@ -67,7 +67,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
 /// @dev At each lender's next interaction, their credit is slashed proportionally.
-/// @dev The fee recipient is not slashed when receiving fees, so it will be slashed a bit too much later.
+/// @dev The fee claimer is not slashed when receiving fees, so it will be slashed a bit too much later.
 ///
 /// ROUNDINGS
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
@@ -112,7 +112,10 @@ contract Midnight is IMidnight {
     /// feeSetter.
     mapping(address loanToken => uint32) public defaultContinuousFee;
 
-    address public feeRecipient;
+    /// @dev When the claimer is set, the old claimer loses the unclaimed trading and continuous fees.
+    mapping(address token => uint256) public claimableTradingFee;
+
+    address public feeClaimer;
 
     /// @dev Contract owner for administrative functions.
     address public owner;
@@ -195,10 +198,10 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
-    function setFeeRecipient(address newFeeRecipient) external {
+    function setFeeClaimer(address newFeeClaimer) external {
         require(msg.sender == owner, "only owner");
-        feeRecipient = newFeeRecipient;
-        emit EventsLib.SetFeeRecipient(newFeeRecipient);
+        feeClaimer = newFeeClaimer;
+        emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
@@ -216,6 +219,14 @@ contract Midnight is IMidnight {
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         defaultContinuousFee[loanToken] = uint32(newContinuousFee);
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
+    }
+
+    function claimTradingFee(address token, uint256 amount, address receiver) external {
+        require(msg.sender == feeClaimer, "only fee claimer");
+        claimableTradingFee[token] -= amount;
+        emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
+
+        SafeTransferLib.safeTransfer(token, receiver, amount);
     }
 
     /// ENTRY-POINTS ///
@@ -362,7 +373,8 @@ contract Midnight is IMidnight {
                 .onBuy(id, offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, feeRecipient, buyerAssets - sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, address(this), buyerAssets - sellerAssets);
+        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -380,7 +392,7 @@ contract Midnight is IMidnight {
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
         require(
             onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender]
-                || (onBehalf == PASSIVE_FEE_RECIPIENT && msg.sender == feeRecipient),
+                || (onBehalf == CONTINUOUS_FEE_RECIPIENT && msg.sender == feeClaimer),
             "unauthorized"
         );
         bytes32 id = touchObligation(obligation);
@@ -490,10 +502,10 @@ contract Midnight is IMidnight {
             "liquidator gated from liquidating"
         );
         Position storage _position = position[id][borrower];
-        uint256 originalDebt = _position.debt;
 
-        (uint256 maxDebt, uint256 badDebt, uint256 liquidatedCollatPrice) =
-            _isHealthy(obligation, _position, collateralIndex, borrower);
+        uint256 originalDebt = _position.debt;
+        (uint256 maxDebt, uint256 liquidatedCollatPrice, uint256 badDebt) =
+            healthData(obligation, id, borrower, collateralIndex);
 
         require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
 
@@ -684,9 +696,9 @@ contract Midnight is IMidnight {
         _position.lossIndex = obligationState[id].lossIndex;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
-        // The passive fee recipient's credit is increased without slashing them first, meaning that they will get
+        // The continuous fee recipient's credit is increased without slashing them first, meaning that they will get
         // slashed a bit too much later.
-        position[id][PASSIVE_FEE_RECIPIENT].credit += accruedFee;
+        position[id][CONTINUOUS_FEE_RECIPIENT].credit += accruedFee;
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
     }
@@ -761,39 +773,40 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
-    /// @dev This function should be called with the id corresponding to the obligation.
-    /// @dev This function does not call any oracle if debt is 0.
+    /// @dev Computes health-related data for a position.
+    /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
     /// @dev Expects the id to correspond to the obligation's id.
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+    function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
+        public
+        view
+        returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
+    {
         Position storage _position = position[id][borrower];
-        (uint256 maxDebt,,) = _isHealthy(obligation, _position, type(uint256).max, borrower);
-        return maxDebt >= _position.debt;
-    }
-
-    /// @dev Returns (maxDebt, badDebt, collatPrice) iterating all active collaterals.
-    /// @dev Pass `type(uint256).max` as collateralIndex when collatPrice is not needed.
-    /// @dev Does not call any oracle if debt is 0.
-    function _isHealthy(
-        Obligation memory obligation,
-        Position storage _position,
-        uint256 collateralIndex,
-        address borrower
-    ) internal view returns (uint256 maxDebt, uint256 badDebt, uint256 collatPrice) {
-        if (_getDeferredCheck(borrower)) return (type(uint256).max, 0, collatPrice);
         badDebt = _position.debt;
-        if (badDebt == 0) return (0, 0, collatPrice);
         uint128 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             Collateral memory collateral = obligation.collaterals[i];
             uint256 price = IOracle(collateral.oracle).price();
             if (i == collateralIndex) collatPrice = price;
-            uint256 _collateralOf = _position.collateral[i];
-            maxDebt += _collateralOf.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(
-                _collateralOf.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif)
-            );
+            uint256 _collateral = _position.collateral[i];
+            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            badDebt =
+                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
             bitmap = bitmap.clearBit(i);
+        }
+    }
+
+    /// @dev This function should be called with the id corresponding to the obligation.
+    /// @dev This function does not call any oracle if debt is 0.
+    /// @dev Expects the id to correspond to the obligation's id.
+    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+        if (_getDeferredCheck(borrower)) return true;
+        if (position[id][borrower].debt == 0) {
+            return true;
+        } else {
+            (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
+            return maxDebt >= position[id][borrower].debt;
         }
     }
 
