@@ -489,6 +489,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
+        uint256 originalDebt = _position.debt;
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
@@ -513,7 +514,7 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = obligation.collateralParams[collateralIndex].maxLif;
-            uint256 lif = _position.debt > maxDebt
+            uint256 lif = originalDebt > maxDebt
                 ? _maxLif
                 : UtilsLib.min(
                     _maxLif, WAD + (_maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF

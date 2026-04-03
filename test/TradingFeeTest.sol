@@ -200,7 +200,7 @@ contract TradingFeeTest is BaseTest {
 
         collateralize(obligation, borrower, MAX_DEBT);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, lender, borrowerOffer);
     }
 

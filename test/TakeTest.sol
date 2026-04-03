@@ -522,7 +522,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(100, lender, borrowerOffer);
     }
 
@@ -535,7 +535,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(100, borrower, lenderOffer);
     }
 
@@ -549,7 +549,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, lender, borrowerOffer);
     }
 
@@ -563,7 +563,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, borrower, lenderOffer);
     }
 

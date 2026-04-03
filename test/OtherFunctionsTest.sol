@@ -99,7 +99,7 @@ contract OtherFunctionsTest is BaseTest {
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
         vm.prank(borrower);
-        vm.expectRevert("unhealthy borrower");
+        vm.expectRevert("borrower is liquidatable");
         midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
     }
 
