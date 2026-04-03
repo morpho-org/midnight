@@ -21,8 +21,8 @@ methods {
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function _.onBuy(bytes32 obligationId, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => DISPATCHER(true);
     function _.onSell(bytes32 obligationId, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => DISPATCHER(true);
-    function FlashTakeCallback.startFlashloan(bytes32 obligationId, uint256 units) internal => CVL_flashLoanStart(obligationId, units);
-    function FlashTakeCallback.endFlashloan(bytes32 obligationId, uint256 units) internal => CVL_flashLoanEnd(obligationId, units);
+    function DeferredDebtTakeCallback.startDeferredDebt(bytes32 obligationId, uint256 units) internal => CVL_deferredDebtStart(obligationId, units);
+    function DeferredDebtTakeCallback.endDeferredDebt(bytes32 obligationId, uint256 units) internal => CVL_deferredDebtEnd(obligationId, units);
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
 
@@ -55,37 +55,50 @@ persistent ghost mapping(bytes32 => mathint) sumDebt {
     init_state axiom (forall bytes32 id. sumDebt[id] == 0);
 }
 
-// Tracks the transient flashloaned units during callbacks.
-// We use persistent ghost to ensure these values are not changed by the callback.
-// This is sound as we prove the rule flashloanedUnitsPaidBack which ensures that the flashloaned units after the callback are the same as before.
-persistent ghost mapping(bytes32 => mathint) flashloanedUnits {
-    init_state axiom (forall bytes32 id. flashloanedUnits[id] == 0);
+// Tracks the latest credit decrease in each obligation.
+// Under the reordered take logic, before both callbacks this stores
+// `sellerCreditDecrease`, so `units - latestCreditDecrease[id]` is the
+// exact debt increase deferred until after the callbacks.
+persistent ghost mapping(bytes32 => mathint) latestCreditDecrease {
+    init_state axiom (forall bytes32 id. latestCreditDecrease[id] == 0);
+}
+
+// Tracks the transient deferred debt during callbacks.
+// We use persistent ghosts to ensure these values are not changed by the callback.
+persistent ghost mapping(bytes32 => mathint) deferredDebt {
+    init_state axiom (forall bytes32 id. deferredDebt[id] == 0);
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
-function CVL_flashLoanStart(bytes32 id, uint256 units) {
-    flashloanedUnits[id] = flashloanedUnits[id] + units;
+hook Sstore position[KEY bytes32 id][KEY address owner].credit uint128 newCredit (uint128 oldCredit) {
+    if (newCredit < oldCredit) {
+        latestCreditDecrease[id] = to_mathint(oldCredit) - to_mathint(newCredit);
+    } else {
+        latestCreditDecrease[id] = 0;
+    }
 }
 
-function CVL_flashLoanEnd(bytes32 id, uint256 units) {
-    flashloanedUnits[id] = flashloanedUnits[id] - units;
+function CVL_deferredDebtStart(bytes32 id, uint256 units) {
+    deferredDebt[id] = deferredDebt[id] + units - latestCreditDecrease[id];
 }
 
-// For any token, the flash loaned units before and after a call is the same.
-// This rule is useful to prove that using persistent ghost for the flashloaned units mapping is sound.
-rule flashloanedUnitsPaidBack(method f, bytes32 id) {
+function CVL_deferredDebtEnd(bytes32 id, uint256 units) {
+    deferredDebt[id] = deferredDebt[id] - units + latestCreditDecrease[id];
+}
+
+rule deferredDebtPaidBack(method f, bytes32 id) {
     env e;
     calldataarg args;
-    mathint oldFlashloanedUnits = flashloanedUnits[id];
+    mathint oldDeferredDebt = deferredDebt[id];
     f(e, args);
-    assert flashloanedUnits[id] == oldFlashloanedUnits, "flashloaned units paid back";
+    assert deferredDebt[id] == oldDeferredDebt, "deferred debt paid back";
 }
 
-strong invariant totalUnitsEqualsSumDebtPlusWithdrawablePlusGap(bytes32 id)
-    to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id)) + flashloanedUnits[id]
+strong invariant totalUnitsEqualsSumDebtPlusWithdrawablePlusDeferredDebt(bytes32 id)
+    to_mathint(totalUnits(id)) == sumDebt[id] + withdrawable(id) + deferredDebt[id]
     {
         preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
             require e.block.timestamp >= 0;
@@ -95,5 +108,5 @@ strong invariant totalUnitsEqualsSumDebtPlusWithdrawablePlusGap(bytes32 id)
         }
     }
 
-weak invariant flashloanedUnitsZero(bytes32 id)
-    flashloanedUnits[id] == 0;
+weak invariant deferredDebtZero(bytes32 id)
+    deferredDebt[id] == 0;
