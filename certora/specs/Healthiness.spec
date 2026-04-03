@@ -8,8 +8,8 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
-    function isLiquidatable(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256) envfree;
-    function isLiquidatableNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256) envfree;
+    function isLiquidatable(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
+    function isLiquidatableNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
 
     /* Assumption: price does not change during rules.
      * Under this assumption we can prove that a healthy borrower cannot get unhealthy by
@@ -28,13 +28,13 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;
 
-    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
-    function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
+    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool(e) expect(bool);
+    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool(e) expect(bool);
+    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external with(env e) => genericCallbackBytes32(e) expect(bytes32);
+    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external with(env e) => genericCallbackBytes32(e) expect(bytes32);
+    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external with(env e) => genericCallback(e) expect void;
+    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external with(env e) => genericCallback(e) expect void;
+    function _.onFlashLoan(address token, uint256 amount, bytes data) external with(env e) => genericCallback(e) expect void;
 }
 
 /// SUMMARY ///
@@ -149,12 +149,12 @@ function summaryToId(Midnight.Obligation obligation, uint256 chainId, address mo
 // Call either isLiquidatable() or isLiquidatableNoBitmap() depending on global setting.
 // We show in CollateralBitmap.spec that both functions return the same value, so calling any of them is okay.
 // To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsLiquidatableNoBitmap.
-function callIsLiquidatable(Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
+function callIsLiquidatable(env e, Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
     bool liquidatable;
     if (useIsLiquidatableNoBitmap) {
-        liquidatable, _, _, _ = isLiquidatableNoBitmap(obligation, id, borrower, max_uint256);
+        liquidatable, _, _, _ = isLiquidatableNoBitmap(e, obligation, id, borrower, max_uint256);
     } else {
-        liquidatable, _, _, _ = isLiquidatable(obligation, id, borrower, max_uint256);
+        liquidatable, _, _, _ = isLiquidatable(e, obligation, id, borrower, max_uint256);
     }
     return liquidatable;
 }
@@ -162,32 +162,31 @@ function callIsLiquidatable(Midnight.Obligation obligation, bytes32 id, address 
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
 // we check that the user is healthy before the callback, do some external call (to simulate changes by the callback),
 // and then require that the user is still healthy after the callback.
-function genericCallback() {
+function genericCallback(env e) {
     address dummy;
-    env e;
     Midnight.Obligation globalObligation = getGlobalObligation();
 
     // check that the user is not liquidatable before the callback.  We remember any violation and check that none occurred at the end of each rule.
-    bool savedNotLiquidatableBefore = notLiquidatableBeforeCallback && !callIsLiquidatable(globalObligation, globalId, globalBorrower);
+    bool savedNotLiquidatableBefore = notLiquidatableBeforeCallback && !callIsLiquidatable(e, globalObligation, globalId, globalBorrower);
 
     callback.callHavoc(e, dummy);
 
     // the callback havocs the global variable notLiquidatableBeforeCallback, so we restore the variable using the saved value in the local variable.
     notLiquidatableBeforeCallback = savedNotLiquidatableBefore;
 
-    require !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable after callback";
+    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
-function genericCallbackBool() returns (bool) {
+function genericCallbackBool(env e) returns (bool) {
     bool result;
-    genericCallback();
+    genericCallback(e);
     return result;
 }
 
-function genericCallbackBytes32() returns (bytes32) {
+function genericCallbackBytes32(env e) returns (bytes32) {
     bytes32 result;
-    genericCallback();
+    genericCallback(e);
     return result;
 }
 
@@ -214,7 +213,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
 
     uint256 collateralBefore = collateral(globalId, globalBorrower, collateralIndex);
     uint256 seizedAssetsOut;
@@ -239,7 +238,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
@@ -254,12 +253,12 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     Midnight.Obligation globalObligation = getGlobalObligation();
     require borrower != globalBorrower || !equalsGlobalObligation(obligation), "borrower or obligation differs";
 
-    require !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
@@ -276,10 +275,10 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
 
     f(e, args);
 
     assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
 }

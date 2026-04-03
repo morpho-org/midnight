@@ -6,8 +6,8 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
-    function isLiquidatable(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256) envfree;
-    function isLiquidatableNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256) envfree;
+    function isLiquidatable(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
+    function isLiquidatableNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
 
     /* Assumption: price does not change during rules.
      * We want to show that isLiquidatable() and isLiquidatableNoBitmap() behaves the same under the
@@ -42,7 +42,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 
 // This shows that isLiquidatable and isLiquidatableNoBitmap return the same values.
 // We also check that the latter function does not revert if isLiquidatable does not revert.
-rule isLiquidatableEquivalent(Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
+rule isLiquidatableEquivalent(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
     require obligation.collateralParams.length <= 3, "restrict to three collateralParams";
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
@@ -52,12 +52,12 @@ rule isLiquidatableEquivalent(Midnight.Obligation obligation, bytes32 id, addres
     uint256 maxDebt1;
     uint256 collatPrice1;
     uint256 badDebt1;
-    isLiquidatable1, maxDebt1, collatPrice1, badDebt1 = isLiquidatable(obligation, id, borrower, collateralIndex);
+    isLiquidatable1, maxDebt1, collatPrice1, badDebt1 = isLiquidatable(e, obligation, id, borrower, collateralIndex);
     bool isLiquidatable2;
     uint256 maxDebt2;
     uint256 collatPrice2;
     uint256 badDebt2;
-    isLiquidatable2, maxDebt2, collatPrice2, badDebt2 = isLiquidatableNoBitmap@withrevert(obligation, id, borrower, collateralIndex);
+    isLiquidatable2, maxDebt2, collatPrice2, badDebt2 = isLiquidatableNoBitmap@withrevert(e, obligation, id, borrower, collateralIndex);
 
     // Assert that isLiquidatableNoBitmap() does not revert and returns the same values.
     assert !lastReverted;
