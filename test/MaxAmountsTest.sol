@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
@@ -92,7 +93,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(ErrorsLib.OverflowUint128.selector);
         take(amount, lender, borrowerOffer);
     }
 
@@ -115,7 +116,7 @@ contract MaxAmountsTest is BaseTest {
 
         authorize(borrower, address(this));
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(ErrorsLib.OverflowUint128.selector);
         midnight.supplyCollateral(obligation, 0, amount, borrower);
     }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 
 contract UtilsLibTest is Test {
@@ -103,7 +104,7 @@ contract UtilsLibTest is Test {
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(ErrorsLib.OverflowUint128.selector);
         UtilsLib.toUint128(x);
     }
 

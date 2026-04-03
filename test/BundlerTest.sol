@@ -7,6 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract BundlerTest is BaseTest {
@@ -84,7 +85,7 @@ contract BundlerTest is BaseTest {
         });
 
         vm.prank(address(0xdead));
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ErrorsLib.Unauthorized.selector);
         takeBundler.bundleTakeUnits(
             midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
         );
@@ -129,7 +130,7 @@ contract BundlerTest is BaseTest {
             assertEq(midnight.debtOf(id, borrower), units, "debt");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
             takeBundler.bundleTakeUnits(
                 midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
             );
@@ -179,7 +180,7 @@ contract BundlerTest is BaseTest {
             assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets, "lender balance");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
             takeBundler.bundleTakeBuyerAssets(
                 midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
@@ -237,7 +238,7 @@ contract BundlerTest is BaseTest {
             assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower balance");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
             takeBundler.bundleTakeSellerAssets(
                 midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
@@ -312,7 +313,7 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets above max");
+        vm.expectRevert(ErrorsLib.BuyerAssetsAboveMax.selector);
         takeBundler.bundleTakeUnits(
             midnight, targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max
         );
@@ -362,7 +363,7 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets below min");
+        vm.expectRevert(ErrorsLib.BuyerAssetsBelowMin.selector);
         takeBundler.bundleTakeUnits(
             midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
         );

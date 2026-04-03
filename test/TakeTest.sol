@@ -10,6 +10,8 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 
@@ -339,7 +341,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maxUnits = exitUnits;
         otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        vm.expectRevert(ErrorsLib.Crossed.selector);
         take(exitUnits, borrower, otherBorrowerOffer);
     }
 
@@ -374,7 +376,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maxUnits = exitUnits;
         otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        vm.expectRevert(ErrorsLib.Crossed.selector);
         take(exitUnits, lender, otherLenderOffer);
     }
 
@@ -394,7 +396,7 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert(ErrorsLib.MaxUnitsExceeded.selector);
         take(secondRevertingTake, lender, borrowerOffer);
 
         take(secondPassingTake, lender, borrowerOffer);
@@ -414,7 +416,7 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert(ErrorsLib.MaxUnitsExceeded.selector);
         take(secondRevertingTake, borrower, lenderOffer);
 
         take(secondPassingTake, borrower, lenderOffer);
@@ -433,7 +435,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert(ErrorsLib.MaxUnitsExceeded.selector);
         take(secondFill + 1, lender, borrowerOffer2);
 
         take(secondFill, lender, borrowerOffer2);
@@ -452,7 +454,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert(ErrorsLib.MaxUnitsExceeded.selector);
         take(secondFill + 1, borrower, lenderOffer2);
 
         take(secondFill, borrower, lenderOffer2);
@@ -547,7 +549,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert(ErrorsLib.SellerUnhealthy.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -561,7 +563,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert(ErrorsLib.SellerUnhealthy.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -569,7 +571,7 @@ contract TakeTest is BaseTest {
         vm.prank(lender);
         midnight.shuffleSession(lender);
 
-        vm.expectRevert("invalid session");
+        vm.expectRevert(ErrorsLib.InvalidSession.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -577,14 +579,14 @@ contract TakeTest is BaseTest {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
-        vm.expectRevert("offer not started");
+        vm.expectRevert(ErrorsLib.OfferNotStarted.selector);
         take(0, borrower, badOffer);
     }
 
     function testTakeOfferExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
-        vm.expectRevert("offer expired");
+        vm.expectRevert(ErrorsLib.OfferExpired.selector);
         take(0, borrower, lenderOffer);
     }
 
@@ -594,7 +596,7 @@ contract TakeTest is BaseTest {
         privateKey[taker] = pkey;
         lenderOffer.maker = taker;
 
-        vm.expectRevert("buyer and seller cannot be the same");
+        vm.expectRevert(ErrorsLib.SameBuyerAndSeller.selector);
         take(0, taker, lenderOffer);
     }
 
@@ -608,7 +610,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
 
-        vm.expectRevert("consumed seller assets");
+        vm.expectRevert(ErrorsLib.MaxSellerAssetsExceeded.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -633,7 +635,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
 
-        vm.expectRevert("consumed buyer assets");
+        vm.expectRevert(ErrorsLib.MaxBuyerAssetsExceeded.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -707,7 +709,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 0;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.InconsistentInput.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -719,7 +721,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxSellerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.InconsistentInput.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -732,14 +734,14 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.InconsistentInput.selector);
         take(units, borrower, lenderOffer);
     }
 
     // test tree / signatures.
 
     function testTakeWrongRoot() public {
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -755,7 +757,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -772,7 +774,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
-        vm.expectRevert("invalid proof");
+        vm.expectRevert(ErrorsLib.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof
@@ -782,7 +784,7 @@ contract TakeTest is BaseTest {
     function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory proof) public {
         vm.assume(proof.length >= 1);
         vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
-        vm.expectRevert("invalid proof");
+        vm.expectRevert(ErrorsLib.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -965,7 +967,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
         collateralize(obligation, borrower, units);
-        vm.expectRevert();
+        vm.expectRevert(stdError.arithmeticError);
         take(units, borrower, lenderOffer);
     }
 

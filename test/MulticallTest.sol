@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract MulticallTest is BaseTest {
@@ -23,7 +24,7 @@ contract MulticallTest is BaseTest {
         data[1] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
 
         vm.prank(midnight.owner());
-        vm.expectRevert("only owner");
+        vm.expectRevert(ErrorsLib.OnlyOwner.selector);
         midnight.multicall(data);
     }
 

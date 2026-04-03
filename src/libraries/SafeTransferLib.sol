@@ -3,10 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "../interfaces/IERC20.sol";
+import {ErrorsLib} from "./ErrorsLib.sol";
 
 library SafeTransferLib {
     function safeTransfer(address token, address to, uint256 value) internal {
-        require(token.code.length > 0, "no code");
+        require(token.code.length > 0, ErrorsLib.TokenHasNoCode());
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transfer, (to, value)));
         if (!success) {
@@ -14,11 +15,11 @@ library SafeTransferLib {
                 revert(add(returndata, 0x20), mload(returndata))
             }
         }
-        require(returndata.length == 0 || abi.decode(returndata, (bool)), "transfer returned false");
+        require(returndata.length == 0 || abi.decode(returndata, (bool)), ErrorsLib.TransferFailed());
     }
 
     function safeTransferFrom(address token, address from, address to, uint256 value) internal {
-        require(token.code.length > 0, "no code");
+        require(token.code.length > 0, ErrorsLib.TokenHasNoCode());
 
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.transferFrom, (from, to, value)));
         if (!success) {
@@ -26,6 +27,6 @@ library SafeTransferLib {
                 revert(add(returndata, 0x20), mload(returndata))
             }
         }
-        require(returndata.length == 0 || abi.decode(returndata, (bool)), "transferFrom returned false");
+        require(returndata.length == 0 || abi.decode(returndata, (bool)), ErrorsLib.TransferFromFailed());
     }
 }

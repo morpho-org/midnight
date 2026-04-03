@@ -6,6 +6,7 @@ import {Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 library TakeAmountsLib {
     using UtilsLib for uint256;
@@ -21,7 +22,7 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee = midnight.tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
-        require(buyerPrice <= WAD, "buyerPrice");
+        require(buyerPrice <= WAD, ErrorsLib.BuyerPriceTooHigh());
         return offer.buy ? targetBuyerAssets.mulDivUp(WAD, buyerPrice) : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
     }
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {IERC20, SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 /// @dev Token not returning any boolean.
 contract ERC20WithoutBoolean {
@@ -66,7 +67,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferNoCode() public {
-        vm.expectRevert("no code");
+        vm.expectRevert(ErrorsLib.TokenHasNoCode.selector);
         this.safeTransfer(address(1), address(1), 1);
     }
 
@@ -81,7 +82,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferReturnedFalse() public {
-        vm.expectRevert("transfer returned false");
+        vm.expectRevert(ErrorsLib.TransferFailed.selector);
         this.safeTransfer(address(tokenFalse), address(1), 1);
     }
 
@@ -96,7 +97,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferFromNoCode() public {
-        vm.expectRevert("no code");
+        vm.expectRevert(ErrorsLib.TokenHasNoCode.selector);
         this.safeTransferFrom(address(1), address(1), address(1), 1);
     }
 
@@ -111,7 +112,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferFromReturnedFalse() public {
-        vm.expectRevert("transferFrom returned false");
+        vm.expectRevert(ErrorsLib.TransferFromFailed.selector);
         this.safeTransferFrom(address(tokenFalse), address(1), address(1), 1);
     }
 

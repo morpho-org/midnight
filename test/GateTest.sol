@@ -6,6 +6,7 @@ import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.s
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
@@ -98,7 +99,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(borrower, true);
 
-        vm.expectRevert("buyer gated from increasing credit");
+        vm.expectRevert(ErrorsLib.BuyerGatedFromCredit.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -108,7 +109,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(lender, true);
 
-        vm.expectRevert("seller gated from increasing debt");
+        vm.expectRevert(ErrorsLib.SellerGatedFromDebt.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -244,7 +245,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
-        if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");
+        if (!isWhitelisted) vm.expectRevert(ErrorsLib.LiquidatorGated.selector);
         midnight.liquidate(gatedObligation, 0, 1, 0, borrower, "");
     }
 
@@ -260,7 +261,7 @@ contract GateTest is BaseTest {
         Oracle(gatedObligation.collateralParams[0].oracle).setPrice(0);
 
         vm.prank(liquidator);
-        if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");
+        if (!isWhitelisted) vm.expectRevert(ErrorsLib.LiquidatorGated.selector);
         midnight.liquidate(gatedObligation, 0, 0, 0, borrower, "");
     }
 
