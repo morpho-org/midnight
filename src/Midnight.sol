@@ -369,8 +369,8 @@ contract Midnight is IMidnight {
             );
         }
 
-        (bool isLiquidatable,,,) = isLiquidatable(offer.obligation, id, seller, type(uint256).max);
-        require(!isLiquidatable, "seller is liquidatable");
+        (bool _isLiquidatable,,,) = isLiquidatable(offer.obligation, id, seller, type(uint256).max);
+        require(!_isLiquidatable, "seller is liquidatable");
 
         return (buyerAssets, sellerAssets, units);
     }
@@ -460,8 +460,8 @@ contract Midnight is IMidnight {
             _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
         }
 
-        (bool isLiquidatable,,,) = isLiquidatable(obligation, id, onBehalf, type(uint256).max);
-        require(!isLiquidatable, "borrower is liquidatable");
+        (bool _isLiquidatable,,,) = isLiquidatable(obligation, id, onBehalf, type(uint256).max);
+        require(!_isLiquidatable, "borrower is liquidatable");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
