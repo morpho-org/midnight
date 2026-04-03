@@ -6,7 +6,7 @@ import {Midnight} from "../../src/Midnight.sol";
 import {Position, Collateral, Obligation} from "../../src/interfaces/IMidnight.sol";
 import {IOracle} from "../../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";
+import {ORACLE_PRICE_SCALE, WAD, DEFERRED_CHECK_SLOT} from "../../src/libraries/ConstantsLib.sol";
 
 contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
