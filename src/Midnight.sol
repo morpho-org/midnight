@@ -752,10 +752,10 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
-    /// @dev Computes health-related data for a position.
+    /// @dev Expects the id to correspond to the obligation's id.
+    /// @dev The collateral price is zero if the collateral is not activated for the borrower.
     /// @dev If the check is defered, the returned collateral price is 0.
     /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
-    /// @dev Expects the id to correspond to the obligation's id.
     function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
         public
         view
@@ -778,11 +778,12 @@ contract Midnight is IMidnight {
         }
     }
 
-    /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
+    /// @dev Returns true if the position is healthy.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
+        // collateralPrice is unused here, passing type(uint256).max as a dummy value.
+        (uint256 maxDebt,,) = healthData(obligation, id, borrower, type(uint256).max);
         return maxDebt >= position[id][borrower].debt;
     }
 
