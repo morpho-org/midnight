@@ -71,26 +71,19 @@ function signerSummary() returns address {
     return result;
 }
 
-function enterReentrantCallback(address callback) {
-    activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] + 1);
-    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount + 1);
-}
-
-function exitReentrantCallback(address callback) {
-    activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] - 1);
-    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount - 1);
-}
-
-function reenterAs(env callbackEnv, address callback) {
+function reenterAs(env callbackEnv) {
     env nestedEnv;
     calldataarg nestedArgs;
 
-    require nestedEnv.msg.sender == callback;
     require nestedEnv.block.timestamp == callbackEnv.block.timestamp;
     require nestedEnv.block.number == callbackEnv.block.number;
     require nestedEnv.msg.value == callbackEnv.msg.value;
 
+    activeReentrantCallerDepth[nestedEnv.msg.sender] = assert_uint256(activeReentrantCallerDepth[nestedEnv.msg.sender] + 1);
+    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount + 1);
     multicall(nestedEnv, nestedArgs);
+    activeReentrantCallerDepth[nestedEnv.msg.sender] = assert_uint256(activeReentrantCallerDepth[nestedEnv.msg.sender] - 1);
+    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount - 1);
 }
 
 function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
@@ -101,9 +94,7 @@ function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
     pendingBuyerCallbackPullsRemaining = 0;
 
     if (result == Utils.callbackSuccess()) {
-        enterReentrantCallback(callback);
-        reenterAs(e, callback);
-        exitReentrantCallback(callback);
+        reenterAs(e);
     
         pendingSignedMakerEligible = false;
         pendingSignedMakerPullsRemaining = 0;
@@ -122,9 +113,7 @@ function onSellSummary(env e, address callback, bytes data) returns (bytes32) {
     pendingBuyerCallbackPullsRemaining = 0;
 
     if (result == Utils.callbackSuccess()) {
-        enterReentrantCallback(callback);
-        reenterAs(e, callback);
-        exitReentrantCallback(callback);
+        reenterAs(e);
     
         pendingSignedMakerEligible = false;
         pendingSignedMakerPullsRemaining = 0;
@@ -139,9 +128,7 @@ function onVoidCallbackSummary(env e, address callback, bytes data) {
     pendingSignedMakerPullsRemaining = 0;
     pendingBuyerCallbackPullsRemaining = 0;
 
-    enterReentrantCallback(callback);
-    reenterAs(e, callback);
-    exitReentrantCallback(callback);
+    reenterAs(e);
 
     pendingSignedMakerEligible = false;
     pendingSignedMakerPullsRemaining = 0;
