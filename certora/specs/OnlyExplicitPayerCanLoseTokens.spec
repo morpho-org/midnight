@@ -59,6 +59,10 @@ ghost mapping(address => uint256) activeReentrantCallerDepth {
     init_state axiom forall address a. activeReentrantCallerDepth[a] == 0;
 }
 
+ghost uint256 activeReentrantCallbackCount {
+    init_state axiom activeReentrantCallbackCount == 0;
+}
+
 function signerSummary() returns address {
     address result;
     pendingSignedMaker = result;
@@ -69,10 +73,12 @@ function signerSummary() returns address {
 
 function enterReentrantCallback(address callback) {
     activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] + 1);
+    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount + 1);
 }
 
 function exitReentrantCallback(address callback) {
     activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] - 1);
+    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount - 1);
 }
 
 function reenterAs(env callbackEnv, address callback) {
@@ -176,12 +182,12 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
 
     bool success;
     if (success) {
-        bool fromTopLevelCaller = src == topLevelCaller;
+        bool inReentrantCallback = activeReentrantCallbackCount > 0;
+        bool fromCurrentCaller = inReentrantCallback ? activeReentrantCallerDepth[src] > 0 : src == topLevelCaller;
         bool fromBuyerCallback = src == pendingBuyerCallback && pendingBuyerCallbackPullsRemaining > 0;
         bool fromSignedMaker = src == pendingSignedMaker && pendingSignedMakerEligible && pendingSignedMakerPullsRemaining > 0;
-        bool fromActiveReentrantCaller = activeReentrantCallerDepth[src] > 0;
     
-        assert fromTopLevelCaller || fromBuyerCallback || fromSignedMaker || fromActiveReentrantCaller;
+        assert fromCurrentCaller || fromBuyerCallback || fromSignedMaker;
     
         if (fromBuyerCallback) {
             pendingBuyerCallbackPullsRemaining = assert_uint256(pendingBuyerCallbackPullsRemaining - 1);
@@ -208,6 +214,7 @@ filtered {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
+    activeReentrantCallbackCount = 0;
     pendingSignedMakerEligible = false;
     pendingSignedMakerPullsRemaining = 0;
     pendingBuyerCallbackPullsRemaining = 0;
