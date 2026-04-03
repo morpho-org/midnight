@@ -278,9 +278,25 @@ contract Midnight is IMidnight {
             offer.buy ? units.mulDivDown(offerPrice - _tradingFee, WAD) : units.mulDivUp(offerPrice, WAD);
 
         Obligation memory obligation = offer.obligation;
+        ObligationState storage _obligationState = obligationState[id];
+        Position storage buyerPos = position[id][buyer];
 
-        (uint256 buyerCreditIncrease, uint128 buyerPendingFeeIncrease) =
-            buyUnits(id, obligation, buyer, units, timeToMaturity, offer.buy && offer.reduceOnly);
+        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(obligation, id, buyer);
+        uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
+        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
+        uint128 buyerPendingFeeIncrease =
+            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+        buyerPos.pendingFee += buyerPendingFeeIncrease;
+        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
+        _obligationState.totalUnits += UtilsLib.toUint128(buyerCreditIncrease);
+        require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
+        if (offer.reduceOnly && offer.buy) require(buyerPos.credit == 0, "maker credit increased");
+
+        require(
+            obligation.enterGate == address(0) || buyerPos.credit == 0
+                || IEnterGate(obligation.enterGate).canIncreaseCredit(buyer),
+            "buyer gated from increasing credit"
+        );
 
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback).onBuy(id, obligation, buyer, buyerAssets, units, buyerCallbackData);
@@ -294,8 +310,28 @@ contract Midnight is IMidnight {
             ICallbacks(sellerCallback).onSell(id, obligation, seller, sellerAssets, units, sellerCallbackData);
         }
 
-        (uint256 sellerCreditDecrease, uint128 sellerPendingFeeDecrease) =
-            sellUnits(id, obligation, seller, units, !offer.buy && offer.reduceOnly);
+        Position storage sellerPos = position[id][seller];
+        if (hasCredit(id, seller)) _updatePosition(obligation, id, seller);
+
+        uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+        uint128 sellerPendingFeeDecrease;
+        if (sellerPos.credit > 0) {
+            sellerPendingFeeDecrease =
+                UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
+            sellerPos.pendingFee -= sellerPendingFeeDecrease;
+        }
+        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
+        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
+        _obligationState.totalUnits -= UtilsLib.toUint128(sellerCreditDecrease);
+
+        if (!offer.buy && offer.reduceOnly) require(sellerPos.debt == 0, "maker debt increased");
+        require(
+            obligation.enterGate == address(0) || sellerPos.debt == 0
+                || IEnterGate(obligation.enterGate).canIncreaseDebt(seller),
+            "seller gated from increasing debt"
+        );
+
+        require(isHealthy(obligation, id, seller), "seller is unhealthy");
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
@@ -328,63 +364,6 @@ contract Midnight is IMidnight {
         );
 
         return (buyerAssets, sellerAssets, units);
-    }
-
-    function buyUnits(
-        bytes32 id,
-        Obligation memory obligation,
-        address buyer,
-        uint256 units,
-        uint256 timeToMaturity,
-        bool reduceOnly
-    ) internal returns (uint256 buyerCreditIncrease, uint128 buyerPendingFeeIncrease) {
-        ObligationState storage _obligationState = obligationState[id];
-        Position storage buyerPos = position[id][buyer];
-
-        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(obligation, id, buyer);
-        buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        buyerPos.pendingFee += buyerPendingFeeIncrease;
-        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
-        _obligationState.totalUnits += UtilsLib.toUint128(buyerCreditIncrease);
-        require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
-        if (reduceOnly) require(buyerPos.credit == 0, "maker credit increased");
-
-        require(
-            obligation.enterGate == address(0) || buyerPos.credit == 0
-                || IEnterGate(obligation.enterGate).canIncreaseCredit(buyer),
-            "buyer gated from increasing credit"
-        );
-    }
-
-    function sellUnits(bytes32 id, Obligation memory obligation, address seller, uint256 units, bool reduceOnly)
-        internal
-        returns (uint256 sellerCreditDecrease, uint128 sellerPendingFeeDecrease)
-    {
-        ObligationState storage _obligationState = obligationState[id];
-        Position storage sellerPos = position[id][seller];
-        if (hasCredit(id, seller)) _updatePosition(obligation, id, seller);
-
-        sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
-        if (sellerPos.credit > 0) {
-            sellerPendingFeeDecrease =
-                UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
-            sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        }
-        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
-        _obligationState.totalUnits -= UtilsLib.toUint128(sellerCreditDecrease);
-
-        if (reduceOnly) require(sellerPos.debt == 0, "maker debt increased");
-        require(
-            obligation.enterGate == address(0) || sellerPos.debt == 0
-                || IEnterGate(obligation.enterGate).canIncreaseDebt(seller),
-            "seller gated from increasing debt"
-        );
-
-        require(isHealthy(obligation, id, seller), "seller is unhealthy");
     }
 
     /// @dev Will revert if there are no withdrawable funds.
