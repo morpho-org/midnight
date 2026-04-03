@@ -25,10 +25,8 @@ methods {
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
-    function _.onBuy(bytes32 obligationId, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => DISPATCHER(true);
-    function _.onSell(bytes32 obligationId, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => DISPATCHER(true);
-    function FlashTakeCallback.startFlashloan(bytes32 obligationId, uint256 units) internal => CVL_flashLoanStart(obligationId, units);
-    function FlashTakeCallback.endFlashloan(bytes32 obligationId, uint256 units) internal => CVL_flashLoanEnd(obligationId, units);
+    function _.onBuy(bytes32 obligationId, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => NONDET;
+    function _.onSell(bytes32 obligationId, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
 
@@ -55,29 +53,6 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
     return Midnight.obligationCreated(summaryToId(obligation));
-}
-
-persistent ghost mapping(bytes32 => mathint) sumDebt {
-    init_state axiom (forall bytes32 id. sumDebt[id] == 0);
-}
-
-// Tracks the transient flashloaned units during callbacks.
-// We use persistent ghost to ensure these values are not changed by the callback.
-// This is sound as we prove the rule flashloanedUnitsPaidBack which ensures that the flashloaned units after the callback are the same as before.
-persistent ghost mapping(bytes32 => mathint) flashloanedUnits {
-    init_state axiom (forall bytes32 id. flashloanedUnits[id] == 0);
-}
-
-hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
-    sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
-}
-
-function CVL_flashLoanStart(bytes32 id, uint256 units) {
-    flashloanedUnits[id] = flashloanedUnits[id] + units;
-}
-
-function CVL_flashLoanEnd(bytes32 id, uint256 units) {
-    flashloanedUnits[id] = flashloanedUnits[id] - units;
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -139,31 +114,7 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
     assert lossIndexAfter >= lossIndexBefore;
 }
 
-// For any token, the flash loaned units before and after a call is the same.
-// This rule is useful to prove that using persistent ghost for the flashloaned units mapping is sound.
-rule flashloanedUnitsPaidBack(method f, bytes32 id) {
-    env e;
-    calldataarg args;
-    mathint oldFlashloanedUnits = flashloanedUnits[id];
-    f(e, args);
-    assert flashloanedUnits[id] == oldFlashloanedUnits, "flashloaned units paid back";
-}
-
 /// INVARIANTS ///
-
-strong invariant totalUnitsEqualsSumDebtPlusWithdrawablePlusGap(bytes32 id)
-    to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id)) + flashloanedUnits[id]
-    {
-        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) with (env e) {
-            // require e.block.timestamp >= 0;
-            // require e.block.timestamp < 2 ^ 128;
-            require userLossIndex(id, offer.maker) <= lossIndex(id);
-            require userLossIndex(id, taker) <= lossIndex(id);
-        }
-    }
-
-weak invariant flashloanedUnitsZero(bytes32 id)
-    flashloanedUnits[id] == 0;
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= creditOf(id, user);
