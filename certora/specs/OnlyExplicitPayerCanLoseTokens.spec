@@ -25,9 +25,8 @@ methods {
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    // Track which callbacks explicitly opted in by returning CALLBACK_SUCCESS.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => callbackSummary(calledContract) expect(bytes32);
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => callbackSummary(calledContract) expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onSellSummary(calledContract) expect(bytes32);
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
@@ -39,25 +38,38 @@ methods {
 
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
-ghost mapping(address => bool) signed {
-    init_state axiom forall address a. signed[a] == false;
+ghost mapping(address => bool) signedOffer {
+    init_state axiom forall address a. signedOffer[a] == false;
 }
 
 ghost mapping(address => bool) callbackReturnedSuccess {
     init_state axiom forall address a. callbackReturnedSuccess[a] == false;
 }
 
+ghost bool buyerCallbackCalled {
+    init_state axiom !buyerCallbackCalled;
+}
+
 function signerSummary() returns address {
     address result;
-    signed[result] = true;
+    signedOffer[result] = true;
     return result;
 }
 
-function callbackSummary(address callback) returns (bytes32) {
+function onBuySummary(address callback) returns (bytes32) {
+    bytes32 result;
+    buyerCallbackCalled = true;
+    callbackReturnedSuccess[callback] = result == Utils.callbackSuccess();
+    return result;
+}
+
+function onSellSummary(address callback) returns (bytes32) {
     bytes32 result;
     callbackReturnedSuccess[callback] = result == Utils.callbackSuccess();
     return result;
 }
+
+definition signedOfferWithCallbackZero(address user) returns bool = signedOffer[user] && !buyerCallbackCalled;
 
 function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
     if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
@@ -72,101 +84,24 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     return success;
 }
 
-definition buyerCallback(address offerCallback, address takerCallback, bool buy) returns address = buy ? offerCallback : takerCallback;
-
-definition sellerCallback(address offerCallback, address takerCallback, bool buy) returns address = buy ? takerCallback : offerCallback;
-
-definition takePayer(env e, bool buy, address maker, address buyerCb) returns address = buyerCb != 0 ? buyerCb : (buy ? maker : e.msg.sender);
-
-rule takeCallbacksMustReturnSuccess(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require e.msg.sender != currentContract, "only external calls";
-    require taker != currentContract, "no trading with contract";
-    require offer.maker != currentContract, "no trading with contract";
-    require offer.callback != currentContract, "midnight reverts on callbacks";
-    require takerCallback != currentContract, "midnight reverts on callbacks";
-
-    address buyerCb = buyerCallback(offer.callback, takerCallback, offer.buy);
-    address sellerCb = sellerCallback(offer.callback, takerCallback, offer.buy);
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-
-    assert buyerCb == 0 || callbackReturnedSuccess[buyerCb];
-    assert sellerCb == 0 || callbackReturnedSuccess[sellerCb];
-}
-
-rule takeDebitsOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address user) {
-    require e.msg.sender != currentContract, "only external calls";
-    require user != currentContract, "track external users only";
-    require taker != currentContract, "no trading with contract";
-    require offer.maker != currentContract, "no trading with contract";
-    require offer.callback != currentContract, "midnight reverts on callbacks";
-    require takerCallback != currentContract, "midnight reverts on callbacks";
-
-    address buyerCb = buyerCallback(offer.callback, takerCallback, offer.buy);
-    address payer = takePayer(e, offer.buy, offer.maker, buyerCb);
-
-    uint256 balanceBefore = tokenBalances[offer.obligation.loanToken][user];
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
-
-    uint256 balanceAfter = tokenBalances[offer.obligation.loanToken][user];
-
-    assert balanceAfter < balanceBefore => user == payer;
-    assert balanceAfter < balanceBefore && buyerCb != 0 => callbackReturnedSuccess[buyerCb];
-    assert balanceAfter < balanceBefore && buyerCb == 0 && offer.buy => signed[offer.maker];
-}
-
-rule repayDebitsOnlyCaller(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data, address user) {
+rule onlyExplicitPayerCanLoseTokens(method f, env e, calldataarg args, address token, address user)
+filtered {
+    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
+        || f.selector == sig:repay(Midnight.Obligation, uint256, address, bytes).selector
+        || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
+        || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
+} {
     require e.msg.sender != currentContract, "only external calls";
     require user != currentContract, "track external users only";
 
-    uint256 balanceBefore = tokenBalances[obligation.loanToken][user];
-
-    repay(e, obligation, units, onBehalf, data);
-
-    uint256 balanceAfter = tokenBalances[obligation.loanToken][user];
-
-    assert balanceAfter < balanceBefore => user == e.msg.sender;
-}
-
-rule supplyCollateralDebitsOnlyCaller(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address user) {
-    require e.msg.sender != currentContract, "only external calls";
-    require user != currentContract, "track external users only";
-    require collateralIndex < obligation.collaterals.length, "valid collateral index";
-
-    address collateralToken = obligation.collaterals[collateralIndex].token;
-    uint256 balanceBefore = tokenBalances[collateralToken][user];
-
-    supplyCollateral(e, obligation, collateralIndex, assets, onBehalf);
-
-    uint256 balanceAfter = tokenBalances[collateralToken][user];
-
-    assert balanceAfter < balanceBefore => user == e.msg.sender;
-}
-
-rule liquidateDebitsOnlyCaller(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
-    require e.msg.sender != currentContract, "only external calls";
-    require user != currentContract, "track external users only";
-
-    uint256 balanceBefore = tokenBalances[obligation.loanToken][user];
-
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-
-    uint256 balanceAfter = tokenBalances[obligation.loanToken][user];
-
-    assert balanceAfter < balanceBefore => user == e.msg.sender;
-}
-
-rule flashLoanDebitsOnlyCaller(env e, address token, uint256 assets, address callback, bytes data, address user) {
-    require e.msg.sender != currentContract, "only external calls";
-    require user != currentContract, "track external users only";
-    require callback != currentContract, "midnight does not implement flashloan callbacks";
+    buyerCallbackCalled = false;
 
     uint256 balanceBefore = tokenBalances[token][user];
 
-    flashLoan(e, token, assets, callback, data);
+    f(e, args);
 
     uint256 balanceAfter = tokenBalances[token][user];
 
-    assert balanceAfter < balanceBefore => user == e.msg.sender;
+    assert balanceAfter < balanceBefore => user == e.msg.sender || callbackReturnedSuccess[user] || signedOfferWithCallbackZero(user);
 }
