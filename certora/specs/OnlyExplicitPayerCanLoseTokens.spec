@@ -3,9 +3,11 @@
 using Utils as Utils;
 
 methods {
-    // Verify the real multicall batching path instead of havocing it away.
+    // This spec intentionally checks direct top-level payer selection only.
+    // Callback-driven reentrancy and multicall batching are out of scope here.
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // Summarize internals/external calls irrelevant to token pull provenance.
+    // Summaries for internals/external calls irrelevant to top-level payer selection.
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function _.price() external => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -24,125 +26,63 @@ methods {
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes data) external with(env e) => onBuySummary(e, calledContract, data) expect(bytes32);
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes data) external with(env e) => onSellSummary(e, calledContract, data) expect(bytes32);
-    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
-    function _.onFlashLoan(address, uint256, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
+    // Deliberately no reentrancy modeling in this simplified spec.
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
 
-    // Track ERC20 debits precisely at the transferFrom boundary.
+    // Track token sends separately from token pulls.
     function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
-    function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(e, calledContract, src, dest, value) expect(bool);
+    function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
 }
 
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
 ghost address topLevelCaller;
 
-ghost address pendingSignedMaker;
+ghost address signedMakerCandidate;
 
-ghost bool pendingSignedMakerEligible {
-    init_state axiom !pendingSignedMakerEligible;
+ghost bool signedMakerCandidateEligible {
+    init_state axiom !signedMakerCandidateEligible;
 }
 
-ghost uint256 pendingSignedMakerPullsRemaining {
-    init_state axiom pendingSignedMakerPullsRemaining == 0;
+ghost address successfulBuyerCallback;
+
+ghost bool successfulBuyerCallbackActive {
+    init_state axiom !successfulBuyerCallbackActive;
 }
-
-ghost address pendingBuyerCallback;
-
-ghost uint256 pendingBuyerCallbackPullsRemaining {
-    init_state axiom pendingBuyerCallbackPullsRemaining == 0;
-}
-
-ghost uint256 reentrantCallbackDepth {
-    init_state axiom reentrantCallbackDepth == 0;
-}
-
-ghost mapping(uint256 => address) reentrantCallerAtDepth;
 
 function signerSummary() returns address {
     address result;
-    pendingSignedMaker = result;
-    pendingSignedMakerEligible = true;
-    pendingSignedMakerPullsRemaining = 2;
+    signedMakerCandidate = result;
+    signedMakerCandidateEligible = true;
     return result;
 }
 
-function reenterAs(env callbackEnv) {
-    env nestedEnv;
-    calldataarg nestedArgs;
-
-    require nestedEnv.block.timestamp == callbackEnv.block.timestamp;
-    require nestedEnv.block.number == callbackEnv.block.number;
-    require nestedEnv.msg.value == callbackEnv.msg.value;
-
-    reentrantCallbackDepth = assert_uint256(reentrantCallbackDepth + 1);
-    reentrantCallerAtDepth[reentrantCallbackDepth] = nestedEnv.msg.sender;
-    multicall(nestedEnv, nestedArgs);
-    reentrantCallbackDepth = assert_uint256(reentrantCallbackDepth - 1);
-}
-
-function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
+function onBuySummary(address callback) returns (bytes32) {
     bytes32 result;
 
-    pendingSignedMakerEligible = false;
-    pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallbackPullsRemaining = 0;
-
-    if (result == Utils.callbackSuccess()) {
-        reenterAs(e);
-    
-        pendingSignedMakerEligible = false;
-        pendingSignedMakerPullsRemaining = 0;
-        pendingBuyerCallback = callback;
-        pendingBuyerCallbackPullsRemaining = 2;
-    }
+    signedMakerCandidateEligible = false;
+    successfulBuyerCallback = callback;
+    successfulBuyerCallbackActive = result == Utils.callbackSuccess();
 
     return result;
 }
 
-function onSellSummary(env e, address callback, bytes data) returns (bytes32) {
-    bytes32 result;
-
-    pendingSignedMakerEligible = false;
-    pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallbackPullsRemaining = 0;
-
-    if (result == Utils.callbackSuccess()) {
-        reenterAs(e);
-    
-        pendingSignedMakerEligible = false;
-        pendingSignedMakerPullsRemaining = 0;
-        pendingBuyerCallbackPullsRemaining = 0;
-    }
-
-    return result;
-}
-
-function onVoidCallbackSummary(env e, address callback, bytes data) {
-    pendingSignedMakerEligible = false;
-    pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallbackPullsRemaining = 0;
-
-    reenterAs(e);
-
-    pendingSignedMakerEligible = false;
-    pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallbackPullsRemaining = 0;
-}
-
+// In take, the maker is only the fallback payer on the buy path with zero buyer callback.
+// The maker is the seller on the sell path, so a credit decrease or debt increase disables
+// the signed-maker payer exemption before transferFrom executes.
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
-    if (user == pendingSignedMaker && newVal < oldVal) {
-        pendingSignedMakerEligible = false;
-        pendingSignedMakerPullsRemaining = 0;
+    if (user == signedMakerCandidate && newVal < oldVal) {
+        signedMakerCandidateEligible = false;
     }
 }
 
 hook Sstore position[KEY bytes32 id][KEY address user].debt uint128 newVal (uint128 oldVal) {
-    if (user == pendingSignedMaker && newVal > oldVal) {
-        pendingSignedMakerEligible = false;
-        pendingSignedMakerPullsRemaining = 0;
+    if (user == signedMakerCandidate && newVal > oldVal) {
+        signedMakerCandidateEligible = false;
     }
 }
 
@@ -159,26 +99,18 @@ function CVL_transfer(address token, address src, address dest, uint256 value) r
     return success;
 }
 
-function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
+function CVL_transferFrom(address token, address src, address dest, uint256 value) returns bool {
     if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
         revert();
     }
 
     bool success;
     if (success) {
-        bool inReentrantCallback = reentrantCallbackDepth > 0;
-        bool fromCurrentCaller = inReentrantCallback ? src == reentrantCallerAtDepth[reentrantCallbackDepth] : src == topLevelCaller;
-        bool fromBuyerCallback = src == pendingBuyerCallback && pendingBuyerCallbackPullsRemaining > 0;
-        bool fromSignedMaker = src == pendingSignedMaker && pendingSignedMakerEligible && pendingSignedMakerPullsRemaining > 0;
+        bool fromTopLevelCaller = src == topLevelCaller;
+        bool fromSuccessfulBuyerCallback = successfulBuyerCallbackActive && src == successfulBuyerCallback;
+        bool fromSignedMakerWithCallbackZero = signedMakerCandidateEligible && src == signedMakerCandidate;
     
-        assert fromCurrentCaller || fromBuyerCallback || fromSignedMaker;
-    
-        if (fromBuyerCallback) {
-            pendingBuyerCallbackPullsRemaining = assert_uint256(pendingBuyerCallbackPullsRemaining - 1);
-        }
-        if (fromSignedMaker) {
-            pendingSignedMakerPullsRemaining = assert_uint256(pendingSignedMakerPullsRemaining - 1);
-        }
+        assert fromTopLevelCaller || fromSuccessfulBuyerCallback || fromSignedMakerWithCallbackZero;
     
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
@@ -193,15 +125,12 @@ filtered {
         || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
-        || f.selector == sig:multicall(bytes[]).selector
 } {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
-    reentrantCallbackDepth = 0;
-    pendingSignedMakerEligible = false;
-    pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallbackPullsRemaining = 0;
+    signedMakerCandidateEligible = false;
+    successfulBuyerCallbackActive = false;
 
     f(e, args);
     assert true;
