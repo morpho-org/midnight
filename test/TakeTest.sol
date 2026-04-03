@@ -514,7 +514,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBuyPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         borrowerOffer.expiry = timestamp;
         borrowerOffer.maxUnits = 100;
@@ -522,11 +522,12 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is unhealthy");
         take(100, lender, borrowerOffer);
     }
 
     function testSellPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         lenderOffer.expiry = timestamp;
         lenderOffer.maxUnits = 100;
@@ -534,6 +535,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is unhealthy");
         take(100, borrower, lenderOffer);
     }
 

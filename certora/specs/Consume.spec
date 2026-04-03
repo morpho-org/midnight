@@ -15,7 +15,7 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address, uint256) internal returns (bool, uint256, uint256, uint256) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 

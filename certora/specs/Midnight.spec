@@ -22,7 +22,7 @@ methods {
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address, uint256) internal returns (bool, uint256, uint256, uint256) => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
 
     // Tokens are assumed to not reenter.

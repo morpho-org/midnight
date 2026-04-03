@@ -39,11 +39,12 @@ ghost CVL_price(address) returns uint256;
 
 rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
-    bool isHealthyBefore = isHealthy(e, obligation, id, borrower);
+    bool isLiquidatableBefore;
+    isLiquidatableBefore, _, _, _ = isLiquidatable(e, obligation, id, borrower, collateralIndex);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     // it's okay to check only after the call that the prover chose the correct id.
     require id == lastId, "id should be derived from obligation";
 
-    assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
+    assert isLiquidatableBefore, "liquidate can only be called on liquidatable obligations";
 }

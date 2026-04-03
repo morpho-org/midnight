@@ -9,7 +9,7 @@ methods {
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address, uint256) internal returns (bool, uint256, uint256, uint256) => NONDET;
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.

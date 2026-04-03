@@ -12,14 +12,18 @@ contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
 
-    /* This healthData function iterates over all collateralParams, it doesn't use the collateral bitmap. */
-    function healthDataNoBitmap(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
-        public
-        view
-        returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
-    {
+    /* This isLiquidatable function iterates over all collateralParams, it doesn't use the collateral bitmap. */
+    function isLiquidatableNoBitmap(
+        Obligation memory obligation,
+        bytes32 id,
+        address borrower,
+        uint256 collateralIndex
+    ) public view returns (bool liquidatable, uint256 maxDebt, uint256 collatPrice, uint256 badDebt) {
         Position storage _position = position[id][borrower];
-        badDebt = _position.debt;
+        uint256 debt = _position.debt;
+        if (debt == 0) return (false, 0, 0, 0);
+
+        badDebt = debt;
         uint256 len = obligation.collateralParams.length;
         for (uint256 i = len; i > 0;) {
             i--;
@@ -32,14 +36,6 @@ contract MidnightWrapper is Midnight {
             badDebt =
                 badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateralParam.maxLif));
         }
-    }
-
-    function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (position[id][borrower].debt == 0) {
-            return true;
-        } else {
-            (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
-            return maxDebt >= position[id][borrower].debt;
-        }
+        liquidatable = block.timestamp > obligation.maturity || debt > maxDebt;
     }
 }

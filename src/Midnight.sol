@@ -369,7 +369,8 @@ contract Midnight is IMidnight {
             );
         }
 
-        require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
+        (bool isLiquidatable,,,) = isLiquidatable(offer.obligation, id, seller, type(uint256).max);
+        require(!isLiquidatable, "seller is liquidatable");
 
         return (buyerAssets, sellerAssets, units);
     }
@@ -459,7 +460,8 @@ contract Midnight is IMidnight {
             _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
         }
 
-        require(isHealthy(obligation, id, onBehalf), "unhealthy borrower");
+        (bool isLiquidatable,,,) = isLiquidatable(obligation, id, onBehalf, type(uint256).max);
+        require(!isLiquidatable, "borrower is liquidatable");
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
@@ -486,18 +488,16 @@ contract Midnight is IMidnight {
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        Position storage _position = position[id][borrower];
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
             "liquidator gated from liquidating"
         );
-        Position storage _position = position[id][borrower];
 
-        uint256 originalDebt = _position.debt;
-        (uint256 maxDebt, uint256 liquidatedCollatPrice, uint256 badDebt) =
-            healthData(obligation, id, borrower, collateralIndex);
-
-        require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+        (bool _isLiquidatable, uint256 maxDebt, uint256 liquidatedCollatPrice, uint256 badDebt) =
+            isLiquidatable(obligation, id, borrower, collateralIndex);
+        require(_isLiquidatable, "position is not liquidatable");
 
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
@@ -513,7 +513,7 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = obligation.collateralParams[collateralIndex].maxLif;
-            uint256 lif = originalDebt > maxDebt
+            uint256 lif = _position.debt > maxDebt
                 ? _maxLif
                 : UtilsLib.min(
                     _maxLif, WAD + (_maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF
@@ -763,16 +763,23 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
+    /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev The collateral price is zero if the collateral is not activated for the borrower.
-    /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
-    function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
+    /// @dev Returns whether the position is liquidatable, and if it is, the max debt, the price of the collateral at
+    /// collateralIndex, and the bad debt.
+    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
         public
         view
-        returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
+        returns (bool, uint256, uint256, uint256)
     {
         Position storage _position = position[id][borrower];
-        badDebt = _position.debt;
+        uint256 debt = _position.debt;
+        if (debt == 0) return (block.timestamp > obligation.maturity, 0, 0, 0);
+
+        uint256 maxDebt;
+        uint256 collatPrice;
+        uint256 badDebt = debt;
         uint128 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
@@ -786,20 +793,7 @@ contract Midnight is IMidnight {
             );
             bitmap = bitmap.clearBit(i);
         }
-    }
-
-    /// @dev This function does not call any oracle if debt is 0.
-    /// @dev Expects the id to correspond to the obligation's id.
-    /// @dev Returns true if the position is healthy.
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        uint256 debt = position[id][borrower].debt;
-        if (debt == 0) {
-            return true;
-        } else {
-            // collateralPrice is unused here, passing type(uint256).max as a dummy value.
-            (uint256 maxDebt,,) = healthData(obligation, id, borrower, type(uint256).max);
-            return maxDebt >= debt;
-        }
+        return (block.timestamp > obligation.maturity || debt > maxDebt, maxDebt, collatPrice, badDebt);
     }
 
     function domainSeparator() internal view returns (bytes32) {

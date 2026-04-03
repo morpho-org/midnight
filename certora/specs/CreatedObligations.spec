@@ -16,7 +16,7 @@ methods {
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
     function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
-    function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function Midnight.isLiquidatable(Midnight.Obligation memory, bytes32, address, uint256) internal returns (bool, uint256, uint256, uint256) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;

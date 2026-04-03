@@ -14,7 +14,7 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address, uint256) internal returns (bool, uint256, uint256, uint256) => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
 }
