@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -30,25 +30,25 @@ contract TakeTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -822,33 +822,33 @@ contract TakeTest is BaseTest {
 
     function testBuySellerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
         borrowerOffer.callbackData = abi.encode(0, collateral);
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
-        assertEq(midnight.collateralOf(id, borrower, 0), 0);
+        deal(obligation.collateralParams[0].token, borrowerOffer.callback, collateral);
+        assertEq(midnight.collateral(id, borrower, 0), 0);
 
         authorize(borrower, borrowerOffer.callback);
 
         take(units, lender, borrowerOffer);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
     }
 
     function testSellSellerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
         lenderOffer.maxUnits = units;
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         address callback = address(new BorrowCallback());
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
-        deal(obligation.collaterals[0].token, callback, collateral);
+        deal(obligation.collateralParams[0].token, callback, collateral);
 
         authorize(borrower, callback);
 
@@ -864,7 +864,7 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
@@ -990,21 +990,17 @@ contract TakeTest is BaseTest {
 
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
-    bytes32 public recordedObligationId;
+    bytes32 public recordedId;
 
-    function onSell(
-        bytes32 obligationId,
-        Obligation memory obligation,
-        address seller,
-        uint256,
-        uint256,
-        bytes memory data
-    ) external returns (bytes32) {
-        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
-        recordedObligationId = obligationId;
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        recordedId = id;
         recordedData = data;
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
-        address collateralToken = obligation.collaterals[collateralIndex].token;
+        address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
@@ -1026,18 +1022,14 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    bytes32 public recordedObligationId;
+    bytes32 public recordedId;
 
-    function onBuy(
-        bytes32 obligationId,
-        Obligation memory obligation,
-        address,
-        uint256 buyerAssets,
-        uint256,
-        bytes memory data
-    ) external returns (bytes32) {
-        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
-        recordedObligationId = obligationId;
+    function onBuy(bytes32 id, Obligation memory obligation, address, uint256 buyerAssets, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        recordedId = id;
         recordedData = data;
         ERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
         return CALLBACK_SUCCESS;

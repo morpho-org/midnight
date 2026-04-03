@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -21,9 +21,9 @@ contract MaxAmountsTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
@@ -105,7 +105,7 @@ contract MaxAmountsTest is BaseTest {
 
         midnight.supplyCollateral(obligation, 0, amount, borrower);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), amount, "collateral at max");
+        assertEq(midnight.collateral(id, borrower, 0), amount, "collateral at max");
     }
 
     function testSupplyCollateralAboveMaxAmountReverts() public {
