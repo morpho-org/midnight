@@ -55,13 +55,11 @@ ghost uint256 pendingBuyerCallbackPullsRemaining {
     init_state axiom pendingBuyerCallbackPullsRemaining == 0;
 }
 
-ghost mapping(address => uint256) activeReentrantCallerDepth {
-    init_state axiom forall address a. activeReentrantCallerDepth[a] == 0;
+ghost uint256 reentrantCallbackDepth {
+    init_state axiom reentrantCallbackDepth == 0;
 }
 
-ghost uint256 activeReentrantCallbackCount {
-    init_state axiom activeReentrantCallbackCount == 0;
-}
+ghost mapping(uint256 => address) reentrantCallerAtDepth;
 
 function signerSummary() returns address {
     address result;
@@ -79,11 +77,10 @@ function reenterAs(env callbackEnv) {
     require nestedEnv.block.number == callbackEnv.block.number;
     require nestedEnv.msg.value == callbackEnv.msg.value;
 
-    activeReentrantCallerDepth[nestedEnv.msg.sender] = assert_uint256(activeReentrantCallerDepth[nestedEnv.msg.sender] + 1);
-    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount + 1);
+    reentrantCallbackDepth = assert_uint256(reentrantCallbackDepth + 1);
+    reentrantCallerAtDepth[reentrantCallbackDepth] = nestedEnv.msg.sender;
     multicall(nestedEnv, nestedArgs);
-    activeReentrantCallerDepth[nestedEnv.msg.sender] = assert_uint256(activeReentrantCallerDepth[nestedEnv.msg.sender] - 1);
-    activeReentrantCallbackCount = assert_uint256(activeReentrantCallbackCount - 1);
+    reentrantCallbackDepth = assert_uint256(reentrantCallbackDepth - 1);
 }
 
 function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
@@ -169,8 +166,8 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
 
     bool success;
     if (success) {
-        bool inReentrantCallback = activeReentrantCallbackCount > 0;
-        bool fromCurrentCaller = inReentrantCallback ? activeReentrantCallerDepth[src] > 0 : src == topLevelCaller;
+        bool inReentrantCallback = reentrantCallbackDepth > 0;
+        bool fromCurrentCaller = inReentrantCallback ? src == reentrantCallerAtDepth[reentrantCallbackDepth] : src == topLevelCaller;
         bool fromBuyerCallback = src == pendingBuyerCallback && pendingBuyerCallbackPullsRemaining > 0;
         bool fromSignedMaker = src == pendingSignedMaker && pendingSignedMakerEligible && pendingSignedMakerPullsRemaining > 0;
     
@@ -201,7 +198,7 @@ filtered {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
-    activeReentrantCallbackCount = 0;
+    reentrantCallbackDepth = 0;
     pendingSignedMakerEligible = false;
     pendingSignedMakerPullsRemaining = 0;
     pendingBuyerCallbackPullsRemaining = 0;
