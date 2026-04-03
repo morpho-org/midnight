@@ -370,7 +370,7 @@ contract Midnight is IMidnight {
             );
         }
         UtilsLib.tSet(DEFERRED_CHECK_SLOT, id, seller, false);
-        
+
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
