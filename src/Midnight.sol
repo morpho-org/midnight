@@ -19,6 +19,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
     CONTINUOUS_FEE_RECIPIENT,
+    CALLBACK_SUCCESS,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
@@ -299,15 +300,24 @@ contract Midnight is IMidnight {
         );
 
         if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback).onBuy(id, obligation, buyer, buyerAssets, units, buyerCallbackData);
+            require(
+                ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
+                    == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, buyer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[obligation.loanToken] += buyerAssets - sellerAssets;
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, buyer, receiver, sellerAssets);
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
+        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback).onSell(id, obligation, seller, sellerAssets, units, sellerCallbackData);
+            require(
+                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                    == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
         Position storage sellerPos = position[id][seller];

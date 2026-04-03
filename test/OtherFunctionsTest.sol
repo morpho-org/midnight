@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
@@ -575,6 +576,20 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(toId(_obligation)), true, "obligation created with cursor 0.5");
+    }
+
+    function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {
+        bytes4[4] memory selectors = [
+            ICallbacks.onBuy.selector,
+            ICallbacks.onSell.selector,
+            ICallbacks.onLiquidate.selector,
+            ICallbacks.onRepay.selector
+        ];
+        for (uint256 i = 0; i < selectors.length; i++) {
+            vm.prank(msgSender);
+            (bool success,) = address(midnight).call(abi.encodePacked(selectors[i], data));
+            assertFalse(success);
+        }
     }
 }
 

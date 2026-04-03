@@ -30,8 +30,8 @@ methods {
 
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.onBuy(bytes32 obligationId, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallback() expect void;
-    function _.onSell(bytes32 obligationId, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallback() expect void;
+    function _.onBuy(bytes32 obligationId, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onSell(bytes32 obligationId, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 obligationId, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
     function _.onLiquidate(bytes32 obligationId, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
@@ -179,6 +179,12 @@ function genericCallback() {
 // Same as the summary above except that it also returns a non-deterministic value.
 function genericCallbackBool() returns (bool) {
     bool result;
+    genericCallback();
+    return result;
+}
+
+function genericCallbackBytes32() returns (bytes32) {
+    bytes32 result;
     genericCallback();
     return result;
 }

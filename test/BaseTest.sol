@@ -155,7 +155,6 @@ abstract contract BaseTest is Test {
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
         loanToken.approve(address(midnight), type(uint256).max);
-
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligation = obligation;
         badBorrowerOffer.buy = false;
