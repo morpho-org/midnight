@@ -21,7 +21,7 @@ contract MidnightWrapper is Midnight {
         if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return (type(uint256).max, collatPrice, 0);
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
-        uint256 len = obligation.collaterals.length;
+        uint256 len = obligation.collateralParams.length;
         for (uint256 i = len; i > 0;) {
             i--;
             uint256 _collateral = _position.collateral[i];
