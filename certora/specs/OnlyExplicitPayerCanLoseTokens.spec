@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
-using TakeCallbackReenter as callbackReenter;
 
 methods {
     // Verify the real multicall batching path instead of havocing it away.
@@ -32,7 +31,7 @@ methods {
     function _.onFlashLoan(address, uint256, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
 
     // Track ERC20 debits precisely at the transferFrom boundary.
-    function _.transfer(address dest, uint256 value) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, dest, value) expect(bool);
+    function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(e, calledContract, src, dest, value) expect(bool);
 }
 
@@ -76,6 +75,18 @@ function exitReentrantCallback(address callback) {
     activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] - 1);
 }
 
+function reenterAs(env callbackEnv, address callback) {
+    env nestedEnv;
+    calldataarg nestedArgs;
+
+    require nestedEnv.msg.sender == callback;
+    require nestedEnv.block.timestamp == callbackEnv.block.timestamp;
+    require nestedEnv.block.number == callbackEnv.block.number;
+    require nestedEnv.msg.value == callbackEnv.msg.value;
+
+    multicall(nestedEnv, nestedArgs);
+}
+
 function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
     bytes32 result;
 
@@ -85,7 +96,7 @@ function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
 
     if (result == Utils.callbackSuccess()) {
         enterReentrantCallback(callback);
-        callbackReenter.reenter(e, data);
+        reenterAs(e, callback);
         exitReentrantCallback(callback);
     
         pendingSignedMakerEligible = false;
@@ -106,7 +117,7 @@ function onSellSummary(env e, address callback, bytes data) returns (bytes32) {
 
     if (result == Utils.callbackSuccess()) {
         enterReentrantCallback(callback);
-        callbackReenter.reenter(e, data);
+        reenterAs(e, callback);
         exitReentrantCallback(callback);
     
         pendingSignedMakerEligible = false;
@@ -123,7 +134,7 @@ function onVoidCallbackSummary(env e, address callback, bytes data) {
     pendingBuyerCallbackPullsRemaining = 0;
 
     enterReentrantCallback(callback);
-    callbackReenter.reenter(e, data);
+    reenterAs(e, callback);
     exitReentrantCallback(callback);
 
     pendingSignedMakerEligible = false;
@@ -143,6 +154,19 @@ hook Sstore position[KEY bytes32 id][KEY address user].debt uint128 newVal (uint
         pendingSignedMakerEligible = false;
         pendingSignedMakerPullsRemaining = 0;
     }
+}
+
+function CVL_transfer(address token, address src, address dest, uint256 value) returns bool {
+    if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
+        revert();
+    }
+
+    bool success;
+    if (success) {
+        tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
+        tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
+    }
+    return success;
 }
 
 function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
