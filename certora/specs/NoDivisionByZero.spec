@@ -135,6 +135,10 @@ filtered {
 rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     require equalsGlobalObligation(obligation);
 
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+
     // Sound: ExactMath.spec proves maxLif * lltv <= WAD * (WAD - 1) when lltv < WAD (lifTimesLltvStrictBound).
     require obligation.collaterals[collateralIndex].lltv < WAD() => to_mathint(obligation.collaterals[collateralIndex].maxLif) * to_mathint(obligation.collaterals[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
 
