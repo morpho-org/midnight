@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Midnight} from "../../src/Midnight.sol";
-import {Position, Collateral, Obligation} from "../../src/interfaces/IMidnight.sol";
+import {Position, CollateralParams, Obligation} from "../../src/interfaces/IMidnight.sol";
 import {IOracle} from "../../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";
@@ -12,8 +12,7 @@ contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
 
-    /* This healthData function iterates over all collaterals, it doesn't use the collateral bitmap. */
-
+    /* This healthData function iterates over all collateralParams, it doesn't use the collateral bitmap. */
     function healthDataNoBitmap(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
         public
         view
@@ -21,17 +20,17 @@ contract MidnightWrapper is Midnight {
     {
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
-        uint256 len = obligation.collaterals.length;
+        uint256 len = obligation.collateralParams.length;
         for (uint256 i = len; i > 0;) {
             i--;
             uint256 _collateral = _position.collateral[i];
             if (_collateral == 0) continue;
-            Collateral memory collateral = obligation.collaterals[i];
-            uint256 price = IOracle(collateral.oracle).price();
+            CollateralParams memory collateralParam = obligation.collateralParams[i];
+            uint256 price = IOracle(collateralParam.oracle).price();
             if (i == collateralIndex) collatPrice = price;
-            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateral.lltv, WAD);
+            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateralParam.lltv, WAD);
             badDebt =
-                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateral.maxLif));
+                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateralParam.maxLif));
         }
     }
 
