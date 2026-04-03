@@ -36,6 +36,20 @@ jobs:
         run: forge lint --deny notes
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - token-type: 0
+            name: standard
+          - token-type: 1
+            name: no-revert
+          - token-type: 2
+            name: usdt
+          - token-type: 3
+            name: revert-to-zero
+          - token-type: 4
+            name: no-return
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,5 +57,7 @@ jobs:
           submodules: recursive
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Run Forge tests
+      - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings
+        env:
+          TOKEN_TYPE: ${{ matrix.token-type }}

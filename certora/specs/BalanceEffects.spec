@@ -25,9 +25,10 @@ methods {
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own
     // body on credit and debt, not the effect of the full transaction including callbacks.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
@@ -166,14 +167,14 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 /// REPAY ///
 
 /// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
-rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes32 anyId, address anyUser) {
+rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, onBehalf);
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    repay(e, obligation, units, onBehalf);
+    repay(e, obligation, units, onBehalf, data);
 
     assert debtOf(id, onBehalf) == debtBefore - units;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -208,7 +209,7 @@ filtered {
     f -> !f.isView
         && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
-        && f.selector != sig:repay(Midnight.Obligation, uint256, address).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Obligation, address).selector
 } {

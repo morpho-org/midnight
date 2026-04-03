@@ -14,7 +14,6 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {ERC20} from "./helpers/ERC20.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
@@ -598,11 +597,9 @@ contract LiquidationTest is BaseTest {
         authorize(borrower, address(this));
 
         deal(obligation.collaterals[0].token, address(this), collateral1);
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral1);
         midnight.supplyCollateral(obligation, 0, collateral1, borrower);
 
         deal(obligation.collaterals[1].token, address(this), collateral2);
-        ERC20(obligation.collaterals[1].token).approve(address(midnight), collateral2);
         midnight.supplyCollateral(obligation, 1, collateral2, borrower);
 
         // Check that the position has no bad debt.
@@ -636,7 +633,6 @@ contract LiquidationTest is BaseTest {
         for (uint256 i = 0; i < 2; i++) {
             address token = obligation.collaterals[i].token;
             deal(token, address(this), collatPerToken);
-            ERC20(token).approve(address(midnight), collatPerToken);
             midnight.supplyCollateral(obligation, i, collatPerToken, borrower);
         }
 
@@ -675,7 +671,6 @@ contract LiquidationTest is BaseTest {
         for (uint256 i = 0; i < 2; i++) {
             address token = obligation.collaterals[i].token;
             deal(token, address(this), collateralAmount);
-            ERC20(token).approve(address(midnight), collateralAmount);
             midnight.supplyCollateral(obligation, i, collateralAmount, borrower);
         }
 

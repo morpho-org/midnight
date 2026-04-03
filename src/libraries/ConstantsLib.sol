@@ -15,6 +15,7 @@ uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
 address constant CONTINUOUS_FEE_RECIPIENT = address(uint160(uint256(keccak256("continuous fee recipient"))));
 uint256 constant DEFERRED_CHECK_SLOT = uint256(keccak256("midnight.deferredCheck"));
+bytes32 constant CALLBACK_SUCCESS = keccak256("MIDNIGHT CALLBACK SUCCESS");
 
 /// @dev The allowed LLTV values, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
 uint256 constant LLTV_0 = 0.385e18;
