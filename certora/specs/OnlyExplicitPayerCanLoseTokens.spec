@@ -42,48 +42,37 @@ ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
 ghost address topLevelCaller;
 
-ghost address signedMakerCandidate;
-
-ghost bool signedMakerCandidateEligible {
-    init_state axiom !signedMakerCandidateEligible;
+ghost bool topLevelCallerAllowed {
+    init_state axiom !topLevelCallerAllowed;
 }
 
-ghost address successfulBuyerCallback;
+ghost address allowedBuyerCallback;
 
-ghost bool successfulBuyerCallbackActive {
-    init_state axiom !successfulBuyerCallbackActive;
+ghost bool allowedBuyerCallbackActive {
+    init_state axiom !allowedBuyerCallbackActive;
+}
+
+ghost address allowedSignedMaker;
+
+ghost bool allowedSignedMakerActive {
+    init_state axiom !allowedSignedMakerActive;
+}
+
+ghost address expectedSigner;
+
+ghost bool badPullSeen {
+    init_state axiom !badPullSeen;
 }
 
 function signerSummary() returns address {
-    address result;
-    signedMakerCandidate = result;
-    signedMakerCandidateEligible = true;
-    return result;
+    return expectedSigner;
 }
 
 function onBuySummary(address callback) returns (bytes32) {
     bytes32 result;
-
-    signedMakerCandidateEligible = false;
-    successfulBuyerCallback = callback;
-    successfulBuyerCallbackActive = result == Utils.callbackSuccess();
-
+    allowedBuyerCallback = callback;
+    allowedBuyerCallbackActive = callback != 0 && result == Utils.callbackSuccess();
     return result;
-}
-
-// In take, the maker is only the fallback payer on the buy path with zero buyer callback.
-// The maker is the seller on the sell path, so a credit decrease or debt increase disables
-// the signed-maker payer exemption before transferFrom executes.
-hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
-    if (user == signedMakerCandidate && newVal < oldVal) {
-        signedMakerCandidateEligible = false;
-    }
-}
-
-hook Sstore position[KEY bytes32 id][KEY address user].debt uint128 newVal (uint128 oldVal) {
-    if (user == signedMakerCandidate && newVal > oldVal) {
-        signedMakerCandidateEligible = false;
-    }
 }
 
 function CVL_transfer(address token, address src, address dest, uint256 value) returns bool {
@@ -106,11 +95,13 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 
     bool success;
     if (success) {
-        bool fromTopLevelCaller = src == topLevelCaller;
-        bool fromSuccessfulBuyerCallback = successfulBuyerCallbackActive && src == successfulBuyerCallback;
-        bool fromSignedMakerWithCallbackZero = signedMakerCandidateEligible && src == signedMakerCandidate;
+        bool fromTopLevelCaller = topLevelCallerAllowed && src == topLevelCaller;
+        bool fromSuccessfulBuyerCallback = allowedBuyerCallbackActive && src == allowedBuyerCallback;
+        bool fromSignedMakerWithCallbackZero = allowedSignedMakerActive && src == allowedSignedMaker;
     
-        assert fromTopLevelCaller || fromSuccessfulBuyerCallback || fromSignedMakerWithCallbackZero;
+        if (!(fromTopLevelCaller || fromSuccessfulBuyerCallback || fromSignedMakerWithCallbackZero)) {
+            badPullSeen = true;
+        }
     
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
@@ -118,10 +109,28 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
     return success;
 }
 
-rule onlyExplicitPayerCanLoseTokens(method f, env e, calldataarg args)
+rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    require e.msg.sender != currentContract, "only external calls";
+
+    address buyerCallback = offer.buy ? offer.callback : takerCallback;
+
+    topLevelCaller = e.msg.sender;
+    topLevelCallerAllowed = !offer.buy && buyerCallback == 0;
+    allowedBuyerCallback = buyerCallback;
+    allowedBuyerCallbackActive = false;
+    allowedSignedMaker = offer.maker;
+    allowedSignedMakerActive = offer.buy && buyerCallback == 0;
+    expectedSigner = offer.maker;
+    badPullSeen = false;
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+
+    assert !badPullSeen;
+}
+
+rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
-        || f.selector == sig:repay(Midnight.Obligation, uint256, address, bytes).selector
+    f -> f.selector == sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
@@ -129,9 +138,12 @@ filtered {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
-    signedMakerCandidateEligible = false;
-    successfulBuyerCallbackActive = false;
+    topLevelCallerAllowed = true;
+    allowedBuyerCallbackActive = false;
+    allowedSignedMakerActive = false;
+    badPullSeen = false;
 
     f(e, args);
-    assert true;
+
+    assert !badPullSeen;
 }
