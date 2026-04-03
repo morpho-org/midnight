@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
 import {IdLib} from "../../src/libraries/IdLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {CONTINUOUS_FEE_RECIPIENT} from "../../src/libraries/ConstantsLib.sol";
+import {CONTINUOUS_FEE_RECIPIENT, CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 contract Utils {
     function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
@@ -30,5 +30,9 @@ contract Utils {
 
     function continuousFeeRecipient() external pure returns (address) {
         return CONTINUOUS_FEE_RECIPIENT;
+    }
+
+    function callbackSuccess() external pure returns (bytes32) {
+        return CALLBACK_SUCCESS;
     }
 }
