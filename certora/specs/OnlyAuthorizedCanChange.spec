@@ -10,7 +10,7 @@ methods {
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function session(address user) external returns (bytes32) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -37,8 +37,8 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -85,9 +85,9 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndSlash(env e, method f
 rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
-    uint256 collateralBefore = collateralOf(id, user, collateralIndex);
+    uint256 collateralBefore = collateral(id, user, collateralIndex);
     f(e, args);
-    uint256 collateralAfter = collateralOf(id, user, collateralIndex);
+    uint256 collateralAfter = collateral(id, user, collateralIndex);
 
     assert collateralAfter == collateralBefore || userIsAuthorized;
 }

@@ -2,10 +2,10 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Collateral, Offer} from "../src/interfaces/IMidnight.sol";
+import {Obligation, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract AuthorizationTest is BaseTest {
@@ -19,9 +19,9 @@ contract AuthorizationTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
@@ -58,7 +58,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Attacker tries to withdraw lender's units
         address attacker = makeAddr("attacker");
@@ -70,7 +70,7 @@ contract AuthorizationTest is BaseTest {
     function testWithdrawCollateralUnauthorized() public {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, user, collateralAmount);
@@ -96,7 +96,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Lender authorizes operator
         address operator = makeAddr("operator");
@@ -114,7 +114,7 @@ contract AuthorizationTest is BaseTest {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
         address operator = makeAddr("operator");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
 
@@ -141,7 +141,7 @@ contract AuthorizationTest is BaseTest {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
         address operator = makeAddr("operator");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         deal(collateralToken, operator, collateralAmount);
         vm.prank(operator);
@@ -158,7 +158,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
-        assertEq(midnight.collateralOf(id, user, 0), collateralAmount);
+        assertEq(midnight.collateral(id, user, 0), collateralAmount);
     }
 
     function testWithdrawSelf() public {
@@ -170,7 +170,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         // Lender can withdraw their own units (no authorization needed)
         vm.prank(lender);
@@ -182,7 +182,7 @@ contract AuthorizationTest is BaseTest {
     function testWithdrawCollateralSelf() public {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
         deal(collateralToken, user, collateralAmount);
@@ -242,7 +242,7 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can take on behalf of taker
         vm.prank(operator);
-        midnight.take(units, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer]));
+        midnight.take(units, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer]));
 
         assertEq(midnight.debtOf(id, taker), units);
     }
@@ -255,17 +255,19 @@ contract AuthorizationTest is BaseTest {
 
         deal(address(loanToken), authorized, units);
         vm.prank(authorized);
+        loanToken.approve(address(midnight), 0);
+        vm.prank(authorized);
         loanToken.approve(address(midnight), units);
 
         vm.prank(authorized);
         vm.expectRevert("unauthorized");
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         vm.prank(borrower);
         midnight.setIsAuthorized(borrower, authorized, true);
 
         vm.prank(authorized);
-        midnight.repay(obligation, units, borrower);
+        midnight.repay(obligation, units, borrower, hex"");
 
         assertEq(midnight.debtOf(id, borrower), 0);
     }

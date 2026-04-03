@@ -3,7 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
+import {ERC20NoRevert} from "./erc20s/ERC20NoRevert.sol";
+import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
+import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
+import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -25,7 +29,7 @@ import {
     LLTV_7,
     LLTV_8
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
@@ -62,9 +66,28 @@ abstract contract BaseTest is Test {
         (otherLender, _privateKey) = makeAddrAndKey("otherLender");
         privateKey[otherLender] = _privateKey;
 
-        loanToken = new ERC20("loan", "loan");
-        collateralToken1 = new ERC20("collat1", "collat1");
-        collateralToken2 = new ERC20("collat2", "collat2");
+        uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
+        if (tokenType == 1) {
+            loanToken = ERC20(address(new ERC20NoRevert()));
+            collateralToken1 = ERC20(address(new ERC20NoRevert()));
+            collateralToken2 = ERC20(address(new ERC20NoRevert()));
+        } else if (tokenType == 2) {
+            loanToken = ERC20(address(new ERC20USDT()));
+            collateralToken1 = ERC20(address(new ERC20USDT()));
+            collateralToken2 = ERC20(address(new ERC20USDT()));
+        } else if (tokenType == 3) {
+            loanToken = ERC20(address(new ERC20RevertToZero()));
+            collateralToken1 = ERC20(address(new ERC20RevertToZero()));
+            collateralToken2 = ERC20(address(new ERC20RevertToZero()));
+        } else if (tokenType == 4) {
+            loanToken = ERC20(address(new ERC20NoReturn()));
+            collateralToken1 = ERC20(address(new ERC20NoReturn()));
+            collateralToken2 = ERC20(address(new ERC20NoReturn()));
+        } else {
+            loanToken = new ERC20("loan", "loan");
+            collateralToken1 = new ERC20("collat1", "collat1");
+            collateralToken2 = new ERC20("collat2", "collat2");
+        }
 
         oracle1 = new Oracle();
         oracle2 = new Oracle();
@@ -94,16 +117,16 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 oraclePrice = Oracle(obligation.collaterals[0].oracle).price();
+        uint256 oraclePrice = Oracle(obligation.collateralParams[0].oracle).price();
         uint256 collateral =
-            debt.mulDivUp(WAD, obligation.collaterals[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
-        deal(address(obligation.collaterals[0].token), _borrower, collateral);
+            debt.mulDivUp(WAD, obligation.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        deal(address(obligation.collateralParams[0].token), _borrower, collateral);
 
-        vm.prank(_borrower);
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral);
-
-        vm.prank(_borrower);
+        vm.startPrank(_borrower);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), 0);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
         midnight.supplyCollateral(obligation, 0, collateral, _borrower);
+        vm.stopPrank();
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
@@ -138,7 +161,6 @@ abstract contract BaseTest is Test {
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
         loanToken.approve(address(midnight), type(uint256).max);
-
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligation = obligation;
         badBorrowerOffer.buy = false;
@@ -151,7 +173,7 @@ abstract contract BaseTest is Test {
 
         authorize(badBorrower, address(this));
 
-        deal(obligation.collaterals[0].token, address(this), 135);
+        deal(obligation.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(obligation, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
@@ -161,17 +183,17 @@ abstract contract BaseTest is Test {
 
         take(100, unluckyLender, badBorrowerOffer);
 
-        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
+        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         // then empty the market (borrow side only).
         authorize(badBorrower, address(this));
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower);
+        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, hex"");
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
-        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
     function toId(Obligation memory obligation) internal view returns (bytes32) {
@@ -224,11 +246,11 @@ abstract contract BaseTest is Test {
         return sig(_root, privateKey[offers[0].maker]);
     }
 
-    function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
+    function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
         for (uint256 i = 1; i < arr.length; i++) {
             uint256 j = i;
             while (j > 0 && bytes20(arr[j].token) < bytes20(arr[j - 1].token)) {
-                Collateral memory temp = arr[j];
+                CollateralParams memory temp = arr[j];
                 arr[j] = arr[j - 1];
                 arr[j - 1] = temp;
                 j--;
@@ -243,18 +265,20 @@ abstract contract BaseTest is Test {
         return tiers[seed % 9];
     }
 
-    /// @dev Returns an obligation with sorted, unique collaterals, valid lltv/maxLif, and a creatable TTM.
+    /// @dev Returns an obligation with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
     function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
-        uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
-        Collateral[] memory collaterals = new Collateral[](len);
+        uint256 len =
+            obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+        CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
-            collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
-            uint256 lltv = allowedLltv(obligation.collaterals[i].lltv);
-            collaterals[i].lltv = lltv;
-            collaterals[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collateralParams[i].token =
+                address(uint160(uint256(keccak256(abi.encode(obligation.collateralParams[i].token, i)))));
+            uint256 lltv = allowedLltv(obligation.collateralParams[i].lltv);
+            collateralParams[i].lltv = lltv;
+            collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
-        collaterals = sortCollaterals(collaterals);
-        obligation.collaterals = collaterals;
+        collateralParams = sortCollateralParams(collateralParams);
+        obligation.collateralParams = collateralParams;
         return obligation;
     }
 
