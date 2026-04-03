@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
+using TakeCallbackReenter as callbackReenter;
 
 methods {
     // Verify the real multicall batching path instead of havocing it away.
@@ -24,11 +25,11 @@ methods {
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => DISPATCHER(true);
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => DISPATCHER(true);
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes data) external with(env e) => onBuySummary(e, calledContract, data) expect(bytes32);
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes data) external with(env e) => onSellSummary(e, calledContract, data) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
+    function _.onFlashLoan(address, uint256, bytes data) external with(env e) => onVoidCallbackSummary(e, calledContract, data) expect void;
 
     // Track ERC20 debits precisely at the transferFrom boundary.
     function _.transfer(address dest, uint256 value) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, dest, value) expect(bool);
@@ -55,6 +56,10 @@ ghost uint256 pendingBuyerCallbackPullsRemaining {
     init_state axiom pendingBuyerCallbackPullsRemaining == 0;
 }
 
+ghost mapping(address => uint256) activeReentrantCallerDepth {
+    init_state axiom forall address a. activeReentrantCallerDepth[a] == 0;
+}
+
 function signerSummary() returns address {
     address result;
     pendingSignedMaker = result;
@@ -63,13 +68,67 @@ function signerSummary() returns address {
     return result;
 }
 
-function onBuySummary(address callback) returns (bytes32) {
+function enterReentrantCallback(address callback) {
+    activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] + 1);
+}
+
+function exitReentrantCallback(address callback) {
+    activeReentrantCallerDepth[callback] = assert_uint256(activeReentrantCallerDepth[callback] - 1);
+}
+
+function onBuySummary(env e, address callback, bytes data) returns (bytes32) {
     bytes32 result;
+
     pendingSignedMakerEligible = false;
     pendingSignedMakerPullsRemaining = 0;
-    pendingBuyerCallback = callback;
-    pendingBuyerCallbackPullsRemaining = result == Utils.callbackSuccess() ? 2 : 0;
+    pendingBuyerCallbackPullsRemaining = 0;
+
+    if (result == Utils.callbackSuccess()) {
+        enterReentrantCallback(callback);
+        callbackReenter.reenter(e, data);
+        exitReentrantCallback(callback);
+    
+        pendingSignedMakerEligible = false;
+        pendingSignedMakerPullsRemaining = 0;
+        pendingBuyerCallback = callback;
+        pendingBuyerCallbackPullsRemaining = 2;
+    }
+
     return result;
+}
+
+function onSellSummary(env e, address callback, bytes data) returns (bytes32) {
+    bytes32 result;
+
+    pendingSignedMakerEligible = false;
+    pendingSignedMakerPullsRemaining = 0;
+    pendingBuyerCallbackPullsRemaining = 0;
+
+    if (result == Utils.callbackSuccess()) {
+        enterReentrantCallback(callback);
+        callbackReenter.reenter(e, data);
+        exitReentrantCallback(callback);
+    
+        pendingSignedMakerEligible = false;
+        pendingSignedMakerPullsRemaining = 0;
+        pendingBuyerCallbackPullsRemaining = 0;
+    }
+
+    return result;
+}
+
+function onVoidCallbackSummary(env e, address callback, bytes data) {
+    pendingSignedMakerEligible = false;
+    pendingSignedMakerPullsRemaining = 0;
+    pendingBuyerCallbackPullsRemaining = 0;
+
+    enterReentrantCallback(callback);
+    callbackReenter.reenter(e, data);
+    exitReentrantCallback(callback);
+
+    pendingSignedMakerEligible = false;
+    pendingSignedMakerPullsRemaining = 0;
+    pendingBuyerCallbackPullsRemaining = 0;
 }
 
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
@@ -96,8 +155,9 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         bool fromTopLevelCaller = src == topLevelCaller;
         bool fromBuyerCallback = src == pendingBuyerCallback && pendingBuyerCallbackPullsRemaining > 0;
         bool fromSignedMaker = src == pendingSignedMaker && pendingSignedMakerEligible && pendingSignedMakerPullsRemaining > 0;
+        bool fromActiveReentrantCaller = activeReentrantCallerDepth[src] > 0;
     
-        assert fromTopLevelCaller || fromBuyerCallback || fromSignedMaker;
+        assert fromTopLevelCaller || fromBuyerCallback || fromSignedMaker || fromActiveReentrantCaller;
     
         if (fromBuyerCallback) {
             pendingBuyerCallbackPullsRemaining = assert_uint256(pendingBuyerCallbackPullsRemaining - 1);
