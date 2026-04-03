@@ -132,6 +132,25 @@ filtered {
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
 
+rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+    require equalsGlobalObligation(obligation);
+
+    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
+    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+
+    // Sound: ExactMath.spec proves maxLif * lltv <= WAD * (WAD - 1) when lltv < WAD (lifTimesLltvStrictBound).
+    require obligation.collaterals[collateralIndex].lltv < WAD() => to_mathint(obligation.collaterals[collateralIndex].maxLif) * to_mathint(obligation.collaterals[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
+
+    // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
+    require ghostPrice(obligation.collaterals[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
+    require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
+
+    require !divisionByZero;
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
+}
+
 // isHealthy and healthData can divide by zero when called with arbitrary inputs (mulDivUp(WAD, maxLif) with maxLif = 0).
 // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
 rule noDivisionByZeroHealthData(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
@@ -153,23 +172,5 @@ rule noDivisionByZeroIsHealthy(env e, Midnight.Obligation obligation, bytes32 id
 
     require !divisionByZero;
     isHealthy(e, obligation, id, borrower);
-    assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
-}
-
-rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    require equalsGlobalObligation(obligation);
-
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
-
-    // Sound: ExactMath.spec proves maxLif * lltv <= WAD * (WAD - 1) when lltv < WAD (lifTimesLltvStrictBound).
-    require obligation.collaterals[collateralIndex].lltv < WAD() => to_mathint(obligation.collaterals[collateralIndex].maxLif) * to_mathint(obligation.collaterals[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
-
-    // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
-    require ghostPrice(obligation.collaterals[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
-    require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
-
-    require !divisionByZero;
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }

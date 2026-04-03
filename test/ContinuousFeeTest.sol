@@ -327,7 +327,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower);
+        midnight.repay(obligation, credit, borrower, hex"");
 
         uint256 pendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;

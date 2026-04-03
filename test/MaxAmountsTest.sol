@@ -54,7 +54,7 @@ contract MaxAmountsTest is BaseTest {
         oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
-        collateralToken1.approve(address(midnight), collateralAmount);
+
         midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
 
         Offer memory borrowerOffer;
@@ -80,7 +80,7 @@ contract MaxAmountsTest is BaseTest {
         oracle1.setPrice(ORACLE_PRICE_SCALE * 1e36);
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
-        collateralToken1.approve(address(midnight), collateralAmount);
+
         midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
 
         Offer memory borrowerOffer;
@@ -100,7 +100,6 @@ contract MaxAmountsTest is BaseTest {
         uint256 amount = MAX_AMOUNT;
 
         deal(address(collateralToken1), address(this), amount);
-        collateralToken1.approve(address(midnight), amount);
 
         authorize(borrower, address(this));
 
@@ -113,7 +112,6 @@ contract MaxAmountsTest is BaseTest {
         uint256 amount = uint256(MAX_AMOUNT) + 1;
 
         deal(address(collateralToken1), address(this), amount);
-        collateralToken1.approve(address(midnight), amount);
 
         authorize(borrower, address(this));
 
