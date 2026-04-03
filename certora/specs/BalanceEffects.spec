@@ -20,7 +20,9 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+
+    // Sound: tickToPrice requires tick > 0 and always returns a positive value.
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => tickToPriceSummary(tick);
 
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own
@@ -31,6 +33,10 @@ methods {
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
+}
+
+ghost tickToPriceSummary(uint256) returns uint256 {
+    axiom forall uint256 t. tickToPriceSummary(t) > 0;
 }
 
 function signerSummary() returns address {
