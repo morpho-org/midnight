@@ -95,8 +95,8 @@ rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uin
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf) {
-    Midnight.repay(e, obligation, units, onBehalf);
+rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
+    Midnight.repay(e, obligation, units, onBehalf, data);
     assert obligationIsCreated(obligation);
 }
 

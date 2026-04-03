@@ -9,9 +9,10 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -890,8 +891,6 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         (address _otherLender,) = makeAddrAndKey("otherLender");
-        vm.prank(_otherLender);
-        loanToken.approve(address(midnight), assets);
         address callback = address(new LendCallback());
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
@@ -976,7 +975,6 @@ contract BorrowCallback is ICallbacks {
         address seller,
         uint256,
         uint256,
-        uint256,
         bytes memory data
     ) external {
         require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
@@ -988,9 +986,11 @@ contract BorrowCallback is ICallbacks {
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1004,16 +1004,17 @@ contract LendCallback is ICallbacks {
         address buyer,
         uint256 buyerAssets,
         uint256,
-        uint256,
         bytes memory data
     ) external {
         require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedObligationId = obligationId;
         recordedData = data;
-        require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
+        SafeTransferLib.safeTransfer(obligation.loanToken, buyer, buyerAssets);
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }

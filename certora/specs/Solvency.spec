@@ -3,6 +3,8 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    function claimableTradingFee(address token) external returns (uint256) envfree;
+
     function _.price() external => NONDET;
 
     // Summarize mulDivUp and mulDivDown by ghost functions. This is for performance of the prover.
@@ -24,6 +26,7 @@ methods {
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(bytes32 obligationId, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
+    function _.onRepay(bytes32 obligationId, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
@@ -133,10 +136,10 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint256 newWithdrawable
 
 /// INVARIANTS AND RULES ///
 
-// For any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token minus the flash loaned amount.
+// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) - flashloans[token]
+    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
