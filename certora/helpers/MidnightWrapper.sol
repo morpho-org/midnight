@@ -19,6 +19,7 @@ contract MidnightWrapper is Midnight {
         view
         returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
     {
+        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return (type(uint256).max, collatPrice, 0);
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
         uint256 len = obligation.collaterals.length;
@@ -36,12 +37,8 @@ contract MidnightWrapper is Midnight {
     }
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return true;
-        if (position[id][borrower].debt == 0) {
-            return true;
-        } else {
-            (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
-            return maxDebt >= position[id][borrower].debt;
-        }
+        // collateralPrice is unused here, passing type(uint256).max as a dummy value.
+        (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, type(uint256).max);
+        return maxDebt >= position[id][borrower].debt;
     }
 }
