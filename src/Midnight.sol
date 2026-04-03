@@ -19,6 +19,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
     CONTINUOUS_FEE_RECIPIENT,
+    DEFERRED_CHECK_SLOT,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
@@ -122,24 +123,6 @@ contract Midnight is IMidnight {
 
     /// @dev Address that can set trading fees.
     address public feeSetter;
-
-    /// @dev When set for a user, isHealthy returns true unconditionally. Used to defer health checks until after
-    /// callbacks. Stored in transient storage (mapping(address => bool) equivalent).
-    uint256 private constant DEFERRED_CHECK_SLOT = uint256(keccak256("midnight.deferredCheck"));
-
-    function _setDeferredCheck(address user, bool value) internal {
-        uint256 slot = uint256(keccak256(abi.encode(user, DEFERRED_CHECK_SLOT)));
-        assembly ("memory-safe") {
-            tstore(slot, value)
-        }
-    }
-
-    function _getDeferredCheck(address user) internal view returns (bool value) {
-        uint256 slot = uint256(keccak256(abi.encode(user, DEFERRED_CHECK_SLOT)));
-        assembly ("memory-safe") {
-            value := tload(slot)
-        }
-    }
 
     /// CONSTRUCTOR ///
 
@@ -366,23 +349,19 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
-        _setDeferredCheck(seller, true);
-
+        UtilsLib.tSet(DEFERRED_CHECK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             ICallbacks(buyerCallback)
                 .onBuy(id, offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
         }
-
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, address(this), buyerAssets - sellerAssets);
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
-
         if (sellerCallback != address(0)) {
             ICallbacks(sellerCallback)
                 .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
         }
-
-        _setDeferredCheck(seller, false);
+        UtilsLib.tSet(DEFERRED_CHECK_SLOT, id, seller, false);
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
@@ -774,6 +753,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Computes health-related data for a position.
+    /// @dev If the check is defered, the returned collateral price is 0.
     /// @dev Returns the max debt, the price of the collateral at collateralIndex, and the bad debt.
     /// @dev Expects the id to correspond to the obligation's id.
     function healthData(Obligation memory obligation, bytes32 id, address borrower, uint256 collateralIndex)
@@ -781,6 +761,7 @@ contract Midnight is IMidnight {
         view
         returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
     {
+        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return (type(uint256).max, collatPrice, 0);
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
         uint128 bitmap = _position.activatedCollaterals;
@@ -801,13 +782,8 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (_getDeferredCheck(borrower)) return true;
-        if (position[id][borrower].debt == 0) {
-            return true;
-        } else {
-            (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
-            return maxDebt >= position[id][borrower].debt;
-        }
+        (uint256 maxDebt,,) = healthData(obligation, id, borrower, 0);
+        return maxDebt >= position[id][borrower].debt;
     }
 
     function domainSeparator() internal view returns (bytes32) {

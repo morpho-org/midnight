@@ -36,7 +36,7 @@ contract MidnightWrapper is Midnight {
     }
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (_getDeferredCheck(borrower)) return true;
+        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return true;
         if (position[id][borrower].debt == 0) {
             return true;
         } else {

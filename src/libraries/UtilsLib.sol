@@ -93,4 +93,20 @@ library UtilsLib {
         // forge-lint: disable-next-item(unsafe-typecast)
         return uint128(bitmap & ~(1 << bit));
     }
+
+    /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
+    function tSet(uint256 baseSlot, bytes32 key1, address key2, bool value) internal {
+        uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
+        assembly ("memory-safe") {
+            tstore(slot, value)
+        }
+    }
+
+    /// @dev Gets a boolean from transient storage keyed by a `(bytes32, address)` pair.
+    function tGet(uint256 baseSlot, bytes32 key1, address key2) internal view returns (bool value) {
+        uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
+        assembly ("memory-safe") {
+            value := tload(slot)
+        }
+    }
 }
