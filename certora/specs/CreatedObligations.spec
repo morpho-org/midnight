@@ -57,19 +57,19 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 
 // Show that a created obligation has at least one collateral.
 strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
-    obligationIsCreated(obligation) => obligation.collaterals.length > 0;
+    obligationIsCreated(obligation) => obligation.collateralParams.length > 0;
 
-// Show that a created obligation has sorted collaterals.
+// Show that a created obligation has sorted collateralParams.
 strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
-    obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
+    obligationIsCreated(obligation) => i < j => j < obligation.collateralParams.length => obligation.collateralParams[i].token < obligation.collateralParams[j].token;
 
-// Show that a created obligation do not have address(0) collaterals.
+// Show that a created obligation do not have address(0) collateralParams.
 strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].token != 0;
 
 // Show that a created obligation has lltv <= WAD.
 strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
@@ -169,4 +169,4 @@ definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385000000000000000
 
 // Show that a created obligation only has allowed LLTV tiers.
 strong invariant createdObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => isLltvAllowed(obligation.collaterals[i].lltv);
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => isLltvAllowed(obligation.collateralParams[i].lltv);
