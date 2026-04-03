@@ -18,12 +18,14 @@ contract MidnightWrapper is Midnight {
         bytes32 id,
         address borrower,
         uint256 collateralIndex
-    ) public view returns (bool liquidatable, uint256 maxDebt, uint256 collatPrice, uint256 badDebt) {
+    ) public view returns (bool, uint256, uint256, uint256) {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
-        if (debt == 0) return (false, 0, 0, 0);
+        if (debt == 0) return (block.timestamp > obligation.maturity, 0, 0, 0);
 
-        badDebt = debt;
+        uint256 maxDebt;
+        uint256 collatPrice;
+        uint256 badDebt = debt;
         uint256 len = obligation.collateralParams.length;
         for (uint256 i = len; i > 0;) {
             i--;
@@ -36,6 +38,6 @@ contract MidnightWrapper is Midnight {
             badDebt =
                 badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateralParam.maxLif));
         }
-        liquidatable = block.timestamp > obligation.maturity || debt > maxDebt;
+        return (block.timestamp > obligation.maturity || debt > maxDebt, maxDebt, collatPrice, badDebt);
     }
 }
