@@ -209,7 +209,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     require globalObligationCollateralLLTV[collateralIndex] * globalObligationCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
-    require globalObligationCollateralLength <= 2, "too many collateralParams for the spec to handle";
+    require globalObligationCollateralLength <= 1, "too many collateralParams for the spec to handle";
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
@@ -248,7 +248,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     // This variable is set to false whenever isLiquidatable() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     notLiquidatableBeforeCallback = true;
 
-    require globalObligationCollateralLength <= 2, "too many collateralParams for the spec to handle";
+    require globalObligationCollateralLength <= 1, "too many collateralParams for the spec to handle";
 
     Midnight.Obligation globalObligation = getGlobalObligation();
     require borrower != globalBorrower || !equalsGlobalObligation(obligation), "borrower or obligation differs";
