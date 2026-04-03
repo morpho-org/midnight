@@ -19,6 +19,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
     CONTINUOUS_FEE_RECIPIENT,
+    CALLBACK_SUCCESS,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
@@ -93,7 +94,7 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => ObligationState) public obligationState;
 
     /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
-    /// @dev To work as expected, all offers in a same group should have the same maxs and loan token.
+    /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
     /// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` should be nonzero per offer.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
 
@@ -104,11 +105,11 @@ contract Midnight is IMidnight {
     /// @dev Whether an address is authorized to act on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
 
-    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overriden by the
+    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
 
-    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overriden by the
+    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
     mapping(address loanToken => uint32) public defaultContinuousFee;
 
@@ -349,17 +350,24 @@ contract Midnight is IMidnight {
         );
 
         if (buyerCallback != address(0)) {
-            ICallbacks(buyerCallback)
-                .onBuy(id, offer.obligation, buyer, buyerAssets, sellerAssets, units, buyerCallbackData);
+            require(
+                ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
+                    == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, address(this), buyerAssets - sellerAssets);
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, buyer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
-            ICallbacks(sellerCallback)
-                .onSell(id, offer.obligation, seller, buyerAssets, sellerAssets, units, sellerCallbackData);
+            require(
+                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                    == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
@@ -367,7 +375,7 @@ contract Midnight is IMidnight {
         return (buyerAssets, sellerAssets, units);
     }
 
-    /// @dev Will revert if there is no withdrawable funds.
+    /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
         require(
             onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender]
@@ -393,7 +401,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf) external {
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
@@ -401,6 +409,10 @@ contract Midnight is IMidnight {
         obligationState[id].withdrawable += units;
 
         emit EventsLib.Repay(msg.sender, id, units, onBehalf);
+
+        if (data.length > 0) {
+            ICallbacks(msg.sender).onRepay(id, obligation, units, onBehalf, data);
+        }
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
     }

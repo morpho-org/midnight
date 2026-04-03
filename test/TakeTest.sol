@@ -4,14 +4,14 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -868,6 +868,30 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
+    function testSellSellerCallbackRevertsOnInvalidReturn(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        lenderOffer.maxUnits = units;
+        lenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        collateralize(obligation, borrower, units);
+        address callback = address(new InvalidSellCallback());
+
+        vm.expectRevert("invalid callback");
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            callback,
+            hex"",
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
     function testSellBuyerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -890,8 +914,6 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         (address _otherLender,) = makeAddrAndKey("otherLender");
-        vm.prank(_otherLender);
-        loanToken.approve(address(midnight), assets);
         address callback = address(new LendCallback());
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
@@ -976,9 +998,8 @@ contract BorrowCallback is ICallbacks {
         address seller,
         uint256,
         uint256,
-        uint256,
         bytes memory data
-    ) external {
+    ) external returns (bytes32) {
         require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedObligationId = obligationId;
         recordedData = data;
@@ -986,11 +1007,20 @@ contract BorrowCallback is ICallbacks {
         address collateralToken = obligation.collaterals[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        return CALLBACK_SUCCESS;
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract LendCallback is ICallbacks {
@@ -1001,19 +1031,49 @@ contract LendCallback is ICallbacks {
     function onBuy(
         bytes32 obligationId,
         Obligation memory obligation,
-        address buyer,
+        address,
         uint256 buyerAssets,
         uint256,
-        uint256,
         bytes memory data
-    ) external {
+    ) external returns (bytes32) {
         require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedObligationId = obligationId;
         recordedData = data;
-        require(ERC20(obligation.loanToken).transfer(buyer, buyerAssets), "transfer failed");
+        ERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
+        return CALLBACK_SUCCESS;
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory) external {}
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract InvalidSellCallback is ICallbacks {
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return bytes32(0);
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }

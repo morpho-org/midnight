@@ -204,7 +204,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower);
+        midnight.repay(gatedObligation, units, borrower, hex"");
 
         assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
     }
@@ -219,7 +219,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower);
+        midnight.repay(gatedObligation, units, borrower, hex"");
 
         gate.setWhitelisted(lender, false);
 
