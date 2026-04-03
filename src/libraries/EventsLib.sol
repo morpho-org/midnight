@@ -7,7 +7,6 @@ import {Obligation} from "../interfaces/IMidnight.sol";
 /// @dev id_ is used to avoid naming conflicts in indexers.
 library EventsLib {
     event Constructor(address indexed owner);
-
     event SetOwner(address indexed owner);
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
@@ -52,7 +51,6 @@ library EventsLib {
     event SupplyCollateral(
         address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf
     );
-
     event WithdrawCollateral(
         address caller,
         bytes32 indexed id_,
@@ -61,25 +59,21 @@ library EventsLib {
         address indexed onBehalf,
         address receiver
     );
-
     event Liquidate(
-        address indexed caller,
+        address caller,
         bytes32 indexed id_,
-        address collateral,
+        address indexed collateral,
         uint256 seizedAssets,
         uint256 repaidUnits,
         address indexed borrower,
         uint256 badDebt,
         uint256 latestLossIndex
     );
-
     event SetConsumed(address indexed caller, address indexed onBehalf, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed caller, address indexed onBehalf, bytes32 session);
     event FlashLoan(address indexed caller, address indexed token, uint256 assets);
-
     event SetIsAuthorized(
         address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized
     );
-
     event ClaimTradingFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);
 }

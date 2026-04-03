@@ -5,7 +5,7 @@ import "BitmapSummaries.spec";
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function collateralOf(bytes32 id, address user, uint256) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 
@@ -35,13 +35,13 @@ persistent ghost summaryMulDivUp(uint256, uint256, uint256) returns uint256;
 
 // Check that a collateral bit is set exactly when there is collateral for that index.
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateralOf(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
 
 // This shows that the real isHealthy returns true if and only if the isHealthy function
 // that does not use collateral bitmap returns true.  We also check that the latter function
 // does not revert if isHealthy does not revert.
 rule isHealthyEquivalent(Midnight.Obligation obligation, bytes32 id, address borrower) {
-    require obligation.collaterals.length <= 3, "restrict to three collaterals";
+    require obligation.collateralParams.length <= 3, "restrict to three collateralParams";
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 2);

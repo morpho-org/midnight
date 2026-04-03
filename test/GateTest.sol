@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -44,29 +44,29 @@ contract GateTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
 
         gatedObligation.loanToken = address(loanToken);
         gatedObligation.maturity = block.timestamp + 100;
-        gatedObligation.collaterals
+        gatedObligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        gatedObligation.collaterals = sortCollaterals(gatedObligation.collaterals);
+        gatedObligation.collateralParams = sortCollateralParams(gatedObligation.collateralParams);
         gatedObligation.enterGate = address(gate);
         gatedObligation.liquidatorGate = address(gate);
 
@@ -240,7 +240,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, borrower, units);
         take(units, lender, borrowerOffer);
 
-        Oracle(gatedObligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+        Oracle(gatedObligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
 
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
@@ -257,7 +257,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, borrower, units);
         take(units, lender, borrowerOffer);
 
-        Oracle(gatedObligation.collaterals[0].oracle).setPrice(0);
+        Oracle(gatedObligation.collateralParams[0].oracle).setPrice(0);
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");

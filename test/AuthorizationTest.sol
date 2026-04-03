@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Collateral, Offer} from "../src/interfaces/IMidnight.sol";
+import {Obligation, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
@@ -19,9 +19,9 @@ contract AuthorizationTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
@@ -70,7 +70,7 @@ contract AuthorizationTest is BaseTest {
     function testWithdrawCollateralUnauthorized() public {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
@@ -113,7 +113,7 @@ contract AuthorizationTest is BaseTest {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
         address operator = makeAddr("operator");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         // User authorizes operator
         vm.prank(user);
@@ -138,7 +138,7 @@ contract AuthorizationTest is BaseTest {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
         address operator = makeAddr("operator");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         deal(collateralToken, operator, collateralAmount);
         vm.prank(operator);
@@ -155,7 +155,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
-        assertEq(midnight.collateralOf(id, user, 0), collateralAmount);
+        assertEq(midnight.collateral(id, user, 0), collateralAmount);
     }
 
     function testWithdrawSelf() public {
@@ -179,7 +179,7 @@ contract AuthorizationTest is BaseTest {
     function testWithdrawCollateralSelf() public {
         uint256 collateralAmount = 1000;
         address user = makeAddr("user");
-        address collateralToken = obligation.collaterals[0].token;
+        address collateralToken = obligation.collateralParams[0].token;
 
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
