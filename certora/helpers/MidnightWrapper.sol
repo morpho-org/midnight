@@ -20,7 +20,7 @@ contract MidnightWrapper is Midnight {
     {
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
-        uint256 len = obligation.collaterals.length;
+        uint256 len = obligation.collateralParams.length;
         for (uint256 i = len; i > 0;) {
             i--;
             uint256 _collateral = _position.collateral[i];

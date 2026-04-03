@@ -86,7 +86,7 @@ function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
 
 function summaryToId(Midnight.Obligation obligation, uint256 chainId, address morpho) returns (bytes32) {
     // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD();
     bytes32 id;
     if (equalsGlobalObligation(obligation) && morpho == currentContract) {
         require id == globalId, "toId() is deterministic";
@@ -152,12 +152,12 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
 }
 
 // isHealthy and healthData can divide by zero when called with arbitrary inputs (mulDivUp(WAD, maxLif) with maxLif = 0).
-// Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+// Sound: touchObligation enforces maxLif >= WAD for all collateralParams (ExactMath.spec).
 rule noDivisionByZeroHealthData(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
     require equalsGlobalObligation(obligation);
 
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+    // Sound: touchObligation enforces maxLif >= WAD for all collateralParams (ExactMath.spec).
+    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD();
 
     require !divisionByZero;
     healthData(e, obligation, id, borrower, collateralIndex);
@@ -167,8 +167,8 @@ rule noDivisionByZeroHealthData(env e, Midnight.Obligation obligation, bytes32 i
 rule noDivisionByZeroIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
     require equalsGlobalObligation(obligation);
 
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+    // Sound: touchObligation enforces maxLif >= WAD for all collateralParams (ExactMath.spec).
+    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD();
 
     require !divisionByZero;
     isHealthy(e, obligation, id, borrower);

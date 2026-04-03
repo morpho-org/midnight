@@ -62,7 +62,7 @@ rule isHealthyEquivalent(Midnight.Obligation obligation, bytes32 id, address bor
 
 // This shows that healthData and healthDataNoBitmap return the same values.
 rule healthDataEquivalent(Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
-    require obligation.collaterals.length <= 3, "restrict to three collaterals";
+    require obligation.collateralParams.length <= 3, "restrict to three collateralParams";
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 2);
