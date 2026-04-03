@@ -28,7 +28,7 @@ methods {
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => DISPATCHER(true);
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => DISPATCHER(true);
-    function _.onFlashLoan(address, uint256, bytes) external => onFlashLoanSummary(calledContract) expect void;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
 
     // Track ERC20 debits precisely at the transferFrom boundary.
     function _.transfer(address dest, uint256 value) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, dest, value) expect(bool);
@@ -55,10 +55,6 @@ ghost uint256 pendingBuyerCallbackPullsRemaining {
     init_state axiom pendingBuyerCallbackPullsRemaining == 0;
 }
 
-ghost mapping(address => bool) flashLoanCallback {
-    init_state axiom forall address a. !flashLoanCallback[a];
-}
-
 function signerSummary() returns address {
     address result;
     pendingSignedMaker = result;
@@ -74,10 +70,6 @@ function onBuySummary(address callback) returns (bytes32) {
     pendingBuyerCallback = callback;
     pendingBuyerCallbackPullsRemaining = result == Utils.callbackSuccess() ? 2 : 0;
     return result;
-}
-
-function onFlashLoanSummary(address callback) {
-    flashLoanCallback[callback] = true;
 }
 
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
@@ -104,9 +96,8 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         bool fromTopLevelCaller = src == topLevelCaller;
         bool fromBuyerCallback = src == pendingBuyerCallback && pendingBuyerCallbackPullsRemaining > 0;
         bool fromSignedMaker = src == pendingSignedMaker && pendingSignedMakerEligible && pendingSignedMakerPullsRemaining > 0;
-        bool fromFlashLoanCallback = flashLoanCallback[src];
     
-        assert fromTopLevelCaller || fromBuyerCallback || fromSignedMaker || fromFlashLoanCallback;
+        assert fromTopLevelCaller || fromBuyerCallback || fromSignedMaker;
     
         if (fromBuyerCallback) {
             pendingBuyerCallbackPullsRemaining = assert_uint256(pendingBuyerCallbackPullsRemaining - 1);
