@@ -271,41 +271,21 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
 
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData,
-            address receiver
-        ) = offer.buy
-            ? (
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                taker,
-                takerCallback,
-                takerCallbackData,
-                receiverIfTakerIsSeller
-            )
-            : (
-                taker,
-                takerCallback,
-                takerCallbackData,
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                offer.receiverIfMakerIsSeller
-            );
+        address buyer = offer.buy ? offer.maker : taker;
+        address seller = offer.buy ? taker : offer.maker;
+        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets;
+        uint256 sellerAssets;
+        {
+            uint256 offerPrice = TickLib.tickToPrice(offer.tick);
+            uint256 _tradingFee = tradingFee(id, timeToMaturity);
+            uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+            uint256 buyerPrice = sellerPrice + _tradingFee;
+            buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+            sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        }
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
@@ -377,7 +357,9 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
+        address buyerCallback = offer.buy ? offer.callback : takerCallback;
         if (buyerCallback != address(0)) {
+            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
                 ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
@@ -390,12 +372,17 @@ contract Midnight is IMidnight {
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
-        if (sellerCallback != address(0)) {
-            require(
-                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+        {
+            address sellerCallback = offer.buy ? takerCallback : offer.callback;
+            if (sellerCallback != address(0)) {
+                bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
+                require(
+                    ICallbacks(sellerCallback)
+                        .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
-                "invalid callback"
-            );
+                    "invalid callback"
+                );
+            }
         }
 
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
