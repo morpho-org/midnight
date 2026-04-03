@@ -792,14 +792,22 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev Returns true if the position is healthy.
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        uint256 debt = position[id][borrower].debt;
+        Position storage _position = position[id][borrower];
+        uint256 debt = _position.debt;
         if (debt == 0) {
             return true;
-        } else {
-            // collateralPrice is unused here, passing type(uint256).max as a dummy value.
-            (uint256 maxDebt,,) = healthData(obligation, id, borrower, type(uint256).max);
-            return maxDebt >= debt;
         }
+
+        uint256 maxDebt;
+        uint128 bitmap = _position.activatedCollaterals;
+        while (maxDebt < debt && bitmap != 0) {
+            uint256 i = UtilsLib.msb(bitmap);
+            CollateralParams memory collateralParam = obligation.collateralParams[i];
+            maxDebt += _position.collateral[i].mulDivDown(IOracle(collateralParam.oracle).price(), ORACLE_PRICE_SCALE)
+                .mulDivDown(collateralParam.lltv, WAD);
+            bitmap = bitmap.clearBit(i);
+        }
+        return maxDebt >= debt;
     }
 
     function domainSeparator() internal view returns (bytes32) {

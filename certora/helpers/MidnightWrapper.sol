@@ -29,17 +29,29 @@ contract MidnightWrapper is Midnight {
             uint256 price = IOracle(collateralParam.oracle).price();
             if (i == collateralIndex) collatPrice = price;
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateralParam.lltv, WAD);
-            badDebt =
-                badDebt.zeroFloorSub(_collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateralParam.maxLif));
+            badDebt = badDebt.zeroFloorSub(
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, collateralParam.maxLif)
+            );
         }
     }
 
     function isHealthyNoBitmap(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        if (position[id][borrower].debt == 0) {
+        Position storage _position = position[id][borrower];
+        uint256 debt = _position.debt;
+        if (debt == 0) {
             return true;
-        } else {
-            (uint256 maxDebt,,) = healthDataNoBitmap(obligation, id, borrower, 0);
-            return maxDebt >= position[id][borrower].debt;
         }
+
+        uint256 maxDebt;
+        uint256 len = obligation.collateralParams.length;
+        for (uint256 i = len; i > 0 && maxDebt < debt;) {
+            i--;
+            uint256 _collateral = _position.collateral[i];
+            if (_collateral == 0) continue;
+            CollateralParams memory collateralParam = obligation.collateralParams[i];
+            uint256 price = IOracle(collateralParam.oracle).price();
+            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(collateralParam.lltv, WAD);
+        }
+        return maxDebt >= debt;
     }
 }
