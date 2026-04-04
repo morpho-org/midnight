@@ -5,6 +5,10 @@ pragma solidity >=0.5.0;
 import {Obligation} from "./IMidnight.sol";
 
 interface ICallbacks {
+    function maxBuy(bytes32 obligationId, Obligation memory obligation, address buyer, bytes memory data)
+        external
+        view
+        returns (uint256);
     function onBuy(
         bytes32 obligationId,
         Obligation memory obligation,
@@ -14,6 +18,10 @@ interface ICallbacks {
         uint256 units,
         bytes memory data
     ) external;
+    function maxSell(bytes32 obligationId, Obligation memory obligation, address seller, bytes memory data)
+        external
+        view
+        returns (uint256);
     function onSell(
         bytes32 obligationId,
         Obligation memory obligation,

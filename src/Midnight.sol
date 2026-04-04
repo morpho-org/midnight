@@ -288,6 +288,15 @@ contract Midnight is IMidnight {
             units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
         }
 
+        if (offer.callback != address(0)) {
+            uint256 callbackMaxAssets = offer.buy
+                ? ICallbacks(offer.callback).maxBuy(id, offer.obligation, offer.maker, offer.callbackData)
+                : ICallbacks(offer.callback).maxSell(id, offer.obligation, offer.maker, offer.callbackData);
+            units = UtilsLib.min(
+                units, _maxUnitsForCallbackAssets(callbackMaxAssets, offer.buy ? buyerPrice : sellerPrice)
+            );
+        }
+
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
@@ -370,6 +379,14 @@ contract Midnight is IMidnight {
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
+    }
+
+    function _maxUnitsForCallbackAssets(uint256 callbackMaxAssets, uint256 price) internal pure returns (uint256) {
+        if (callbackMaxAssets == type(uint256).max) return type(uint256).max;
+
+        uint256 whole = callbackMaxAssets / price;
+        if (whole > type(uint256).max / WAD) return type(uint256).max;
+        return whole * WAD + (callbackMaxAssets % price).mulDivDown(WAD, price);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
