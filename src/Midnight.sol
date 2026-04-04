@@ -849,40 +849,36 @@ contract Midnight is IMidnight {
             collateralParamHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
         }
 
-        return keccak256(
-            abi.encode(
-                OBLIGATION_TYPEHASH,
-                obligation.loanToken,
-                hashBytes32Array(collateralParamHashes),
-                obligation.maturity,
-                obligation.rcfThreshold,
-                obligation.enterGate,
-                obligation.liquidatorGate
-            )
-        );
+        bytes32[7] memory values;
+        values[0] = OBLIGATION_TYPEHASH;
+        values[1] = bytes32(uint256(uint160(obligation.loanToken)));
+        values[2] = hashBytes32Array(collateralParamHashes);
+        values[3] = bytes32(obligation.maturity);
+        values[4] = bytes32(obligation.rcfThreshold);
+        values[5] = bytes32(uint256(uint160(obligation.enterGate)));
+        values[6] = bytes32(uint256(uint160(obligation.liquidatorGate)));
+        return keccak256(abi.encode(values));
     }
 
     function offerStructHash(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                OFFER_TYPEHASH,
-                hashObligation(offer.obligation),
-                offer.buy,
-                offer.maker,
-                offer.start,
-                offer.expiry,
-                offer.tick,
-                offer.group,
-                offer.session,
-                offer.callback,
-                keccak256(offer.callbackData),
-                offer.receiverIfMakerIsSeller,
-                offer.reduceOnly,
-                offer.maxUnits,
-                offer.maxSellerAssets,
-                offer.maxBuyerAssets
-            )
-        );
+        bytes32[16] memory values;
+        values[0] = OFFER_TYPEHASH;
+        values[1] = hashObligation(offer.obligation);
+        values[2] = offer.buy ? bytes32(uint256(1)) : bytes32(0);
+        values[3] = bytes32(uint256(uint160(offer.maker)));
+        values[4] = bytes32(offer.start);
+        values[5] = bytes32(offer.expiry);
+        values[6] = bytes32(offer.tick);
+        values[7] = offer.group;
+        values[8] = offer.session;
+        values[9] = bytes32(uint256(uint160(offer.callback)));
+        values[10] = keccak256(offer.callbackData);
+        values[11] = bytes32(uint256(uint160(offer.receiverIfMakerIsSeller)));
+        values[12] = offer.reduceOnly ? bytes32(uint256(1)) : bytes32(0);
+        values[13] = bytes32(offer.maxUnits);
+        values[14] = bytes32(offer.maxSellerAssets);
+        values[15] = bytes32(offer.maxBuyerAssets);
+        return keccak256(abi.encode(values));
     }
 
     function offerDigest(Offer memory offer) internal view returns (bytes32) {
