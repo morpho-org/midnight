@@ -17,7 +17,9 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
+    COLLATERAL_PARAMS_TYPEHASH,
+    OBLIGATION_TYPEHASH,
+    OFFER_TYPEHASH,
     CALLBACK_SUCCESS,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
@@ -249,8 +251,9 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
+        bytes32 offerDigest_ = offerDigest(offer);
         require(signer(root, sig) == offer.maker, "invalid signature");
-        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(UtilsLib.isLeaf(root, offerDigest_, proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -817,10 +820,77 @@ contract Midnight is IMidnight {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
-    function signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+    function hashBytes32Array(bytes32[] memory hashes) internal pure returns (bytes32) {
+        bytes memory encoded = new bytes(hashes.length * 32);
+        for (uint256 i = 0; i < hashes.length; ++i) {
+            bytes32 hash = hashes[i];
+            assembly ("memory-safe") {
+                mstore(add(add(encoded, 0x20), mul(i, 0x20)), hash)
+            }
+        }
+        return keccak256(encoded);
+    }
+
+    function hashCollateralParams(CollateralParams memory collateralParam) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                COLLATERAL_PARAMS_TYPEHASH,
+                collateralParam.token,
+                collateralParam.lltv,
+                collateralParam.maxLif,
+                collateralParam.oracle
+            )
+        );
+    }
+
+    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
+        bytes32[] memory collateralParamHashes = new bytes32[](obligation.collateralParams.length);
+        for (uint256 i = 0; i < obligation.collateralParams.length; ++i) {
+            collateralParamHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
+        }
+
+        return keccak256(
+            abi.encode(
+                OBLIGATION_TYPEHASH,
+                obligation.loanToken,
+                hashBytes32Array(collateralParamHashes),
+                obligation.maturity,
+                obligation.rcfThreshold,
+                obligation.enterGate,
+                obligation.liquidatorGate
+            )
+        );
+    }
+
+    function offerStructHash(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                OFFER_TYPEHASH,
+                hashObligation(offer.obligation),
+                offer.buy,
+                offer.maker,
+                offer.start,
+                offer.expiry,
+                offer.tick,
+                offer.group,
+                offer.session,
+                offer.callback,
+                keccak256(offer.callbackData),
+                offer.receiverIfMakerIsSeller,
+                offer.reduceOnly,
+                offer.maxUnits,
+                offer.maxSellerAssets,
+                offer.maxBuyerAssets
+            )
+        );
+    }
+
+    function offerDigest(Offer memory offer) internal view returns (bytes32) {
+        return keccak256(bytes.concat("\x19\x01", domainSeparator(), offerStructHash(offer)));
+    }
+
+    function signer(bytes32 root, Signature memory signature) internal pure returns (address) {
+        address tentativeSigner = ecrecover(root, signature.v, signature.r, signature.s);
         require(tentativeSigner != address(0), "invalid signature");
         return tentativeSigner;
     }

@@ -18,7 +18,6 @@ import {
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
     EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
     LLTV_0,
     LLTV_1,
     LLTV_2,
@@ -33,6 +32,13 @@ import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/
 import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+bytes32 constant COLLATERAL_PARAMS_TYPEHASH = keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)");
+bytes32 constant OBLIGATION_TYPEHASH = keccak256(
+    "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)"
+);
+bytes32 constant OFFER_TYPEHASH = keccak256(
+    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,bool reduceOnly,uint256 maxUnits,uint256 maxSellerAssets,uint256 maxBuyerAssets)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)"
+);
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -199,12 +205,81 @@ abstract contract BaseTest is Test {
         midnight.setIsAuthorized(from, to, true);
     }
 
-    function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offers[0]));
+    function hashCollateralParams(CollateralParams memory collateralParam) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                COLLATERAL_PARAMS_TYPEHASH,
+                collateralParam.token,
+                collateralParam.lltv,
+                collateralParam.maxLif,
+                collateralParam.oracle
+            )
+        );
     }
 
-    function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
+    function hashBytes32Array(bytes32[] memory hashes) internal pure returns (bytes32) {
+        bytes memory encoded = new bytes(hashes.length * 32);
+        for (uint256 i = 0; i < hashes.length; ++i) {
+            bytes32 hash = hashes[i];
+            assembly ("memory-safe") {
+                mstore(add(add(encoded, 0x20), mul(i, 0x20)), hash)
+            }
+        }
+        return keccak256(encoded);
+    }
+
+    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
+        bytes32[] memory collateralParamHashes = new bytes32[](obligation.collateralParams.length);
+        for (uint256 i = 0; i < obligation.collateralParams.length; ++i) {
+            collateralParamHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
+        }
+
+        return keccak256(
+            abi.encode(
+                OBLIGATION_TYPEHASH,
+                obligation.loanToken,
+                hashBytes32Array(collateralParamHashes),
+                obligation.maturity,
+                obligation.rcfThreshold,
+                obligation.enterGate,
+                obligation.liquidatorGate
+            )
+        );
+    }
+
+    function offerStructHash(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                OFFER_TYPEHASH,
+                hashObligation(offer.obligation),
+                offer.buy,
+                offer.maker,
+                offer.start,
+                offer.expiry,
+                offer.tick,
+                offer.group,
+                offer.session,
+                offer.callback,
+                keccak256(offer.callbackData),
+                offer.receiverIfMakerIsSeller,
+                offer.reduceOnly,
+                offer.maxUnits,
+                offer.maxSellerAssets,
+                offer.maxBuyerAssets
+            )
+        );
+    }
+
+    function offerDigest(Offer memory offer) internal view returns (bytes32) {
+        return keccak256(bytes.concat("\x19\x01", domainSeparator(), offerStructHash(offer)));
+    }
+
+    function root(Offer[1] memory offers) internal view returns (bytes32) {
+        return offerDigest(offers[0]);
+    }
+
+    function root(Offer[2] memory offers) internal view returns (bytes32) {
+        return UtilsLib.commutativeHash(offerDigest(offers[0]), offerDigest(offers[1]));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -212,9 +287,9 @@ abstract contract BaseTest is Test {
     }
 
     // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+    function proof(Offer[2] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory res = new bytes32[](1);
-        res[0] = keccak256(abi.encode(offers[1]));
+        res[0] = offerDigest(offers[1]);
         return res;
     }
 
@@ -222,11 +297,9 @@ abstract contract BaseTest is Test {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(midnight)));
     }
 
-    function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
+    function sig(bytes32 _root, uint256 _privateKey) internal pure returns (Signature memory) {
         Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, messageHash);
+        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, _root);
         return signature;
     }
 
