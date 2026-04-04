@@ -349,7 +349,7 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
-        UtilsLib.tSet(DEFERRED_CHECK_SLOT, id, seller, true);
+        bool wasInDeferredHealthCheck = UtilsLib.tExchange(DEFERRED_CHECK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             require(
                 ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
@@ -368,9 +368,10 @@ contract Midnight is IMidnight {
                 "invalid callback"
             );
         }
-        UtilsLib.tSet(DEFERRED_CHECK_SLOT, id, seller, false);
-
-        require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
+        if (!wasInDeferredHealthCheck) {
+            UtilsLib.tExchange(DEFERRED_CHECK_SLOT, id, seller, false);
+            require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
+        }
 
         return (buyerAssets, sellerAssets, units);
     }

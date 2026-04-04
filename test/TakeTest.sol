@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
@@ -85,6 +85,79 @@ contract TakeTest is BaseTest {
     }
 
     // tests.
+
+    /// @dev Borrower has collateral for 60 units. Two nested takes each add 50 units of debt (total 100).
+    /// The outer take's seller callback supplies extra collateral before the final health check.
+    /// Without deferred health checks, the inner take's health check reverts (100 debt, ~60 collateral).
+    function testNestedTakeDeferredHealthCheck() public {
+        collateralize(obligation, borrower, 60);
+
+        ReentrantCallback cb = new ReentrantCallback(address(midnight));
+        authorize(lender, address(cb));
+        authorize(borrower, address(cb));
+
+        // Fund cb for loan token payments and extra collateral supply.
+        deal(address(loanToken), address(cb), 200);
+        vm.prank(address(cb));
+        loanToken.approve(address(midnight), type(uint256).max);
+
+        address collatToken = obligation.collateralParams[0].token;
+        uint256 extraCollateral = uint256(100).mulDivUp(WAD, obligation.collateralParams[0].lltv)
+            .mulDivUp(ORACLE_PRICE_SCALE, oracle1.price()) + 1;
+        deal(collatToken, address(cb), extraCollateral);
+        vm.prank(address(cb));
+        ERC20(collatToken).approve(address(midnight), type(uint256).max);
+
+        // Inner borrower offer (different group).
+        Offer memory borrowerOffer2;
+        borrowerOffer2.obligation = obligation;
+        borrowerOffer2.buy = false;
+        borrowerOffer2.maker = borrower;
+        borrowerOffer2.receiverIfMakerIsSeller = borrower;
+        borrowerOffer2.maxUnits = type(uint256).max;
+        borrowerOffer2.expiry = block.timestamp + 200;
+        borrowerOffer2.tick = MAX_TICK;
+        borrowerOffer2.group = keccak256("group2");
+
+        // onBuy: trigger inner take (adds 50 more debt to borrower).
+        cb.setOnBuyCall(
+            abi.encodeCall(
+                midnight.take,
+                (
+                    50,
+                    lender,
+                    address(cb),
+                    hex"",
+                    lender,
+                    borrowerOffer2,
+                    sig([borrowerOffer2]),
+                    root([borrowerOffer2]),
+                    proof([borrowerOffer2])
+                )
+            )
+        );
+
+        // onSell: supply extra collateral so borrower is healthy at the final check.
+        cb.setOnSellCall(abi.encodeCall(midnight.supplyCollateral, (obligation, 0, extraCollateral, borrower)));
+
+        // Outer take: cb.onBuy triggers inner take, then cb.onSell supplies collateral.
+        borrowerOffer.tick = MAX_TICK;
+        borrowerOffer.callback = address(cb);
+        vm.prank(address(cb));
+        midnight.take(
+            50,
+            lender,
+            address(cb),
+            hex"",
+            lender,
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer])
+        );
+
+        assertEq(midnight.debtOf(id, borrower), 100, "borrower total debt");
+    }
 
     // path 1: Lender enters + borrower enters.
 
@@ -1040,6 +1113,48 @@ contract LendCallback is ICallbacks {
         pure
         returns (bytes32)
     {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract ReentrantCallback is ICallbacks {
+    address immutable TARGET;
+    bytes onBuyCall;
+    bytes onSellCall;
+
+    constructor(address _target) {
+        TARGET = _target;
+    }
+
+    function setOnBuyCall(bytes memory data) external {
+        onBuyCall = data;
+    }
+
+    function setOnSellCall(bytes memory data) external {
+        onSellCall = data;
+    }
+
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external returns (bytes32) {
+        if (onBuyCall.length > 0) {
+            bytes memory data = onBuyCall;
+            delete onBuyCall;
+            (bool ok,) = TARGET.call(data);
+            require(ok, "onBuy call failed");
+        }
+        return CALLBACK_SUCCESS;
+    }
+
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external returns (bytes32) {
+        if (onSellCall.length > 0) {
+            bytes memory data = onSellCall;
+            delete onSellCall;
+            (bool ok,) = TARGET.call(data);
+            require(ok, "onSell call failed");
+        }
         return CALLBACK_SUCCESS;
     }
 

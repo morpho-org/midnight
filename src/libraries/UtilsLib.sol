@@ -94,10 +94,11 @@ library UtilsLib {
         return uint128(bitmap & ~(1 << bit));
     }
 
-    /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
-    function tSet(uint256 baseSlot, bytes32 key1, address key2, bool value) internal {
+    /// @dev Sets a boolean in transient storage and returns the previous value.
+    function tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool previous) {
         uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
         assembly ("memory-safe") {
+            previous := tload(slot)
             tstore(slot, value)
         }
     }
