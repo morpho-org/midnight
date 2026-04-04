@@ -29,13 +29,13 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;
 
-    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool(e) expect(bool);
-    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool(e) expect(bool);
-    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external with(env e) => genericCallbackBytes32(e) expect(bytes32);
-    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external with(env e) => genericCallbackBytes32(e) expect(bytes32);
-    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external with(env e) => genericCallback(e) expect void;
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external with(env e) => genericCallback(e) expect void;
-    function _.onFlashLoan(address token, uint256 amount, bytes data) external with(env e) => genericCallback(e) expect void;
+    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
+    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
+    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
+    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
+    function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
 }
 
 /// SUMMARY ///
@@ -164,8 +164,9 @@ function callIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, addres
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
 // we check that the user is healthy before the callback, do some external call (to simulate changes by the callback),
 // and then require that the user is still healthy after the callback.
-function genericCallback(env e) {
+function genericCallback() {
     address dummy;
+    env e;
     Midnight.Obligation globalObligation = getGlobalObligation();
 
     // check that the user is healthy before the callback.  We remember any violation and check that none occurred at the end of each rule.
@@ -180,15 +181,15 @@ function genericCallback(env e) {
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
-function genericCallbackBool(env e) returns (bool) {
+function genericCallbackBool() returns (bool) {
     bool result;
-    genericCallback(e);
+    genericCallback();
     return result;
 }
 
-function genericCallbackBytes32(env e) returns (bytes32) {
+function genericCallbackBytes32() returns (bytes32) {
     bytes32 result;
-    genericCallback(e);
+    genericCallback();
     return result;
 }
 
