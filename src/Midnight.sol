@@ -289,14 +289,9 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed;
-        if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + sellerAssets;
-        } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + buyerAssets;
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] = currentConsumed + units;
-        }
+        uint256 consumedDelta =
+            offer.maxSellerAssets > 0 ? sellerAssets : (offer.maxBuyerAssets > 0 ? buyerAssets : units);
+        uint256 newConsumed = consumed[offer.maker][offer.group] = currentConsumed + consumedDelta;
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
