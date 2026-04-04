@@ -18,6 +18,7 @@ methods {
     function _.price() external => summaryPrice(calledContract) expect(uint256);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address morpho) internal returns (bytes32) => summaryToId(obligation, chainId, morpho);
+    function Midnight.offerDigest(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     /* Summarize mulDivDown and mulDivUp to simplify the verification task.
      * Use a ghost function that ensures mulDivDown/Up behaves deterministically and

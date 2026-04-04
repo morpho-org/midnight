@@ -10,6 +10,7 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function Midnight.offerDigest(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.

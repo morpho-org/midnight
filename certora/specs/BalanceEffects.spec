@@ -32,6 +32,7 @@ methods {
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
+    function Midnight.offerDigest(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 function signerSummary() returns address {

@@ -6,6 +6,7 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
+    function Midnight.offerDigest(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
