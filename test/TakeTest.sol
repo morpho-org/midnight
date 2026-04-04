@@ -868,6 +868,35 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
     }
 
+    function testSellSellerCallbackSetsDeferredCheckFlag(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
+        lenderOffer.maxUnits = units;
+        lenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        DeferredCheckBorrowCallback callback = new DeferredCheckBorrowCallback();
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        deal(obligation.collateralParams[0].token, address(callback), collateral);
+
+        authorize(borrower, address(callback));
+
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(callback),
+            abi.encode(0, collateral),
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+
+        assertTrue(callback.recordedDeferredCheck());
+        assertFalse(midnight.deferredCheck(id, borrower));
+    }
+
     function testSellSellerCallbackRevertsOnInvalidReturn(uint256 units) public {
         units = bound(units, 1, maxAssets);
         lenderOffer.maxUnits = units;
@@ -1003,6 +1032,34 @@ contract BorrowCallback is ICallbacks {
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        return CALLBACK_SUCCESS;
+    }
+
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract DeferredCheckBorrowCallback is ICallbacks {
+    bool public recordedDeferredCheck;
+
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
+        ERC20(obligation.collateralParams[collateralIndex].token).approve(msg.sender, amount);
+        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        recordedDeferredCheck = Midnight(msg.sender).deferredCheck(id, seller);
         return CALLBACK_SUCCESS;
     }
 

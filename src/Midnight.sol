@@ -764,6 +764,10 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
+    function deferredCheck(bytes32 id, address borrower) public view returns (bool) {
+        return UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower);
+    }
+
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev The collateral price is zero if the collateral is not activated for the borrower.
     /// @dev If the check is defered, the returned collateral price is 0.
@@ -773,7 +777,7 @@ contract Midnight is IMidnight {
         view
         returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
     {
-        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return (type(uint256).max, collatPrice, 0);
+        if (deferredCheck(id, borrower)) return (type(uint256).max, collatPrice, 0);
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
         uint128 bitmap = _position.activatedCollaterals;

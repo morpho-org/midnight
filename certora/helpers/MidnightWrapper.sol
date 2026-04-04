@@ -6,7 +6,7 @@ import {Midnight} from "../../src/Midnight.sol";
 import {Position, CollateralParams, Obligation} from "../../src/interfaces/IMidnight.sol";
 import {IOracle} from "../../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {ORACLE_PRICE_SCALE, WAD, DEFERRED_CHECK_SLOT} from "../../src/libraries/ConstantsLib.sol";
+import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";
 
 contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
@@ -18,7 +18,7 @@ contract MidnightWrapper is Midnight {
         view
         returns (uint256 maxDebt, uint256 collatPrice, uint256 badDebt)
     {
-        if (UtilsLib.tGet(DEFERRED_CHECK_SLOT, id, borrower)) return (type(uint256).max, collatPrice, 0);
+        if (deferredCheck(id, borrower)) return (type(uint256).max, collatPrice, 0);
         Position storage _position = position[id][borrower];
         badDebt = _position.debt;
         uint256 len = obligation.collateralParams.length;
