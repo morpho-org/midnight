@@ -18,6 +18,9 @@ import {
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
     EIP712_DOMAIN_TYPEHASH,
+    COLLATERAL_PARAMS_TYPEHASH,
+    OBLIGATION_TYPEHASH,
+    OFFER_TYPEHASH,
     LLTV_0,
     LLTV_1,
     LLTV_2,
@@ -32,13 +35,6 @@ import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/
 import {Midnight} from "../src/Midnight.sol";
 
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
-bytes32 constant COLLATERAL_PARAMS_TYPEHASH = keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)");
-bytes32 constant OBLIGATION_TYPEHASH = keccak256(
-    "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)"
-);
-bytes32 constant OFFER_TYPEHASH = keccak256(
-    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,bool reduceOnly,uint256 maxUnits,uint256 maxSellerAssets,uint256 maxBuyerAssets)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)"
-);
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;

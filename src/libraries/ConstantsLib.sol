@@ -9,13 +9,9 @@ uint32 constant MAX_CONTINUOUS_FEE = uint32(uint256(0.01e18) / uint256(365 days)
 uint256 constant TIME_TO_MAX_LIF = 15 minutes;
 bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
 bytes32 constant ROOT_TYPEHASH = keccak256("Root(bytes32 root)");
-bytes32 constant COLLATERAL_PARAMS_TYPEHASH = keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)");
-bytes32 constant OBLIGATION_TYPEHASH = keccak256(
-    "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)"
-);
-bytes32 constant OFFER_TYPEHASH = keccak256(
-    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,bool reduceOnly,uint256 maxUnits,uint256 maxSellerAssets,uint256 maxBuyerAssets)CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)"
-);
+bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
+bytes32 constant OBLIGATION_TYPEHASH = 0xdcb3d766540d305590a1ee685cb2636a7271c1eea05949c19a23eb48c7492d24;
+bytes32 constant OFFER_TYPEHASH = 0xbec0053fa7c8d734e48d8a8c0dcfa1764809c185521a20cc0d228fe3f20d1f98;
 uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
 uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
