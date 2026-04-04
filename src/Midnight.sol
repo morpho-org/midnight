@@ -37,6 +37,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev To create a "max" offer, use `type(uint128).max` for `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits`.
+/// @dev Using values above `type(uint128).max` can overflow intermediate offer-cap computations.
 ///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
