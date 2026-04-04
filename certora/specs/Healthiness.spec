@@ -8,6 +8,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function isLiquidatable(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
     function isLiquidatableNoBitmap(Midnight.Obligation, bytes32, address, uint256) external returns (bool, uint256, uint256, uint256);
 
@@ -91,11 +92,11 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 }
 
 // global variable indicating whether to use the optimized isLiquidatable() or the bitmap-less implementation
-// see callIsLiquidatable() below.
+// see callIsHealthy() below.
 persistent ghost bool useIsLiquidatableNoBitmap;
 
 // global variable to track whether the user was healthy before the callbacks.
-ghost bool notLiquidatableBeforeCallback;
+ghost bool healthyBeforeCallback;
 
 // global variable to track which obligation and borrower we're testing.
 persistent ghost address globalObligationLoanToken;
@@ -147,16 +148,17 @@ function summaryToId(Midnight.Obligation obligation, uint256 chainId, address mo
 }
 
 // Call either isLiquidatable() or isLiquidatableNoBitmap() depending on global setting.
-// We show in CollateralBitmap.spec that both functions return the same value, so calling any of them is okay.
+// We use the returned maxDebt to recover the original healthiness predicate maxDebt >= debt.
 // To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsLiquidatableNoBitmap.
-function callIsLiquidatable(env e, Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
+function callIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
     bool liquidatable;
+    uint256 maxDebt;
     if (useIsLiquidatableNoBitmap) {
-        liquidatable, _, _, _ = isLiquidatableNoBitmap(e, obligation, id, borrower, max_uint256);
+        liquidatable, maxDebt, _, _ = isLiquidatableNoBitmap(e, obligation, id, borrower, max_uint256);
     } else {
-        liquidatable, _, _, _ = isLiquidatable(e, obligation, id, borrower, max_uint256);
+        liquidatable, maxDebt, _, _ = isLiquidatable(e, obligation, id, borrower, max_uint256);
     }
-    return liquidatable;
+    return maxDebt >= debtOf(id, borrower);
 }
 
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
@@ -166,15 +168,15 @@ function genericCallback(env e) {
     address dummy;
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    // check that the user is not liquidatable before the callback.  We remember any violation and check that none occurred at the end of each rule.
-    bool savedNotLiquidatableBefore = notLiquidatableBeforeCallback && !callIsLiquidatable(e, globalObligation, globalId, globalBorrower);
+    // check that the user is healthy before the callback.  We remember any violation and check that none occurred at the end of each rule.
+    bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(e, globalObligation, globalId, globalBorrower);
 
     callback.callHavoc(e, dummy);
 
-    // the callback havocs the global variable notLiquidatableBeforeCallback, so we restore the variable using the saved value in the local variable.
-    notLiquidatableBeforeCallback = savedNotLiquidatableBefore;
+    // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
+    healthyBeforeCallback = savedHealthyBefore;
 
-    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after callback";
+    require callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
@@ -204,8 +206,8 @@ function genericCallbackBytes32(env e) returns (bytes32) {
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, bytes data) {
     useIsLiquidatableNoBitmap = false;
 
-    // This variable is set to false whenever isLiquidatable() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    notLiquidatableBeforeCallback = true;
+    // This variable is set to false whenever healthiness is violated before a callback.  Initially we set it to true to indicate no violations detected.
+    healthyBeforeCallback = true;
 
     require globalObligationCollateralLLTV[collateralIndex] * globalObligationCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
@@ -213,7 +215,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy before call";
 
     uint256 collateralBefore = collateral(globalId, globalBorrower, collateralIndex);
     uint256 seizedAssetsOut;
@@ -237,28 +239,28 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
-    assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
 rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     useIsLiquidatableNoBitmap = true;
 
-    // This variable is set to false whenever isLiquidatable() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    notLiquidatableBeforeCallback = true;
+    // This variable is set to false whenever healthiness is violated before a callback.  Initially we set it to true to indicate no violations detected.
+    healthyBeforeCallback = true;
 
     require globalObligationCollateralLength <= 1, "too many collateralParams for the spec to handle";
 
     Midnight.Obligation globalObligation = getGlobalObligation();
     require borrower != globalBorrower || !equalsGlobalObligation(obligation), "borrower or obligation differs";
 
-    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy before call";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
-    assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
@@ -266,8 +268,8 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
     // for withdraw collateral we choose isLiquidatable() for all others the isLiquidatableNoBitmap function.
     useIsLiquidatableNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 
-    // This variable is set to false whenever isLiquidatable() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    notLiquidatableBeforeCallback = true;
+    // This variable is set to false whenever healthiness is violated before a callback.  Initially we set it to true to indicate no violations detected.
+    healthyBeforeCallback = true;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
 
@@ -275,10 +277,10 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
+    require callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy before call";
 
     f(e, args);
 
-    assert notLiquidatableBeforeCallback, "user is not liquidatable before callbacks";
-    assert !callIsLiquidatable(e, globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
+    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert callIsHealthy(e, globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
