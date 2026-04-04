@@ -616,7 +616,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = units;
+        lenderOffer.maxSellerAssets = type(uint128).max;
 
         (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
 
@@ -640,7 +640,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = units;
+        borrowerOffer.maxBuyerAssets = type(uint128).max;
 
         (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
 
