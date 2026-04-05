@@ -154,7 +154,7 @@ strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
 
 function noFeesAreSet(bytes32 id) returns (bool) {
     uint32[7] fees = Midnight.fees(id);
-    return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
+    return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0 && Midnight.continuousFee(id) == 0;
 }
 
 definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.position[id][user].activatedCollaterals == 0;

@@ -170,7 +170,7 @@ contract Midnight is IMidnight {
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         require(obligationState[id].created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint32.max * FEE_STEP
-        obligationState[id].fees[index + 1] = uint32(newTradingFee / FEE_STEP);
+        obligationState[id].fees[index] = uint32(newTradingFee / FEE_STEP);
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -190,7 +190,7 @@ contract Midnight is IMidnight {
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, "continuous fee too high");
         require(obligationState[id].created, "obligation not created");
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
-        obligationState[id].fees[0] = uint32(newContinuousFee);
+        obligationState[id].fees[7] = uint32(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
     }
 
@@ -312,9 +312,8 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        uint256 obligationContinuousFee = _obligationState.fees[0];
         uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(obligationContinuousFee * timeToMaturity, WAD));
+            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.fees[7] * timeToMaturity, WAD));
         buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
         uint128 sellerPendingFeeDecrease;
@@ -659,10 +658,12 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
-            ObligationState storage _obligationState = obligationState[id];
-            _obligationState.created = true;
-            _obligationState.fees[0] = defaultContinuousFee[obligation.loanToken];
-            _setTradingFees(_obligationState, defaultTradingFees[obligation.loanToken]);
+            obligationState[id].created = true;
+            obligationState[id].fees[7] = defaultContinuousFee[obligation.loanToken];
+            uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
+            for (uint256 i = 0; i < 7; i++) {
+                obligationState[id].fees[i] = _defaultTradingFees[i];
+            }
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -779,12 +780,12 @@ contract Midnight is IMidnight {
     function fees(bytes32 id) external view returns (uint32[7] memory tradingFees) {
         uint32[8] memory _fees = obligationState[id].fees;
         for (uint256 i = 0; i < 7; i++) {
-            tradingFees[i] = _fees[i + 1];
+            tradingFees[i] = _fees[i];
         }
     }
 
     function continuousFee(bytes32 id) external view returns (uint32) {
-        return obligationState[id].fees[0];
+        return obligationState[id].fees[7];
     }
 
     function continuousFeeAmount(bytes32 id) external view returns (uint256) {
@@ -846,7 +847,7 @@ contract Midnight is IMidnight {
 
         uint32[8] memory _fees = _obligationState.fees;
 
-        if (timeToMaturity >= 360 days) return _fees[7] * FEE_STEP;
+        if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 index, uint256 start, uint256 end) =
@@ -858,15 +859,9 @@ contract Midnight is IMidnight {
                                         (5, 180 days, 360 days);
         // forgefmt: disable-end
 
-        uint256 feeLower = _fees[index + 1] * FEE_STEP;
-        uint256 feeUpper = _fees[index + 2] * FEE_STEP;
+        uint256 feeLower = _fees[index] * FEE_STEP;
+        uint256 feeUpper = _fees[index + 1] * FEE_STEP;
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
-    }
-
-    function _setTradingFees(ObligationState storage _obligationState, uint16[7] memory tradingFees) internal {
-        for (uint256 i = 0; i < 7; i++) {
-            _obligationState.fees[i + 1] = tradingFees[i];
-        }
     }
 }

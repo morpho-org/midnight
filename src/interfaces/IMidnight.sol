@@ -46,8 +46,8 @@ struct Signature {
     bytes32 s;
 }
 
-/// @dev `fees[0]`: continuousFee, `fees[1-7]`: tradingFee breakpoints (divided by FEE_STEP) for 0d, 1d, 7d, 30d,
-/// 90d, 180d, and 360d.
+/// @dev `fees[0-6]`: tradingFee breakpoints (divided by FEE_STEP) for 0d, 1d, 7d, 30d, 90d, 180d, and 360d.
+/// @dev `fees[7]`: continuousFee.
 struct ObligationState {
     uint128 totalUnits;
     uint120 lossIndex;
