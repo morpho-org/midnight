@@ -3,17 +3,10 @@
 pragma solidity ^0.8.0;
 
 import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
-import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
-    using UtilsLib for uint256;
-
-    function actualContinuousFee(uint256 fee) internal pure returns (uint256) {
-        return fee.mulDivDown(type(uint16).max, MAX_CONTINUOUS_FEE).mulDivDown(MAX_CONTINUOUS_FEE, type(uint16).max);
-    }
-
     function testInitialOwner() public view {
         assertEq(midnight.owner(), address(this), "deployer should be initial owner");
     }
@@ -366,8 +359,8 @@ contract SettersTest is BaseTest {
         midnight.touchObligation(obligation);
         bytes32 id = toId(obligation);
 
-        assertEq(midnight.continuousFee(id), actualContinuousFee(fee), "obligation inherits default fee");
+        assertEq(midnight.continuousFee(id), fee, "obligation inherits default fee");
         midnight.setObligationContinuousFee(id, fee2);
-        assertEq(midnight.continuousFee(id), actualContinuousFee(fee2), "obligation fee updated");
+        assertEq(midnight.continuousFee(id), fee2, "obligation fee updated");
     }
 }

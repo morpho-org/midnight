@@ -60,6 +60,12 @@ library UtilsLib {
         }
     }
 
+    function toUint120(uint256 x) internal pure returns (uint120) {
+        require(x <= type(uint120).max, "uint256 overflows uint120");
+        // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint120).max
+        return uint120(x);
+    }
+
     function toUint128(uint256 x) internal pure returns (uint128) {
         require(x <= type(uint128).max, "uint256 overflows uint128");
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max

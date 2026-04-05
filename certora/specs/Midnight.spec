@@ -102,9 +102,9 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 }
 
 rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+    uint120 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     f(e, args);
-    uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
+    uint120 lossIndexAfter = currentContract.obligationState[id].lossIndex;
     assert lossIndexAfter >= lossIndexBefore;
 }
 

@@ -225,7 +225,7 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
-        uint16[7] memory fees = midnight.fees(_id);
+        uint32[7] memory fees = midnight.fees(_id);
         for (uint256 i = 0; i < 7; i++) {
             assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
@@ -233,12 +233,12 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
     }
 
-    function smallValue(uint256 packedSmallValues, uint256 index) internal pure returns (uint16) {
-        // forge-lint: disable-next-line(unsafe-typecast) as shifting by 16 * index keeps only one uint16 lane
-        return uint16(packedSmallValues >> (index * 16));
+    function feeValue(uint256 packedFees, uint256 index) internal pure returns (uint32) {
+        // forge-lint: disable-next-line(unsafe-typecast) as shifting by 32 * index keeps only one uint32 lane
+        return uint32(packedFees >> (index * 32));
     }
 
-    function testTouchObligationPacksSmallValues(Obligation memory _obligation) public {
+    function testTouchObligationPacksFees(Obligation memory _obligation) public {
         vm.assume(_obligation.collateralParams.length > 0);
         _obligation = validObligation(_obligation);
 
@@ -249,15 +249,16 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         bytes32 stateSlot = keccak256(abi.encode(_id, uint256(1)));
-        uint256 packedSmallValues = uint256(vm.load(address(midnight), bytes32(uint256(stateSlot) + 2)));
+        uint256 slot0 = uint256(vm.load(address(midnight), stateSlot));
+        uint256 packedFees = uint256(vm.load(address(midnight), bytes32(uint256(stateSlot) + 2)));
 
-        assertEq(smallValue(packedSmallValues, 0), 1, "created stored in smallValues[0]");
-        assertEq(smallValue(packedSmallValues, 1), type(uint16).max, "continuous fee stored in smallValues[1]");
+        assertEq((slot0 >> 248) & 1, 1, "created packed in slot 0");
+        assertEq(feeValue(packedFees, 0), MAX_CONTINUOUS_FEE, "continuous fee stored in fees[0]");
         for (uint256 i = 0; i < 7; i++) {
             assertEq(
-                smallValue(packedSmallValues, i + 2),
+                feeValue(packedFees, i + 1),
                 midnight.defaultTradingFees(_obligation.loanToken, i),
-                "trading fee stored in smallValues"
+                "trading fee stored in fees"
             );
         }
     }

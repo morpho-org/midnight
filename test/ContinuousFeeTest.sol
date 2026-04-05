@@ -44,12 +44,8 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setIsAuthorized(otherBorrower, address(this), true);
     }
 
-    function actualContinuousFee(uint256 feeRate) internal pure returns (uint256) {
-        return feeRate.mulDivDown(type(uint16).max, MAX_CONTINUOUS_FEE).mulDivDown(MAX_CONTINUOUS_FEE, type(uint16).max);
-    }
-
-    /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * actualContinuousFee(feeRate) * ttm /
-    /// WAD, borrower.pendingFee = 0.
+    /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * feeRate * ttm / WAD,
+    /// borrower.pendingFee = 0.
     function setupLender(uint256 credit, uint256 feeRate, uint256 ttm) internal {
         obligation.maturity = block.timestamp + ttm;
         id = toId(obligation);
@@ -178,7 +174,7 @@ contract ContinuousFeeTest is BaseTest {
 
         setupLender(credit, feeRate, ttm);
 
-        uint256 expectedRemaining = actualContinuousFee(feeRate).mulDivDown(credit * ttm, WAD);
+        uint256 expectedRemaining = (uint256(feeRate) * credit).mulDivDown(ttm, WAD);
         assertEq(midnight.pendingFee(id, lender), expectedRemaining, "lender remaining after entry");
         assertEq(midnight.pendingFee(id, borrower), 0, "borrower has no pending fee");
         assertEq(midnight.debtOf(id, borrower), credit, "debt unchanged at entry");
@@ -225,7 +221,7 @@ contract ContinuousFeeTest is BaseTest {
         take(credit2, lender, _makeBorrowOffer(credit2));
 
         uint256 blendedRemaining = midnight.pendingFee(id, lender);
-        uint256 expectedAdded = actualContinuousFee(rate2).mulDivDown(credit2 * ttm, WAD);
+        uint256 expectedAdded = (uint256(rate2) * credit2).mulDivDown(ttm, WAD);
         assertApproxEqAbs(blendedRemaining, remaining1 + expectedAdded, 1, "remaining blended");
 
         // Accrue
@@ -262,7 +258,7 @@ contract ContinuousFeeTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 takeAssets = exitAmount.mulDivDown(price, WAD);
-        uint256 buyerPendingFeeIncrease = exitAmount.mulDivDown(actualContinuousFee(feeRate) * (ttm - elapsed), WAD);
+        uint256 buyerPendingFeeIncrease = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
         uint256 sellerPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
 
