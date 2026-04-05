@@ -47,11 +47,11 @@ struct Signature {
 }
 
 /// @dev `fees[0-6]`: tradingFee breakpoints (divided by FEE_STEP) for 0d, 1d, 7d, 30d, 90d, 180d, and 360d.
-/// @dev `fees[7]`: continuousFee.
+/// @dev `fees[7]`: continuousFee, stored as `type(uint32).max - continuousFee`. This way `fees[7] == 0` iff the
+/// obligation has never been touched, so it doubles as the "created" flag and no separate bool is needed.
 struct ObligationState {
     uint128 totalUnits;
-    uint120 lossIndex;
-    bool created;
+    uint128 lossIndex;
     uint128 withdrawable;
     uint128 continuousFeeAmount;
     uint32[8] fees;

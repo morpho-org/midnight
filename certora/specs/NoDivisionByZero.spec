@@ -63,13 +63,13 @@ persistent ghost bytes32 globalId;
 /// HOOKS ///
 
 // lossIndex < max: the protocol stop behaving correctly if this happens (documented).
-hook Sload uint120 value obligationState[KEY bytes32 id].lossIndex {
-    require value < max_uint120;
+hook Sload uint128 value obligationState[KEY bytes32 id].lossIndex {
+    require value < max_uint128;
 }
 
 // Follows from userLossIndexLeqObligationLossIndex in Midnight.spec and the hook above.
 hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossIndex {
-    require value < max_uint120;
+    require value < max_uint128;
 }
 
 /// SUMMARIES ///

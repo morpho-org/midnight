@@ -289,7 +289,7 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 256, "lender units after slashing");
+        assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
     }
 
     function testLiquidateEmitsLossIndex(uint256 units) public {
@@ -299,11 +299,11 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
-        (uint128 oldTotalUnits, uint256 previousLossIndex,,,) = midnight.obligationState(id);
+        (uint128 oldTotalUnits, uint256 previousLossIndex,,) = midnight.obligationState(id);
         uint256 expectedLossIndex = expectedBadDebt == 0
             ? previousLossIndex
-            : type(uint120).max
-                - (type(uint120).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+            : type(uint128).max
+                - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -320,8 +320,8 @@ contract LiquidationTest is BaseTest {
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
 
-        (, uint256 lossIndex,,,) = midnight.obligationState(id);
-        uint256 expectedCredit = units.mulDivDown(type(uint120).max - lossIndex, type(uint120).max);
+        (, uint256 lossIndex,,) = midnight.obligationState(id);
+        uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
         emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
@@ -346,7 +346,7 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 256, "lender units after slashing");
+        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -368,7 +368,7 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 256, "lender units after slashing");
+        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
     }
 
     // Check that if there is bad debt it is possible to seize almost all collateral.
@@ -775,8 +775,8 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        uint120 _lossIndex = midnight.lossIndex(id);
-        assertEq(_lossIndex, type(uint120).max, "loss index");
+        uint128 _lossIndex = midnight.lossIndex(id);
+        assertEq(_lossIndex, type(uint128).max, "loss index");
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
 
