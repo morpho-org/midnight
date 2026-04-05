@@ -25,7 +25,9 @@ definition FEE_STEP() returns uint256 = 1000000000000;
 
 definition defaultFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
-definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].fees[index] * FEE_STEP());
+definition rawObligationFee(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].fee0 : index == 1 ? currentContract.obligationState[id].fee1 : index == 2 ? currentContract.obligationState[id].fee2 : index == 3 ? currentContract.obligationState[id].fee3 : index == 4 ? currentContract.obligationState[id].fee4 : index == 5 ? currentContract.obligationState[id].fee5 : currentContract.obligationState[id].fee6;
+
+definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(rawObligationFee(id, index) * FEE_STEP());
 
 /// Default fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultFeePerIndexBound(address loanToken, uint256 index)
@@ -73,6 +75,7 @@ rule newObligationFeesMatchDefault(env e, Midnight.Obligation obligation, uint25
 
 /// Only the fee setter can modify default fees (multicall is DELETEd and not checked here).
 rule onlyFeeSetterCanChangeDefaultFees(method f, env e, address token, uint256 index) filtered { f -> !f.isView } {
+    require index <= 6, "index out of bounds";
     uint256 defaultFeeBefore = defaultFee(token, index);
     calldataarg args;
     f(e, args);
@@ -81,6 +84,7 @@ rule onlyFeeSetterCanChangeDefaultFees(method f, env e, address token, uint256 i
 
 /// Once an obligation is created, only the fee setter can modify its fees.
 rule onlyFeeSetterCanChangeObligationFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
+    require index <= 6, "index out of bounds";
     require obligationCreated(id), "assume that the obligation is created";
     uint256 obligationFeeBefore = obligationFee(id, index);
     calldataarg args;

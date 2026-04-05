@@ -18,7 +18,6 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
-    CONTINUOUS_FEE_RECIPIENT,
     CALLBACK_SUCCESS,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
@@ -68,7 +67,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
 /// @dev At each lender's next interaction, their credit is slashed proportionally.
-/// @dev The fee claimer is not slashed when receiving fees, so it will be slashed a bit too much later.
 ///
 /// ROUNDINGS
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
@@ -178,9 +176,17 @@ contract Midnight is IMidnight {
         require(index <= 6, "invalid index");
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
-        require(obligationState[id].created, "obligation not created");
+        ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
-        obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
+        uint16 toStore = uint16(newTradingFee / FEE_STEP);
+        if (index == 0) _obligationState.fee0 = toStore;
+        else if (index == 1) _obligationState.fee1 = toStore;
+        else if (index == 2) _obligationState.fee2 = toStore;
+        else if (index == 3) _obligationState.fee3 = toStore;
+        else if (index == 4) _obligationState.fee4 = toStore;
+        else if (index == 5) _obligationState.fee5 = toStore;
+        else if (index == 6) _obligationState.fee6 = toStore;
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -198,9 +204,10 @@ contract Midnight is IMidnight {
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, "continuous fee too high");
-        require(obligationState[id].created, "obligation not created");
+        ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.created, "obligation not created");
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
-        obligationState[id].continuousFee = uint32(newContinuousFee);
+        _obligationState.continuousFee = uint32(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
     }
 
@@ -238,6 +245,21 @@ contract Midnight is IMidnight {
         claimableTradingFee[token] -= amount;
         emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
         SafeTransferLib.safeTransfer(token, receiver, amount);
+    }
+
+    function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
+        require(msg.sender == feeClaimer, "only fee claimer");
+        bytes32 id = toId(obligation);
+        ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.created, "not created");
+
+        _obligationState.continuousFeeCredit -= UtilsLib.toUint128(amount);
+        _obligationState.totalUnits -= UtilsLib.toUint128(amount);
+        _obligationState.withdrawable -= UtilsLib.toUint128(amount);
+
+        emit EventsLib.ClaimContinuousFee(msg.sender, id, amount, receiver);
+
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, amount);
     }
 
     /// ENTRY-POINTS ///
@@ -396,11 +418,7 @@ contract Midnight is IMidnight {
 
     /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
-        require(
-            onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender]
-                || (onBehalf == CONTINUOUS_FEE_RECIPIENT && msg.sender == feeClaimer),
-            "unauthorized"
-        );
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         _updatePosition(obligation, id, onBehalf);
@@ -412,7 +430,7 @@ contract Midnight is IMidnight {
             _position.pendingFee -= pendingFeeDecrease;
         }
         _position.credit -= UtilsLib.toUint128(units);
-        _obligationState.withdrawable -= units;
+        _obligationState.withdrawable -= UtilsLib.toUint128(units);
         _obligationState.totalUnits -= UtilsLib.toUint128(units);
 
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
@@ -425,7 +443,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
 
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
-        obligationState[id].withdrawable += units;
+        obligationState[id].withdrawable += UtilsLib.toUint128(units);
 
         emit EventsLib.Repay(msg.sender, id, units, onBehalf);
 
@@ -542,12 +560,18 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
+            uint256 oldLossIndex = _obligationState.lossIndex;
             _obligationState.lossIndex = UtilsLib.toUint128(
                 type(uint128).max
-                    - (type(uint128).max - _obligationState.lossIndex)
-                    .mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                    - (type(uint128).max - oldLossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
+            _obligationState.continuousFeeCredit = oldLossIndex < type(uint128).max
+                ? UtilsLib.toUint128(
+                    _obligationState.continuousFeeCredit
+                        .mulDivDown(type(uint128).max - _obligationState.lossIndex, type(uint128).max - oldLossIndex)
+                )
+                : 0;
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
@@ -585,7 +609,7 @@ contract Midnight is IMidnight {
             if (newCollateral == 0 && seizedAssets > 0) {
                 _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
             }
-            _obligationState.withdrawable += repaidUnits;
+            _obligationState.withdrawable += UtilsLib.toUint128(repaidUnits);
             _position.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
@@ -668,9 +692,17 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
-            obligationState[id].created = true;
-            obligationState[id].fees = defaultTradingFees[obligation.loanToken];
-            obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
+            ObligationState storage _obligationState = obligationState[id];
+            _obligationState.created = true;
+            uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
+            _obligationState.fee0 = _defaultTradingFees[0];
+            _obligationState.fee1 = _defaultTradingFees[1];
+            _obligationState.fee2 = _defaultTradingFees[2];
+            _obligationState.fee3 = _defaultTradingFees[3];
+            _obligationState.fee4 = _defaultTradingFees[4];
+            _obligationState.fee5 = _defaultTradingFees[5];
+            _obligationState.fee6 = _defaultTradingFees[6];
+            _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -725,9 +757,7 @@ contract Midnight is IMidnight {
         _position.lossIndex = obligationState[id].lossIndex;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
-        // The continuous fee recipient's credit is increased without slashing them first, meaning that they will get
-        // slashed a bit too much later.
-        position[id][CONTINUOUS_FEE_RECIPIENT].credit += accruedFee;
+        obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
     }
@@ -786,12 +816,24 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
-    function fees(bytes32 id) external view returns (uint16[7] memory) {
-        return obligationState[id].fees;
+    function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
+        return [
+            obligationState[id].fee0,
+            obligationState[id].fee1,
+            obligationState[id].fee2,
+            obligationState[id].fee3,
+            obligationState[id].fee4,
+            obligationState[id].fee5,
+            obligationState[id].fee6
+        ];
     }
 
     function continuousFee(bytes32 id) external view returns (uint32) {
         return obligationState[id].continuousFee;
+    }
+
+    function continuousFeeCredit(bytes32 id) external view returns (uint256) {
+        return obligationState[id].continuousFeeCredit;
     }
 
     function pendingFee(bytes32 id, address user) external view returns (uint128) {
@@ -844,24 +886,20 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        require(obligationState[id].created, "not created");
+        ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.created, "not created");
 
-        uint16[7] memory _fees = obligationState[id].fees;
-
-        if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
+        if (timeToMaturity >= 360 days) return _obligationState.fee6 * FEE_STEP;
 
         // forgefmt: disable-start
-        (uint256 index, uint256 start, uint256 end) =
-            timeToMaturity < 1 days   ? (0, 0 days, 1 days) :
-            timeToMaturity < 7 days   ? (1, 1 days, 7 days) :
-            timeToMaturity < 30 days  ? (2, 7 days, 30 days) :
-            timeToMaturity < 90 days  ? (3, 30 days, 90 days) :
-            timeToMaturity < 180 days ? (4, 90 days, 180 days) :
-                                        (5, 180 days, 360 days);
+        (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.fee0 * FEE_STEP, _obligationState.fee1 * FEE_STEP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.fee1 * FEE_STEP, _obligationState.fee2 * FEE_STEP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.fee2 * FEE_STEP, _obligationState.fee3 * FEE_STEP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.fee3 * FEE_STEP, _obligationState.fee4 * FEE_STEP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.fee4 * FEE_STEP, _obligationState.fee5 * FEE_STEP) :
+                                        (180 days, 360 days, _obligationState.fee5 * FEE_STEP, _obligationState.fee6 * FEE_STEP);
         // forgefmt: disable-end
-
-        uint256 feeLower = _fees[index] * FEE_STEP;
-        uint256 feeUpper = _fees[index + 1] * FEE_STEP;
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }

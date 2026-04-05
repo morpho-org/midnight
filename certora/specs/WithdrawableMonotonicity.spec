@@ -34,12 +34,21 @@ rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Obligation obligation,
     assert withdrawableAfter == withdrawableBefore - unitsInput;
 }
 
+rule claimContinuousFeeDecreasesWithdrawableExactly(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
+    bytes32 id = toId(e, obligation);
+    uint256 withdrawableBefore = withdrawable(id);
+    claimContinuousFee(e, obligation, amount, receiver);
+    uint256 withdrawableAfter = withdrawable(id);
+    assert withdrawableAfter == withdrawableBefore - amount;
+}
+
 rule withdrawableUnchanged(method f, env e, calldataarg args, bytes32 id)
 filtered {
     f -> !f.isView
         && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
+        && f.selector != sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
 } {
     uint256 withdrawableBefore = withdrawable(id);
     f(e, args);
