@@ -279,18 +279,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
 // Show that the user stays healthy on take, if the user under consideration is the seller on the obligation under consideration.
 // In this case, the seller may become temporarily unhealthy during callbacks and is only checked again at the end of take().
-rule stayHealthyTakeSameSeller(
-    env e,
-    uint256 units,
-    address taker,
-    address takerCallback,
-    bytes takerCallbackData,
-    address receiverIfTakerIsSeller,
-    Midnight.Offer offer,
-    Midnight.Signature signature,
-    bytes32 root,
-    bytes32[] proof
-) {
+rule stayHealthyTakeSameSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     useIsHealthyNoBitmap = true;
     relaxCallbackHealthForTakeSeller = true;
 
@@ -311,18 +300,7 @@ rule stayHealthyTakeSameSeller(
 }
 
 // Show that the user stays healthy on take, if another user is the seller or the obligation differs.
-rule stayHealthyTakeOtherBorrower(
-    env e,
-    uint256 units,
-    address taker,
-    address takerCallback,
-    bytes takerCallbackData,
-    address receiverIfTakerIsSeller,
-    Midnight.Offer offer,
-    Midnight.Signature signature,
-    bytes32 root,
-    bytes32[] proof
-) {
+rule stayHealthyTakeOtherBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     useIsHealthyNoBitmap = true;
     relaxCallbackHealthForTakeSeller = false;
 
