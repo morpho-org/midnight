@@ -284,16 +284,16 @@ contract Midnight is IMidnight {
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? _maxUnitsForFloorConsumedAssets(remainingSellerAssets, sellerPrice)
-                    : _maxUnitsForCeilConsumedAssets(remainingSellerAssets, sellerPrice)
+                    ? (remainingSellerAssets + 1).mulDivUp(WAD, sellerPrice) - 1
+                    : remainingSellerAssets.mulDivDown(WAD, sellerPrice)
             );
         } else if (offer.maxBuyerAssets > 0) {
             uint256 remainingBuyerAssets = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? _maxUnitsForFloorConsumedAssets(remainingBuyerAssets, buyerPrice)
-                    : _maxUnitsForCeilConsumedAssets(remainingBuyerAssets, buyerPrice)
+                    ? (remainingBuyerAssets + 1).mulDivUp(WAD, buyerPrice) - 1
+                    : remainingBuyerAssets.mulDivDown(WAD, buyerPrice)
             );
         } else {
             units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
@@ -381,16 +381,6 @@ contract Midnight is IMidnight {
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
-    }
-
-    /// @dev Returns the maximum units such that floor(units * price / WAD) <= remainingAssets.
-    function _maxUnitsForFloorConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        return (remainingAssets + 1).mulDivUp(WAD, price) - 1;
-    }
-
-    /// @dev Returns the maximum units such that ceil(units * price / WAD) <= remainingAssets.
-    function _maxUnitsForCeilConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        return remainingAssets.mulDivDown(WAD, price);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
