@@ -14,7 +14,6 @@ import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
-    MAX_CONTINUOUS_FEE,
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF
@@ -218,7 +217,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.assume(_obligation.collateralParams.length > 0);
         _obligation = validObligation(_obligation);
 
-        midnight.setDefaultContinuousFee(_obligation.loanToken, MAX_CONTINUOUS_FEE);
+        midnight.setDefaultContinuousFee(_obligation.loanToken, type(uint16).max);
         for (uint256 i = 0; i < 7; i++) {
             midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
         }
@@ -230,7 +229,36 @@ contract OtherFunctionsTest is BaseTest {
             assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
         }
-        assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
+        assertEq(midnight.continuousFee(_id), type(uint16).max, "continuousFee");
+    }
+
+    function arrayDataElement(uint256 packedArrayData, uint256 index) internal pure returns (uint16) {
+        // forge-lint: disable-next-line(unsafe-typecast) as shifting by 16 * index keeps only one uint16 lane
+        return uint16(packedArrayData >> (index * 16));
+    }
+
+    function testTouchObligationPacksArrayData(Obligation memory _obligation) public {
+        vm.assume(_obligation.collateralParams.length > 0);
+        _obligation = validObligation(_obligation);
+
+        midnight.setDefaultContinuousFee(_obligation.loanToken, type(uint16).max);
+        for (uint256 i = 0; i < 7; i++) {
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+        }
+
+        bytes32 _id = midnight.touchObligation(_obligation);
+        bytes32 stateSlot = keccak256(abi.encode(_id, uint256(1)));
+        uint256 packedArrayData = uint256(vm.load(address(midnight), bytes32(uint256(stateSlot) + 2)));
+
+        assertEq(arrayDataElement(packedArrayData, 0), 1, "created stored in arrayData[0]");
+        assertEq(arrayDataElement(packedArrayData, 1), type(uint16).max, "continuous fee stored in arrayData[1]");
+        for (uint256 i = 0; i < 7; i++) {
+            assertEq(
+                arrayDataElement(packedArrayData, i + 2),
+                midnight.defaultTradingFees(_obligation.loanToken, i),
+                "trading fee stored in arrayData"
+            );
+        }
     }
 
     function testToObligation(Obligation memory _obligation) public {

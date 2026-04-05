@@ -10,7 +10,7 @@ methods {
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
-    function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
+    function Midnight.continuousFee(bytes32) external returns (uint16) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;

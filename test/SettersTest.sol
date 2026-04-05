@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
@@ -312,7 +311,7 @@ contract SettersTest is BaseTest {
     }
 
     function testSetContinuousFeeTooHigh(uint256 fee) public {
-        fee = bound(fee, MAX_CONTINUOUS_FEE + 1, type(uint256).max);
+        fee = bound(fee, uint256(type(uint16).max) + 1, type(uint32).max);
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -337,8 +336,8 @@ contract SettersTest is BaseTest {
     }
 
     function testSetContinuousFeeSuccess(uint256 fee, uint256 fee2) public {
-        fee = bound(fee, 0, MAX_CONTINUOUS_FEE);
-        fee2 = bound(fee2, 0, MAX_CONTINUOUS_FEE);
+        fee = bound(fee, 0, type(uint16).max);
+        fee2 = bound(fee2, 0, type(uint16).max);
         vm.assume(fee != fee2);
 
         midnight.setDefaultContinuousFee(address(loanToken), fee);

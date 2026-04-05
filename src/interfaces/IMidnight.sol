@@ -51,9 +51,7 @@ struct ObligationState {
     uint128 lossIndex;
     uint128 withdrawable;
     uint128 continuousFeeAmount;
-    bool created;
-    uint16[7] fees;
-    uint32 continuousFee;
+    uint16[9] arrayData;
 }
 
 struct Position {

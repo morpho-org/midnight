@@ -25,7 +25,7 @@ definition FEE_STEP() returns uint256 = 1000000000000;
 
 definition defaultFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
-definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].fees[index] * FEE_STEP());
+definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].arrayData[assert_uint256(index + 2)] * FEE_STEP());
 
 /// Default fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultFeePerIndexBound(address loanToken, uint256 index)
@@ -73,6 +73,7 @@ rule newObligationFeesMatchDefault(env e, Midnight.Obligation obligation, uint25
 
 /// Only the fee setter can modify default fees (multicall is DELETEd and not checked here).
 rule onlyFeeSetterCanChangeDefaultFees(method f, env e, address token, uint256 index) filtered { f -> !f.isView } {
+    require index <= 6, "index out of bounds";
     uint256 defaultFeeBefore = defaultFee(token, index);
     calldataarg args;
     f(e, args);
@@ -81,6 +82,7 @@ rule onlyFeeSetterCanChangeDefaultFees(method f, env e, address token, uint256 i
 
 /// Once an obligation is created, only the fee setter can modify its fees.
 rule onlyFeeSetterCanChangeObligationFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
+    require index <= 6, "index out of bounds";
     require obligationCreated(id), "assume that the obligation is created";
     uint256 obligationFeeBefore = obligationFee(id, index);
     calldataarg args;
