@@ -221,6 +221,8 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
+    /// @dev `units` values above `type(uint128).max` might still succeed after capping, but might also revert early due
+    /// to overflow depending on which offer-cap path is taken.
     function take(
         uint256 units,
         address taker,
@@ -232,7 +234,6 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
-        require(units <= type(uint128).max, "units too high");
         require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
