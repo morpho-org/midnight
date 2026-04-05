@@ -48,6 +48,7 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
     assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
 }
 
+// Subsumed by sellerCannotBeLiquidatedAndLockCannotBeRemovedUnderLiquidationLock but worth keeping
 rule liquidateRevertsWhenLocked(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
     bool wasLocked = liquidationLocked(e, id, borrower);
