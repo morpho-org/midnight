@@ -299,7 +299,8 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
-        (uint128 oldTotalUnits, uint256 previousLossIndex,,,,) = midnight.obligationState(id);
+        uint256 oldTotalUnits = midnight.totalUnits(id);
+        uint256 previousLossIndex = midnight.lossIndex(id);
         uint256 expectedLossIndex = expectedBadDebt == 0
             ? previousLossIndex
             : type(uint128).max
@@ -320,7 +321,7 @@ contract LiquidationTest is BaseTest {
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
 
-        (, uint256 lossIndex,,,,) = midnight.obligationState(id);
+        uint256 lossIndex = midnight.lossIndex(id);
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
@@ -733,7 +734,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        (, uint128 oblLossIndex,,,,) = midnight.obligationState(id);
+        uint128 oblLossIndex = midnight.lossIndex(id);
         assertGt(oblLossIndex, midnight.userLossIndex(id, borrower), "loss index stale before");
 
         midnight.updatePosition(obligation, borrower);
@@ -775,7 +776,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        (, uint128 _lossIndex,,,,) = midnight.obligationState(id);
+        uint128 _lossIndex = midnight.lossIndex(id);
         assertEq(_lossIndex, type(uint128).max, "loss index");
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");

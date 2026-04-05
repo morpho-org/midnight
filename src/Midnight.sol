@@ -105,7 +105,7 @@ contract Midnight is IMidnight {
 
     /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
-    mapping(address loanToken => uint16[7]) public defaultTradingFees;
+    mapping(address loanToken => uint112) public packedDefaultTradingFees;
 
     /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
@@ -170,7 +170,8 @@ contract Midnight is IMidnight {
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         require(obligationState[id].created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
-        obligationState[id].fees[index] = uint16(newTradingFee / FEE_STEP);
+        obligationState[id].packedTradingFees =
+            setTradingFee(obligationState[id].packedTradingFees, index, uint16(newTradingFee / FEE_STEP));
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -181,7 +182,8 @@ contract Midnight is IMidnight {
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
-        defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
+        packedDefaultTradingFees[loanToken] =
+            setTradingFee(packedDefaultTradingFees[loanToken], index, uint16(newTradingFee / FEE_STEP));
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
@@ -658,9 +660,9 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
-            obligationState[id].created = true;
-            obligationState[id].fees = defaultTradingFees[obligation.loanToken];
+            obligationState[id].packedTradingFees = packedDefaultTradingFees[obligation.loanToken];
             obligationState[id].continuousFee = defaultContinuousFee[obligation.loanToken];
+            obligationState[id].created = true;
             IdLib.storeInCode(obligation);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -774,8 +776,12 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
-    function fees(bytes32 id) external view returns (uint16[7] memory) {
-        return obligationState[id].fees;
+    function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
+        return tradingFeeArray(obligationState[id].packedTradingFees);
+    }
+
+    function defaultTradingFees(address loanToken) public view returns (uint16[7] memory) {
+        return tradingFeeArray(packedDefaultTradingFees[loanToken]);
     }
 
     function continuousFee(bytes32 id) external view returns (uint32) {
@@ -838,9 +844,9 @@ contract Midnight is IMidnight {
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         require(obligationState[id].created, "not created");
 
-        uint16[7] memory _fees = obligationState[id].fees;
+        uint112 packed = obligationState[id].packedTradingFees;
 
-        if (timeToMaturity >= 360 days) return _fees[6] * FEE_STEP;
+        if (timeToMaturity >= 360 days) return uint16(packed >> (6 * 16)) * FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 index, uint256 start, uint256 end) =
@@ -852,9 +858,25 @@ contract Midnight is IMidnight {
                                         (5, 180 days, 360 days);
         // forgefmt: disable-end
 
-        uint256 feeLower = _fees[index] * FEE_STEP;
-        uint256 feeUpper = _fees[index + 1] * FEE_STEP;
+        uint256 shift = index * 16;
+        uint256 feeLower = uint16(packed >> shift) * FEE_STEP;
+        uint256 feeUpper = uint16(packed >> (shift + 16)) * FEE_STEP;
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+    }
+
+    function tradingFeeArray(uint112 packed) internal pure returns (uint16[7] memory result) {
+        for (uint256 i = 0; i < 7; ++i) {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            result[i] = uint16(packed >> (i * 16));
+        }
+    }
+
+    function setTradingFee(uint112 packed, uint256 index, uint16 fee) internal pure returns (uint112) {
+        if (index > 6) revert("invalid index");
+        uint256 shift = index * 16;
+        uint256 cleared = uint256(packed) & ~(uint256(type(uint16).max) << shift);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint112(cleared | (uint256(fee) << shift));
     }
 }
