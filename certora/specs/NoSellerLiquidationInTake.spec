@@ -81,8 +81,6 @@ function genericCallbackBytes32() returns (bytes32) {
 rule liquidationLockInTakeCallbacks(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     globalId = summaryToId(offer.obligation);
     globalBorrower = offer.buy ? taker : offer.maker;
-    require liquidationLocked(e, globalId, globalBorrower), "borrower is locked before call";
-
     liquidated = false;
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
