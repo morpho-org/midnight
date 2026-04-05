@@ -105,7 +105,7 @@ contract Midnight is IMidnight {
 
     /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
-    mapping(address loanToken => uint16[7]) public defaultTradingFees;
+    mapping(address loanToken => uint32[7]) public defaultTradingFees;
 
     /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overridden by the
     /// feeSetter.
@@ -181,7 +181,7 @@ contract Midnight is IMidnight {
         require(newTradingFee <= maxTradingFee(index), "value too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint32.max * FEE_STEP
-        defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
+        defaultTradingFees[loanToken][index] = uint32(newTradingFee / FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
@@ -660,7 +660,7 @@ contract Midnight is IMidnight {
 
             obligationState[id].created = true;
             obligationState[id].fees[7] = defaultContinuousFee[obligation.loanToken];
-            uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
+            uint32[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
             for (uint256 i = 0; i < 7; i++) {
                 obligationState[id].fees[i] = _defaultTradingFees[i];
             }
