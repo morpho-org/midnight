@@ -311,6 +311,7 @@ contract Midnight is IMidnight {
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+        require(timeToMaturity > 0 || sellerCreditDecrease == units, "seller debt increased post maturity");
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));

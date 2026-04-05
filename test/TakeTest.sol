@@ -513,7 +513,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, address(this)), 0, "debt");
     }
 
-    function testBuyPastMaturity(uint256 timestamp) public {
+    function testBuyPastMaturityRevertWhenIncreasingDebt(uint256 timestamp) public {
         timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
         vm.warp(timestamp);
         borrowerOffer.expiry = timestamp;
@@ -522,10 +522,11 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller debt increased post maturity");
         take(100, lender, borrowerOffer);
     }
 
-    function testSellPastMaturity(uint256 timestamp) public {
+    function testSellPastMaturityRevertWhenIncreasingDebt(uint256 timestamp) public {
         timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
         vm.warp(timestamp);
         lenderOffer.expiry = timestamp;
@@ -534,7 +535,45 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller debt increased post maturity");
         take(100, borrower, lenderOffer);
+    }
+
+    function testBuyPastMaturityAllowsDebtReduction(uint256 timestamp) public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+
+        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        vm.warp(timestamp);
+        otherLenderOffer.expiry = timestamp;
+        otherLenderOffer.maxUnits = units;
+        otherLenderOffer.tick = MAX_TICK;
+
+        uint256 buyerAssets = units.mulDivUp(TickLib.tickToPrice(MAX_TICK) + midnight.tradingFee(id, 0), WAD);
+        deal(address(loanToken), otherBorrower, buyerAssets);
+
+        take(units, otherBorrower, otherLenderOffer);
+
+        assertEq(midnight.creditOf(id, otherLender), 0, "otherLender credit");
+        assertEq(midnight.debtOf(id, otherBorrower), 0, "otherBorrower debt");
+    }
+
+    function testSellPastMaturityAllowsDebtReduction(uint256 timestamp) public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+
+        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        vm.warp(timestamp);
+        otherBorrowerOffer.expiry = timestamp;
+        otherBorrowerOffer.maxUnits = units;
+        otherBorrowerOffer.tick = MAX_TICK;
+
+        deal(address(loanToken), otherBorrower, units);
+
+        take(units, otherLender, otherBorrowerOffer);
+
+        assertEq(midnight.creditOf(id, otherLender), 0, "otherLender credit");
+        assertEq(midnight.debtOf(id, otherBorrower), 0, "otherBorrower debt");
     }
 
     function testBuyUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
