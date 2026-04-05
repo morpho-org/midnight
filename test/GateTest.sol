@@ -74,7 +74,7 @@ contract GateTest is BaseTest {
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.obligation = gatedObligation;
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -82,7 +82,7 @@ contract GateTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.obligation = gatedObligation;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -140,7 +140,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.buy = false;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
-        otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxUnits = type(uint128).max;
         otherBorrowerOffer.obligation = gatedObligation;
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
@@ -166,7 +166,7 @@ contract GateTest is BaseTest {
         Offer memory otherLenderOffer;
         otherLenderOffer.buy = true;
         otherLenderOffer.maker = otherLender;
-        otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxUnits = type(uint128).max;
         otherLenderOffer.obligation = gatedObligation;
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
@@ -181,7 +181,7 @@ contract GateTest is BaseTest {
         exitOffer.buy = false;
         exitOffer.maker = otherLender;
         exitOffer.receiverIfMakerIsSeller = otherLender;
-        exitOffer.maxUnits = type(uint256).max;
+        exitOffer.maxUnits = type(uint128).max;
         exitOffer.obligation = gatedObligation;
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
@@ -273,7 +273,7 @@ contract GateTest is BaseTest {
         Offer memory ungatedLenderOffer;
         ungatedLenderOffer.buy = true;
         ungatedLenderOffer.maker = lender;
-        ungatedLenderOffer.maxUnits = type(uint256).max;
+        ungatedLenderOffer.maxUnits = type(uint128).max;
         ungatedLenderOffer.obligation = obligation;
         ungatedLenderOffer.expiry = block.timestamp + 200;
         ungatedLenderOffer.tick = MAX_TICK;

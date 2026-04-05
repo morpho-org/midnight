@@ -37,6 +37,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev To create a "max" offer, use `type(uint128).max` for `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits`.
 ///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
@@ -231,6 +232,7 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
+        require(units <= type(uint128).max, "units too high");
         require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
@@ -383,23 +385,12 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the maximum units such that floor(units * price / WAD) <= remainingAssets.
     function _maxUnitsForFloorConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        uint256 base = remainingAssets / price;
-        if (base > type(uint256).max / WAD) return type(uint256).max;
-        base *= WAD;
-
-        uint256 remainder = remainingAssets % price;
-        uint256 extra = ((remainder + 1) * WAD - 1) / price;
-        return base > type(uint256).max - extra ? type(uint256).max : base + extra;
+        return (remainingAssets + 1).mulDivUp(WAD, price) - 1;
     }
 
     /// @dev Returns the maximum units such that ceil(units * price / WAD) <= remainingAssets.
     function _maxUnitsForCeilConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        uint256 base = remainingAssets / price;
-        if (base > type(uint256).max / WAD) return type(uint256).max;
-        base *= WAD;
-
-        uint256 extra = (remainingAssets % price).mulDivDown(WAD, price);
-        return base > type(uint256).max - extra ? type(uint256).max : base + extra;
+        return remainingAssets.mulDivDown(WAD, price);
     }
 
     /// @dev Will revert if there are no withdrawable funds.

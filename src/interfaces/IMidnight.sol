@@ -35,9 +35,9 @@ struct Offer {
     bytes callbackData;
     address receiverIfMakerIsSeller;
     bool reduceOnly;
-    uint256 maxUnits;
-    uint256 maxSellerAssets;
-    uint256 maxBuyerAssets;
+    uint128 maxUnits;
+    uint128 maxSellerAssets;
+    uint128 maxBuyerAssets;
 }
 
 struct Signature {
