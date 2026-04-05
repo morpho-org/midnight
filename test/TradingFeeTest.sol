@@ -184,7 +184,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testPostMaturityFee(uint256 units, uint256 sellerTick, uint256 fee0Day, uint256 maturity) public {
-        units = bound(units, 0, MAX_DEBT);
+        units = bound(units, 1, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
@@ -198,20 +198,10 @@ contract TradingFeeTest is BaseTest {
         midnight.setDefaultTradingFee(address(loanToken), 0, fee0Day);
         borrowerOffer.tick = sellerTick;
 
-        uint256 tradingFee = fee0Day;
-
-        uint256 buyerPrice = sellerPrice + tradingFee;
-        vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
-
-        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
-        take(units, lender, borrowerOffer);
 
-        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
-        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
+        vm.expectRevert("seller is liquidatable");
+        take(units, lender, borrowerOffer);
     }
 
     function testEarlyFee(uint256 units, uint256 sellerTick, uint256 fee360Days, uint256 maturity) public {

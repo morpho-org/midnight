@@ -48,14 +48,13 @@ rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 co
     assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
 }
 
-// Subsumed by sellerCannotBeLiquidatedAndLockCannotBeRemovedUnderLiquidationLock but worth keeping
-rule liquidateRevertsWhenLocked(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+rule liquidateRevertsWhenNotLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
-    bool wasLocked = liquidationLocked(e, id, borrower);
+    bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     // it's okay to check only after the call that the prover chose the correct id.
     require id == lastId, "id should be derived from obligation";
 
-    assert !wasLocked, "liquidate cannot succeed when liquidation is locked for the borrower";
+    assert wasLiquidatable, "liquidate cannot succeed when the borrower is not liquidatable";
 }

@@ -12,6 +12,7 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {Oracle} from "./helpers/Oracle.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -514,7 +515,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBuyPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         borrowerOffer.expiry = timestamp;
         borrowerOffer.maxUnits = 100;
@@ -522,11 +523,12 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is liquidatable");
         take(100, lender, borrowerOffer);
     }
 
     function testSellPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         lenderOffer.expiry = timestamp;
         lenderOffer.maxUnits = 100;
@@ -534,6 +536,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is liquidatable");
         take(100, borrower, lenderOffer);
     }
 
@@ -547,7 +550,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, lender, borrowerOffer);
     }
 
@@ -561,7 +564,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, borrower, lenderOffer);
     }
 
@@ -882,7 +885,6 @@ contract TakeTest is BaseTest {
 
         authorize(borrower, address(callback));
 
-        vm.warp(obligation.maturity + 1);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -927,11 +929,10 @@ contract TakeTest is BaseTest {
             proof([lenderOffer]),
             units,
             0,
-            collateral,
+            2 * collateral,
             repaidUnits
         );
 
-        vm.warp(obligation.maturity + 1);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1119,6 +1120,10 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, collateralAmount);
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+
+        Oracle oracle = Oracle(obligation.collateralParams[collateralIndex].oracle);
+        uint256 healthyPrice = oracle.price();
+        oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
         try Midnight(msg.sender).liquidate(obligation, collateralIndex, 0, repaidUnits, seller, "") returns (
             uint256, uint256
@@ -1129,6 +1134,7 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         } catch (bytes memory revertData) {
             liquidateRevertData = revertData;
         }
+        oracle.setPrice(healthyPrice);
         return CALLBACK_SUCCESS;
     }
 
@@ -1184,17 +1190,22 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         returns (bytes32)
     {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
-        uint256 idx = storedCollateralIndex;
-        address collateralToken = obligation.collateralParams[idx].token;
-        ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
-        Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
         if (!reentered) {
+            uint256 idx = storedCollateralIndex;
+            address collateralToken = obligation.collateralParams[idx].token;
+            ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
+            Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+
             reentered = true;
             Offer memory nestedOffer = storedOffer;
             Signature memory nestedSig = storedSig;
             bytes32[] memory nestedProof = storedProof;
             Midnight(msg.sender)
                 .take(innerUnits, seller, address(this), "", seller, nestedOffer, nestedSig, storedRoot, nestedProof);
+
+            Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
+            uint256 healthyPrice = oracle.price();
+            oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
             try Midnight(msg.sender).liquidate(obligation, idx, 0, storedRepaidUnits, seller, "") returns (
                 uint256, uint256
@@ -1203,6 +1214,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
             } catch Error(string memory reason) {
                 liquidateError = reason;
             }
+            oracle.setPrice(healthyPrice);
         }
         return CALLBACK_SUCCESS;
     }
