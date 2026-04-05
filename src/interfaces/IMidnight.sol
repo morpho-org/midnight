@@ -46,12 +46,15 @@ struct Signature {
     bytes32 s;
 }
 
+/// @dev `smallValues[0]` is 1 iff the obligation was created, `smallValues[1]` stores the continuous fee compressed
+/// between 0 and `MAX_CONTINUOUS_FEE`, and `smallValues[2..8]` store the seven trading-fee breakpoints divided by
+/// `FEE_STEP` for 0d, 1d, 7d, 30d, 90d, 180d, and 360d.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossIndex;
     uint128 withdrawable;
     uint128 continuousFeeAmount;
-    uint16[9] arrayData;
+    uint16[9] smallValues;
 }
 
 struct Position {

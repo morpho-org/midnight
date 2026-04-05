@@ -44,8 +44,8 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setIsAuthorized(otherBorrower, address(this), true);
     }
 
-    function actualContinuousFee(uint256 encodedFee) internal pure returns (uint256) {
-        return encodedFee.mulDivDown(MAX_CONTINUOUS_FEE, type(uint16).max);
+    function actualContinuousFee(uint256 feeRate) internal pure returns (uint256) {
+        return feeRate.mulDivDown(type(uint16).max, MAX_CONTINUOUS_FEE).mulDivDown(MAX_CONTINUOUS_FEE, type(uint16).max);
     }
 
     /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * actualContinuousFee(feeRate) * ttm /
@@ -70,7 +70,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testAccrualPreMaturity(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, type(uint16).max);
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -107,7 +107,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testAccrualPostMaturity(uint256 credit, uint256 feeRate, uint256 ttm, uint256 extraTime) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 1, 360 days);
         extraTime = bound(extraTime, 0, 360 days);
 
@@ -145,7 +145,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed2
     ) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 4, 360 days);
         elapsed1 = bound(elapsed1, 1, ttm / 2);
         elapsed2 = bound(elapsed2, 1, ttm / 2);
@@ -173,7 +173,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testSingleLend(uint256 credit, uint256 feeRate, uint256 ttm) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, type(uint16).max);
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 1, 360 days);
 
         setupLender(credit, feeRate, ttm);
@@ -205,8 +205,8 @@ contract ContinuousFeeTest is BaseTest {
     ) public {
         credit1 = bound(credit1, 1e18, MAX_CREDIT / 2);
         credit2 = bound(credit2, 1, MAX_CREDIT / 2);
-        rate1 = bound(rate1, 0, type(uint16).max);
-        rate2 = bound(rate2, 0, type(uint16).max);
+        rate1 = bound(rate1, 0, MAX_CONTINUOUS_FEE);
+        rate2 = bound(rate2, 0, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -241,7 +241,7 @@ contract ContinuousFeeTest is BaseTest {
         public
     {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, type(uint16).max);
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 0, ttm - 1);
 
@@ -314,7 +314,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed
     ) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, type(uint16).max);
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 0, ttm - 1);
 
@@ -365,7 +365,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed2
     ) public {
         credit = bound(credit, 100, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 10, 360 days);
         elapsed1 = bound(elapsed1, 1, ttm - 2);
         elapsed2 = bound(elapsed2, 1, ttm - elapsed1 - 1);
@@ -403,7 +403,7 @@ contract ContinuousFeeTest is BaseTest {
         public
     {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -445,7 +445,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testClaimContinuousFeeExcessReverts(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -470,7 +470,7 @@ contract ContinuousFeeTest is BaseTest {
         bool withBadDebt
     ) public {
         credit = bound(credit, 100, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, type(uint16).max);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
         ttm = bound(ttm, 10, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 

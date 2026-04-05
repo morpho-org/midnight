@@ -25,7 +25,7 @@ definition FEE_STEP() returns uint256 = 1000000000000;
 
 definition defaultFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
-definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].arrayData[assert_uint256(index + 2)] * FEE_STEP());
+definition obligationFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(currentContract.obligationState[id].smallValues[assert_uint256(index + 2)] * FEE_STEP());
 
 /// Default fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultFeePerIndexBound(address loanToken, uint256 index)
