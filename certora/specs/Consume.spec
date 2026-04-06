@@ -74,16 +74,15 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
     assert consumed(user, group) >= consumedBefore;
 }
 
-/// After a successful `take`, consumed[offer.maker][offer.group] does not exceed the effective max,
-/// provided it was within bounds before the call.
+/// After a successful `take`, consumed[offer.maker][offer.group] does not exceed the effective max.
+/// The new `take` enforces `currentConsumed + consumedDelta <= activeMax`, so the bound holds unconditionally
+/// (including for cancellation paths where the maker raised `consumed` past the cap via `setConsumed`).
 rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    uint256 consumedBefore = consumed(offer.maker, offer.group);
-
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert offer.maxSellerAssets > 0 && consumedBefore <= offer.maxSellerAssets => consumed(offer.maker, offer.group) <= offer.maxSellerAssets;
-    assert offer.maxBuyerAssets > 0 && consumedBefore <= offer.maxBuyerAssets => consumed(offer.maker, offer.group) <= offer.maxBuyerAssets;
-    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 && consumedBefore <= offer.maxUnits => consumed(offer.maker, offer.group) <= offer.maxUnits;
+    assert offer.maxSellerAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxSellerAssets;
+    assert offer.maxBuyerAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxBuyerAssets;
+    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
 /// After a successful `take`, the change in consumed equals min(units, available).

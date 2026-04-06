@@ -277,6 +277,7 @@ contract Midnight is IMidnight {
     /// @dev `units` values above `type(uint128).max` might still succeed after capping, but might also revert early due
     /// to overflow depending on which offer-cap path is taken.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
+    /// @dev If an offer has max == consumed, takes can still happen (but no assets/units will be taken/sent).
     function take(
         uint256 units,
         address taker,
@@ -335,23 +336,21 @@ contract Midnight is IMidnight {
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 currentConsumed = consumed[offer.maker][offer.group];
         if (offer.maxSellerAssets > 0) {
-            uint256 remainingSellerAssets = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? (remainingSellerAssets + 1).mulDivUp(WAD, sellerPrice) - 1
-                    : remainingSellerAssets.mulDivDown(WAD, sellerPrice)
+                    ? (offer.maxSellerAssets - currentConsumed + 1).mulDivUp(WAD, sellerPrice) - 1
+                    : (offer.maxSellerAssets - currentConsumed).mulDivDown(WAD, sellerPrice)
             );
         } else if (offer.maxBuyerAssets > 0) {
-            uint256 remainingBuyerAssets = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? (remainingBuyerAssets + 1).mulDivUp(WAD, buyerPrice) - 1
-                    : remainingBuyerAssets.mulDivDown(WAD, buyerPrice)
+                    ? (offer.maxBuyerAssets - currentConsumed + 1).mulDivUp(WAD, buyerPrice) - 1
+                    : (offer.maxBuyerAssets - currentConsumed).mulDivDown(WAD, buyerPrice)
             );
         } else {
-            units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
+            units = UtilsLib.min(units, offer.maxUnits - currentConsumed);
         }
 
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);

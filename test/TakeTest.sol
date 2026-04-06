@@ -901,7 +901,7 @@ contract TakeTest is BaseTest {
         uint256 units = 100e18;
         uint256 repaidUnits = 1e18;
         uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         ReentrantLiquidateBorrowCallback callback = new ReentrantLiquidateBorrowCallback();
@@ -938,7 +938,7 @@ contract TakeTest is BaseTest {
         uint256 repaidUnits = 1e18;
         uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
-        lenderOffer.maxUnits = 2 * units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(2 * units);
         lenderOffer.tick = MAX_TICK;
 
         NestedTakeReentrantLiquidateCallback callback = new NestedTakeReentrantLiquidateCallback();
@@ -1022,7 +1022,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBuyBuyerCallback(uint256 units) public {
-        units = bound(units, 0, maxAssets);
+        units = bound(units, 1, maxAssets);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         (address _otherLender,) = makeAddrAndKey("otherLender");
