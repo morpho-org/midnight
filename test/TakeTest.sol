@@ -2,17 +2,17 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {Oracle} from "./helpers/Oracle.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -31,25 +31,25 @@ contract TakeTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -515,7 +515,7 @@ contract TakeTest is BaseTest {
     }
 
     function testBuyPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         borrowerOffer.expiry = timestamp;
         borrowerOffer.maxUnits = 100;
@@ -523,11 +523,12 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is liquidatable");
         take(100, lender, borrowerOffer);
     }
 
     function testSellPastMaturity(uint256 timestamp) public {
-        timestamp = bound(timestamp, obligation.maturity, type(uint32).max);
+        timestamp = bound(timestamp, obligation.maturity + 1, type(uint32).max);
         vm.warp(timestamp);
         lenderOffer.expiry = timestamp;
         lenderOffer.maxUnits = 100;
@@ -535,6 +536,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
+        vm.expectRevert("seller is liquidatable");
         take(100, borrower, lenderOffer);
     }
 
@@ -548,7 +550,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, lender, borrowerOffer);
     }
 
@@ -562,7 +564,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is unhealthy");
+        vm.expectRevert("seller is liquidatable");
         take(units, borrower, lenderOffer);
     }
 
@@ -823,33 +825,33 @@ contract TakeTest is BaseTest {
 
     function testBuySellerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
         borrowerOffer.callbackData = abi.encode(0, collateral);
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        deal(obligation.collaterals[0].token, borrowerOffer.callback, collateral);
-        assertEq(midnight.collateralOf(id, borrower, 0), 0);
+        deal(obligation.collateralParams[0].token, borrowerOffer.callback, collateral);
+        assertEq(midnight.collateral(id, borrower, 0), 0);
 
         authorize(borrower, borrowerOffer.callback);
 
         take(units, lender, borrowerOffer);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
     }
 
     function testSellSellerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
         lenderOffer.maxUnits = units;
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         address callback = address(new BorrowCallback());
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
-        deal(obligation.collaterals[0].token, callback, collateral);
+        deal(obligation.collateralParams[0].token, callback, collateral);
 
         authorize(borrower, callback);
 
@@ -865,8 +867,115 @@ contract TakeTest is BaseTest {
             root([lenderOffer]),
             proof([lenderOffer])
         );
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
+    }
+
+    function testSellSellerCallbackLiquidateRevertsWhileLiquidationLocked() public {
+        uint256 units = 100e18;
+        uint256 repaidUnits = 1e18;
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
+        lenderOffer.maxUnits = units;
+        lenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        ReentrantLiquidateBorrowCallback callback = new ReentrantLiquidateBorrowCallback();
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        deal(obligation.collateralParams[0].token, address(callback), collateral);
+        deal(address(loanToken), address(callback), repaidUnits);
+
+        authorize(borrower, address(callback));
+
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(callback),
+            abi.encode(0, collateral, repaidUnits),
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+
+        assertFalse(callback.liquidateSucceeded());
+        assertEq(callback.liquidateError(), "liquidation locked");
+        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
+    }
+
+    // Show the effect of the wasLocked variable in `take`.
+    // The variable is not necessary but makes the behavior easy to describe.
+    // With wasLocked, a nested take does not restore liquidatability.
+    function testSellNestedTakeLiquidateRevertsWhileLiquidationLocked() public {
+        uint256 units = 100e18;
+        uint256 repaidUnits = 1e18;
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        lenderOffer.maxUnits = 2 * units;
+        lenderOffer.tick = MAX_TICK;
+
+        NestedTakeReentrantLiquidateCallback callback = new NestedTakeReentrantLiquidateCallback();
+        deal(address(loanToken), lender, (2 * units).mulDivDown(price, WAD));
+        deal(obligation.collateralParams[0].token, address(callback), 2 * collateral);
+        deal(address(loanToken), address(callback), repaidUnits);
+
+        authorize(borrower, address(callback));
+
+        callback.prepare(
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer]),
+            units,
+            0,
+            2 * collateral,
+            repaidUnits
+        );
+
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(callback),
+            "",
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+
+        assertTrue(callback.reentered());
+        assertFalse(callback.liquidateSucceeded());
+        assertEq(callback.liquidateError(), "liquidation locked");
+        assertTrue(midnight.liquidationLocked(id, borrower) == false);
+        assertEq(midnight.debtOf(id, borrower), 2 * units);
+        assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
+    }
+
+    function testSellSellerCallbackRevertsOnInvalidReturn(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        lenderOffer.maxUnits = units;
+        lenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        collateralize(obligation, borrower, units);
+        address callback = address(new InvalidSellCallback());
+
+        vm.expectRevert("invalid callback");
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            callback,
+            hex"",
+            borrower,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
     }
 
     function testSellBuyerCallback(uint256 units) public {
@@ -967,26 +1076,156 @@ contract TakeTest is BaseTest {
 
 contract BorrowCallback is ICallbacks {
     bytes public recordedData;
-    bytes32 public recordedObligationId;
+    bytes32 public recordedId;
 
-    function onSell(
-        bytes32 obligationId,
-        Obligation memory obligation,
-        address seller,
-        uint256,
-        uint256,
-        bytes memory data
-    ) external {
-        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
-        recordedObligationId = obligationId;
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        recordedId = id;
         recordedData = data;
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
-        address collateralToken = obligation.collaterals[collateralIndex].token;
+        address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        return CALLBACK_SUCCESS;
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract ReentrantLiquidateBorrowCallback is ICallbacks {
+    bool public liquidateSucceeded;
+    string public liquidateError;
+    bytes public liquidateRevertData;
+
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
+            abi.decode(data, (uint256, uint256, uint256));
+        address collateralToken = obligation.collateralParams[collateralIndex].token;
+        ERC20(collateralToken).approve(msg.sender, collateralAmount);
+        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+
+        Oracle oracle = Oracle(obligation.collateralParams[collateralIndex].oracle);
+        uint256 healthyPrice = oracle.price();
+        oracle.setPrice(healthyPrice / 2);
+        ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
+        try Midnight(msg.sender).liquidate(obligation, collateralIndex, 0, repaidUnits, seller, "") returns (
+            uint256, uint256
+        ) {
+            liquidateSucceeded = true;
+        } catch Error(string memory reason) {
+            liquidateError = reason;
+        } catch (bytes memory revertData) {
+            liquidateRevertData = revertData;
+        }
+        oracle.setPrice(healthyPrice);
+        return CALLBACK_SUCCESS;
+    }
+
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract NestedTakeReentrantLiquidateCallback is ICallbacks {
+    bool public reentered;
+    bool public liquidateSucceeded;
+    string public liquidateError;
+
+    Offer internal storedOffer;
+    Signature internal storedSig;
+    bytes32 internal storedRoot;
+    bytes32[] internal storedProof;
+    uint256 internal innerUnits;
+    uint256 internal storedCollateralIndex;
+    uint256 internal storedCollateralAmount;
+    uint256 internal storedRepaidUnits;
+
+    function prepare(
+        Offer memory _offer,
+        Signature memory _sig,
+        bytes32 _root,
+        bytes32[] memory _proof,
+        uint256 _innerUnits,
+        uint256 _collateralIndex,
+        uint256 _collateralAmount,
+        uint256 _repaidUnits
+    ) external {
+        storedOffer = _offer;
+        storedSig = _sig;
+        storedRoot = _root;
+        storedProof = _proof;
+        innerUnits = _innerUnits;
+        storedCollateralIndex = _collateralIndex;
+        storedCollateralAmount = _collateralAmount;
+        storedRepaidUnits = _repaidUnits;
+    }
+
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        if (!reentered) {
+            uint256 idx = storedCollateralIndex;
+            address collateralToken = obligation.collateralParams[idx].token;
+            ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
+            Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+
+            reentered = true;
+            Offer memory nestedOffer = storedOffer;
+            Signature memory nestedSig = storedSig;
+            bytes32[] memory nestedProof = storedProof;
+            Midnight(msg.sender)
+                .take(innerUnits, seller, address(this), "", seller, nestedOffer, nestedSig, storedRoot, nestedProof);
+
+            Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
+            uint256 healthyPrice = oracle.price();
+            oracle.setPrice(healthyPrice / 2);
+            ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
+            try Midnight(msg.sender).liquidate(obligation, idx, 0, storedRepaidUnits, seller, "") returns (
+                uint256, uint256
+            ) {
+                liquidateSucceeded = true;
+            } catch Error(string memory reason) {
+                liquidateError = reason;
+            }
+            oracle.setPrice(healthyPrice);
+        }
+        return CALLBACK_SUCCESS;
+    }
+
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 
@@ -996,23 +1235,48 @@ contract BorrowCallback is ICallbacks {
 contract LendCallback is ICallbacks {
     bytes public recordedData;
 
-    bytes32 public recordedObligationId;
+    bytes32 public recordedId;
 
-    function onBuy(
-        bytes32 obligationId,
-        Obligation memory obligation,
-        address buyer,
-        uint256 buyerAssets,
-        uint256,
-        bytes memory data
-    ) external {
-        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
-        recordedObligationId = obligationId;
+    function onBuy(bytes32 id, Obligation memory obligation, address, uint256 buyerAssets, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        recordedId = id;
         recordedData = data;
-        SafeTransferLib.safeTransfer(obligation.loanToken, buyer, buyerAssets);
+        ERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
+        return CALLBACK_SUCCESS;
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory) external {}
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract InvalidSellCallback is ICallbacks {
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return bytes32(0);
+    }
 
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 
