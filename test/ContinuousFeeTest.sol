@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, MAX_CONTINUOUS_FEE, CONTINUOUS_FEE_RECIPIENT} from "../src/libraries/ConstantsLib.sol";
+import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -95,9 +95,9 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
 
-        // Fee credit minted to recipient
+        // Fee accumulated in continuousFeeCredit
         if (expectedFee > 0) {
-            assertEq(midnight.creditOf(id, CONTINUOUS_FEE_RECIPIENT), expectedFee, "fee claimer credit");
+            assertEq(midnight.continuousFeeCredit(id), expectedFee, "continuousFeeCredit");
         }
     }
 
@@ -393,6 +393,69 @@ contract ContinuousFeeTest is BaseTest {
         assertApproxEqAbs(
             midnight.pendingFee(id, lender), pendingAfterSlash - accruedFee, 1, "remaining after slash and accrual"
         );
+    }
+
+    function testClaimContinuousFee(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed, uint256 claimAmount)
+        public
+    {
+        credit = bound(credit, 1, MAX_CREDIT);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        ttm = bound(ttm, 2, 360 days);
+        elapsed = bound(elapsed, 1, ttm - 1);
+
+        setupLender(credit, feeRate, ttm);
+
+        vm.warp(block.timestamp + elapsed);
+        midnight.updatePosition(obligation, lender);
+
+        uint256 feeAmount = midnight.continuousFeeCredit(id);
+        vm.assume(feeAmount > 0);
+        claimAmount = bound(claimAmount, 1, feeAmount);
+
+        // Repay so withdrawable covers the claim.
+        deal(address(loanToken), borrower, credit);
+        vm.prank(borrower);
+        midnight.repay(obligation, credit, borrower, hex"");
+
+        address receiver = makeAddr("receiver");
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+        uint256 withdrawableBefore = midnight.withdrawable(id);
+
+        vm.expectEmit();
+        emit EventsLib.ClaimContinuousFee(feeClaimer, id, claimAmount, receiver);
+        vm.prank(feeClaimer);
+        midnight.claimContinuousFee(obligation, claimAmount, receiver);
+
+        assertEq(loanToken.balanceOf(receiver), claimAmount, "receiver balance");
+        assertEq(midnight.continuousFeeCredit(id), feeAmount - claimAmount, "continuousFeeCredit after claim");
+        assertEq(midnight.totalUnits(id), totalUnitsBefore - claimAmount, "totalUnits after claim");
+        assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after claim");
+    }
+
+    function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
+        vm.assume(caller != feeClaimer);
+        vm.prank(caller);
+        vm.expectRevert("only fee claimer");
+        midnight.claimContinuousFee(obligation, 0, caller);
+    }
+
+    function testClaimContinuousFeeExcessReverts(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
+        credit = bound(credit, 1, MAX_CREDIT);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        ttm = bound(ttm, 2, 360 days);
+        elapsed = bound(elapsed, 1, ttm - 1);
+
+        setupLender(credit, feeRate, ttm);
+
+        vm.warp(block.timestamp + elapsed);
+        midnight.updatePosition(obligation, lender);
+
+        uint256 feeAmount = midnight.continuousFeeCredit(id);
+        vm.assume(feeAmount > 0);
+
+        vm.prank(feeClaimer);
+        vm.expectRevert();
+        midnight.claimContinuousFee(obligation, feeAmount + 1, feeClaimer);
     }
 
     function testUpdatePositionViewCorrect(
