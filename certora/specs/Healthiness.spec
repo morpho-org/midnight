@@ -24,6 +24,15 @@ methods {
      */
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 /// SUMMARY ///
