@@ -152,6 +152,10 @@ function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borro
     }
 }
 
+definition takeSeller(address taker, Midnight.Offer offer) returns address = offer.buy ? taker : offer.maker;
+
+definition takeBuyer(address taker, Midnight.Offer offer) returns address = offer.buy ? offer.maker : taker;
+
 //// RULES //////
 
 // The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
@@ -214,8 +218,42 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
-// Show that the user stays healthy on any other function than liquidate.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+// Show that the user stays healthy on take, if the user under consideration is the seller on the obligation under consideration.
+rule stayHealthyTakeSameSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    useIsHealthyNoBitmap = false;
+
+    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
+
+    Midnight.Obligation globalObligation = getGlobalObligation();
+    require equalsGlobalObligation(offer.obligation), "obligation matches";
+    require takeSeller(taker, offer) == globalBorrower, "seller matches";
+
+    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+
+    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
+}
+
+// Show that the user stays healthy on take, if the user is neither buyer nor seller on the obligation under consideration,
+// or the obligation differs.
+rule stayHealthyTakeOtherBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    useIsHealthyNoBitmap = true;
+
+    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
+
+    Midnight.Obligation globalObligation = getGlobalObligation();
+    require (takeSeller(taker, offer) != globalBorrower && takeBuyer(taker, offer) != globalBorrower) || !equalsGlobalObligation(offer.obligation), "borrower is not a take participant on the tracked obligation";
+
+    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+
+    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
+}
+
+// Show that the user stays healthy on any other function than liquidate or take.
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
     // for withdrawCollateral we choose isHealthy(); for all others we choose the bitmap-less implementation.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 
