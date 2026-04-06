@@ -1,34 +1,29 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
-    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
-    function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => NONDET;
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function lossIndex(bytes32 id) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
-    function Utils.continuousFeeRecipient() external returns (address) envfree;
 
     function _.price() external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
+    function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => NONDET;
 }
 
 /// HELPERS ///
@@ -47,10 +42,7 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 definition WAD() returns uint256 = 10 ^ 18;
 
 // In a buy-offer take, the buyer's pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
-// Measured from the post-update baseline (after slash and accrual) so that only the new-credit fee contribution is bounded.
 rule continuousFeeNotOverchargedInBuyOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require offer.maker != Utils.continuousFeeRecipient(), "Continuous Fee Recipient can't call take()";
-
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
@@ -67,24 +59,20 @@ rule continuousFeeNotOverchargedInBuyOffer(env e, uint256 units, address taker, 
     mathint creditDelta = to_mathint(creditOf(id, offer.maker)) - to_mathint(postUpdateCredit);
     mathint pendingFeeDelta = to_mathint(pendingFee(id, offer.maker)) - to_mathint(postUpdatePendingFee);
 
-    require offer.buy, "maker is the buyer only in a buy-offer";
+    require offer.buy, "scope to buy offers";
 
     assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
-// When a seller's credit decreases via a take, their pendingFee decreases by
-// exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
+// When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
 rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    require offer.maker != Utils.continuousFeeRecipient(), "Continuous Fee Recipient can't call take()";
-    //require offer.maker != taker, "maker and taker are the same address";
-
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
 
-    require postUpdateCredit > 0 || postUpdatePendingFee == 0, "noRemainingContinuousFeeWithoutCredit: credit == 0 => pendingFee == 0";
+    require postUpdateCredit > 0 || postUpdatePendingFee == 0, "noRemainingContinuousFeeWithoutCredit";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
@@ -96,20 +84,38 @@ rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address 
     mathint creditDelta = to_mathint(postUpdateCredit) - to_mathint(creditAfter);
     mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFeeAfter);
 
-    require offer.buy == false, "take only removes credit from the maker in a sell-offer";
+    require offer.buy == false, "scope to sell offers";
 
-    // if postUpdateCredit is zero, then pendingFeeDelta is also zero, else equals ceil(creditDecrease * postUpdatePendingFee / postUpdateCredit).
     assert postUpdateCredit == 0 || pendingFeeDelta == (to_mathint(postUpdatePendingFee) * creditDelta + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
 }
 
-// take() must not modify credit or pendingFee of any address other than the buyer, seller, and CONTINUOUS_FEE_RECIPIENT.
+// take() increases continuousFeeCredit by exactly the accrued fees of the buyer and seller.
+rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    address buyer = offer.buy ? offer.maker : taker;
+    address seller = offer.buy ? taker : offer.maker;
+
+    bytes32 id;
+    uint128 buyerAccruedFee;
+    uint128 sellerAccruedFee;
+
+    _, _, buyerAccruedFee = updatePositionView(e, offer.obligation, id, buyer);
+    _, _, sellerAccruedFee = updatePositionView(e, offer.obligation, id, seller);
+
+    uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+
+    require id == lastId, "id should be derived from obligation";
+
+    assert continuousFeeCredit(id) == continuousFeeCreditBefore + buyerAccruedFee + sellerAccruedFee;
+}
+
+// take() must not modify credit or pendingFee of any address other than the buyer and seller.
 rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    require user != buyer, "user is a third party, different from buyer";
-    require user != seller, "user is a third party, different from seller";
-    require user != Utils.continuousFeeRecipient(), "user is a third party, different from continuous fee recipient";
+    require user != buyer && user != seller, "user is different from buyer and seller";
 
     bytes32 id;
     uint256 creditBefore = creditOf(id, user);
