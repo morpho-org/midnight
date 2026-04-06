@@ -125,6 +125,36 @@ contract GateTest is BaseTest {
         assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should have debt");
     }
 
+    function testEnterGateAllowsTakeWhenLenderHadCreditBefore(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        gate.setWhitelisted(lender, true);
+        gate.setWhitelisted(borrower, true);
+        collateralize(gatedObligation, borrower, units);
+        take(units, lender, borrowerOffer);
+
+        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should already have credit");
+
+        gate.setWhitelisted(lender, false);
+        gate.setWhitelisted(borrower, false);
+
+        take(0, otherBorrower, lenderOffer);
+    }
+
+    function testEnterGateAllowsTakeWhenBorrowerHadDebtBefore(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        gate.setWhitelisted(lender, true);
+        gate.setWhitelisted(borrower, true);
+        collateralize(gatedObligation, borrower, units);
+        take(units, lender, borrowerOffer);
+
+        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should already have debt");
+
+        gate.setWhitelisted(lender, false);
+        gate.setWhitelisted(borrower, false);
+
+        take(0, otherLender, borrowerOffer);
+    }
+
     // --- No gate check on exit  ---
 
     function testNoEnterGateCheckWhenBorrowerIsExitingBorrower(uint256 units) public {
