@@ -45,7 +45,7 @@ contract TakeAmountsTest is BaseTest {
         id = toId(obligation);
 
         offer.buy = false;
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;

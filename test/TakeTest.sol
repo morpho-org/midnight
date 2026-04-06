@@ -56,7 +56,7 @@ contract TakeTest is BaseTest {
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -64,7 +64,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
-        otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxUnits = type(uint128).max;
         otherLenderOffer.obligation = obligation;
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
@@ -72,14 +72,14 @@ contract TakeTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.obligation = obligation;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
-        otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxUnits = type(uint128).max;
         otherBorrowerOffer.obligation = obligation;
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
@@ -142,7 +142,7 @@ contract TakeTest is BaseTest {
         uint256 actualOtherLenderCredit = midnight.creditOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets + 1);
         otherLenderOffer.buy = false;
-        otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxUnits = type(uint128).max;
         otherLenderOffer.tick = tick;
         uint256 totalUnitsBefore = midnight.totalUnits(id);
 
@@ -165,7 +165,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, otherLenderUnits);
         uint256 actualOtherLenderCredit = midnight.creditOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets + 1);
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.tick = tick;
         uint256 totalUnitsBefore = midnight.totalUnits(id);
 
@@ -208,7 +208,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, existingUnits);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
         collateralize(obligation, borrower, units);
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
         deal(address(loanToken), otherBorrower, units.mulDivUp(price, WAD));
@@ -228,7 +228,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, existingUnits);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
         collateralize(obligation, borrower, units);
-        otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxUnits = type(uint128).max;
         otherBorrowerOffer.tick = tick;
         uint256 totalUnitsBefore = midnight.totalUnits(id);
 
@@ -273,7 +273,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderCredit = midnight.creditOf(id, otherLender);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
 
-        otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxUnits = type(uint128).max;
         otherLenderOffer.tick = tick;
         deal(address(loanToken), otherBorrower, buyerAssets);
 
@@ -296,7 +296,7 @@ contract TakeTest is BaseTest {
         uint256 otherLenderCredit = midnight.creditOf(id, otherLender);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
 
-        otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxUnits = type(uint128).max;
         otherBorrowerOffer.tick = tick;
 
         take(units, otherLender, otherBorrowerOffer);
@@ -314,7 +314,7 @@ contract TakeTest is BaseTest {
         exitUnits = bound(exitUnits, 1, existingUnits);
         setupOtherUsers(obligation, existingUnits);
 
-        otherBorrowerOffer.maxUnits = exitUnits;
+        otherBorrowerOffer.maxUnits = UtilsLib.toUint128(exitUnits);
         otherBorrowerOffer.reduceOnly = true;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -337,7 +337,7 @@ contract TakeTest is BaseTest {
         exitUnits = bound(exitUnits, existingUnits + 1, maxAssets);
         setupOtherUsers(obligation, existingUnits);
 
-        otherBorrowerOffer.maxUnits = exitUnits;
+        otherBorrowerOffer.maxUnits = UtilsLib.toUint128(exitUnits);
         otherBorrowerOffer.reduceOnly = true;
 
         vm.expectRevert("maker credit or debt increased");
@@ -349,7 +349,7 @@ contract TakeTest is BaseTest {
         exitUnits = bound(exitUnits, 1, existingUnits);
         setupOtherUsers(obligation, existingUnits);
 
-        otherLenderOffer.maxUnits = exitUnits;
+        otherLenderOffer.maxUnits = UtilsLib.toUint128(exitUnits);
         otherLenderOffer.reduceOnly = true;
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -372,7 +372,7 @@ contract TakeTest is BaseTest {
         exitUnits = bound(exitUnits, existingUnits + 1, maxAssets);
         setupOtherUsers(obligation, existingUnits);
 
-        otherLenderOffer.maxUnits = exitUnits;
+        otherLenderOffer.maxUnits = UtilsLib.toUint128(exitUnits);
         otherLenderOffer.reduceOnly = true;
 
         vm.expectRevert("maker credit or debt increased");
@@ -386,7 +386,7 @@ contract TakeTest is BaseTest {
         offerUnits = bound(offerUnits, units, maxAssets - 1);
         secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
         thirdTake = bound(thirdTake, 0, maxAssets);
-        borrowerOffer.maxUnits = offerUnits;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(offerUnits);
         deal(address(loanToken), lender, offerUnits);
         collateralize(obligation, borrower, offerUnits);
 
@@ -406,7 +406,7 @@ contract TakeTest is BaseTest {
         offerUnits = bound(offerUnits, units, maxAssets - 1);
         secondTake = bound(secondTake, offerUnits - units + 1, maxAssets);
         thirdTake = bound(thirdTake, 0, maxAssets);
-        lenderOffer.maxUnits = offerUnits;
+        lenderOffer.maxUnits = UtilsLib.toUint128(offerUnits);
         deal(address(loanToken), lender, offerUnits);
         collateralize(obligation, borrower, offerUnits);
 
@@ -424,7 +424,7 @@ contract TakeTest is BaseTest {
     function testBuyGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
-        borrowerOffer.maxUnits = firstFill + secondFill;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(firstFill + secondFill);
         borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
         borrowerOffer2.obligation.maturity = obligation.maturity + 100;
@@ -442,7 +442,7 @@ contract TakeTest is BaseTest {
     function testSellGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
-        lenderOffer.maxUnits = firstFill + secondFill;
+        lenderOffer.maxUnits = UtilsLib.toUint128(firstFill + secondFill);
         lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
         lenderOffer2.obligation.maturity = obligation.maturity + 100;
@@ -469,9 +469,9 @@ contract TakeTest is BaseTest {
         vm.assume(price1 > price2);
         vm.assume(price1 > 0.5 ether);
         vm.assume(price2 > 0.5 ether);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.tick = tick1;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = tick2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
@@ -495,9 +495,9 @@ contract TakeTest is BaseTest {
         vm.assume(price2 > price1);
         vm.assume(price1 > 0.5 ether);
         vm.assume(price2 > 0.5 ether);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.tick = tick1;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = tick2;
 
         deal(address(loanToken), lender, units.mulDivDown(price2, WAD));
@@ -540,7 +540,7 @@ contract TakeTest is BaseTest {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 1, MAX_TICK);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
@@ -554,7 +554,7 @@ contract TakeTest is BaseTest {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
         tick = bound(tick, 1, MAX_TICK);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
@@ -616,7 +616,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = type(uint256).max;
+        lenderOffer.maxSellerAssets = type(uint128).max;
 
         (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
 
@@ -655,7 +655,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = type(uint256).max;
+        borrowerOffer.maxBuyerAssets = type(uint128).max;
 
         (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
 
@@ -685,7 +685,7 @@ contract TakeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivDown(price, WAD);
 
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = expectedSellerAssets;
+        lenderOffer.maxSellerAssets = UtilsLib.toUint128(expectedSellerAssets);
 
         (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
         assertEq(sellerAssets, expectedSellerAssets);
@@ -699,7 +699,7 @@ contract TakeTest is BaseTest {
         uint256 expectedBuyerAssets = units.mulDivUp(price, WAD);
 
         borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = expectedBuyerAssets;
+        borrowerOffer.maxBuyerAssets = UtilsLib.toUint128(expectedBuyerAssets);
 
         (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
         assertEq(buyerAssets, expectedBuyerAssets);
@@ -829,7 +829,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(lenderOffer.tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, units);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
 
         vm.prank(borrower);
         midnight.take(
@@ -852,7 +852,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
         borrowerOffer.callbackData = abi.encode(0, collateral);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
@@ -870,7 +870,7 @@ contract TakeTest is BaseTest {
     function testSellSellerCallback(uint256 units) public {
         units = bound(units, 0, maxAssets);
         uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         address callback = address(new BorrowCallback());
@@ -902,7 +902,7 @@ contract TakeTest is BaseTest {
         lenderOffer.callback = address(new LendCallback());
         lenderOffer.callbackData = abi.encode(loanToken, assets);
         lenderOffer.maker = address(otherLender);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lenderOffer.callback, assets);
         collateralize(obligation, borrower, units);
@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
         uint256 assets = units.mulDivUp(price, WAD);
         (address _otherLender,) = makeAddrAndKey("otherLender");
         address callback = address(new LendCallback());
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
@@ -951,7 +951,7 @@ contract TakeTest is BaseTest {
     function testPriceZero_NoTradingFee_sell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         collateralize(obligation, borrower, units);
         vm.expectRevert("tick out of range");
         take(units, lender, borrowerOffer);
@@ -963,7 +963,7 @@ contract TakeTest is BaseTest {
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         collateralize(obligation, borrower, units);
         vm.expectRevert("tick out of range");
         take(units, borrower, lenderOffer);
@@ -975,7 +975,7 @@ contract TakeTest is BaseTest {
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         collateralize(obligation, borrower, units);
         vm.expectRevert("tick out of range");
         take(units, lender, borrowerOffer);

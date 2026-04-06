@@ -37,6 +37,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev To create a "max" offer, use `type(uint128).max` for `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits`.
 ///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
@@ -220,6 +221,8 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
+    /// @dev `units` values above `type(uint128).max` might still succeed after capping, but might also revert early due
+    /// to overflow depending on which offer-cap path is taken.
     function take(
         uint256 units,
         address taker,
@@ -282,16 +285,16 @@ contract Midnight is IMidnight {
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? _maxUnitsForFloorConsumedAssets(remainingSellerAssets, sellerPrice)
-                    : _maxUnitsForCeilConsumedAssets(remainingSellerAssets, sellerPrice)
+                    ? (remainingSellerAssets + 1).mulDivUp(WAD, sellerPrice) - 1
+                    : remainingSellerAssets.mulDivDown(WAD, sellerPrice)
             );
         } else if (offer.maxBuyerAssets > 0) {
             uint256 remainingBuyerAssets = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
             units = UtilsLib.min(
                 units,
                 offer.buy
-                    ? _maxUnitsForFloorConsumedAssets(remainingBuyerAssets, buyerPrice)
-                    : _maxUnitsForCeilConsumedAssets(remainingBuyerAssets, buyerPrice)
+                    ? (remainingBuyerAssets + 1).mulDivUp(WAD, buyerPrice) - 1
+                    : remainingBuyerAssets.mulDivDown(WAD, buyerPrice)
             );
         } else {
             units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
@@ -379,27 +382,6 @@ contract Midnight is IMidnight {
         require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
 
         return (buyerAssets, sellerAssets, units);
-    }
-
-    /// @dev Returns the maximum units such that floor(units * price / WAD) <= remainingAssets.
-    function _maxUnitsForFloorConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        uint256 base = remainingAssets / price;
-        if (base > type(uint256).max / WAD) return type(uint256).max;
-        base *= WAD;
-
-        uint256 remainder = remainingAssets % price;
-        uint256 extra = ((remainder + 1) * WAD - 1) / price;
-        return base > type(uint256).max - extra ? type(uint256).max : base + extra;
-    }
-
-    /// @dev Returns the maximum units such that ceil(units * price / WAD) <= remainingAssets.
-    function _maxUnitsForCeilConsumedAssets(uint256 remainingAssets, uint256 price) internal pure returns (uint256) {
-        uint256 base = remainingAssets / price;
-        if (base > type(uint256).max / WAD) return type(uint256).max;
-        base *= WAD;
-
-        uint256 extra = (remainingAssets % price).mulDivDown(WAD, price);
-        return base > type(uint256).max - extra ? type(uint256).max : base + extra;
     }
 
     /// @dev Will revert if there are no withdrawable funds.

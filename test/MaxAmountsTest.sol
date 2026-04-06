@@ -62,7 +62,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -72,7 +72,7 @@ contract MaxAmountsTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), amount, "debt at max");
     }
 
-    function testTakeAboveMaxAmountReverts() public {
+    function testTakeAboveMaxAmountCapsToOfferMaxUnits() public {
         uint256 amount = uint256(MAX_AMOUNT) + 1;
 
         deal(address(loanToken), lender, amount);
@@ -88,12 +88,15 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert("uint256 overflows uint128");
-        take(amount, lender, borrowerOffer);
+        (,, uint256 filledUnits) = take(amount, lender, borrowerOffer);
+
+        assertEq(filledUnits, MAX_AMOUNT, "filled units capped");
+        assertEq(midnight.totalUnits(id), MAX_AMOUNT, "total units capped");
+        assertEq(midnight.debtOf(id, borrower), MAX_AMOUNT, "debt capped");
     }
 
     function testSupplyCollateralMaxAmount() public {
