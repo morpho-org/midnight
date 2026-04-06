@@ -8,6 +8,7 @@ methods {
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
+    function liquidationLocked(bytes32, address) external returns (bool) envfree;
 
     /* Assumption: price does not change during rules.
      * Under this assumption we can prove that a healthy borrower cannot get unhealthy by
@@ -227,6 +228,7 @@ rule stayHealthyTakeSameSeller(env e, uint256 units, address taker, address take
     Midnight.Obligation globalObligation = getGlobalObligation();
     require equalsGlobalObligation(offer.obligation), "obligation matches";
     require takeSeller(taker, offer) == globalBorrower, "seller matches";
+    require !liquidationLocked(globalId, globalBorrower), "seller not transiently liquidation-locked";
 
     require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
 
