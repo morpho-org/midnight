@@ -2,6 +2,8 @@
 
 import "BitmapSummaries.spec";
 
+using Havoc as callback;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -24,16 +26,17 @@ methods {
      */
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+    function _.havocAll() external => HAVOC_ALL;
 
-    // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight for this property.
-    // This proof only cares that a borrower is healthy before the outer call and healthy again after a successful return.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    // Model callbacks and token transfers as arbitrary external code so reentrant effects remain reachable,
+    // but do not assert healthiness during the callback window.
+    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
+    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
+    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
+    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
+    function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
 }
 
 /// SUMMARY ///
@@ -151,6 +154,28 @@ function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borro
     } else {
         return isHealthy(obligation, id, borrower);
     }
+}
+
+// Summary for every callback (token transfer, onLiquidate, onFlashLoan, onBuy, onSell).
+// We keep arbitrary callback/token side effects reachable via HAVOC, but only prove healthiness before the
+// outer call and after the successful outer call returns.
+function genericCallback() {
+    address dummy;
+    env e;
+
+    callback.callHavoc(e, dummy);
+}
+
+function genericCallbackBool() returns (bool) {
+    bool result;
+    genericCallback();
+    return result;
+}
+
+function genericCallbackBytes32() returns (bytes32) {
+    bytes32 result;
+    genericCallback();
+    return result;
 }
 
 //// RULES //////
