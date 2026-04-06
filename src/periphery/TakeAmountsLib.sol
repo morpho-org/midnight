@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.26;
 
 import {Midnight} from "../Midnight.sol";
 import {Offer} from "../interfaces/IMidnight.sol";
