@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.31;
+pragma solidity 0.8.34;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {IdLib} from "./libraries/IdLib.sol";
@@ -18,6 +18,7 @@ import {
     LIQUIDATION_CURSOR_HIGH,
     EIP712_DOMAIN_TYPEHASH,
     ROOT_TYPEHASH,
+    LIQUIDATION_LOCK_SLOT,
     CALLBACK_SUCCESS,
     isLltvAllowed
 } from "./libraries/ConstantsLib.sol";
@@ -82,6 +83,36 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev In particular, it does not prevent the user from exiting the obligation
 /// @dev even when the entry gate is reverting.
 /// @dev The liquidator gate prevents the user from liquidating the obligation (and realizing bad debt).
+///
+/// MISC
+/// @dev Zero checks are not systematically performed.
+/// @dev No-ops are allowed.
+/// @dev NatSpec comments are included only when they bring clarity.
+///
+/// TOKEN REQUIREMENTS
+/// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
+/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`.
+/// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
+/// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
+/// - Midnight must send/receive exactly the requested amount on transfers.
+/// - It should not revert on `transfer` and `transferFrom` if balances and approvals are right.
+/// - It should not revert on no-op transfers.
+///
+/// LIVENESS
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`
+/// (unless the borrower has no debt), and `take` whenever the seller still has debt revert.
+/// @dev If `enterGate` reverts or returns false on `canIncreaseCredit`, `take` reverts whenever the buyer's credit
+/// increases.
+/// @dev If `enterGate` reverts or returns false on `canIncreaseDebt`, `take` reverts whenever the seller's debt
+/// increases.
+/// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
+/// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
+/// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
+/// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
+/// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
+/// that token.
+/// @dev If a callback reverts, or if a buy/sell callback returns something other than `CALLBACK_SUCCESS`,
+/// callback-enabled `take`, `repay`, `liquidate`, and `flashLoan` revert.
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
@@ -271,6 +302,7 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
+    /// @dev The seller cannot be liquidated during the callbacks of a take.
     function take(
         uint256 units,
         address taker,
@@ -329,6 +361,7 @@ contract Midnight is IMidnight {
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
@@ -341,22 +374,22 @@ contract Midnight is IMidnight {
             sellerPos.pendingFee -= sellerPendingFeeDecrease;
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
+        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
         if (offer.reduceOnly) {
-            require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "maker credit or debt increased");
+            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, "maker credit or debt increased");
         }
 
         require(
-            offer.obligation.enterGate == address(0) || buyerPos.credit == 0
+            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
             "buyer gated from increasing credit"
         );
         require(
-            offer.obligation.enterGate == address(0) || sellerPos.debt == 0
+            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
             "seller gated from increasing debt"
         );
@@ -380,6 +413,7 @@ contract Midnight is IMidnight {
         );
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
+        bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
@@ -406,8 +440,8 @@ contract Midnight is IMidnight {
                 );
             }
         }
-
-        require(isHealthy(offer.obligation, id, seller), "seller is unhealthy");
+        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
+        require(!isLiquidatable(offer.obligation, id, seller), "seller is liquidatable");
 
         // MVP limits.
         require(buyerAssets <= maxTakeableAssets[offer.obligation.loanToken], "exceeds max takeable");
@@ -535,6 +569,7 @@ contract Midnight is IMidnight {
             "liquidator gated from liquidating"
         );
         Position storage _position = position[id][borrower];
+        require(!UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, borrower), "liquidation locked");
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
@@ -842,6 +877,17 @@ contract Midnight is IMidnight {
 
     function lastAccrual(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].lastAccrual;
+    }
+
+    function liquidationLocked(bytes32 id, address user) external view returns (bool) {
+        return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
+    }
+
+    /// @dev A borrower is liquidatable if liquidation is not transiently locked, and they are past maturity
+    /// or not healthy.
+    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+        return !UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, borrower)
+            && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.

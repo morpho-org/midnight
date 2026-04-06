@@ -18,6 +18,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
 
       - name: Check formatting
         run: forge fmt --check
@@ -31,6 +33,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
 
       - name: Run forge lint
         run: forge lint --deny notes
@@ -57,6 +61,8 @@ jobs:
           submodules: recursive
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
       - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings
         env:
