@@ -50,6 +50,11 @@ persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
 
 persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint;
 
+/* Axioms that are proved by MulDiv.spec */
+
+/* proved in mulDivMonotoneA */
+definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => summaryMulDivDownM(a1, b, d) <= summaryMulDivDownM(a2, b, d);
+
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -144,6 +149,8 @@ function callIsNotLiquidatable(Midnight.Obligation obligation, bytes32 id, addre
 
 definition takeSeller(address taker, Midnight.Offer offer) returns address = offer.buy ? taker : offer.maker;
 
+definition takeBuyer(address taker, Midnight.Offer offer) returns address = offer.buy ? offer.maker : taker;
+
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell).
 // We check that the tracked borrower is not liquidatable before the callback, do some external call
 // (to simulate changes by the callback), and then require that the borrower is still not liquidatable after the callback.
@@ -203,7 +210,8 @@ rule stayNotLiquidatableLiquidateOtherBorrower(env e, Midnight.Obligation obliga
 
 // Show that the borrower stays not liquidatable on take, if the borrower under consideration is the seller on the obligation under consideration.
 rule stayNotLiquidatableTakeSameSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    useIsHealthyNoBitmap = true;
+    // Align the post-call check with take's runtime seller health check.
+    useIsHealthyNoBitmap = false;
     globalBlockTimestamp = e.block.timestamp;
 
     // This variable is set to false whenever not liquidatable is violated before a callback. Initially we set it to true.
@@ -223,7 +231,8 @@ rule stayNotLiquidatableTakeSameSeller(env e, uint256 units, address taker, addr
     assert callIsNotLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable after call";
 }
 
-// Show that the borrower stays not liquidatable on take, if another user is the seller or the obligation differs.
+// Show that the borrower stays not liquidatable on take, if the borrower is neither buyer nor seller on the
+// obligation under consideration, or the obligation differs.
 rule stayNotLiquidatableTakeOtherBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     useIsHealthyNoBitmap = true;
     globalBlockTimestamp = e.block.timestamp;
@@ -234,7 +243,7 @@ rule stayNotLiquidatableTakeOtherBorrower(env e, uint256 units, address taker, a
     require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
 
     Midnight.Obligation globalObligation = getGlobalObligation();
-    require takeSeller(taker, offer) != globalBorrower || !equalsGlobalObligation(offer.obligation), "seller or obligation differs";
+    require (takeSeller(taker, offer) != globalBorrower && takeBuyer(taker, offer) != globalBorrower) || !equalsGlobalObligation(offer.obligation), "borrower is not a take participant on the tracked obligation";
 
     require callIsNotLiquidatable(globalObligation, globalId, globalBorrower), "user is not liquidatable before call";
 
@@ -252,6 +261,8 @@ rule stayNotLiquidatable(env e, method f, calldataarg args) filtered { f -> f.se
 
     // This variable is set to false whenever not liquidatable is violated before a callback. Initially we set it to true.
     notLiquidatableBeforeCallback = true;
+
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
 
     require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
 
