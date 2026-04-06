@@ -4,7 +4,7 @@ pragma solidity 0.8.31;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {IdLib} from "./libraries/IdLib.sol";
-import {TickLib} from "./libraries/TickLib.sol";
+import {TickLib, BASE_SPACING} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {
     WAD,
@@ -122,6 +122,12 @@ contract Midnight is IMidnight {
     /// @dev Address that can set trading fees.
     address public feeSetter;
 
+    /// @dev Address that can set tick accessibility levels.
+    address public tickSetter;
+
+    /// @dev Default spacing per loan token. Applied when obligations are created.
+    mapping(address loanToken => uint8) public defaultSpacing;
+
     /// CONSTRUCTOR ///
 
     constructor() {
@@ -160,6 +166,34 @@ contract Midnight is IMidnight {
         require(msg.sender == owner, "only owner");
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
+    }
+
+    function setTickSetter(address newTickSetter) external {
+        require(msg.sender == owner, "only owner");
+        tickSetter = newTickSetter;
+        emit EventsLib.SetTickSetter(newTickSetter);
+    }
+
+    /// @dev Refines the tick spacing of a specific obligation. Can only decrease (more ticks become accessible).
+    function setObligationSpacing(bytes32 id, uint256 newSpacing) external {
+        require(msg.sender == tickSetter, "only tick setter");
+        require(newSpacing > 0 && BASE_SPACING % newSpacing == 0, "invalid spacing");
+        require(obligationState[id].created, "obligation not created");
+        require(newSpacing < obligationState[id].spacing, "can only decrease spacing");
+        // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
+        obligationState[id].spacing = uint8(newSpacing);
+        emit EventsLib.SetObligationSpacing(id, newSpacing);
+    }
+
+    /// @dev Sets the default spacing for new obligations with the given loan token.
+    /// @dev Unlike per-obligation spacing (which can only decrease), the default can be freely changed because it only
+    /// affects future obligations at creation time. Existing obligations and their signed offers are never impacted.
+    function setDefaultSpacing(address loanToken, uint256 newSpacing) external {
+        require(msg.sender == tickSetter, "only tick setter");
+        require(newSpacing > 0 && BASE_SPACING % newSpacing == 0, "invalid spacing");
+        // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
+        defaultSpacing[loanToken] = uint8(newSpacing);
+        emit EventsLib.SetDefaultSpacing(loanToken, newSpacing);
     }
 
     /// @dev Overrides the fee of a specific obligation.
@@ -291,6 +325,8 @@ contract Midnight is IMidnight {
                 offer.callbackData,
                 offer.receiverIfMakerIsSeller
             );
+
+        require(offer.tick % _obligationState.spacing == 0, "tick not accessible at obligation level");
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -669,6 +705,9 @@ contract Midnight is IMidnight {
 
             ObligationState storage _obligationState = obligationState[id];
             _obligationState.created = true;
+            uint8 _defaultSpacing = defaultSpacing[obligation.loanToken];
+            // forge-lint: disable-next-line(unsafe-typecast) as BASE_SPACING < type(uint8).max
+            _obligationState.spacing = _defaultSpacing == 0 ? uint8(BASE_SPACING) : _defaultSpacing;
             uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
             _obligationState.fee0 = _defaultTradingFees[0];
             _obligationState.fee1 = _defaultTradingFees[1];
@@ -785,6 +824,10 @@ contract Midnight is IMidnight {
 
     function obligationCreated(bytes32 id) external view returns (bool) {
         return obligationState[id].created;
+    }
+
+    function spacing(bytes32 id) external view returns (uint8) {
+        return obligationState[id].spacing;
     }
 
     function withdrawable(bytes32 id) external view returns (uint256) {

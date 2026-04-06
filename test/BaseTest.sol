@@ -55,6 +55,7 @@ abstract contract BaseTest is Test {
         midnight = new Midnight();
 
         midnight.setFeeSetter(address(this));
+        midnight.setTickSetter(address(this));
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -88,6 +89,8 @@ abstract contract BaseTest is Test {
             collateralToken1 = new ERC20("collat1", "collat1");
             collateralToken2 = new ERC20("collat2", "collat2");
         }
+
+        midnight.setDefaultSpacing(address(loanToken), 1);
 
         oracle1 = new Oracle();
         oracle2 = new Oracle();

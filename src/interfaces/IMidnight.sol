@@ -59,6 +59,7 @@ struct ObligationState {
     uint16 fee5;
     uint16 fee6;
     uint32 continuousFee;
+    uint8 spacing;
     bool created;
 }
 
