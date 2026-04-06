@@ -46,10 +46,11 @@ rule makerFavorableRounding(env e, uint256 units, address taker, address takerCa
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _ = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 filledUnits;
+    buyerAssets, sellerAssets, filledUnits = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
-    assert offer.buy => to_mathint(buyerAssets) * WAD() <= to_mathint(units) * to_mathint(offerPrice);
-    assert !offer.buy => to_mathint(sellerAssets) * WAD() >= to_mathint(units) * to_mathint(offerPrice);
+    assert offer.buy => to_mathint(buyerAssets) * WAD() <= to_mathint(filledUnits) * to_mathint(offerPrice);
+    assert !offer.buy => to_mathint(sellerAssets) * WAD() >= to_mathint(filledUnits) * to_mathint(offerPrice);
 }
 
 // The trading fee cannot be bypassed: the spread between what the buyer pays and what
@@ -59,12 +60,13 @@ rule feeIsNotBypassed(env e, uint256 units, address taker, address takerCallback
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _ = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 filledUnits;
+    buyerAssets, sellerAssets, filledUnits = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     uint256 fee = CVL_tradingFee(lastId, timeToMaturity);
 
-    assert to_mathint(buyerAssets) - to_mathint(sellerAssets) >= (to_mathint(units) * to_mathint(fee)) / WAD();
-    assert to_mathint(buyerAssets) - to_mathint(sellerAssets) <= (to_mathint(units) * to_mathint(fee) + WAD() - 1) / WAD();
+    assert to_mathint(buyerAssets) - to_mathint(sellerAssets) >= (to_mathint(filledUnits) * to_mathint(fee)) / WAD();
+    assert to_mathint(buyerAssets) - to_mathint(sellerAssets) <= (to_mathint(filledUnits) * to_mathint(fee) + WAD() - 1) / WAD();
 }
 
 // taking zero units must produce zero assets on both sides.

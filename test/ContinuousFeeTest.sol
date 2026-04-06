@@ -58,7 +58,7 @@ contract ContinuousFeeTest is BaseTest {
         o.obligation = obligation;
         o.buy = true;
         o.maker = otherLender;
-        o.maxUnits = units;
+        o.maxUnits = UtilsLib.toUint128(units);
         o.expiry = block.timestamp;
         o.tick = MAX_TICK;
         o.group = group;
@@ -185,7 +185,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.buy = false;
         borrowOffer.maker = otherBorrower;
         borrowOffer.receiverIfMakerIsSeller = otherBorrower;
-        borrowOffer.maxUnits = credit2;
+        borrowOffer.maxUnits = UtilsLib.toUint128(credit2);
         borrowOffer.start = block.timestamp;
         borrowOffer.expiry = block.timestamp;
         borrowOffer.tick = MAX_TICK;

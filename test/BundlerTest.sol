@@ -91,9 +91,11 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
+        offerUnits0 = bound(offerUnits0, 0, type(uint128).max);
+        offerUnits1 = bound(offerUnits1, 0, type(uint128).max);
         units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
-        offers[0].maxUnits = offerUnits0;
-        offers[1].maxUnits = offerUnits1;
+        offers[0].maxUnits = UtilsLib.toUint128(offerUnits0);
+        offers[1].maxUnits = UtilsLib.toUint128(offerUnits1);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
         collateralize(obligation, borrower, units);
@@ -137,9 +139,11 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
+        offerUnits0 = bound(offerUnits0, 0, type(uint128).max);
+        offerUnits1 = bound(offerUnits1, 0, type(uint128).max);
         targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
-        offers[0].maxUnits = offerUnits0;
-        offers[1].maxUnits = offerUnits1;
+        offers[0].maxUnits = UtilsLib.toUint128(offerUnits0);
+        offers[1].maxUnits = UtilsLib.toUint128(offerUnits1);
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         // NB: splitting across offers can require 1 extra unit due to per-leg rounding of buyer assets.
@@ -187,9 +191,11 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeSellerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
+        offerUnits0 = bound(offerUnits0, 0, type(uint128).max);
+        offerUnits1 = bound(offerUnits1, 0, type(uint128).max);
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
-        offers[0].maxUnits = offerUnits0;
-        offers[1].maxUnits = offerUnits1;
+        offers[0].maxUnits = UtilsLib.toUint128(offerUnits0);
+        offers[1].maxUnits = UtilsLib.toUint128(offerUnits1);
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchObligation(obligation);
@@ -273,15 +279,17 @@ contract BundlerTest is BaseTest {
         uint256 tick1,
         uint256 maxBuyerAssets
     ) public {
+        offerUnits0 = bound(offerUnits0, 0, type(uint128).max);
+        offerUnits1 = bound(offerUnits1, 0, type(uint128).max);
         uint256 minTick = _minTick();
         tick0 = bound(tick0, minTick, MAX_TICK);
         tick1 = bound(tick1, minTick, MAX_TICK);
         // Ensure buyerAssets > 0 so the max bound actually triggers.
         uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
         targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
-        offers[0].maxUnits = offerUnits0;
+        offers[0].maxUnits = UtilsLib.toUint128(offerUnits0);
         offers[0].tick = tick0;
-        offers[1].maxUnits = offerUnits1;
+        offers[1].maxUnits = UtilsLib.toUint128(offerUnits1);
         offers[1].tick = tick1;
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
@@ -326,13 +334,15 @@ contract BundlerTest is BaseTest {
         uint256 tick1,
         uint256 minBuyerAssets
     ) public {
+        offerUnits0 = bound(offerUnits0, 0, type(uint128).max);
+        offerUnits1 = bound(offerUnits1, 0, type(uint128).max);
         uint256 minTick = _minTick();
         tick0 = bound(tick0, minTick, MAX_TICK);
         tick1 = bound(tick1, minTick, MAX_TICK);
         targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
-        offers[0].maxUnits = offerUnits0;
+        offers[0].maxUnits = UtilsLib.toUint128(offerUnits0);
         offers[0].tick = tick0;
-        offers[1].maxUnits = offerUnits1;
+        offers[1].maxUnits = UtilsLib.toUint128(offerUnits1);
         offers[1].tick = tick1;
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);

@@ -20,7 +20,9 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+
+    // Sound: tickToPrice requires tick > 0 and always returns a positive value.
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => tickToPriceSummary(tick);
 
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own
@@ -32,6 +34,10 @@ methods {
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
+}
+
+ghost tickToPriceSummary(uint256) returns uint256 {
+    axiom forall uint256 t. tickToPriceSummary(t) > 0;
 }
 
 function signerSummary() returns address {
@@ -101,14 +107,15 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 filledUnits;
+    _, _, filledUnits = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
 
-    mathint makerDelta = offer.buy ? units : -units;
+    mathint makerDelta = offer.buy ? filledUnits : -filledUnits;
     assert makerNetAfter == makerNetBefore + makerDelta;
-    mathint takerDelta = offer.buy ? -units : units;
+    mathint takerDelta = offer.buy ? -filledUnits : filledUnits;
     assert takerNetAfter == takerNetBefore + takerDelta;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;

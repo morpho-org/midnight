@@ -140,7 +140,7 @@ abstract contract BaseTest is Test {
         lenderOffer.obligation = obligation;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -284,7 +284,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;

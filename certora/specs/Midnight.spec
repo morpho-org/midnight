@@ -74,8 +74,8 @@ rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, addres
 
     buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
 
-    // The output units is equal to the input.
-    assert unitsOutput == unitsInput;
+    // The output units is at most the input (capped to available).
+    assert unitsOutput <= unitsInput;
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;

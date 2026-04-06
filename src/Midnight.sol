@@ -37,6 +37,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev To create a "max" offer, use `type(uint128).max` for `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits`.
 ///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
@@ -242,6 +243,8 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
+    /// @dev `units` values above `type(uint128).max` might still succeed after capping, but might also revert early due
+    /// to overflow depending on which offer-cap path is taken.
     function take(
         uint256 units,
         address taker,
@@ -296,21 +299,35 @@ contract Midnight is IMidnight {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        require(sellerPrice > 0, "seller price is zero");
         uint256 buyerPrice = sellerPrice + _tradingFee;
+        uint256 currentConsumed = consumed[offer.maker][offer.group];
+        if (offer.maxSellerAssets > 0) {
+            uint256 remainingSellerAssets = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
+            units = UtilsLib.min(
+                units,
+                offer.buy
+                    ? (remainingSellerAssets + 1).mulDivUp(WAD, sellerPrice) - 1
+                    : remainingSellerAssets.mulDivDown(WAD, sellerPrice)
+            );
+        } else if (offer.maxBuyerAssets > 0) {
+            uint256 remainingBuyerAssets = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
+            units = UtilsLib.min(
+                units,
+                offer.buy
+                    ? (remainingBuyerAssets + 1).mulDivUp(WAD, buyerPrice) - 1
+                    : remainingBuyerAssets.mulDivDown(WAD, buyerPrice)
+            );
+        } else {
+            units = UtilsLib.min(units, offer.maxUnits.zeroFloorSub(currentConsumed));
+        }
+
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed;
-        if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, "consumed seller assets");
-        } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, "consumed");
-        }
+        uint256 consumedDelta =
+            offer.maxSellerAssets > 0 ? sellerAssets : (offer.maxBuyerAssets > 0 ? buyerAssets : units);
+        uint256 newConsumed = consumed[offer.maker][offer.group] = currentConsumed + consumedDelta;
 
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
