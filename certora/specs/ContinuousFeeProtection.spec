@@ -14,7 +14,6 @@ methods {
     function _.price() external => NONDET;
     function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
@@ -24,6 +23,9 @@ methods {
     function _.canIncreaseDebt(address) external => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => NONDET;
+
+    // the properties are about pendingFee/ credit accounting, and not liquidation interactions.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
 }
 
 /// HELPERS ///
