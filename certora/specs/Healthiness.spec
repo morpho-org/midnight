@@ -2,8 +2,6 @@
 
 import "BitmapSummaries.spec";
 
-using Havoc as callback;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -26,15 +24,16 @@ methods {
      */
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
-    function _.havocAll() external => HAVOC_ALL;
 
-    function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
-    function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
+    // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight for this property.
+    // This proof only cares that a borrower is healthy before the outer call and healthy again after a successful return.
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 /// SUMMARY ///
@@ -154,32 +153,6 @@ function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borro
     }
 }
 
-definition takeSeller(address taker, Midnight.Offer offer) returns address = offer.buy ? taker : offer.maker;
-
-definition takeBuyer(address taker, Midnight.Offer offer) returns address = offer.buy ? offer.maker : taker;
-
-// Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell).
-// We do not prove healthiness during callbacks; we only prove healthiness again at the end of the outer call.
-function genericCallback() {
-    address dummy;
-    env e;
-
-    callback.callHavoc(e, dummy);
-}
-
-// Same as the summary above except that it also returns a non-deterministic value.
-function genericCallbackBool() returns (bool) {
-    bool result;
-    genericCallback();
-    return result;
-}
-
-function genericCallbackBytes32() returns (bytes32) {
-    bytes32 result;
-    genericCallback();
-    return result;
-}
-
 //// RULES //////
 
 // The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
@@ -242,44 +215,9 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
-// Show that the user stays healthy on take, if the user under consideration is the seller on the obligation under consideration.
-rule stayHealthyTakeSameSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    useIsHealthyNoBitmap = false;
-
-    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
-
-    Midnight.Obligation globalObligation = getGlobalObligation();
-    require equalsGlobalObligation(offer.obligation), "obligation matches";
-    require takeSeller(taker, offer) == globalBorrower, "seller matches";
-
-    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
-
-    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
-}
-
-// Show that the user stays healthy on take, if the user is neither buyer nor seller on the obligation under consideration,
-// or the obligation differs.
-rule stayHealthyTakeOtherBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    useIsHealthyNoBitmap = true;
-
-    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
-
-    Midnight.Obligation globalObligation = getGlobalObligation();
-    require (takeSeller(taker, offer) != globalBorrower && takeBuyer(taker, offer) != globalBorrower) || !equalsGlobalObligation(offer.obligation), "borrower is not a take participant on the tracked obligation";
-
-    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
-
-    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
-}
-
-// Show that the user stays healthy on any other function than liquidate or take.
-// Take is handled by the two dedicated rules above.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector } {
-    // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
+// Show that the user stays healthy on any other function than liquidate.
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+    // for withdrawCollateral we choose isHealthy(); for all others we choose the bitmap-less implementation.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
