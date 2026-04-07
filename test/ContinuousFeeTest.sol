@@ -8,6 +8,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
 
@@ -437,7 +438,7 @@ contract ContinuousFeeTest is BaseTest {
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(ErrorsLib.OnlyFeeClaimer.selector);
         midnight.claimContinuousFee(obligation, 0, caller);
     }
 

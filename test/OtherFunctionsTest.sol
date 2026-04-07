@@ -11,6 +11,7 @@ import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -101,7 +102,7 @@ contract OtherFunctionsTest is BaseTest {
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
         vm.prank(borrower);
-        vm.expectRevert("unhealthy borrower");
+        vm.expectRevert(ErrorsLib.UnhealthyBorrower.selector);
         midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
     }
 
@@ -213,7 +214,7 @@ contract OtherFunctionsTest is BaseTest {
         midnight.setConsumed(group, amount0, user);
 
         vm.prank(user);
-        vm.expectRevert("already consumed");
+        vm.expectRevert(ErrorsLib.AlreadyConsumed.selector);
         midnight.setConsumed(group, amount1, user);
     }
 
@@ -362,7 +363,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.loanToken = address(loanToken);
         _obligation.maturity = block.timestamp + 100;
         _obligation.collateralParams = new CollateralParams[](0);
-        vm.expectRevert("no collateralParams");
+        vm.expectRevert(ErrorsLib.NoCollateralParams.selector);
         midnight.touchObligation(_obligation);
     }
 
@@ -370,7 +371,7 @@ contract OtherFunctionsTest is BaseTest {
         numCollaterals = bound(numCollaterals, MAX_COLLATERALS + 1, 1000);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
 
-        vm.expectRevert("too many collateralParams");
+        vm.expectRevert(ErrorsLib.TooManyCollateralParams.selector);
         midnight.touchObligation(_obligation);
     }
 
@@ -386,7 +387,7 @@ contract OtherFunctionsTest is BaseTest {
             token: address(uint160(1)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle2)
         });
         _obligation.collateralParams = collateralParams;
-        vm.expectRevert("collateralParams not sorted");
+        vm.expectRevert(ErrorsLib.CollateralParamsNotSorted.selector);
         midnight.touchObligation(_obligation);
     }
 
@@ -400,7 +401,7 @@ contract OtherFunctionsTest is BaseTest {
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         _obligation.collateralParams = collateralParams;
-        vm.expectRevert("lltv not allowed");
+        vm.expectRevert(ErrorsLib.LltvNotAllowed.selector);
         midnight.touchObligation(_obligation);
     }
 
@@ -415,7 +416,7 @@ contract OtherFunctionsTest is BaseTest {
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         _obligation.collateralParams = collateralParams;
-        vm.expectRevert("lltv not allowed");
+        vm.expectRevert(ErrorsLib.LltvNotAllowed.selector);
         midnight.touchObligation(_obligation);
     }
 
@@ -440,7 +441,7 @@ contract OtherFunctionsTest is BaseTest {
         address lastToken = _obligation.collateralParams[numCollaterals - 1].token;
         deal(lastToken, address(this), 1e18);
         ERC20(lastToken).approve(address(midnight), 1e18);
-        vm.expectRevert("too many activated collaterals");
+        vm.expectRevert(ErrorsLib.TooManyActivatedCollaterals.selector);
         midnight.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
     }
 
@@ -551,7 +552,7 @@ contract OtherFunctionsTest is BaseTest {
             CollateralParams({token: address(collateralToken1), lltv: lltv, maxLif: lif, oracle: address(oracle1)});
         _obligation.collateralParams = collateralParams;
 
-        vm.expectRevert("invalid maxLif");
+        vm.expectRevert(ErrorsLib.InvalidMaxLif.selector);
         midnight.touchObligation(_obligation);
     }
 
