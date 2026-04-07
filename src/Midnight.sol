@@ -225,21 +225,21 @@ contract Midnight is IMidnight {
 
     /// @dev Set max total units for a loan asset.
     function setMaxTotalUnits(address loanToken, uint128 newMaxTotalUnits) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == roleSetter, "only role setter");
         maxTotalUnits[loanToken] = newMaxTotalUnits;
         emit EventsLib.SetMaxTotalUnits(loanToken, newMaxTotalUnits);
     }
 
     /// @dev Set max takeable assets for a loan asset.
     function setMaxTakeableAssets(address loanToken, uint256 newMaxTakeableAssets) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == roleSetter, "only role setter");
         maxTakeableAssets[loanToken] = newMaxTakeableAssets;
         emit EventsLib.SetMaxTakeableAssets(loanToken, newMaxTakeableAssets);
     }
 
     /// @dev Set max collateral per user for a collateral token.
     function setMaxCollateralPerUser(address collateralToken, uint256 newMaxCollateralPerUser) external {
-        require(msg.sender == owner, "Only owner");
+        require(msg.sender == roleSetter, "only role setter");
         maxCollateralPerUser[collateralToken] = newMaxCollateralPerUser;
         emit EventsLib.SetMaxCollateralPerUser(collateralToken, newMaxCollateralPerUser);
     }
