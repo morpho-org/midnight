@@ -21,6 +21,7 @@ contract MockVault {
     }
 
     function withdraw(uint256 assets, address receiver, address) external returns (uint256) {
+        // forge-lint: disable-next-line(erc20-unchecked-transfer) test mock with controlled ERC20.
         ERC20(asset).transfer(receiver, assets);
         return assets;
     }
