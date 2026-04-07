@@ -101,7 +101,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert("position is not liquidatable");
+        vm.expectRevert("not liquidatable");
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
@@ -121,7 +121,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
@@ -131,7 +131,7 @@ contract LiquidationTest is BaseTest {
         liquidationOraclePrice = bound(liquidationOraclePrice, 0, ORACLE_PRICE_SCALE - 1);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
@@ -299,7 +299,8 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
-        (uint128 oldTotalUnits, uint256 previousLossIndex,,,,) = midnight.obligationState(id);
+        uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
+        uint256 previousLossIndex = midnight.lossIndex(id);
         uint256 expectedLossIndex = expectedBadDebt == 0
             ? previousLossIndex
             : type(uint128).max
@@ -320,7 +321,7 @@ contract LiquidationTest is BaseTest {
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
 
-        (, uint256 lossIndex,,,,) = midnight.obligationState(id);
+        uint256 lossIndex = midnight.lossIndex(id);
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
@@ -595,7 +596,9 @@ contract LiquidationTest is BaseTest {
 
         // Collateralize with both collateralParams.
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         deal(obligation.collateralParams[0].token, address(this), collateral1);
         midnight.supplyCollateral(obligation, 0, collateral1, borrower);
@@ -627,7 +630,9 @@ contract LiquidationTest is BaseTest {
         uint256 lltv0 = obligation.collateralParams[0].lltv;
         uint256 lltv1 = obligation.collateralParams[1].lltv;
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -669,7 +674,9 @@ contract LiquidationTest is BaseTest {
         uint256 units = 1000e18;
         uint256 collateralAmount = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Supply both collateralParams.
         for (uint256 i = 0; i < 2; i++) {
@@ -733,7 +740,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        (, uint128 oblLossIndex,,,,) = midnight.obligationState(id);
+        uint128 oblLossIndex = midnight.lossIndex(id);
         assertGt(oblLossIndex, midnight.userLossIndex(id, borrower), "loss index stale before");
 
         midnight.updatePosition(obligation, borrower);
@@ -775,7 +782,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        (, uint128 _lossIndex,,,,) = midnight.obligationState(id);
+        uint128 _lossIndex = midnight.lossIndex(id);
         assertEq(_lossIndex, type(uint128).max, "loss index");
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
@@ -783,7 +790,8 @@ contract LiquidationTest is BaseTest {
         // withdrawCollateral still works
         uint256 collateral = midnight.collateral(id, borrower, 0);
         assertGt(collateral, 0, "has collateral");
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(this), true);
         midnight.withdrawCollateral(obligation, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }

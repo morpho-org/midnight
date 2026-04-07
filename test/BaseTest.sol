@@ -17,8 +17,6 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
-    EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
     LLTV_0,
     LLTV_1,
     LLTV_2,
@@ -29,9 +27,11 @@ import {
     LLTV_7,
     LLTV_8
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-
+import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
+import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {EcrecoverAuthorizer} from "../src/authorizers/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
@@ -50,9 +50,15 @@ abstract contract BaseTest is Test {
     address internal otherBorrower;
     address internal otherLender;
     address internal liquidator = makeAddr("liquidator");
+    EcrecoverRatifier internal ecrecoverRatifier;
+    EcrecoverAuthorizer internal ecrecoverAuthorizer;
+
+    bytes internal emptySig;
 
     function setUp() public virtual {
         midnight = new Midnight();
+        ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
+        ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
 
         midnight.setFeeSetter(address(this));
 
@@ -65,6 +71,16 @@ abstract contract BaseTest is Test {
         privateKey[otherBorrower] = _privateKey;
         (otherLender, _privateKey) = makeAddrAndKey("otherLender");
         privateKey[otherLender] = _privateKey;
+
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
+        vm.prank(otherBorrower);
+        midnight.setIsAuthorized(otherBorrower, address(ecrecoverRatifier), true);
+        vm.prank(otherLender);
+        midnight.setIsAuthorized(otherLender, address(ecrecoverRatifier), true);
 
         uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
         if (tokenType == 1) {
@@ -142,6 +158,7 @@ abstract contract BaseTest is Test {
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -161,11 +178,16 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
+        badBorrowerOffer.ratifier = address(ecrecoverRatifier);
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.tick = MAX_TICK;
 
-        authorize(badBorrower, address(this));
+        vm.prank(badBorrower);
+
+        midnight.setIsAuthorized(badBorrower, address(ecrecoverRatifier), true);
+        vm.prank(badBorrower);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
 
         deal(obligation.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(obligation, 0, 135, badBorrower);
@@ -181,7 +203,8 @@ abstract contract BaseTest is Test {
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         // then empty the market (borrow side only).
-        authorize(badBorrower, address(this));
+        vm.prank(badBorrower);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
         midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, hex"");
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
@@ -194,9 +217,23 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function authorize(address from, address to) internal {
-        vm.prank(from);
-        midnight.setIsAuthorized(from, to, true);
+    function sig(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
+    }
+
+    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
+        return new bytes32[](0);
+    }
+
+    // assumes the offer is the first one!
+    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](1);
+        _path[0] = keccak256(abi.encode(offers[1]));
+        return _path;
+    }
+
+    function root(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -207,37 +244,30 @@ abstract contract BaseTest is Test {
         return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
     }
 
-    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
-        return new bytes32[](0);
+    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
     }
 
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory res = new bytes32[](1);
-        res[0] = keccak256(abi.encode(offers[1]));
-        return res;
-    }
-
-    function domainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(midnight)));
-    }
-
-    function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract)
+        internal
+        view
+        returns (Signature memory)
+    {
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, messageHash);
-        return signature;
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
+        Signature memory _signature;
+        (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
+        return _signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
 
-    function sig(Offer[2] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -285,6 +315,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;

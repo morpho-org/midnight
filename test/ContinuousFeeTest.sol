@@ -59,6 +59,7 @@ contract ContinuousFeeTest is BaseTest {
         o.buy = true;
         o.maker = otherLender;
         o.maxUnits = units;
+        o.ratifier = address(ecrecoverRatifier);
         o.expiry = block.timestamp;
         o.tick = MAX_TICK;
         o.group = group;
@@ -95,9 +96,9 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
 
-        // Fee accumulated in continuousFeeAmount
+        // Fee accumulated in continuousFeeCredit
         if (expectedFee > 0) {
-            assertEq(midnight.continuousFeeAmount(id), expectedFee, "continuousFeeAmount");
+            assertEq(midnight.continuousFeeCredit(id), expectedFee, "continuousFeeCredit");
         }
     }
 
@@ -186,6 +187,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.maker = otherBorrower;
         borrowOffer.receiverIfMakerIsSeller = otherBorrower;
         borrowOffer.maxUnits = credit2;
+        borrowOffer.ratifier = address(ecrecoverRatifier);
         borrowOffer.start = block.timestamp;
         borrowOffer.expiry = block.timestamp;
         borrowOffer.tick = MAX_TICK;
@@ -408,7 +410,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed);
         midnight.updatePosition(obligation, lender);
 
-        uint256 feeAmount = midnight.continuousFeeAmount(id);
+        uint256 feeAmount = midnight.continuousFeeCredit(id);
         vm.assume(feeAmount > 0);
         claimAmount = bound(claimAmount, 1, feeAmount);
 
@@ -427,7 +429,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.claimContinuousFee(obligation, claimAmount, receiver);
 
         assertEq(loanToken.balanceOf(receiver), claimAmount, "receiver balance");
-        assertEq(midnight.continuousFeeAmount(id), feeAmount - claimAmount, "continuousFeeAmount after claim");
+        assertEq(midnight.continuousFeeCredit(id), feeAmount - claimAmount, "continuousFeeCredit after claim");
         assertEq(midnight.totalUnits(id), totalUnitsBefore - claimAmount, "totalUnits after claim");
         assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after claim");
     }
@@ -450,7 +452,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed);
         midnight.updatePosition(obligation, lender);
 
-        uint256 feeAmount = midnight.continuousFeeAmount(id);
+        uint256 feeAmount = midnight.continuousFeeCredit(id);
         vm.assume(feeAmount > 0);
 
         vm.prank(feeClaimer);

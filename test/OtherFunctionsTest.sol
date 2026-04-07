@@ -57,7 +57,9 @@ contract OtherFunctionsTest is BaseTest {
         obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         id = toId(obligation);
     }
@@ -130,7 +132,8 @@ contract OtherFunctionsTest is BaseTest {
 
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
-        authorize(borrower, address(callback));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(callback), true);
 
         callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
 
@@ -210,7 +213,7 @@ contract OtherFunctionsTest is BaseTest {
         midnight.setConsumed(group, amount0, user);
 
         vm.prank(user);
-        vm.expectRevert("consumed");
+        vm.expectRevert("already consumed");
         midnight.setConsumed(group, amount1, user);
     }
 
@@ -225,7 +228,7 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
-        uint16[7] memory fees = midnight.fees(_id);
+        uint16[7] memory fees = midnight.tradingFees(_id);
         for (uint256 i = 0; i < 7; i++) {
             assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
@@ -437,7 +440,7 @@ contract OtherFunctionsTest is BaseTest {
         address lastToken = _obligation.collateralParams[numCollaterals - 1].token;
         deal(lastToken, address(this), 1e18);
         ERC20(lastToken).approve(address(midnight), 1e18);
-        vm.expectRevert("too many collaterals per borrower");
+        vm.expectRevert("too many activated collaterals");
         midnight.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
     }
 

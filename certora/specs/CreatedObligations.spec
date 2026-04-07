@@ -9,7 +9,7 @@ methods {
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
-    function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
@@ -18,7 +18,8 @@ methods {
     function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
     function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -85,8 +86,8 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
@@ -128,6 +129,9 @@ strong invariant obligationFeesAreEmptyIfNotCreated(bytes32 id)
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
 
+strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => currentContract.obligationState[id].continuousFeeCredit == 0;
+
 strong invariant obligationLossIndexIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossIndex == 0;
 
@@ -153,7 +157,7 @@ strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
 
 function noFeesAreSet(bytes32 id) returns (bool) {
-    uint16[7] fees = Midnight.fees(id);
+    uint16[7] fees = Midnight.tradingFees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
