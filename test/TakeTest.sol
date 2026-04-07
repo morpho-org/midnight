@@ -313,6 +313,150 @@ contract TakeTest is BaseTest {
         assertEq(loanToken.balanceOf(otherLender), buyerAssets, "otherLender balance");
     }
 
+    function testBuy1PostMaturity() public {
+        uint256 units = 100;
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        borrowerOffer.expiry = timestamp;
+        borrowerOffer.maxUnits = units;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        vm.expectRevert("seller is liquidatable");
+        take(units, lender, borrowerOffer);
+    }
+
+    function testSell1PostMaturity() public {
+        uint256 units = 100;
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        lenderOffer.expiry = timestamp;
+        lenderOffer.maxUnits = units;
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        vm.expectRevert("seller is liquidatable");
+        take(units, borrower, lenderOffer);
+    }
+
+    function testBuy2PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+        assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        otherLenderOffer.expiry = timestamp;
+        otherLenderOffer.maxUnits = units;
+        deal(address(loanToken), lender, units);
+
+        take(units, lender, otherLenderOffer);
+
+        assertEq(midnight.creditOf(id, lender), units, "lender units");
+        assertEq(midnight.debtOf(id, lender), 0, "lender debt");
+        assertEq(midnight.creditOf(id, otherLender), 0, "other lender units");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertEq(midnight.totalUnits(id), totalUnitsBefore, "total units");
+    }
+
+    function testSell2PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+        assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        lenderOffer.expiry = timestamp;
+        lenderOffer.maxUnits = units;
+        deal(address(loanToken), lender, units);
+
+        take(units, otherLender, lenderOffer);
+
+        assertEq(midnight.creditOf(id, lender), units, "lender units");
+        assertEq(midnight.debtOf(id, lender), 0, "lender debt");
+        assertEq(midnight.creditOf(id, otherLender), 0, "other lender units");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertEq(midnight.totalUnits(id), totalUnitsBefore, "total units");
+    }
+
+    function testBuy3PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        borrowerOffer.expiry = timestamp;
+        borrowerOffer.maxUnits = units;
+        deal(address(loanToken), otherBorrower, units);
+        collateralize(obligation, borrower, units);
+
+        vm.expectRevert("seller is liquidatable");
+        take(units, otherBorrower, borrowerOffer);
+    }
+
+    function testSell3PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        otherBorrowerOffer.expiry = timestamp;
+        otherBorrowerOffer.maxUnits = units;
+        deal(address(loanToken), otherBorrower, units);
+        collateralize(obligation, borrower, units);
+
+        vm.expectRevert("seller is liquidatable");
+        take(units, borrower, otherBorrowerOffer);
+    }
+
+    function testBuy4PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+        assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        otherLenderOffer.expiry = timestamp;
+        otherLenderOffer.maxUnits = units;
+        deal(address(loanToken), otherBorrower, units);
+
+        take(units, otherBorrower, otherLenderOffer);
+
+        assertEq(midnight.creditOf(id, otherLender), 0, "otherLender units");
+        assertEq(midnight.debtOf(id, otherBorrower), otherBorrowerDebt - units, "otherBorrower debt");
+        assertEq(midnight.totalUnits(id), otherBorrowerDebt - units, "total units");
+    }
+
+    function testSell4PostMaturity() public {
+        uint256 units = 100;
+        setupOtherUsers(obligation, units);
+        assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
+        assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
+        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
+
+        uint256 timestamp = obligation.maturity + 1;
+        vm.warp(timestamp);
+        otherBorrowerOffer.expiry = timestamp;
+        otherBorrowerOffer.maxUnits = units;
+        deal(address(loanToken), otherBorrower, units);
+
+        take(units, otherLender, otherBorrowerOffer);
+
+        assertEq(midnight.creditOf(id, otherLender), 0, "otherLender units");
+        assertEq(midnight.debtOf(id, otherBorrower), otherBorrowerDebt - units, "otherBorrower debt");
+        assertEq(midnight.totalUnits(id), otherBorrowerDebt - units, "total units");
+    }
+
     // reduceOnly tests.
 
     function testReduceOnlyBuySuccess(uint256 existingUnits, uint256 exitUnits) public {
@@ -401,7 +545,7 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert("consumed units");
         take(secondRevertingTake, lender, borrowerOffer);
 
         take(secondPassingTake, lender, borrowerOffer);
@@ -421,7 +565,7 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert("consumed units");
         take(secondRevertingTake, borrower, lenderOffer);
 
         take(secondPassingTake, borrower, lenderOffer);
@@ -440,7 +584,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert("consumed units");
         take(secondFill + 1, lender, borrowerOffer2);
 
         take(secondFill, lender, borrowerOffer2);
@@ -459,7 +603,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert("consumed");
+        vm.expectRevert("consumed units");
         take(secondFill + 1, borrower, lenderOffer2);
 
         take(secondFill, borrower, lenderOffer2);
@@ -603,7 +747,7 @@ contract TakeTest is BaseTest {
         privateKey[taker] = pkey;
         lenderOffer.maker = taker;
 
-        vm.expectRevert("buyer and seller cannot be the same");
+        vm.expectRevert("cannot self take");
         take(0, taker, lenderOffer);
     }
 
@@ -935,7 +1079,7 @@ contract TakeTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("unauthorized");
         vm.prank(sender);
         midnight.take(
             100,
@@ -994,7 +1138,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
-        vm.expectRevert("ratification failed");
+        vm.expectRevert("not ratified");
         vm.prank(sender);
         midnight.take(
             0,
@@ -1014,7 +1158,7 @@ contract TakeTest is BaseTest {
         vm.assume(taker != sender);
         vm.assume(!midnight.isAuthorized(taker, sender));
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert("taker unauthorized");
         vm.prank(sender);
         midnight.take(
             100,
@@ -1151,7 +1295,7 @@ contract TakeTest is BaseTest {
         );
 
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateError(), "liquidation locked");
+        assertEq(callback.liquidateError(), "not liquidatable");
         assertEq(midnight.debtOf(id, borrower), units);
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
@@ -1202,7 +1346,7 @@ contract TakeTest is BaseTest {
 
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateError(), "liquidation locked");
+        assertEq(callback.liquidateError(), "not liquidatable");
         assertTrue(midnight.liquidationLocked(id, borrower) == false);
         assertEq(midnight.debtOf(id, borrower), 2 * units);
         assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
@@ -1345,7 +1489,7 @@ contract TakeTest is BaseTest {
 
         Signature memory badSig;
 
-        vm.expectRevert("ratifier not authorized");
+        vm.expectRevert("ratifier unauthorized");
         vm.prank(borrower);
         midnight.take(
             units,

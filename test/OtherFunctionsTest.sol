@@ -214,7 +214,7 @@ contract OtherFunctionsTest is BaseTest {
         midnight.setConsumed(group, amount0, user);
 
         vm.prank(user);
-        vm.expectRevert("consumed");
+        vm.expectRevert("already consumed");
         midnight.setConsumed(group, amount1, user);
     }
 
@@ -442,7 +442,7 @@ contract OtherFunctionsTest is BaseTest {
         address lastToken = _obligation.collateralParams[numCollaterals - 1].token;
         deal(lastToken, address(this), 1e18);
         ERC20(lastToken).approve(address(midnight), 1e18);
-        vm.expectRevert("too many collaterals per borrower");
+        vm.expectRevert("too many activated collaterals");
         midnight.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
     }
 

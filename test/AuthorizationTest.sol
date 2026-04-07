@@ -217,7 +217,7 @@ contract AuthorizationTest is BaseTest {
         // Attacker tries to take on behalf of taker
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert("unauthorized");
+        vm.expectRevert("taker unauthorized");
         midnight.take(units, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer]));
     }
 

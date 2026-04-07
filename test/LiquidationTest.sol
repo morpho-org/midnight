@@ -101,7 +101,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert("position is not liquidatable");
+        vm.expectRevert("not liquidatable");
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
@@ -121,7 +121,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
@@ -131,7 +131,7 @@ contract LiquidationTest is BaseTest {
         liquidationOraclePrice = bound(liquidationOraclePrice, 0, ORACLE_PRICE_SCALE - 1);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
-        obligation.maturity = block.timestamp - 1;
+        vm.warp(obligation.maturity + 1);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");

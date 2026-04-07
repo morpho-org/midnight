@@ -21,7 +21,7 @@ contract EcrecoverRatifier is IRatifier {
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
         require(_signer != address(0), "invalid signature");
-        require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), "invalid signature");
+        require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), "unauthorized");
         return CALLBACK_SUCCESS;
     }
 }

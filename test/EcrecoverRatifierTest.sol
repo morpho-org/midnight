@@ -50,7 +50,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = keccak256(abi.encode(offer));
         bytes memory data = signRoot(_root, borrower);
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("unauthorized");
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 
@@ -59,7 +59,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = keccak256(abi.encode(offer));
         bytes memory data = abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}));
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("unauthorized");
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 
@@ -69,7 +69,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory data = signRoot(_root, lender);
 
         bytes32 wrongRoot = keccak256("wrong");
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("unauthorized");
         ecrecoverRatifier.onRatify(offer, wrongRoot, data);
     }
 
@@ -89,7 +89,7 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, false);
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert("unauthorized");
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 }

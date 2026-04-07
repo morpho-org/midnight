@@ -99,7 +99,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// callback-enabled `take`, `repay`, `liquidate`, and `flashLoan` revert.
 ///
 /// ROLES
-/// @dev The owner can set the owner, fee setter, and fee claimer.
+/// @dev The role setter can set the role setter, fee setter, and fee claimer.
 /// @dev The fee setter can set the default and per-obligation trading fee and continuous fee.
 /// @dev The fee claimer can claim the trading fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -124,7 +124,7 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableTradingFee;
-    address public owner;
+    address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
     
@@ -139,8 +139,8 @@ contract Midnight is IMidnight {
     /// CONSTRUCTOR ///
 
     constructor() {
-        owner = msg.sender;
-        emit EventsLib.Constructor(owner);
+        roleSetter = msg.sender;
+        emit EventsLib.Constructor(roleSetter);
     }
 
     /// MULTICALL ///
@@ -158,30 +158,30 @@ contract Midnight is IMidnight {
 
     /// ADMIN FUNCTIONS ///
 
-    function setOwner(address newOwner) external {
-        require(msg.sender == owner, "only owner");
-        owner = newOwner;
-        emit EventsLib.SetOwner(newOwner);
+    function setRoleSetter(address newRoleSetter) external {
+        require(msg.sender == roleSetter, "only role setter");
+        roleSetter = newRoleSetter;
+        emit EventsLib.SetRoleSetter(newRoleSetter);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == roleSetter, "only role setter");
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     function setFeeClaimer(address newFeeClaimer) external {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == roleSetter, "only role setter");
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
+        ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
-        require(newTradingFee <= maxTradingFee(index), "value too high");
+        require(newTradingFee <= maxTradingFee(index), "trading fee too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
-        ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.created, "obligation not created");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
         uint16 toStore = uint16(newTradingFee / FEE_STEP);
@@ -198,7 +198,7 @@ contract Midnight is IMidnight {
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
-        require(newTradingFee <= maxTradingFee(index), "value too high");
+        require(newTradingFee <= maxTradingFee(index), "trading fee too high");
         require(newTradingFee % FEE_STEP == 0, "fee should be a multiple of FEE_STEP");
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
         defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
@@ -206,9 +206,9 @@ contract Midnight is IMidnight {
     }
 
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
+        ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeSetter, "only fee setter");
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, "continuous fee too high");
-        ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.created, "obligation not created");
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         _obligationState.continuousFee = uint32(newContinuousFee);
@@ -252,10 +252,10 @@ contract Midnight is IMidnight {
     }
 
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
-        require(msg.sender == feeClaimer, "only fee claimer");
         bytes32 id = toId(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(_obligationState.created, "not created");
+        require(msg.sender == feeClaimer, "only fee claimer");
+        require(_obligationState.created, "obligation not created");
 
         _obligationState.continuousFeeCredit -= UtilsLib.toUint128(amount);
         _obligationState.totalUnits -= UtilsLib.toUint128(amount);
@@ -287,20 +287,17 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
-        require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
-        require(taker == msg.sender || isAuthorized[taker][msg.sender], "unauthorized");
-        require(block.timestamp >= offer.start, "offer not started");
-        require(block.timestamp <= offer.expiry, "offer expired");
-        require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
-        require(offer.session == session[offer.maker], "invalid session");
-        require(isAuthorized[offer.maker][offer.ratifier], "ratifier not authorized");
-        require(
-            IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, "ratification failed"
-        );
-
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
+        require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
+        require(taker == msg.sender || isAuthorized[taker][msg.sender], "taker unauthorized");
+        require(block.timestamp >= offer.start, "offer not started");
+        require(block.timestamp <= offer.expiry, "offer expired");
+        require(offer.maker != taker, "cannot self take");
+        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(offer.session == session[offer.maker], "invalid session");
+        require(isAuthorized[offer.maker][offer.ratifier], "ratifier unauthorized");
+        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, "not ratified");
 
         address buyer = offer.buy ? offer.maker : taker;
         address seller = offer.buy ? taker : offer.maker;
@@ -327,7 +324,7 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
         } else {
             newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, "consumed");
+            require(newConsumed <= offer.maxUnits, "consumed units");
         }
 
         Position storage buyerPos = position[id][buyer];
@@ -339,19 +336,20 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+        uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
+            ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
+            : 0;
+
+        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
-        uint128 sellerPendingFeeDecrease;
-        if (sellerPos.credit > 0) {
-            sellerPendingFeeDecrease =
-                UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit));
-            sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        }
+
+        sellerPos.pendingFee -= sellerPendingFeeDecrease;
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
+
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
@@ -429,9 +427,9 @@ contract Midnight is IMidnight {
 
     /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
@@ -469,9 +467,9 @@ contract Midnight is IMidnight {
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
         external
     {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
 
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
@@ -480,7 +478,7 @@ contract Midnight is IMidnight {
         if (oldCollateral == 0 && assets > 0) {
             uint128 newBitmap = _position.activatedCollaterals.setBit(collateralIndex);
             _position.activatedCollaterals = newBitmap;
-            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, "too many collaterals per borrower");
+            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, "too many activated collaterals");
         }
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
@@ -501,9 +499,9 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
 
         Position storage _position = position[id][onBehalf];
         uint256 newCollateral = _position.collateral[collateralIndex] - assets;
@@ -521,7 +519,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
-    /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
+    /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
     /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
     /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
     /// @dev Recovery close factor means that debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is
@@ -537,16 +535,15 @@ contract Midnight is IMidnight {
         address borrower,
         bytes calldata data
     ) external returns (uint256, uint256) {
-        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
+        Position storage _position = position[id][borrower];
+        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
             "liquidator gated from liquidating"
         );
-        Position storage _position = position[id][borrower];
-        require(!liquidationLocked(id, borrower), "liquidation locked");
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
@@ -566,7 +563,11 @@ contract Midnight is IMidnight {
             bitmap = bitmap.clearBit(i);
         }
 
-        require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+        require(
+            originalDebt > 0 && !liquidationLocked(id, borrower)
+                && (block.timestamp > obligation.maturity || originalDebt > maxDebt),
+            "not liquidatable"
+        );
 
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
@@ -651,10 +652,8 @@ contract Midnight is IMidnight {
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
-        require(amount >= consumed[onBehalf][group], "consumed");
-
+        require(amount >= consumed[onBehalf][group], "already consumed");
         consumed[onBehalf][group] = amount;
-
         emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
     }
 
@@ -663,7 +662,6 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 newSession = keccak256(abi.encode(session[onBehalf], blockhash(block.number - 1)));
         session[onBehalf] = newSession;
-
         emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
@@ -676,11 +674,8 @@ contract Midnight is IMidnight {
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
-
         SafeTransferLib.safeTransfer(token, msg.sender, assets);
-
         IFlashLoanCallback(callback).onFlashLoan(token, assets, data);
-
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
@@ -752,7 +747,7 @@ contract Midnight is IMidnight {
     /// @dev Slashes the position and accrues the continuous fee.
     function updatePosition(Obligation memory obligation, address user) external {
         bytes32 id = toId(obligation);
-        require(obligationState[id].created, "not created");
+        require(obligationState[id].created, "obligation not created");
         _updatePosition(obligation, id, user);
     }
 
@@ -799,7 +794,7 @@ contract Midnight is IMidnight {
     /// @dev Reverts if the id is not a valid id of a touched obligation.
     /// @dev Returns the obligation corresponding to the given id.
     function toObligation(bytes32 id) external view returns (Obligation memory) {
-        require(obligationState[id].created, "not created");
+        require(obligationState[id].created, "obligation not created");
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Obligation));
     }
@@ -860,10 +855,10 @@ contract Midnight is IMidnight {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
     }
 
-    /// @dev A borrower is liquidatable if liquidation is not transiently locked, and they are past maturity
-    /// or not healthy.
+    /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
+    /// past maturity or not healthy.
     function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return !liquidationLocked(id, borrower)
+        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
             && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
     }
 
@@ -899,7 +894,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         ObligationState storage _obligationState = obligationState[id];
-        require(_obligationState.created, "not created");
+        require(_obligationState.created, "obligation not created");
 
         if (timeToMaturity >= 360 days) return _obligationState.fee6 * FEE_STEP;
 

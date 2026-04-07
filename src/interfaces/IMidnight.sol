@@ -75,7 +75,7 @@ interface IMidnight {
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
     function feeClaimer() external view returns (address);
-    function owner() external view returns (address);
+    function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
 
     /// MULTICALL ///
@@ -84,7 +84,7 @@ interface IMidnight {
 
     /// ADMIN FUNCTIONS ///
 
-    function setOwner(address newOwner) external;
+    function setRoleSetter(address newRoleSetter) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
