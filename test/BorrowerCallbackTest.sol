@@ -2,15 +2,14 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
-import {Midnight} from "../src/Midnight.sol";
-import {WAD, ORACLE_PRICE_SCALE, LLTV_2} from "../src/libraries/ConstantsLib.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {WAD, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BorrowerCallback, CollateralData} from "../src/periphery/BorrowerCallback.sol";
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
 
 contract BorrowerCallbackTest is BaseTest {
     using UtilsLib for uint256;
@@ -27,25 +26,25 @@ contract BorrowerCallbackTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -55,6 +54,7 @@ contract BorrowerCallbackTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = obligation;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
     }
@@ -65,7 +65,7 @@ contract BorrowerCallbackTest is BaseTest {
 
     function testOnSellSingleCollateralMaker(uint256 units) public {
         units = bound(units, 1, 1e33);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
 
         borrowerOffer.callback = address(borrowerCallback);
         CollateralData[] memory collateralData = new CollateralData[](1);
@@ -78,24 +78,25 @@ contract BorrowerCallbackTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
 
         // Fund callback with collateral tokens and approve midnight.
-        deal(obligation.collaterals[0].token, address(borrowerCallback), collateral);
+        deal(obligation.collateralParams[0].token, address(borrowerCallback), collateral);
         vm.prank(address(borrowerCallback));
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
 
         // Authorize callback to supply collateral on behalf of borrower.
-        authorize(borrower, address(borrowerCallback));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(borrowerCallback), true);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), 0);
+        assertEq(midnight.collateral(id, borrower, 0), 0);
 
         take(units, lender, borrowerOffer);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
     function testOnSellMultipleCollateralsMaker(uint256 units) public {
         units = bound(units, 1, 1e33);
-        uint256 collateral0 = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
-        uint256 collateral1 = units.mulDivUp(WAD, obligation.collaterals[1].lltv);
+        uint256 collateral0 = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
+        uint256 collateral1 = units.mulDivUp(WAD, obligation.collateralParams[1].lltv);
 
         borrowerOffer.callback = address(borrowerCallback);
         CollateralData[] memory collateralData = new CollateralData[](2);
@@ -109,28 +110,29 @@ contract BorrowerCallbackTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
 
         // Fund callback with collateral tokens and approve midnight.
-        deal(obligation.collaterals[0].token, address(borrowerCallback), collateral0);
-        deal(obligation.collaterals[1].token, address(borrowerCallback), collateral1);
+        deal(obligation.collateralParams[0].token, address(borrowerCallback), collateral0);
+        deal(obligation.collateralParams[1].token, address(borrowerCallback), collateral1);
         vm.prank(address(borrowerCallback));
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral0);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral0);
         vm.prank(address(borrowerCallback));
-        ERC20(obligation.collaterals[1].token).approve(address(midnight), collateral1);
+        ERC20(obligation.collateralParams[1].token).approve(address(midnight), collateral1);
 
         // Authorize callback to supply collateral on behalf of borrower.
-        authorize(borrower, address(borrowerCallback));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(borrowerCallback), true);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), 0);
-        assertEq(midnight.collateralOf(id, borrower, 1), 0);
+        assertEq(midnight.collateral(id, borrower, 0), 0);
+        assertEq(midnight.collateral(id, borrower, 1), 0);
 
         take(units, lender, borrowerOffer);
 
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral0);
-        assertEq(midnight.collateralOf(id, borrower, 1), collateral1);
+        assertEq(midnight.collateral(id, borrower, 0), collateral0);
+        assertEq(midnight.collateral(id, borrower, 1), collateral1);
     }
 
     function testOnSellTaker(uint256 units) public {
         units = bound(units, 1, 1e33);
-        uint256 collateral = units.mulDivUp(WAD, obligation.collaterals[0].lltv);
+        uint256 collateral = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
 
         // Lender makes a buy offer.
         Offer memory lenderOffer;
@@ -138,6 +140,7 @@ contract BorrowerCallbackTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -146,17 +149,18 @@ contract BorrowerCallbackTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
 
         // Fund callback with collateral tokens and approve midnight.
-        deal(obligation.collaterals[0].token, address(borrowerCallback), collateral);
+        deal(obligation.collateralParams[0].token, address(borrowerCallback), collateral);
         vm.prank(address(borrowerCallback));
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
 
         // Authorize callback to supply collateral on behalf of borrower.
-        authorize(borrower, address(borrowerCallback));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(borrowerCallback), true);
 
         CollateralData[] memory collateralData = new CollateralData[](1);
         collateralData[0] = CollateralData({collateralIndex: 0, amount: collateral});
 
-        assertEq(midnight.collateralOf(id, borrower, 0), 0);
+        assertEq(midnight.collateral(id, borrower, 0), 0);
 
         // Borrower takes the lender's buy offer, passing BorrowerCallback as taker callback.
         vm.prank(borrower);
@@ -172,25 +176,31 @@ contract BorrowerCallbackTest is BaseTest {
             proof([lenderOffer])
         );
 
-        assertEq(midnight.collateralOf(id, borrower, 0), collateral);
+        assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
     function testOnSellUnauthorized() public {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
+        borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnBuyReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        borrowerCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
+        borrowerCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
         borrowerCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
+    }
+
+    function testOnRepayReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        borrowerCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }

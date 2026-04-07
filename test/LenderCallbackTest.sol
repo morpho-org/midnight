@@ -2,8 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
-import {Midnight} from "../src/Midnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -11,7 +10,7 @@ import {VaultLenderCallback} from "../src/periphery/VaultLenderCallback.sol";
 import {ObligationLenderCallback} from "../src/periphery/ObligationLenderCallback.sol";
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
 
 // TODO: use real vault v2
 contract MockVault {
@@ -42,25 +41,25 @@ contract VaultLenderCallbackTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -70,6 +69,7 @@ contract VaultLenderCallbackTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = obligation;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
     }
@@ -95,6 +95,7 @@ contract VaultLenderCallbackTest is BaseTest {
         lenderOffer.callbackData = abi.encode(address(vault));
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -144,19 +145,25 @@ contract VaultLenderCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
+        vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnSellReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        vaultLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
+        vaultLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
         vaultLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
+    }
+
+    function testOnRepayReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        vaultLenderCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }
 
@@ -175,25 +182,25 @@ contract ObligationLenderCallbackTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: LLTV_2,
                     maxLif: maxLif(LLTV_2, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -203,6 +210,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = obligation;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
     }
@@ -215,7 +223,7 @@ contract ObligationLenderCallbackTest is BaseTest {
     function _setupMidnightSource(uint256 buyerAssets) internal returns (Obligation memory obligation2, bytes32 id2) {
         obligation2.loanToken = address(loanToken);
         obligation2.maturity = block.timestamp + 200;
-        obligation2.collaterals = obligation.collaterals;
+        obligation2.collateralParams = obligation.collateralParams;
         obligation2.rcfThreshold = 0;
         id2 = toId(obligation2);
 
@@ -228,6 +236,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         lenderOffer2.maker = lender;
         lenderOffer2.maxUnits = buyerAssets;
         lenderOffer2.obligation = obligation2;
+        lenderOffer2.ratifier = address(ecrecoverRatifier);
         lenderOffer2.expiry = block.timestamp + 300;
         lenderOffer2.tick = MAX_TICK;
         lenderOffer2.group = keccak256("obligation2");
@@ -237,10 +246,11 @@ contract ObligationLenderCallbackTest is BaseTest {
         // Borrower repays to create withdrawable funds.
         deal(address(loanToken), borrower, buyerAssets);
         vm.prank(borrower);
-        midnight.repay(obligation2, buyerAssets, borrower);
+        midnight.repay(obligation2, buyerAssets, borrower, hex"");
 
         // Authorize callback to withdraw on behalf of lender.
-        authorize(lender, address(obligationLenderCallback));
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, address(obligationLenderCallback), true);
     }
 
     function testOnBuyMidnightMaker(uint256 units) public {
@@ -258,6 +268,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         lenderOffer.callbackData = abi.encode(address(uint160(uint256(id2))));
         lenderOffer.maxUnits = units;
         lenderOffer.obligation = obligation;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -305,18 +316,24 @@ contract ObligationLenderCallbackTest is BaseTest {
         Obligation memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
-        obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnSellReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
-        obligationLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, 0, "");
+        obligationLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
     }
 
     function testOnLiquidateReverts() public {
         Obligation memory ob;
         vm.expectRevert("not implemented");
         obligationLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
+    }
+
+    function testOnRepayReverts() public {
+        Obligation memory ob;
+        vm.expectRevert("not implemented");
+        obligationLenderCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }
