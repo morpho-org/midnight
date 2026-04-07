@@ -3,14 +3,16 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    //function getPassiveFeeRecipient() external returns address envfree;
+
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function creditAfterSlashing(bytes32 id, address user) external returns (uint256) envfree;
+    function updatePositionView(Midnight.Obligation memory obligation, bytes32 id, address user) external returns (uint128, uint128, uint128);
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationLossIndex(bytes32) external returns (uint128) envfree;
 
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
+    //function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    //function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
 
     // Summarize price oracle as NONDET (it is a view function)
     function _.price() external => NONDET;
@@ -23,13 +25,15 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.msb(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
 }
+
+definition PASSIVE_FEE_RECIPIENT() returns address = 0x7e3dce7c19791d65d67ef7ce3c42d2b7fe6fecb1; //currentContract.getPassiveFeeRecipient();
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -55,6 +59,14 @@ ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
     // this is necessary to help the prover. It's an obvious consequence, but the usum implementation does not reason about quantifiers.
     init_state axiom forall bytes32 id. (usum address user. preciseCreditDivIndex[id][user]) == 0;
 }
+
+ghost mapping(bytes32 => mapping(address => mathint)) pendingFeeMirror {
+    init_state axiom forall bytes32 id. forall address user. pendingFeeMirror[id][user] == 0;
+}
+ghost mapping(bytes32 => mapping(address => mathint)) lastAccrualMirror {
+    init_state axiom forall bytes32 id. forall address user. lastAccrualMirror[id][user] == 0;
+}
+
 
 /// HELPER FUNCTIONS ///
 
@@ -90,6 +102,23 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lossIndex uint128 newInd
     updateCreditDivIndex(id, owner, cvlCreditOf(id, owner), newIndex);
 }
 
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].pendingFee
+{
+    require pendingFeeMirror[id][owner] == value, "ghost mirror";
+}
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].lastAccrual
+{
+    require lastAccrualMirror[id][owner] == value, "ghost mirror";
+}
+hook Sstore position[KEY bytes32 id][KEY address owner].pendingFee uint128 newPending (uint128 oldPending) 
+{
+    pendingFeeMirror[id][owner] = newPending;
+}
+hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newLast (uint128 oldLast) 
+{
+    lastAccrualMirror[id][owner] = newLast;
+}
+
 /// invariants ///
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
@@ -97,12 +126,16 @@ strong invariant preciseCreditCorrect(bytes32 id, address owner)
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) <= PRECISION * totalUnits(id)
 {
-    preserved slash(bytes32 slashid, address user) with (env e) {
+    preserved updatePosition(Midnight.Obligation obligation, address user) with (env e) {
+        //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
         requireInvariant preciseCreditCorrect(id, user);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
     }
 
     preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
+        //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
         requireInvariant preciseCreditCorrect(id, onBehalf);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
     }
@@ -115,6 +148,8 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
         address borrower,
         bytes data
     ) with (env e) {
+        //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
         requireInvariant preciseCreditCorrect(id, borrower);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
     }
@@ -129,6 +164,8 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
         Midnight.Signature signature,
         bytes32 root,
         bytes32[] proof) with (env e) {
+        //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
         requireInvariant preciseCreditCorrect(id, taker);
         requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
         requireInvariant preciseCreditCorrect(id, offer.maker);
@@ -142,12 +179,41 @@ strong invariant obligationLossIndexLeqUserLossIndex(bytes32 id, address owner)
     mapIndex(cvlUserLossIndex(id, owner)) == 0 => mapIndex(obligationLossIndex(id)) == 0;
 //    mapIndex(obligationLossIndex(id)) <= mapIndex(cvlUserLossIndex(id, owner));
 
-strong invariant creditAfterSlashingValue(bytes32 id, address owner)
-    mapIndex(cvlUserLossIndex(id,owner)) != 0 =>
-    (creditAfterSlashing(id, owner) == preciseCreditDivIndex[id][owner] * mapIndex(obligationLossIndex(id)) / PRECISION)
+rule updatePositionViewReflectedByIndex(env e, Midnight.Obligation obligation, bytes32 id, address owner)
 {
-    preserved {
-        requireInvariant preciseCreditCorrect(id, owner);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, owner);
-    }
+    requireInvariant preciseCreditCorrect(id, owner);
+    requireInvariant obligationLossIndexLeqUserLossIndex(id, owner);
+
+    uint128 newCredit;
+    uint128 newPending;
+    uint128 fee;
+
+    mathint preciseCreditBefore = preciseCreditDivIndex[id][owner] * mapIndex(obligationLossIndex(id));
+    mathint pendingBefore = pendingFeeMirror[id][owner];
+    mathint lastAccrualBefore = lastAccrualMirror[id][owner];
+
+    require e.block.timestamp >= lastAccrualBefore, "Time is increasing";
+
+    newCredit, newPending, fee = updatePositionView(e, obligation, id, owner);
+
+    assert fee <= pendingBefore, "Cannot take more fee than pending";
+    assert (newCredit + fee) * PRECISION <= preciseCreditBefore, "newCredit (with fees) is at most precise credit after slashing";
 }
+
+rule updatePositionZero(env e, Midnight.Obligation obligation, bytes32 id, address owner) {
+    require currentContract.position[id][owner].credit == 0, "Assume no credit";
+
+    uint128 newCredit;
+    uint128 newPending;
+    uint128 fee;
+    newCredit, newPending, fee = updatePositionView(e, obligation, id, owner);
+
+    assert newCredit == 0 && newPending == 0 && fee == 0;
+}
+
+
+invariant pendingFeeLessEqualThanCredit(bytes32 id, address user)
+    currentContract.position[id][user].pendingFee <= currentContract.position[id][user].credit;
+
+invariant pendingFeeLessThanCredit(bytes32 id, address user)
+    currentContract.position[id][user].pendingFee < currentContract.position[id][user].credit || currentContract.position[id][user].pendingFee == 0;
