@@ -27,16 +27,11 @@ methods {
     // body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address, uint256, bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => signerSummary();
-}
-
-function signerSummary() returns address {
-    address returnedSigner;
-    return returnedSigner;
 }
 
 /// UPDATE POSITION ///
@@ -89,7 +84,7 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, addre
 
 /// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
 /// and only changes credit of maker and taker and debt of maker and taker at the obligation id.
-rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.obligation);
 
     uint128 makerCreditBefore;
@@ -101,7 +96,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
@@ -157,7 +152,7 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, Midnight.Signature, bytes32, bytes32[]).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector

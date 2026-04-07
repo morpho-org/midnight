@@ -2,12 +2,14 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Signature, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
@@ -56,6 +58,7 @@ contract TakeTest is BaseTest {
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.obligation = obligation;
         lenderOffer.expiry = block.timestamp + 200;
@@ -63,6 +66,7 @@ contract TakeTest is BaseTest {
 
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
+        otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.obligation = obligation;
@@ -71,6 +75,7 @@ contract TakeTest is BaseTest {
 
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = obligation;
@@ -79,6 +84,7 @@ contract TakeTest is BaseTest {
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
+        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.obligation = obligation;
         otherBorrowerOffer.expiry = block.timestamp + 200;
@@ -741,24 +747,18 @@ contract TakeTest is BaseTest {
 
     // test tree / signatures.
 
-    function testTakeWrongRoot() public {
-        vm.expectRevert("invalid signature");
+    function testTakeInvalidRoot(bytes32 invalidRoot) public {
+        vm.assume(invalidRoot != root([lenderOffer]));
+        vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            sig([borrowerOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), invalidRoot, new bytes32[](0)
         );
     }
 
     function testTakeInvalidSignature() public {
         vm.expectRevert("invalid signature");
+        Signature memory _sig = Signature({v: 1, r: 0, s: 0});
         vm.prank(borrower);
         midnight.take(
             100,
@@ -767,24 +767,82 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            Signature({v: 0, r: 0, s: 0}),
+            abi.encode(_sig),
             root([lenderOffer]),
             proof([lenderOffer])
         );
     }
 
-    function testTakeInvalidProofOneLeaf(bytes32[] memory proof) public {
-        vm.assume(proof.length >= 1);
+    function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender) public {
+        vm.assume(sender != address(0));
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
+        RatifyCallback ratifier = new RatifyCallback();
+        lenderOffer.maker = address(ratifier);
+        lenderOffer.ratifier = address(ratifier);
+
+        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
+
+        vm.prank(address(ratifier));
+
+        midnight.setIsAuthorized(address(ratifier), address(ratifier), true);
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer], vm.addr(otherPrivateKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
+        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
+    }
+
+    function testTakeByRatificationDifferentFromMaker(address maker, address sender, uint256 otherPrivateKey) public {
+        otherPrivateKey = boundPrivateKey(otherPrivateKey);
+        vm.assume(sender != address(0));
+        vm.assume(maker != sender);
+        vm.assume(maker != address(0));
+        RatifyCallback ratifier = new RatifyCallback();
+        vm.assume(maker != address(ratifier));
+        lenderOffer.maker = maker;
+        lenderOffer.ratifier = address(ratifier);
+
+        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
+
+        vm.prank(maker);
+        midnight.setIsAuthorized(maker, address(ratifier), true);
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer], vm.addr(otherPrivateKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
+        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
+    }
+
+    function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
+        vm.assume(_path.length >= 1);
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), proof
+            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), _path
         );
     }
 
-    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory proof) public {
-        vm.assume(proof.length >= 1);
-        vm.assume(proof[0] != keccak256(abi.encode(otherOffer)));
+    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
+        vm.assume(_path.length >= 1);
+        vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
         vm.expectRevert("invalid proof");
         vm.prank(borrower);
         midnight.take(
@@ -796,7 +854,7 @@ contract TakeTest is BaseTest {
             lenderOffer,
             sig([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
-            proof
+            _path
         );
     }
 
@@ -821,6 +879,194 @@ contract TakeTest is BaseTest {
         );
     }
 
+    function testTakeNotRatified() public {
+        vm.expectRevert();
+        vm.prank(borrower);
+        midnight.take(
+            100, borrower, address(0), hex"", borrower, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
+        );
+    }
+
+    function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
+        vm.assume(sender != address(0));
+        makerSecretKey = boundPrivateKey(makerSecretKey);
+        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
+        lenderOffer.maker = vm.addr(makerSecretKey);
+        vm.assume(sender != vm.addr(makerSecretKey));
+        vm.prank(vm.addr(makerSecretKey));
+        midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testTakeOfferRatified(address maker, address sender) public {
+        vm.assume(sender != address(0));
+        vm.assume(maker != sender);
+        vm.assume(maker != address(0));
+        RatifyCallback ratifier = new RatifyCallback();
+        lenderOffer.maker = maker;
+        lenderOffer.ratifier = address(ratifier);
+        vm.prank(maker);
+        midnight.setIsAuthorized(maker, address(ratifier), true);
+        vm.prank(sender);
+        midnight.take(
+            0, sender, address(0), hex"", sender, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
+        );
+    }
+
+    function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
+        makerSecretKey = boundPrivateKey(makerSecretKey);
+        otherSecretKey = boundPrivateKey(otherSecretKey);
+        vm.assume(otherSecretKey != makerSecretKey);
+        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
+        privateKey[vm.addr(otherSecretKey)] = otherSecretKey;
+
+        lenderOffer.maker = vm.addr(makerSecretKey);
+        vm.prank(vm.addr(makerSecretKey));
+        midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
+
+        vm.expectRevert("invalid signature");
+        vm.prank(sender);
+        midnight.take(
+            100,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer], vm.addr(otherSecretKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testOfferAuthorizationAuthorizedSigner(uint256 makerSecretKey, address sender, uint256 otherSecretKey)
+        public
+    {
+        vm.assume(sender != address(0));
+        makerSecretKey = boundPrivateKey(makerSecretKey);
+        otherSecretKey = boundPrivateKey(otherSecretKey);
+        vm.assume(otherSecretKey != makerSecretKey);
+        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
+        privateKey[vm.addr(otherSecretKey)] = otherSecretKey;
+
+        lenderOffer.maker = vm.addr(makerSecretKey);
+        vm.assume(sender != lenderOffer.maker);
+
+        vm.prank(vm.addr(makerSecretKey));
+
+        midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
+        vm.prank(lenderOffer.maker);
+        midnight.setIsAuthorized(lenderOffer.maker, vm.addr(otherSecretKey), true);
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer], vm.addr(otherSecretKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
+        vm.assume(maker != sender);
+        vm.assume(maker != address(0));
+        signerPrivateKey = boundPrivateKey(signerPrivateKey);
+        privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
+        RatifyCallback ratifier = new RatifyCallback();
+        ratifier.setReturnValue(bytes32(0));
+        lenderOffer.maker = maker;
+        lenderOffer.ratifier = address(ratifier);
+
+        vm.prank(maker);
+        midnight.setIsAuthorized(maker, address(ratifier), true);
+        vm.expectRevert("ratification failed");
+        vm.prank(sender);
+        midnight.take(
+            0,
+            sender,
+            address(0),
+            hex"",
+            sender,
+            lenderOffer,
+            sig([lenderOffer], vm.addr(signerPrivateKey)),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testOrderNotAuthorized(address taker, address sender) public {
+        vm.assume(sender != address(this));
+        vm.assume(taker != sender);
+        vm.assume(!midnight.isAuthorized(taker, sender));
+
+        vm.expectRevert("unauthorized");
+        vm.prank(sender);
+        midnight.take(
+            100,
+            taker,
+            address(0),
+            hex"",
+            taker,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testOrderByTaker(address taker) public {
+        vm.assume(taker != address(0));
+        vm.assume(taker != lenderOffer.maker);
+        vm.prank(taker);
+        midnight.take(
+            0,
+            taker,
+            address(0),
+            hex"",
+            taker,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
+    function testOrderByAuthorized(address taker, address sender) public {
+        vm.assume(taker != address(0));
+        vm.assume(sender != address(0));
+        vm.assume(taker != sender);
+        vm.assume(taker != lenderOffer.maker);
+        vm.prank(taker);
+        midnight.setIsAuthorized(taker, sender, true);
+        vm.prank(sender);
+        midnight.take(
+            0,
+            taker,
+            address(0),
+            hex"",
+            taker,
+            lenderOffer,
+            sig([lenderOffer]),
+            root([lenderOffer]),
+            proof([lenderOffer])
+        );
+    }
+
     // test callbacks.
 
     function testBuySellerCallback(uint256 units) public {
@@ -835,7 +1081,9 @@ contract TakeTest is BaseTest {
         deal(obligation.collateralParams[0].token, borrowerOffer.callback, collateral);
         assertEq(midnight.collateral(id, borrower, 0), 0);
 
-        authorize(borrower, borrowerOffer.callback);
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, borrowerOffer.callback, true);
 
         take(units, lender, borrowerOffer);
 
@@ -853,7 +1101,9 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         deal(obligation.collateralParams[0].token, callback, collateral);
 
-        authorize(borrower, callback);
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, callback, true);
 
         vm.prank(borrower);
         midnight.take(
@@ -883,7 +1133,9 @@ contract TakeTest is BaseTest {
         deal(obligation.collateralParams[0].token, address(callback), collateral);
         deal(address(loanToken), address(callback), repaidUnits);
 
-        authorize(borrower, address(callback));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(callback), true);
 
         vm.prank(borrower);
         midnight.take(
@@ -920,7 +1172,9 @@ contract TakeTest is BaseTest {
         deal(obligation.collateralParams[0].token, address(callback), 2 * collateral);
         deal(address(loanToken), address(callback), repaidUnits);
 
-        authorize(borrower, address(callback));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(callback), true);
 
         callback.prepare(
             lenderOffer,
@@ -1072,6 +1326,39 @@ contract TakeTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), units, "creditOf");
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
+
+    function testTradeWithAddressZero(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+
+        // address(0) as maker cannot authorize the ratifier
+        Offer memory zeroOffer;
+        zeroOffer.buy = true;
+        zeroOffer.maker = address(0);
+        zeroOffer.ratifier = address(ecrecoverRatifier);
+        zeroOffer.maxUnits = units;
+        zeroOffer.obligation = obligation;
+        zeroOffer.expiry = block.timestamp + 200;
+        zeroOffer.tick = 0; // 0 price so any units transfer 0 assets
+
+        // taker = borrower, needs collateral
+        collateralize(obligation, borrower, units);
+
+        Signature memory badSig;
+
+        vm.expectRevert("ratifier not authorized");
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            zeroOffer,
+            abi.encode(badSig),
+            root(zeroOffer),
+            new bytes32[](0)
+        );
+    }
 }
 
 contract BorrowCallback is ICallbacks {
@@ -1157,7 +1444,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
     string public liquidateError;
 
     Offer internal storedOffer;
-    Signature internal storedSig;
+    bytes internal storedSig;
     bytes32 internal storedRoot;
     bytes32[] internal storedProof;
     uint256 internal innerUnits;
@@ -1167,7 +1454,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
 
     function prepare(
         Offer memory _offer,
-        Signature memory _sig,
+        bytes memory _sig,
         bytes32 _root,
         bytes32[] memory _proof,
         uint256 _innerUnits,
@@ -1198,10 +1485,9 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
 
             reentered = true;
             Offer memory nestedOffer = storedOffer;
-            Signature memory nestedSig = storedSig;
             bytes32[] memory nestedProof = storedProof;
             Midnight(msg.sender)
-                .take(innerUnits, seller, address(this), "", seller, nestedOffer, nestedSig, storedRoot, nestedProof);
+                .take(innerUnits, seller, address(this), "", seller, nestedOffer, storedSig, storedRoot, nestedProof);
 
             Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
             uint256 healthyPrice = oracle.price();
@@ -1281,4 +1567,32 @@ contract InvalidSellCallback is ICallbacks {
     function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
 
     function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+}
+
+contract RatifyCallback is IRatifier {
+    address public recordedSigner;
+    Offer internal _recordedOffer;
+    bytes32 public returnValue = CALLBACK_SUCCESS;
+
+    function recordedOffer() public view returns (Offer memory) {
+        return _recordedOffer;
+    }
+
+    function onRatify(Offer memory offer, bytes32 root, bytes memory data) external returns (bytes32) {
+        _recordedOffer = offer;
+
+        if (data.length > 0) {
+            Signature memory signature = abi.decode(data, (Signature));
+            bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
+            recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);
+        }
+
+        return returnValue;
+    }
+
+    function setReturnValue(bytes32 _returnValue) external {
+        returnValue = _returnValue;
+    }
 }

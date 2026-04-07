@@ -205,6 +205,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
+        offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
@@ -228,6 +229,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
+        offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;
@@ -249,6 +251,7 @@ contract AuthorizationTest is BaseTest {
 
     function testRepayAuthorization(address authorized) public {
         vm.assume(authorized != borrower);
+        vm.assume(!midnight.isAuthorized(borrower, authorized));
         uint256 units = 1000;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -326,6 +329,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
+        offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
         offer.obligation = obligation;
         offer.expiry = block.timestamp + 200;

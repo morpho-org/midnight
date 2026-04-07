@@ -596,7 +596,9 @@ contract LiquidationTest is BaseTest {
 
         // Collateralize with both collateralParams.
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         deal(obligation.collateralParams[0].token, address(this), collateral1);
         midnight.supplyCollateral(obligation, 0, collateral1, borrower);
@@ -628,7 +630,9 @@ contract LiquidationTest is BaseTest {
         uint256 lltv0 = obligation.collateralParams[0].lltv;
         uint256 lltv1 = obligation.collateralParams[1].lltv;
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -670,7 +674,9 @@ contract LiquidationTest is BaseTest {
         uint256 units = 1000e18;
         uint256 collateralAmount = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         // Supply both collateralParams.
         for (uint256 i = 0; i < 2; i++) {
@@ -784,7 +790,8 @@ contract LiquidationTest is BaseTest {
         // withdrawCollateral still works
         uint256 collateral = midnight.collateral(id, borrower, 0);
         assertGt(collateral, 0, "has collateral");
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(this), true);
         midnight.withdrawCollateral(obligation, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }

@@ -76,6 +76,7 @@ contract GateTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.obligation = gatedObligation;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -84,6 +85,7 @@ contract GateTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = gatedObligation;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -172,6 +174,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.obligation = gatedObligation;
+        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
 
@@ -198,6 +201,7 @@ contract GateTest is BaseTest {
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.obligation = gatedObligation;
+        otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
@@ -213,6 +217,7 @@ contract GateTest is BaseTest {
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
         exitOffer.obligation = gatedObligation;
+        exitOffer.ratifier = address(ecrecoverRatifier);
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
 
@@ -305,6 +310,7 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.obligation = obligation;
+        ungatedLenderOffer.ratifier = address(ecrecoverRatifier);
         ungatedLenderOffer.expiry = block.timestamp + 200;
         ungatedLenderOffer.tick = MAX_TICK;
 

@@ -3,7 +3,7 @@
 pragma solidity 0.8.34;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer, Signature} from "../interfaces/IMidnight.sol";
+import {Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
@@ -13,7 +13,7 @@ contract TakeBundler {
     struct Take {
         uint256 units;
         Offer offer;
-        Signature sig;
+        bytes sig;
         bytes32 root;
         bytes32[] proof;
     }
