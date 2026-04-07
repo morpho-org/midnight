@@ -7,6 +7,7 @@ import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 uint256 constant MAX_AMOUNT = type(uint128).max;
 
@@ -98,7 +99,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(ErrorsLib.Uint128Overflow.selector);
         take(amount, lender, borrowerOffer);
     }
 
@@ -125,7 +126,7 @@ contract MaxAmountsTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(this), true);
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(ErrorsLib.Uint128Overflow.selector);
         midnight.supplyCollateral(obligation, 0, amount, borrower);
     }
 }
