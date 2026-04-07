@@ -9,6 +9,7 @@ methods {
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
+    function liquidationLocked(bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 
     /* Assumption: price does not change during rules.
@@ -166,14 +167,17 @@ function genericCallback() {
     Midnight.Obligation globalObligation = getGlobalObligation();
 
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
-    bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
+    bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
+    bool savedHealthyBefore = healthyBeforeCallback && (callIsHealthy(globalObligation, globalId, globalBorrower)
+        || liquidationLocked(globalId, globalBorrower));
 
     callback.callHavoc(e, dummy);
 
     // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
     healthyBeforeCallback = savedHealthyBefore;
 
-    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after callback";
+    require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore;
+    require callIsHealthy(globalObligation, globalId, globalBorrower) || liquidationLocked(globalId, globalBorrower), "user is healthy after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
@@ -281,3 +285,6 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
+
+weak invariant notLiquidationLocked()
+    !liquidationLocked(globalId, globalBorrower);
