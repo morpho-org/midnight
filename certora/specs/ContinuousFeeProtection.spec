@@ -43,15 +43,23 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-// The buyer's pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
-rule continuousFeeNotOverchargedBuyer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+// take() updates buyer and seller pending fees according to their post-update credit changes:
+// 1. the buyer's pendingFee increases by floor(creditIncrease * continuousFee * timeToMaturity / WAD).
+// 2. the seller's pendingFee decreases by exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
+rule pendingFeeAdjustedForBuyerAndSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     address buyer = offer.buy ? offer.maker : taker;
+    address seller = offer.buy ? taker : offer.maker;
 
     bytes32 id;
-    uint128 postUpdateCredit;
-    uint128 postUpdatePendingFee;
+    uint128 buyerPostUpdateCredit;
+    uint128 buyerPostUpdatePendingFee;
+    uint128 sellerPostUpdateCredit;
+    uint128 sellerPostUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
+    buyerPostUpdateCredit, buyerPostUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
+    sellerPostUpdateCredit, sellerPostUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, seller);
+
+    require sellerPostUpdateCredit > 0 || sellerPostUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
@@ -60,35 +68,14 @@ rule continuousFeeNotOverchargedBuyer(env e, uint256 units, address taker, addre
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = to_mathint(creditOf(id, buyer)) - to_mathint(postUpdateCredit);
-    mathint pendingFeeDelta = to_mathint(pendingFee(id, buyer)) - to_mathint(postUpdatePendingFee);
+    mathint buyerCreditIncrease = to_mathint(creditOf(id, buyer)) - to_mathint(buyerPostUpdateCredit);
+    mathint buyerPendingFeeIncrease = to_mathint(pendingFee(id, buyer)) - to_mathint(buyerPostUpdatePendingFee);
 
-    assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
-}
+    mathint sellerCreditDecrease = to_mathint(sellerPostUpdateCredit) - to_mathint(creditOf(id, seller));
+    mathint sellerPendingFeeDecrease = to_mathint(sellerPostUpdatePendingFee) - to_mathint(pendingFee(id, seller));
 
-// When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(PendingFee * creditDelta / postUpdateCredit).
-rule pendingFeeDecreasesProportionallySeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    address seller = offer.buy ? taker : offer.maker;
-
-    bytes32 id;
-    uint128 postUpdateCredit;
-    uint128 postUpdatePendingFee;
-
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, seller);
-
-    require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    require id == lastId, "id should be derived from obligation";
-
-    uint256 creditAfter = creditOf(id, seller);
-    uint256 pendingFeeAfter = pendingFee(id, seller);
-
-    mathint creditDelta = to_mathint(postUpdateCredit) - to_mathint(creditAfter);
-    mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFeeAfter);
-
-    assert postUpdateCredit == 0 || pendingFeeDelta == (to_mathint(postUpdatePendingFee) * creditDelta + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
+    assert buyerPendingFeeIncrease == (buyerCreditIncrease * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    assert sellerPostUpdateCredit == 0 || sellerPendingFeeDecrease == (to_mathint(sellerPostUpdatePendingFee) * sellerCreditDecrease + to_mathint(sellerPostUpdateCredit) - 1) / to_mathint(sellerPostUpdateCredit);
 }
 
 // take() increases continuousFeeCredit by exactly the accrued fees of the buyer and seller.
