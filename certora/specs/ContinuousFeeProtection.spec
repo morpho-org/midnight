@@ -74,7 +74,7 @@ rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address 
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
 
-    require postUpdateCredit > 0 || postUpdatePendingFee == 0, "noRemainingContinuousFeeWithoutCredit";
+    require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
