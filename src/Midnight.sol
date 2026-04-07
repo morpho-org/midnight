@@ -6,39 +6,14 @@ import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {
-    WAD,
-    ORACLE_PRICE_SCALE,
-    FEE_STEP,
-    MAX_CONTINUOUS_FEE,
-    TIME_TO_MAX_LIF,
-    MAX_COLLATERALS,
-    MAX_COLLATERALS_PER_BORROWER,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
-    EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
-    LIQUIDATION_LOCK_SLOT,
-    CALLBACK_SUCCESS,
-    isLltvAllowed
-} from "./libraries/ConstantsLib.sol";
+import "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {
-    IMidnight,
-    Obligation,
-    Offer,
-    Signature,
-    CollateralParams,
-    ObligationState,
-    Position
-} from "./interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Position} from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
+import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
-/// MAX AMOUNTS
-/// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
-///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
 /// - `collateralParams.length > 0`: at least one collateral is required.
@@ -51,16 +26,16 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// collaterals simultaneously.
 ///
 /// TRADING FEES
+/// @dev A default trading fee (per loan token) is set on new obligations. Then, the fee setter can override it.
 /// @dev The trading fee is computed using piecewise linear interpolation between breakpoints.
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits.
-/// @dev Max trading fee is defined per index (see maxTradingFee function).
+/// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
 ///
 /// CONTINUOUS FEES
-/// @dev A default continuous fee is set per loan token and applied when obligations are created. Then, the fee setter
-/// can override the continuous fee per obligation.
+/// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
 /// @dev The fee is tracked per lender via `pendingFee` in each position. If the obligation's continuous fee changes,
 /// the pending fee of existing lenders is not updated (=> their fee is fixed).
 /// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
@@ -68,6 +43,21 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
 /// @dev At each lender's next interaction, their credit is slashed proportionally.
+///
+/// GROUPS
+/// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
+/// @dev To work as expected, all offers in the same group should have the same max values and loan token.
+/// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` can be nonzero per offer.
+///
+/// SESSION
+/// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
+/// @dev Offers should have the current session to be valid.
+///
+/// AUTHORIZATIONS
+/// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
+/// any account that has been authorized.
+/// @dev In particular, authorized accounts can authorize other accounts on behalf of the user.
+/// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
@@ -78,16 +68,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// afterwards (bad debt can no longer be realized).
 ///
 /// GATES
-/// @dev Gates can restrict increasing exposure in an obligation and who may liquidate positions.
-/// @dev The entry gate can gate entry actions (increasing credit or debt) in the obligation.
-/// @dev In particular, it does not prevent the user from exiting the obligation
-/// @dev even when the entry gate is reverting.
-/// @dev The liquidator gate prevents the user from liquidating the obligation (and realizing bad debt).
-///
-/// MISC
-/// @dev Zero checks are not systematically performed.
-/// @dev No-ops are allowed.
-/// @dev NatSpec comments are included only when they bring clarity.
+/// @dev Gates are optional (address(0) = unrestricted).
+/// @dev The entry gate can prevent entry actions (increasing credit or debt) in the obligation.
+/// @dev In particular, it does not prevent the user from exiting the obligation even when the entry gate is reverting.
+/// @dev The liquidator gate can prevent the user from liquidating borrowers in the obligation (and realizing bad debt).
 ///
 /// TOKEN REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
@@ -99,12 +83,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - It should not revert on no-op transfers.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`
-/// (unless the borrower has no debt), and `take` whenever the seller still has debt revert.
-/// @dev If `enterGate` reverts or returns false on `canIncreaseCredit`, `take` reverts whenever the buyer ends with
-/// non-zero credit.
-/// @dev If `enterGate` reverts or returns false on `canIncreaseDebt`, `take` reverts whenever the seller ends with
-/// non-zero debt.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`  when the
+/// borrower has debt, and `take` whenever the seller still has debt all revert.
+/// @dev If an activated collateral oracle returns 0 on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
+/// debt, `take` whenever the seller still has debt, and `liquidate` with repaid input all revert.
+/// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
+/// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
 /// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
 /// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
@@ -113,6 +97,19 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// that token.
 /// @dev If a callback reverts, or if a buy/sell callback returns something other than `CALLBACK_SUCCESS`,
 /// callback-enabled `take`, `repay`, `liquidate`, and `flashLoan` revert.
+///
+/// ROLES
+/// @dev The role setter can set the role setter, fee setter, and fee claimer.
+/// @dev The fee setter can set the default and per-obligation trading fee and continuous fee.
+/// @dev The fee claimer can claim the trading fee and continuous fee.
+/// @dev When the claimer is set, the old claimer loses the unclaimed fees.
+///
+/// MISC
+/// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev Zero checks are not systematically performed.
+/// @dev No-ops are allowed.
+/// @dev NatSpec comments are included only when they bring clarity.
+///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
@@ -121,43 +118,21 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => ObligationState) public obligationState;
-
-    /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
-    /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-    /// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` should be nonzero per offer.
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
-
-    /// @dev Offers should have the current session to be valid.
-    /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
     mapping(address user => bytes32) public session;
-
-    /// @dev Whether an address is authorized to act on behalf of another address.
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
-
-    /// @dev Default trading fees per loan token. Set when the obligation is created. Can be later overridden by the
-    /// feeSetter.
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
-
-    /// @dev Default continuous fee per loan token. Set when the obligation is created. Can be later overridden by the
-    /// feeSetter.
     mapping(address loanToken => uint32) public defaultContinuousFee;
-
-    /// @dev When the claimer is set, the old claimer loses the unclaimed trading and continuous fees.
     mapping(address token => uint256) public claimableTradingFee;
-
-    address public feeClaimer;
-
-    /// @dev Contract owner for administrative functions.
-    address public owner;
-
-    /// @dev Address that can set trading fees.
+    address public roleSetter;
     address public feeSetter;
+    address public feeClaimer;
 
     /// CONSTRUCTOR ///
 
     constructor() {
-        owner = msg.sender;
-        emit EventsLib.Constructor(owner);
+        roleSetter = msg.sender;
+        emit EventsLib.Constructor(roleSetter);
     }
 
     /// MULTICALL ///
@@ -175,25 +150,24 @@ contract Midnight is IMidnight {
 
     /// ADMIN FUNCTIONS ///
 
-    function setOwner(address newOwner) external {
-        require(msg.sender == owner, "only owner");
-        owner = newOwner;
-        emit EventsLib.SetOwner(newOwner);
+    function setRoleSetter(address newRoleSetter) external {
+        require(msg.sender == roleSetter, "only role setter");
+        roleSetter = newRoleSetter;
+        emit EventsLib.SetRoleSetter(newRoleSetter);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == roleSetter, "only role setter");
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     function setFeeClaimer(address newFeeClaimer) external {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == roleSetter, "only role setter");
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
-    /// @dev Overrides the fee of a specific obligation.
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
@@ -213,7 +187,6 @@ contract Midnight is IMidnight {
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
-    /// @dev Doesn't change the fee of already created obligations.
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
@@ -266,7 +239,6 @@ contract Midnight is IMidnight {
 
     /// ENTRY-POINTS ///
 
-    /// @dev Returns buyerAssets, sellerAssets, units.
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
@@ -274,6 +246,7 @@ contract Midnight is IMidnight {
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
+    /// @dev Returns buyerAssets, sellerAssets, units.
     function take(
         uint256 units,
         address taker,
@@ -281,7 +254,7 @@ contract Midnight is IMidnight {
         bytes memory takerCallbackData,
         address receiverIfTakerIsSeller,
         Offer memory offer,
-        Signature memory sig,
+        bytes memory ratifierData,
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
@@ -290,9 +263,13 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
         require(offer.maker != taker, "buyer and seller cannot be the same");
-        require(signer(root, sig) == offer.maker, "invalid signature");
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
         require(offer.session == session[offer.maker], "invalid session");
+        require(isAuthorized[offer.maker][offer.ratifier], "ratifier not authorized");
+        require(
+            IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, "ratification failed"
+        );
+
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
 
@@ -352,6 +329,7 @@ contract Midnight is IMidnight {
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
@@ -364,22 +342,22 @@ contract Midnight is IMidnight {
             sellerPos.pendingFee -= sellerPendingFeeDecrease;
         }
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(units - sellerCreditDecrease);
+        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
         if (offer.reduceOnly) {
-            require(offer.buy ? buyerPos.credit == 0 : sellerPos.debt == 0, "maker credit or debt increased");
+            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, "maker credit or debt increased");
         }
 
         require(
-            offer.obligation.enterGate == address(0) || buyerPos.credit == 0
+            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
             "buyer gated from increasing credit"
         );
         require(
-            offer.obligation.enterGate == address(0) || sellerPos.debt == 0
+            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
             "seller gated from increasing debt"
         );
@@ -518,7 +496,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
-    /// @dev Accounts are liquidatable if they are unhealthy or if the maturity has passed.
+    /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
     /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
     /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
     /// @dev Recovery close factor means that debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is
@@ -543,7 +521,7 @@ contract Midnight is IMidnight {
             "liquidator gated from liquidating"
         );
         Position storage _position = position[id][borrower];
-        require(!UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, borrower), "liquidation locked");
+        require(!liquidationLocked(id, borrower), "liquidation locked");
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
@@ -563,7 +541,10 @@ contract Midnight is IMidnight {
             bitmap = bitmap.clearBit(i);
         }
 
-        require(block.timestamp > obligation.maturity || originalDebt > maxDebt, "position is not liquidatable");
+        require(
+            originalDebt > 0 && (block.timestamp > obligation.maturity || originalDebt > maxDebt),
+            "position is not liquidatable"
+        );
 
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
@@ -793,8 +774,8 @@ contract Midnight is IMidnight {
         return IdLib.toId(obligation, block.chainid, address(this));
     }
 
-    /// @dev Returns the obligation corresponding to the given id.
     /// @dev Reverts if the id is not a valid id of a touched obligation.
+    /// @dev Returns the obligation corresponding to the given id.
     function toObligation(bytes32 id) external view returns (Obligation memory) {
         require(obligationState[id].created, "not created");
         address create2Address = address(uint160(uint256(id)));
@@ -853,14 +834,14 @@ contract Midnight is IMidnight {
         return position[id][user].lastAccrual;
     }
 
-    function liquidationLocked(bytes32 id, address user) external view returns (bool) {
+    function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
     }
 
-    /// @dev A borrower is liquidatable if liquidation is not transiently locked, and they are past maturity
-    /// or not healthy.
+    /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
+    /// past maturity or not healthy.
     function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return !UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, borrower)
+        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
             && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
     }
 
@@ -883,23 +864,12 @@ contract Midnight is IMidnight {
         return maxDebt >= debt;
     }
 
-    function domainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
-    }
-
-    function signer(bytes32 root, Signature memory signature) internal view returns (address) {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        address tentativeSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(tentativeSigner != address(0), "invalid signature");
-        return tentativeSigner;
-    }
-
+    /// @dev Returns the max LIF for the given lltv and cursor.
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
         return WAD.mulDivDown(WAD, WAD - cursor.mulDivDown(WAD - lltv, WAD));
     }
 
-    /// @dev 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
+    /// @dev Returns the max trading fee for the given index.
     function maxTradingFee(uint256 index) public pure returns (uint256) {
         return [0.000014e18, 0.000014e18, 0.000098e18, 0.000417e18, 0.00125e18, 0.0025e18, 0.005e18][index];
     }

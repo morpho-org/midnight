@@ -57,7 +57,9 @@ contract OtherFunctionsTest is BaseTest {
         obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(this), true);
 
         id = toId(obligation);
     }
@@ -130,7 +132,8 @@ contract OtherFunctionsTest is BaseTest {
 
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
-        authorize(borrower, address(callback));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(callback), true);
 
         callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
 
