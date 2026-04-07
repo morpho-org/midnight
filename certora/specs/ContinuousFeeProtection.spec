@@ -66,7 +66,7 @@ rule continuousFeeNotOverchargedBuyer(env e, uint256 units, address taker, addre
     assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
-// When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
+// When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(PendingFee * creditDelta / postUpdateCredit).
 rule pendingFeeDecreasesProportionallySeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
     address seller = offer.buy ? taker : offer.maker;
 
