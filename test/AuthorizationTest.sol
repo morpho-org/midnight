@@ -72,7 +72,7 @@ contract AuthorizationTest is BaseTest {
         address user = makeAddr("user");
         address collateralToken = obligation.collateralParams[0].token;
 
-        midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
+        midnight.setLimits(collateralToken, type(uint128).max, type(uint256).max, type(uint256).max);
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
@@ -116,7 +116,7 @@ contract AuthorizationTest is BaseTest {
         address operator = makeAddr("operator");
         address collateralToken = obligation.collateralParams[0].token;
 
-        midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
+        midnight.setLimits(collateralToken, type(uint128).max, type(uint256).max, type(uint256).max);
 
         // User authorizes operator
         vm.prank(user);
@@ -184,7 +184,7 @@ contract AuthorizationTest is BaseTest {
         address user = makeAddr("user");
         address collateralToken = obligation.collateralParams[0].token;
 
-        midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
+        midnight.setLimits(collateralToken, type(uint128).max, type(uint256).max, type(uint256).max);
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
@@ -217,7 +217,7 @@ contract AuthorizationTest is BaseTest {
         // Attacker tries to take on behalf of taker
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert("taker unauthorized");
+        vm.expectRevert("unauthorized");
         midnight.take(units, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer]));
     }
 

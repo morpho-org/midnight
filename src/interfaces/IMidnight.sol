@@ -78,10 +78,6 @@ interface IMidnight {
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
 
-    /// MULTICALL ///
-
-    function multicall(bytes[] calldata calls) external;
-
     /// ADMIN FUNCTIONS ///
 
     function setRoleSetter(address newRoleSetter) external;

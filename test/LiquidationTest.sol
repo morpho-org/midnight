@@ -463,7 +463,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
         repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert("rcf violated");
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         repaid = bound(repaid, 0, min(maxR, units));
@@ -536,7 +536,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         // Full liquidation should revert because remaining debt >= rcfThreshold.
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert("rcf violated");
         midnight.liquidate(obligation, 0, 0, units, borrower, "");
     }
 
@@ -552,7 +552,7 @@ contract LiquidationTest is BaseTest {
         // At exact maturity: recovery close factor applies.
         if (maxRepaid < units) {
             vm.warp(obligation.maturity);
-            vm.expectRevert("recovery close factor conditions violated");
+            vm.expectRevert("rcf violated");
             midnight.liquidate(obligation, 0, 0, units, borrower, "");
         }
 
@@ -665,55 +665,6 @@ contract LiquidationTest is BaseTest {
         );
 
         midnight.liquidate(obligation, liqIdx, 0, maxR, borrower, "");
-    }
-
-    // gas tests
-
-    /// forge-config: default.isolate = true
-    function testGasLiquidateMultipleCollaterals() public {
-        uint256 units = 1000e18;
-        uint256 collateralAmount = units.mulDivUp(WAD, obligation.collateralParams[0].lltv);
-
-        vm.prank(borrower);
-
-        midnight.setIsAuthorized(borrower, address(this), true);
-
-        // Supply both collateralParams.
-        for (uint256 i = 0; i < 2; i++) {
-            address token = obligation.collateralParams[i].token;
-            deal(token, address(this), collateralAmount);
-            midnight.supplyCollateral(obligation, i, collateralAmount, borrower);
-        }
-
-        setupObligation(obligation, units);
-
-        // Make position liquidatable.
-        oracle1.setPrice(0.5e36);
-        oracle2.setPrice(0.5e36);
-        vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
-
-        uint256 repay = units / 2;
-
-        uint256 snapshot = vm.snapshotState();
-
-        // Multicall with 1 liquidation.
-        bytes[] memory calls1 = new bytes[](1);
-        calls1[0] = abi.encodeCall(midnight.liquidate, (obligation, 0, 0, repay, borrower, ""));
-        uint256 gasBefore1 = gasleft();
-        midnight.multicall(calls1);
-        uint256 gas1 = gasBefore1 - gasleft();
-        vm.revertToState(snapshot);
-
-        // Multicall with 2 liquidations.
-        bytes[] memory calls2 = new bytes[](2);
-        calls2[0] = abi.encodeCall(midnight.liquidate, (obligation, 0, 0, repay, borrower, ""));
-        calls2[1] = abi.encodeCall(midnight.liquidate, (obligation, 1, 0, repay, borrower, ""));
-        uint256 gasBefore2 = gasleft();
-        midnight.multicall(calls2);
-        uint256 gas2 = gasBefore2 - gasleft();
-
-        emit log_named_uint("Gas 1st seizure (cold)", gas1);
-        emit log_named_uint("Gas 2nd seizure (warm)", gas2 - gas1);
     }
 
     // slash tests.

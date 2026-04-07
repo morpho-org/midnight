@@ -100,7 +100,7 @@ contract SettersTest is BaseTest {
     function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("trading fee too high");
+        vm.expectRevert("too high");
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
@@ -108,7 +108,7 @@ contract SettersTest is BaseTest {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert("fee should be a multiple of FEE_STEP");
+        vm.expectRevert("fee not FEE_STEP multiple");
         midnight.setObligationTradingFee(id, index, fee);
     }
 
@@ -121,7 +121,7 @@ contract SettersTest is BaseTest {
     }
 
     function testSetObligationTradingFeeObligationNotCreated(bytes32 id) public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert("not created");
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
@@ -214,7 +214,7 @@ contract SettersTest is BaseTest {
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("trading fee too high");
+        vm.expectRevert("too high");
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
 
@@ -332,7 +332,7 @@ contract SettersTest is BaseTest {
         vm.expectRevert("continuous fee too high");
         midnight.setObligationContinuousFee(id, fee);
 
-        vm.expectRevert("continuous fee too high");
+        vm.expectRevert("too high");
         midnight.setDefaultContinuousFee(address(loanToken), fee);
     }
 

@@ -1158,7 +1158,7 @@ contract TakeTest is BaseTest {
         vm.assume(taker != sender);
         vm.assume(!midnight.isAuthorized(taker, sender));
 
-        vm.expectRevert("taker unauthorized");
+        vm.expectRevert("unauthorized");
         vm.prank(sender);
         midnight.take(
             100,

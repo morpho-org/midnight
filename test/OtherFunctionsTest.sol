@@ -176,7 +176,7 @@ contract OtherFunctionsTest is BaseTest {
         supply = bound(supply, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, supply);
         address collateralToken = obligation.collateralParams[0].token;
-        midnight.setMaxCollateralPerUser(collateralToken, type(uint256).max);
+        midnight.setLimits(collateralToken, type(uint128).max, type(uint256).max, type(uint256).max);
         address receiver = makeAddr("receiver");
         deal(collateralToken, address(this), supply);
         midnight.supplyCollateral(obligation, 0, supply, address(this));
@@ -350,7 +350,7 @@ contract OtherFunctionsTest is BaseTest {
             collateralParams[i] = CollateralParams({
                 token: address(token), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(_oracle)
             });
-            midnight.setMaxCollateralPerUser(address(token), type(uint256).max);
+            midnight.setLimits(address(token), type(uint128).max, type(uint256).max, type(uint256).max);
         }
         collateralParams = sortCollateralParams(collateralParams);
         _obligation.loanToken = address(loanToken);
