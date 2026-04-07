@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-/// @dev Errors are sorted alphabetically.
 library ErrorsLib {
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
