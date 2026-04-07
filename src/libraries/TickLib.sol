@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {ErrorsLib} from "./ErrorsLib.sol";
+
 int256 constant LN_ONE_PLUS_DELTA = 0.024692612590371501e18; // ln(1 + 0.025)
 uint256 constant MAX_TICK = 1046;
 
@@ -36,7 +38,7 @@ library TickLib {
     }
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
-        require(tick <= MAX_TICK, "tick out of range");
+        require(tick <= MAX_TICK, ErrorsLib.TickOutOfRange());
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
@@ -47,7 +49,7 @@ library TickLib {
 
     /// @dev Returns the lowest tick with a higher price.
     function priceToTick(uint256 price) internal pure returns (uint256) {
-        require(price <= 1e18, "Price is greater than one");
+        require(price <= 1e18, ErrorsLib.PriceGreaterThanOne());
         uint256 low = 0;
         uint256 high = MAX_TICK;
         while (low != high) {

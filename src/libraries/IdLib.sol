@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation} from "../interfaces/IMidnight.sol";
+import {ErrorsLib} from "./ErrorsLib.sol";
 
 library IdLib {
     /// @dev Used as a prefix to some data, to give a creation code that deploys the data as runtime bytecode.
@@ -35,6 +36,6 @@ library IdLib {
         assembly ("memory-safe") {
             create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainid())
         }
-        require(create2Address != address(0), "Failed to create SStore2 contract");
+        require(create2Address != address(0), ErrorsLib.SStore2DeploymentFailed());
     }
 }
