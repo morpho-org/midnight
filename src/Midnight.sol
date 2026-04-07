@@ -127,7 +127,7 @@ contract Midnight is IMidnight {
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
-    
+
     /// @dev MVP limits.
     // max total units per obligation of a given loan token
     mapping(address loanToken => uint128) public maxTotalUnits;
