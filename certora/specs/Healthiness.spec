@@ -36,6 +36,7 @@ methods {
     function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallback() expect void;
     function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallback() expect void;
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallback() expect void;
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///
@@ -46,14 +47,14 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
-    /* proved in mulDivZero in MulDiv.spec */
-    axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(0, b, d) == 0;
-}
+persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint;
 
 persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint;
 
 /* Axioms that are proved by MulDiv.spec */
+
+/* proved in mulDivZero in MulDiv.spec */
+definition axiomDownZero(mathint b, mathint d) returns bool = d > 0 => summaryMulDivDownM(0, b, d) == 0;
 
 /* proved in mulDivMonotoneA */
 definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => summaryMulDivDownM(a1, b, d) <= summaryMulDivDownM(a2, b, d);
@@ -152,9 +153,9 @@ function summaryToId(Midnight.Obligation obligation, uint256 chainId, address mo
 // To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsHealthyNoBitmap.
 function callIsHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) returns (bool) {
     if (useIsHealthyNoBitmap) {
-        return isHealthyNoBitmap(obligation, id, borrower);
+        return isHealthyNoBitmap(obligation, id, borrower) || liquidationLocked(id, borrower);
     } else {
-        return isHealthy(obligation, id, borrower);
+        return isHealthy(obligation, id, borrower) || liquidationLocked(id, borrower);
     }
 }
 
@@ -168,16 +169,15 @@ function genericCallback() {
 
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
-    bool savedHealthyBefore = healthyBeforeCallback && (callIsHealthy(globalObligation, globalId, globalBorrower)
-        || liquidationLocked(globalId, globalBorrower));
+    bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
 
     callback.callHavoc(e, dummy);
 
     // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
     healthyBeforeCallback = savedHealthyBefore;
 
-    require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore;
-    require callIsHealthy(globalObligation, globalId, globalBorrower) || liquidationLocked(globalId, globalBorrower), "user is healthy after callback";
+    require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
+    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
@@ -233,6 +233,8 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
     require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
+    require axiomDownZero(price, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomDownZero(globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
     require axiomInverseUpDown(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), "axiom";
     require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
     require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralMaxLif[collateralIndex], globalObligationCollateralLLTV[collateralIndex]), "axiom";
@@ -265,9 +267,9 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector } {
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
     // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
+    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector);
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
@@ -284,6 +286,14 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
+}
+
+rule liquidationLockedPreserved(env e, method f, calldataarg args) {
+    bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
+
+    f(e, args);
+
+    assert liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore;
 }
 
 weak invariant notLiquidationLocked()
