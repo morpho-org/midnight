@@ -13,6 +13,7 @@ import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
@@ -322,7 +323,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -335,7 +336,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -396,7 +397,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, otherBorrower, borrowerOffer);
     }
 
@@ -411,7 +412,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, borrower, otherBorrowerOffer);
     }
 
@@ -490,7 +491,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maxUnits = exitUnits;
         otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        vm.expectRevert(ErrorsLib.MakerCreditOrDebtIncreased.selector);
         take(exitUnits, borrower, otherBorrowerOffer);
     }
 
@@ -525,7 +526,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maxUnits = exitUnits;
         otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert("maker credit or debt increased");
+        vm.expectRevert(ErrorsLib.MakerCreditOrDebtIncreased.selector);
         take(exitUnits, lender, otherLenderOffer);
     }
 
@@ -545,7 +546,7 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert("consumed units");
+        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
         take(secondRevertingTake, lender, borrowerOffer);
 
         take(secondPassingTake, lender, borrowerOffer);
@@ -565,7 +566,7 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert("consumed units");
+        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
         take(secondRevertingTake, borrower, lenderOffer);
 
         take(secondPassingTake, borrower, lenderOffer);
@@ -584,7 +585,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert("consumed units");
+        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
         take(secondFill + 1, lender, borrowerOffer2);
 
         take(secondFill, lender, borrowerOffer2);
@@ -603,7 +604,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert("consumed units");
+        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
         take(secondFill + 1, borrower, lenderOffer2);
 
         take(secondFill, borrower, lenderOffer2);
@@ -673,7 +674,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(100, lender, borrowerOffer);
     }
 
@@ -686,7 +687,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -700,7 +701,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -714,7 +715,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -722,7 +723,7 @@ contract TakeTest is BaseTest {
         vm.prank(lender);
         midnight.shuffleSession(lender);
 
-        vm.expectRevert("invalid session");
+        vm.expectRevert(ErrorsLib.InvalidSession.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -730,14 +731,14 @@ contract TakeTest is BaseTest {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
-        vm.expectRevert("offer not started");
+        vm.expectRevert(ErrorsLib.OfferNotStarted.selector);
         take(0, borrower, badOffer);
     }
 
     function testTakeOfferExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
-        vm.expectRevert("offer expired");
+        vm.expectRevert(ErrorsLib.OfferExpired.selector);
         take(0, borrower, lenderOffer);
     }
 
@@ -747,7 +748,7 @@ contract TakeTest is BaseTest {
         privateKey[taker] = pkey;
         lenderOffer.maker = taker;
 
-        vm.expectRevert("cannot self take");
+        vm.expectRevert(ErrorsLib.SelfTake.selector);
         take(0, taker, lenderOffer);
     }
 
@@ -761,7 +762,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
 
-        vm.expectRevert("consumed seller assets");
+        vm.expectRevert(ErrorsLib.ConsumedSellerAssets.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -786,7 +787,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
 
-        vm.expectRevert("consumed buyer assets");
+        vm.expectRevert(ErrorsLib.ConsumedBuyerAssets.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -860,7 +861,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 0;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -872,7 +873,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxSellerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -885,7 +886,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert("multiple max");
+        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -893,7 +894,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidRoot(bytes32 invalidRoot) public {
         vm.assume(invalidRoot != root([lenderOffer]));
-        vm.expectRevert("invalid proof");
+        vm.expectRevert(ErrorsLib.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), invalidRoot, new bytes32[](0)
@@ -977,7 +978,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
-        vm.expectRevert("invalid proof");
+        vm.expectRevert(ErrorsLib.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), _path
@@ -987,7 +988,7 @@ contract TakeTest is BaseTest {
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
         vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
-        vm.expectRevert("invalid proof");
+        vm.expectRevert(ErrorsLib.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -1138,7 +1139,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
-        vm.expectRevert("not ratified");
+        vm.expectRevert(ErrorsLib.NotRatified.selector);
         vm.prank(sender);
         midnight.take(
             0,
@@ -1158,7 +1159,7 @@ contract TakeTest is BaseTest {
         vm.assume(taker != sender);
         vm.assume(!midnight.isAuthorized(taker, sender));
 
-        vm.expectRevert("taker unauthorized");
+        vm.expectRevert(ErrorsLib.TakerUnauthorized.selector);
         vm.prank(sender);
         midnight.take(
             100,
@@ -1295,7 +1296,7 @@ contract TakeTest is BaseTest {
         );
 
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateError(), "not liquidatable");
+        assertEq(callback.liquidateErrorSelector(), ErrorsLib.NotLiquidatable.selector);
         assertEq(midnight.debtOf(id, borrower), units);
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
@@ -1346,7 +1347,7 @@ contract TakeTest is BaseTest {
 
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateError(), "not liquidatable");
+        assertEq(callback.liquidateErrorSelector(), ErrorsLib.NotLiquidatable.selector);
         assertTrue(midnight.liquidationLocked(id, borrower) == false);
         assertEq(midnight.debtOf(id, borrower), 2 * units);
         assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
@@ -1361,7 +1362,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert("invalid callback");
+        vm.expectRevert(ErrorsLib.InvalidCallback.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1489,7 +1490,7 @@ contract TakeTest is BaseTest {
 
         Signature memory badSig;
 
-        vm.expectRevert("ratifier unauthorized");
+        vm.expectRevert(ErrorsLib.RatifierUnauthorized.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1538,8 +1539,7 @@ contract BorrowCallback is ICallbacks {
 
 contract ReentrantLiquidateBorrowCallback is ICallbacks {
     bool public liquidateSucceeded;
-    string public liquidateError;
-    bytes public liquidateRevertData;
+    bytes4 public liquidateErrorSelector;
 
     function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
         external
@@ -1560,10 +1560,8 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
             uint256, uint256
         ) {
             liquidateSucceeded = true;
-        } catch Error(string memory reason) {
-            liquidateError = reason;
         } catch (bytes memory revertData) {
-            liquidateRevertData = revertData;
+            liquidateErrorSelector = bytes4(revertData);
         }
         oracle.setPrice(healthyPrice);
         return CALLBACK_SUCCESS;
@@ -1585,7 +1583,7 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
 contract NestedTakeReentrantLiquidateCallback is ICallbacks {
     bool public reentered;
     bool public liquidateSucceeded;
-    string public liquidateError;
+    bytes4 public liquidateErrorSelector;
 
     Offer internal storedOffer;
     bytes internal storedSig;
@@ -1641,8 +1639,8 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
-            } catch Error(string memory reason) {
-                liquidateError = reason;
+            } catch (bytes memory revertData) {
+                liquidateErrorSelector = bytes4(revertData);
             }
             oracle.setPrice(healthyPrice);
         }

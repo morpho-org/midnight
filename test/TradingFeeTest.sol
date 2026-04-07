@@ -8,6 +8,7 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 // The maximum debt from a trade must fit in uint128, and the required collateral (debt / lltv)
 // must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3.
@@ -202,7 +203,7 @@ contract TradingFeeTest is BaseTest {
 
         collateralize(obligation, borrower, MAX_DEBT);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -261,7 +262,7 @@ contract TradingFeeTest is BaseTest {
     function testClaimTradingFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(ErrorsLib.OnlyFeeClaimer.selector);
         midnight.claimTradingFee(address(loanToken), 0, caller);
     }
 
