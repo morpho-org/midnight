@@ -43,13 +43,15 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-// In a buy-offer take, the buyer's pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
-rule continuousFeeNotOverchargedInBuyOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+// The buyer's pendingFee increases by at most floor(creditIncrease * continuousFee * timeToMaturity / WAD).
+rule continuousFeeNotOverchargedBuyer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    address buyer = offer.buy ? offer.maker : taker;
+
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
@@ -58,21 +60,21 @@ rule continuousFeeNotOverchargedInBuyOffer(env e, uint256 units, address taker, 
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = to_mathint(creditOf(id, offer.maker)) - to_mathint(postUpdateCredit);
-    mathint pendingFeeDelta = to_mathint(pendingFee(id, offer.maker)) - to_mathint(postUpdatePendingFee);
-
-    require offer.buy, "scope to buy offers";
+    mathint creditDelta = to_mathint(creditOf(id, buyer)) - to_mathint(postUpdateCredit);
+    mathint pendingFeeDelta = to_mathint(pendingFee(id, buyer)) - to_mathint(postUpdatePendingFee);
 
     assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(postUpdatePendingFee * creditDecrease / postUpdateCredit).
-rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+rule pendingFeeDecreasesProportionallySeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+    address seller = offer.buy ? taker : offer.maker;
+
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, offer.maker);
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, seller);
 
     require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
@@ -80,13 +82,11 @@ rule pendingFeeDecreasesProportionallyInSellOffer(env e, uint256 units, address 
 
     require id == lastId, "id should be derived from obligation";
 
-    uint256 creditAfter = creditOf(id, offer.maker);
-    uint256 pendingFeeAfter = pendingFee(id, offer.maker);
+    uint256 creditAfter = creditOf(id, seller);
+    uint256 pendingFeeAfter = pendingFee(id, seller);
 
     mathint creditDelta = to_mathint(postUpdateCredit) - to_mathint(creditAfter);
     mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFeeAfter);
-
-    require offer.buy == false, "scope to sell offers";
 
     assert postUpdateCredit == 0 || pendingFeeDelta == (to_mathint(postUpdatePendingFee) * creditDelta + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
 }
@@ -112,7 +112,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
     assert continuousFeeCredit(id) == continuousFeeCreditBefore + buyerAccruedFee + sellerAccruedFee;
 }
 
-// take() must not modify credit or pendingFee of any address other than the buyer and seller.
+// updatePositionView()
 rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
@@ -120,13 +120,21 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
     require user != buyer && user != seller, "user is different from buyer and seller";
 
     bytes32 id;
-    uint256 creditBefore = creditOf(id, user);
-    uint256 pendingFeeBefore = pendingFee(id, user);
+    uint256 postUpdateCreditBefore;
+    uint256 postUpdatePendingFeeBefore;
+    uint256 userAccruedFeeBefore;
+    postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.obligation, id, user);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
 
     require id == lastId, "id should be derived from obligation";
 
-    assert creditOf(id, user) == creditBefore;
-    assert pendingFee(id, user) == pendingFeeBefore;
+    uint256 postUpdateCreditAfter;
+    uint256 postUpdatePendingFeeAfter;
+    uint256 userAccruedFeeAfter;
+    postUpdateCreditAfter, postUpdatePendingFeeAfter, userAccruedFeeAfter = updatePositionView(e, offer.obligation, id, user);
+
+    assert postUpdateCreditBefore == postUpdateCreditAfter, "take should not change credit of third party";
+    assert postUpdatePendingFeeBefore == postUpdatePendingFeeAfter, "take should not change pending fee of third party";
+    assert userAccruedFeeBefore == userAccruedFeeAfter, "take should not change accrued fee of third party";
 }
