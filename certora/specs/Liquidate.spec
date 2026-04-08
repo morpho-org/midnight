@@ -73,17 +73,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     assert borrowerCollateralAfter <= borrowerCollateralBefore;
 }
 
-rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    bytes32 id;
-    bool isHealthyBefore = isHealthy(obligation, id, borrower);
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-
-    // it's okay to check only after the call that the prover chose the correct id.
-    require id == lastId, "id should be derived from obligation";
-
-    assert !isHealthyBefore || e.block.timestamp > obligation.maturity, "liquidate can only be called on unhealthy obligations";
-}
-
+// liquidate should revert if the position is not liquidatable.
 rule liquidateRevertsWhenNotLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
     bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
