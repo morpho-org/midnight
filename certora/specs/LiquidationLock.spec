@@ -159,6 +159,7 @@ rule otherUnlockedPairsStayUnlockedInTakeCallbacks(env e, uint256 units, address
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
     assert unlockedBeforeCallbacks;
+    assert !liquidationLocked(e, globalId, globalBorrower), "pair is unlocked after call";
 }
 
 // After a take, a seller cannot be liquidated on the sold obligation.
