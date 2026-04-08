@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -13,8 +11,9 @@ methods {
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
-    function Utils.passiveFeeRecipient() external returns (address) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
+    function isLiquidatable(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool);
     function _.canLiquidate(address) external => NONDET;
 }
 
@@ -49,13 +48,12 @@ ghost CVL_price(address) returns uint256;
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
     bytes32 id;
-    bool liquidatable = !isHealthy(e, obligation, id, borrower) || obligation.maturity < e.block.timestamp;
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
-    uint256 collateralBefore = collateralOf(id, user, collateralIndex);
+    uint256 collateralBefore = collateral(id, user, collateralIndex);
     uint256 borrowerDebtBefore = debtOf(id, borrower);
-    uint256 borrowerCollateralBefore = collateralOf(id, borrower, collateralIndex);
+    uint256 borrowerCollateralBefore = collateral(id, borrower, collateralIndex);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
@@ -64,20 +62,20 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
-    uint256 collateralAfter = collateralOf(id, user, collateralIndex);
+    uint256 collateralAfter = collateral(id, user, collateralIndex);
     uint256 borrowerDebtAfter = debtOf(id, borrower);
-    uint256 borrowerCollateralAfter = collateralOf(id, borrower, collateralIndex);
+    uint256 borrowerCollateralAfter = collateral(id, borrower, collateralIndex);
 
     assert creditAfter == creditBefore;
-    assert debtAfter == debtBefore || (user == borrower && liquidatable);
-    assert collateralAfter == collateralBefore || (user == borrower && liquidatable);
+    assert debtAfter == debtBefore || (user == borrower && isLiquidatable(e, obligation, id, borrower));
+    assert collateralAfter == collateralBefore || (user == borrower && isLiquidatable(e, obligation, id, borrower));
     assert borrowerDebtAfter <= borrowerDebtBefore;
     assert borrowerCollateralAfter <= borrowerCollateralBefore;
 }
 
 rule liquidateRequireUnhealthy(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id;
-    bool isHealthyBefore = isHealthy(e, obligation, id, borrower);
+    bool isHealthyBefore = isHealthy(obligation, id, borrower);
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
     // it's okay to check only after the call that the prover chose the correct id.
