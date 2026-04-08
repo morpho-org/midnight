@@ -22,8 +22,9 @@ methods {
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => CVL_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => CVL_mulDivUp(a, b, d);
-    function UtilsLib.tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool) => cvlTExchange(baseSlot, key1, key2, value);
-    function UtilsLib.tGet(uint256 baseSlot, bytes32 key1, address key2) internal returns (bool) => cvlTGet(baseSlot, key1, key2);
+
+    // function UtilsLib.tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool) => cvlTExchange(baseSlot, key1, key2, value);
+    // function UtilsLib.tGet(uint256 baseSlot, bytes32 key1, address key2) internal returns (bool) => cvlTGet(baseSlot, key1, key2);
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     function _.havocAll() external => HAVOC_ALL;
@@ -41,14 +42,15 @@ persistent ghost bytes32 globalId;
 
 persistent ghost address globalBorrower;
 
+// Accumulator, false if at least one callback started with the lock off.
 ghost bool lockedBeforeCallbacks;
 
+// Accumulator, false if at least one callback started with the lock on.
 ghost bool unlockedBeforeCallbacks;
 
 // Non-persistent as calls can trigger oracle updates
 ghost CVL_price(address) returns uint256;
 
-// Pure function ghosts (deterministic: same inputs → same output)
 ghost CVL_msb(uint128) returns uint256;
 
 ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
@@ -109,7 +111,7 @@ rule notLiquidatableWhenLocked(env e, Midnight.Obligation obligation, address bo
     assert !isLiquidatable(e, obligation, id, borrower), "locked borrower is not liquidatable";
 }
 
-// During a take, the liquidation lock of the sold obligation is on.
+// During a take, liquidation of the seller on the sold obligation is locked.
 rule sellerAlwaysLockedInTakeCallbacks(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     globalId = summaryToId(offer.obligation);
     globalBorrower = offer.buy ? taker : offer.maker;
@@ -119,7 +121,34 @@ rule sellerAlwaysLockedInTakeCallbacks(env e, uint256 units, address taker, addr
     assert lockedBeforeCallbacks;
 }
 
-// During a take, unrelated unlocked pairs stay unlocked during callbacks.
+// The 5 rules below show that the only liquidation lock state that is not strongly preserved is a disabled lock for the seller of an obligation.
+// That disabled lock state is weakly preserved, and all external calls in it begin with the lock as enabled.
+
+// An enabled liquidation lock is preserved during and after calls.
+rule lockPreservation(method f, env e, calldataarg args, bytes32 id, address borrower) {
+    globalId = id;
+    globalBorrower = borrower;
+    require liquidationLocked(e, globalId, globalBorrower);
+    lockedBeforeCallbacks = true;
+
+    f(e, args);
+    assert lockedBeforeCallbacks, "lock preserved during call";
+    assert liquidationLocked(e, globalId, globalBorrower), "lock preserved after call";
+}
+
+// A disabled liquidation lock is preserved during and after calls except in take.
+rule unlockedLockPreservation(method f, env e, calldataarg args, bytes32 id, address borrower) filtered { f -> f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector } {
+    globalId = id;
+    globalBorrower = borrower;
+    require !liquidationLocked(e, globalId, globalBorrower);
+    unlockedBeforeCallbacks = true;
+
+    f(e, args);
+    assert unlockedBeforeCallbacks, "disabled lock preserved during call";
+    assert !liquidationLocked(e, globalId, globalBorrower), "disabled lock preserved after call";
+}
+
+// Except for the lock on the seller in the taken obligation, any disabled liquidation lock is preserved during and after a take.
 rule otherUnlockedPairsStayUnlockedInTakeCallbacks(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, bytes32 id, address borrower) {
     globalId = id;
     globalBorrower = borrower;
@@ -132,18 +161,6 @@ rule otherUnlockedPairsStayUnlockedInTakeCallbacks(env e, uint256 units, address
     assert unlockedBeforeCallbacks;
 }
 
-// A liquidation lock is preserved during and after calls.
-rule lockPreservation(method f, env e, calldataarg args, bytes32 id, address borrower) {
-    globalId = id;
-    globalBorrower = borrower;
-    require liquidationLocked(e, globalId, globalBorrower);
-    lockedBeforeCallbacks = true;
-
-    f(e, args);
-    assert lockedBeforeCallbacks, "lock preserved during call";
-    assert liquidationLocked(e, globalId, globalBorrower), "lock preserved after call";
-}
-
 // After a take, a seller cannot be liquidated on the sold obligation.
 rule sellerNotLiquidatableAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     globalId = summaryToId(offer.obligation);
@@ -154,6 +171,13 @@ rule sellerNotLiquidatableAfterTake(env e, uint256 units, address taker, address
     assert !isLiquidatable(e, offer.obligation, globalId, globalBorrower), "seller is not liquidatable after take";
 }
 
-/// Liquidation locks are disabled between toplevel calls.
-invariant liquidationIsNotLocked(bytes32 id, address user)
-    !liquidationLocked(id, user);
+// The seller disabled lock is weakly preserved
+rule sellerUnlockedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    globalId = summaryToId(offer.obligation);
+    globalBorrower = offer.buy ? taker : offer.maker;
+    require !liquidationLocked(e, globalId, globalBorrower), "seller is not locked before call";
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
+
+    assert !liquidationLocked(e, globalId, globalBorrower), "seller is not locked after take";
+}
