@@ -1561,6 +1561,7 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         ) {
             liquidateSucceeded = true;
         } catch (bytes memory revertData) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             liquidateErrorSelector = bytes4(revertData);
         }
         oracle.setPrice(healthyPrice);
@@ -1640,6 +1641,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
             ) {
                 liquidateSucceeded = true;
             } catch (bytes memory revertData) {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 liquidateErrorSelector = bytes4(revertData);
             }
             oracle.setPrice(healthyPrice);
