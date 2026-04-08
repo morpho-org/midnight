@@ -11,6 +11,7 @@ methods {
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;

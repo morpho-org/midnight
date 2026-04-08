@@ -95,7 +95,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 persistent ghost bool useIsHealthyNoBitmap;
 
 // global variable to track whether the user was healthy before the callbacks.
-ghost bool healthyBeforeCallback;
+ghost bool healthyBeforeCallbacks;
 
 // global variable to track which obligation and borrower we're testing.
 persistent ghost address globalObligationLoanToken;
@@ -166,14 +166,15 @@ function genericCallback() {
     Midnight.Obligation globalObligation = getGlobalObligation();
 
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
-    bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
+    bool healthyBefore = callIsHealthy(globalObligation, globalId, globalBorrower);
+    bool savedHealthyBeforeCallbacks = healthyBeforeCallbacks && healthyBefore;
 
     callback.callHavoc(e, dummy);
 
-    // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
-    healthyBeforeCallback = savedHealthyBefore;
+    // the callback havocs the global variable healthyBeforeCallbacks, so we restore the variable using the saved value in the local variable.
+    healthyBeforeCallbacks = savedHealthyBeforeCallbacks;
 
-    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after callback";
+    require callIsHealthy(globalObligation, globalId, globalBorrower) == healthyBefore, "healthy state preserved after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
@@ -204,7 +205,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyBeforeCallbacks = true;
 
     require globalObligationCollateralLLTV[collateralIndex] * globalObligationCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
@@ -236,7 +237,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyBeforeCallbacks, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
@@ -245,7 +246,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyBeforeCallbacks = true;
 
     require globalObligationCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
@@ -256,7 +257,48 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyBeforeCallbacks, "user is healthy before callbacks";
+    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
+}
+
+// Show that the seller is healthy after a take if his liquidation was not locked before the call.
+rule sellerHealthyAfterUnlockedTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    useIsHealthyNoBitmap = false;
+
+    // This variable is set to true whenever isHealthy() is violated before a callback.  Initially we set it to false to indicate no violations detected.
+    healthyBeforeCallbacks = true;
+
+    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
+
+    Midnight.Obligation globalObligation = getGlobalObligation();
+    globalBorrower = offer.buy ? taker : offer.maker;
+    require equalsGlobalObligation(offer.obligation), "obligation";
+    require !liquidationLocked(e, globalId, globalBorrower), "seller is not locked before call";
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
+
+    // We do not check that the user stayed healthy as that may not be the case
+    assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
+}
+
+// Show that users other than the seller stay healthy during take.
+rule stayHealthyTakeOtherBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    useIsHealthyNoBitmap = true;
+
+    // This variable is set to true whenever isHealthy() is violated before a callback.  Initially we set it to false to indicate no violations detected.
+    healthyBeforeCallbacks = true;
+
+    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
+
+    Midnight.Obligation globalObligation = getGlobalObligation();
+    address borrower = offer.buy ? taker : offer.maker;
+    require borrower != globalBorrower || !equalsGlobalObligation(offer.obligation), "borrower or obligation differs";
+
+    require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
+
+    assert healthyBeforeCallbacks, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
@@ -266,7 +308,7 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyBeforeCallbacks = true;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
 
@@ -278,6 +320,6 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
 
     f(e, args);
 
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyBeforeCallbacks, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }

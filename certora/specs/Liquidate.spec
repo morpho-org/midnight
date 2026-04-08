@@ -58,3 +58,14 @@ rule liquidateRevertsWhenNotLiquidatable(env e, Midnight.Obligation obligation, 
 
     assert wasLiquidatable, "liquidate cannot succeed when the borrower is not liquidatable";
 }
+
+rule notLiquidatableImpliesLiquidateReverts(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+    bytes32 id;
+    require !isLiquidatable(e, obligation, id, borrower), "borrower is not liquidatable before call";
+
+    liquidate@withrevert(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+
+    require id == lastId, "id should be derived from obligation";
+
+    assert lastReverted, "liquidate reverts when the borrower is not liquidatable";
+}
