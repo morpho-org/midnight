@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
@@ -24,32 +24,32 @@ contract BundlerTest is BaseTest {
         takeBundler = new TakeBundler();
 
         // Set trading fees to max for all breakpoints.
-        midnight.setFeeRecipient(makeAddr("feeRecipient"));
+        midnight.setFeeClaimer(makeAddr("feeClaimer"));
         for (uint256 i; i <= 6; i++) {
             midnight.setDefaultTradingFee(address(loanToken), i, midnight.maxTradingFee(i));
         }
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = midnight.touchObligation(obligation);
@@ -58,6 +58,7 @@ contract BundlerTest is BaseTest {
         offers[0].buy = true;
         offers[0].maker = lender;
         offers[0].obligation = obligation;
+        offers[0].ratifier = address(ecrecoverRatifier);
         offers[0].expiry = block.timestamp + 200;
         offers[0].tick = MAX_TICK;
 
@@ -65,6 +66,7 @@ contract BundlerTest is BaseTest {
         offers[1].buy = true;
         offers[1].maker = lender;
         offers[1].obligation = obligation;
+        offers[1].ratifier = address(ecrecoverRatifier);
         offers[1].expiry = block.timestamp + 200;
         offers[1].tick = MAX_TICK;
         offers[1].group = bytes32(uint256(1));
@@ -73,8 +75,10 @@ contract BundlerTest is BaseTest {
     }
 
     function _authorizeBundler() internal {
-        authorize(borrower, address(takeBundler));
-        authorize(borrower, address(this));
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(takeBundler), true);
+        vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(this), true);
     }
 
     function testUnauthorized() public {
@@ -119,7 +123,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             takeBundler.bundleTakeUnits(
-                midnight, units, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
+                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -131,7 +135,7 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert("insufficient liquidity");
             takeBundler.bundleTakeUnits(
-                midnight, units, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
+                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
             );
         }
     }
@@ -169,7 +173,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             takeBundler.bundleTakeBuyerAssets(
-                midnight, targetBuyerAssets, borrower, address(0), takes, 0, type(uint256).max
+                midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -181,7 +185,7 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert("insufficient liquidity");
             takeBundler.bundleTakeBuyerAssets(
-                midnight, targetBuyerAssets, borrower, address(0), takes, 0, type(uint256).max
+                midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
         }
     }
@@ -314,7 +318,7 @@ contract BundlerTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("buyer assets above max");
         takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, address(0), takes, 0, maxBuyerAssets, 0, type(uint256).max
+            midnight, targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max
         );
     }
 
@@ -364,7 +368,7 @@ contract BundlerTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("buyer assets below min");
         takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, address(0), takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
+            midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
         );
     }
 }

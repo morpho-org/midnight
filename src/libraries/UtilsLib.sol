@@ -10,6 +10,13 @@ library UtilsLib {
         }
     }
 
+    /// @dev Returns true if at most one of `x`, `y`, and `z` is nonzero.
+    function atMostOneNonZero(uint256 x, uint256 y, uint256 z) internal pure returns (bool r) {
+        assembly {
+            r := gt(add(add(iszero(x), iszero(y)), iszero(z)), 1)
+        }
+    }
+
     /// @dev Returns min(a, b).
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
@@ -85,5 +92,23 @@ library UtilsLib {
     function clearBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast)
         return uint128(bitmap & ~(1 << bit));
+    }
+
+    /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
+    /// @dev Returns the previous value at the written slot.
+    function tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool previous) {
+        uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
+        assembly ("memory-safe") {
+            previous := tload(slot)
+            tstore(slot, value)
+        }
+    }
+
+    /// @dev Gets a boolean from transient storage keyed by a `(bytes32, address)` pair.
+    function tGet(uint256 baseSlot, bytes32 key1, address key2) internal view returns (bool value) {
+        uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
+        assembly ("memory-safe") {
+            value := tload(slot)
+        }
     }
 }
