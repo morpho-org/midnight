@@ -48,7 +48,7 @@ ghost CVL_price(address) returns uint256;
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
     bytes32 id;
-    bool isLiquidatable = isLiquidatable(e, obligation, id, borrower);
+    bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
@@ -67,8 +67,8 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 borrowerCollateralAfter = collateral(id, borrower, collateralIndex);
 
     assert creditAfter == creditBefore;
-    assert debtAfter == debtBefore || (user == borrower && isLiquidatable);
-    assert collateralAfter == collateralBefore || (user == borrower && isLiquidatable);
+    assert debtAfter == debtBefore || (user == borrower && wasLiquidatable);
+    assert collateralAfter == collateralBefore || (user == borrower && wasLiquidatable);
     assert borrowerDebtAfter <= borrowerDebtBefore;
     assert borrowerCollateralAfter <= borrowerCollateralBefore;
 }
