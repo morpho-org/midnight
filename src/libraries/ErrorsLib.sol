@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 
 library ErrorsLib {
     error AlreadyConsumed();
+    error BuyerAssetsAboveMax();
+    error BuyerAssetsBelowMin();
     error BuyerGatedFromIncreasingCredit();
     error BuyerPendingFeeExceedsCredit();
     error CollateralParamsNotSorted();
@@ -13,6 +15,7 @@ library ErrorsLib {
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
     error InconsistentInput();
+    error InsufficientLiquidity();
     error InvalidCallback();
     error InvalidFeeIndex();
     error InvalidMaxLif();
@@ -36,6 +39,8 @@ library ErrorsLib {
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
     error SelfTake();
+    error SellerAssetsAboveMax();
+    error SellerAssetsBelowMin();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
     error SStore2DeploymentFailed();
@@ -49,4 +54,6 @@ library ErrorsLib {
     error Uint128Overflow();
     error Unauthorized();
     error UnhealthyBorrower();
+    error UnitsAboveMax();
+    error UnitsBelowMin();
 }
