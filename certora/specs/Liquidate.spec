@@ -52,8 +52,6 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
-    uint256 borrowerDebtBefore = debtOf(id, borrower);
-    uint256 borrowerCollateralBefore = collateral(id, borrower, collateralIndex);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
@@ -63,14 +61,12 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
     uint256 collateralAfter = collateral(id, user, collateralIndex);
-    uint256 borrowerDebtAfter = debtOf(id, borrower);
-    uint256 borrowerCollateralAfter = collateral(id, borrower, collateralIndex);
 
     assert creditAfter == creditBefore;
     assert debtAfter == debtBefore || (user == borrower && wasLiquidatable);
     assert collateralAfter == collateralBefore || (user == borrower && wasLiquidatable);
-    assert borrowerDebtAfter <= borrowerDebtBefore;
-    assert borrowerCollateralAfter <= borrowerCollateralBefore;
+    assert debtAfter <= debtBefore;
+    assert collateralAfter <= collateralBefore;
 }
 
 // liquidate should revert if the position is not liquidatable.
