@@ -168,14 +168,14 @@ function isHealthyOrLiquidationLocked(Midnight.Obligation obligation, bytes32 id
 }
 
 // Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
-// we check that the user is healthy before the callback, do some external call (to simulate changes by the callback),
-// and then require that the user is still healthy after the callback.
+// we check that the user is healthy or locked before the callback, do some external call (to simulate changes by the callback),
+// and then require that the user is still healthy or locked after the callback.
 function genericCallback() {
     address dummy;
     env e;
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
+    // check that isHealthy or locked holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
     bool savedHealthyBefore = healthyOrLockedBeforeCallbacks && isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower);
 
@@ -185,7 +185,7 @@ function genericCallback() {
     healthyOrLockedBeforeCallbacks = savedHealthyBefore;
 
     require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
-    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after callback";
+    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after callback";
 }
 
 // Same as the summary above except that it also returns a non-deterministic value.
@@ -228,7 +228,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy before call";
+    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked before call";
 
     uint256 collateralBefore = collateral(globalId, globalBorrower, collateralIndex);
     uint256 seizedAssetsOut;
@@ -254,8 +254,8 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
-    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
-    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
+    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after call";
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
@@ -270,12 +270,12 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     Midnight.Obligation globalObligation = getGlobalObligation();
     require borrower != globalBorrower || !equalsGlobalObligation(obligation), "borrower or obligation differs";
 
-    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy before call";
+    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked before call";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
-    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
-    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
+    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after call";
 }
 
 // Show that the user stays healthy on any other function than liquidate.
@@ -297,12 +297,12 @@ rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> !isL
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
-    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy before call";
+    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked before call";
 
     f(e, args);
 
-    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
-    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
+    assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after call";
 }
 
 // Show that liquidationLocked flag is preserved over calls
