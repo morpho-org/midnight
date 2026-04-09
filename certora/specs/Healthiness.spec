@@ -76,6 +76,13 @@ definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a 
 /* proved in mulDivLifLLTV */
 definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
 
+/* function selectors for take/liquidate/withdrawCollateral */
+definition isTake(method f) returns bool = (f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector);
+
+definition isLiquidate(method f) returns bool = (f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector);
+
+definition isWithdrawCollateral(method f) returns bool = (f.selector == sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector);
+
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -97,7 +104,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 persistent ghost bool useIsHealthyNoBitmap;
 
 // global variable to track whether the user was healthy before the callbacks.
-ghost bool healthyBeforeCallback;
+ghost bool healthyOrLockedBeforeCallbacks;
 
 // global variable to track which obligation and borrower we're testing.
 persistent ghost address globalObligationLoanToken;
@@ -170,12 +177,12 @@ function genericCallback() {
 
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
-    bool savedHealthyBefore = healthyBeforeCallback && isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower);
+    bool savedHealthyBefore = healthyOrLockedBeforeCallbacks && isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower);
 
     callback.callHavoc(e, dummy);
 
-    // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
-    healthyBeforeCallback = savedHealthyBefore;
+    // the callback havocs the global variable healthyOrLockedBeforeCallbacks, so we restore the variable using the saved value in the local variable.
+    healthyOrLockedBeforeCallbacks = savedHealthyBefore;
 
     require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
     require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after callback";
@@ -199,6 +206,10 @@ function genericCallbackBytes32() returns (bytes32) {
 // The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
 // Since we have a ghost summary for price(), we assume the price will not change during the call.
 
+// The precise invariant we show is
+//    `isHealthy(globalObligation, globalId, globalBorrower) || liquidationLocked(globalId, globalBorrower)`
+// which is also true during the callbacks in take().
+
 // To avoid timeouts, we split out two cases for liquidate:
 //  1) the borrower under consideration is the one that is liquidated on the obligation under consideration.
 //  2) the borrower is different from the liquidated user, or the obligation is different.
@@ -209,7 +220,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyOrLockedBeforeCallbacks = true;
 
     require globalObligationCollateralLLTV[collateralIndex] * globalObligationCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
@@ -243,7 +254,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
     assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
@@ -252,7 +263,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyOrLockedBeforeCallbacks = true;
 
     require globalObligationCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
@@ -263,23 +274,26 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
 
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
     assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
 // Show that the user stays healthy on any other function than liquidate.
 // We also allow the user to be liquidationLocked() (for callbacks from take(), where the seller
 // is not required to be healthy).
-rule stayHealthyOrLiquidationLocked(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
-    // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector);
+rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> !isLiquidate(f) } {
+    // for withdraw collateral and take we choose isHealthy() for all others the isHealthyNoBitmap function.
+    useIsHealthyNoBitmap = (!isWithdrawCollateral(f) && !isTake(f));
+
+    // for take use 2 collaterals (to avoid timeouts), otherwise 3.
+    mathint maxCollaterals = isTake(f) ? 2 : 3;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
-    healthyBeforeCallback = true;
+    healthyOrLockedBeforeCallbacks = true;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
 
-    require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
+    require globalObligationCollateralLength <= maxCollaterals, "too many collateralParams for the spec to handle";
 
     Midnight.Obligation globalObligation = getGlobalObligation();
 
@@ -287,7 +301,7 @@ rule stayHealthyOrLiquidationLocked(env e, method f, calldataarg args) filtered 
 
     f(e, args);
 
-    assert healthyBeforeCallback, "user is healthy before callbacks";
+    assert healthyOrLockedBeforeCallbacks, "user is healthy before callbacks";
     assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy after call";
 }
 
@@ -304,3 +318,15 @@ rule liquidationLockedPreserved(env e, method f, calldataarg args) {
 // Show that by the end of a transactions the global borrower is not liquidation locked.
 weak invariant notLiquidationLocked()
     !liquidationLocked(globalId, globalBorrower);
+
+// Check that locked positions are not liquidatable.  We check in Liquidation.spec that
+// liquidate() reverts if isLiquidatable() returns false.  Here we check that isLiquidatable()
+// returns false.
+rule notLiquidatableWhenLocked(env e) {
+    Midnight.Obligation globalObligation = getGlobalObligation();
+
+    bool liquidationLocked = liquidationLocked(globalId, globalBorrower);
+    bool isLiquidatable = isLiquidatable(e, globalObligation, globalId, globalBorrower);
+
+    assert liquidationLocked => !isLiquidatable;
+}
