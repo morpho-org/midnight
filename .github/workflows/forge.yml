@@ -38,6 +38,22 @@ jobs:
 
       - name: Run forge lint
         run: forge lint --deny notes
+
+  sizes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
+
+      - name: Run forge build
+        run: forge build --force --sizes
+
   test:
     runs-on: ubuntu-latest
     strategy:
