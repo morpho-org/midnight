@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
+import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 interface IHavoc {
     function havoc() external;
@@ -39,10 +40,11 @@ contract FlashLiquidateCallback {
         endFlashloan(obligation.loanToken, units);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes calldata data) external {
+    function onFlashLoan(address token, uint256 amount, bytes calldata data) external returns (bytes32) {
         startFlashloan(token, amount);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
         endFlashloan(token, amount);
+        return CALLBACK_SUCCESS;
     }
 }

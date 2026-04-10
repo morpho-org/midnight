@@ -40,5 +40,5 @@ interface ICallbacks {
 }
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external;
+    function onFlashLoan(address token, uint256 amount, bytes memory data) external returns (bytes32);
 }

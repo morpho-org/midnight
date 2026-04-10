@@ -650,7 +650,7 @@ contract Midnight is IMidnight {
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
         SafeTransferLib.safeTransfer(token, msg.sender, assets);
-        IFlashLoanCallback(callback).onFlashLoan(token, assets, data);
+        require(IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS, "invalid callback");
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
