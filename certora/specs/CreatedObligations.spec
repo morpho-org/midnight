@@ -9,7 +9,7 @@ methods {
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
-    function Midnight.fees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
@@ -18,7 +18,8 @@ methods {
     function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
     function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -57,19 +58,19 @@ function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
 
 // Show that a created obligation has at least one collateral.
 strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
-    obligationIsCreated(obligation) => obligation.collaterals.length > 0;
+    obligationIsCreated(obligation) => obligation.collateralParams.length > 0;
 
-// Show that a created obligation has sorted collaterals.
+// Show that a created obligation has sorted collateralParams.
 strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
-    obligationIsCreated(obligation) => i < j => j < obligation.collaterals.length => obligation.collaterals[i].token < obligation.collaterals[j].token;
+    obligationIsCreated(obligation) => i < j => j < obligation.collateralParams.length => obligation.collateralParams[i].token < obligation.collateralParams[j].token;
 
-// Show that a created obligation do not have address(0) collaterals.
+// Show that a created obligation do not have address(0) collateralParams.
 strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].token != 0;
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].token != 0;
 
 // Show that a created obligation has lltv <= WAD.
 strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD();
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
@@ -85,8 +86,8 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
@@ -95,8 +96,8 @@ rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uin
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf) {
-    Midnight.repay(e, obligation, units, onBehalf);
+rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
+    Midnight.repay(e, obligation, units, onBehalf, data);
     assert obligationIsCreated(obligation);
 }
 
@@ -128,6 +129,9 @@ strong invariant obligationFeesAreEmptyIfNotCreated(bytes32 id)
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
 
+strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => currentContract.obligationState[id].continuousFeeCredit == 0;
+
 strong invariant obligationLossIndexIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossIndex == 0;
 
@@ -153,7 +157,7 @@ strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
 
 function noFeesAreSet(bytes32 id) returns (bool) {
-    uint16[7] fees = Midnight.fees(id);
+    uint16[7] fees = Midnight.tradingFees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
@@ -165,8 +169,8 @@ definition userHasNoLastAccrual(bytes32 id, address user) returns bool = Midnigh
 
 definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
 
-definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385000000000000000 || lltv == 625000000000000000 || lltv == 770000000000000000 || lltv == 860000000000000000 || lltv == 915000000000000000 || lltv == 945000000000000000 || lltv == 965000000000000000 || lltv == 980000000000000000 || lltv == 1000000000000000000;
+definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 
 // Show that a created obligation only has allowed LLTV tiers.
 strong invariant createdObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collaterals.length => isLltvAllowed(obligation.collaterals[i].lltv);
+    obligationIsCreated(obligation) => i < obligation.collateralParams.length => isLltvAllowed(obligation.collateralParams[i].lltv);

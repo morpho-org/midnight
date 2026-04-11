@@ -8,11 +8,11 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function claimableTradingFee(address token) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
-    function Utils.passiveFeeRecipient() external returns (address) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -22,7 +22,8 @@ methods {
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -65,18 +66,23 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 unitsOutput;
 
-    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, signature, root, proof);
+    uint256 claimableBefore = claimableTradingFee(offer.obligation.loanToken);
+
+    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     // The output units is equal to the input.
     assert unitsOutput == unitsInput;
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
+
+    // The claimable trading fee increases by exactly the spread.
+    assert claimableTradingFee(offer.obligation.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
@@ -127,7 +133,6 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
     userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
 
-/// A user cannot have both credit and debt, excluding PASSIVE_FEE_RECIPIENT who receives
-/// credit from fee accrual and could theoretically be a trade participant.
+/// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    user != Utils.passiveFeeRecipient() => (creditOf(id, user) == 0 || debtOf(id, user) == 0);
+    creditOf(id, user) == 0 || debtOf(id, user) == 0;

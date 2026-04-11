@@ -32,6 +32,13 @@ contract FlashLiquidateCallback {
         endFlashloan(obligation.loanToken, repaidUnits);
     }
 
+    function onRepay(bytes32, Obligation memory obligation, uint256 units, address, bytes memory data) external {
+        startFlashloan(obligation.loanToken, units);
+        address account = abi.decode(data, (address));
+        IHavoc(account).havoc();
+        endFlashloan(obligation.loanToken, units);
+    }
+
     function onFlashLoan(address token, uint256 amount, bytes calldata data) external {
         startFlashloan(token, amount);
         address account = abi.decode(data, (address));

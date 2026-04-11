@@ -2,25 +2,13 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-contract ERC20NoRevert {
-    address public owner;
+contract ERC20RevertToZero {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
-    constructor() {
-        owner = msg.sender;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner);
-        _;
-    }
-
     function _transfer(address _from, address _to, uint256 _amount) internal returns (bool) {
-        if (balanceOf[_from] < _amount) {
-            return false;
-        }
+        require(_to != address(0), "ERC20: transfer to the zero address");
         balanceOf[_from] -= _amount;
         balanceOf[_to] += _amount;
         return true;
@@ -31,19 +19,12 @@ contract ERC20NoRevert {
     }
 
     function transferFrom(address _from, address _to, uint256 _amount) public returns (bool) {
-        if (allowance[_from][msg.sender] < _amount) {
-            return false;
-        }
         allowance[_from][msg.sender] -= _amount;
         return _transfer(_from, _to, _amount);
     }
 
-    function approve(address _spender, uint256 _amount) public {
+    function approve(address _spender, uint256 _amount) public returns (bool) {
         allowance[msg.sender][_spender] = _amount;
-    }
-
-    function mint(address _receiver, uint256 _amount) public onlyOwner {
-        balanceOf[_receiver] += _amount;
-        totalSupply += _amount;
+        return true;
     }
 }

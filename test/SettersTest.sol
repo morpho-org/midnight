@@ -4,23 +4,23 @@ pragma solidity ^0.8.0;
 
 import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {Obligation, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
-    function testInitialOwner() public view {
-        assertEq(midnight.owner(), address(this), "deployer should be initial owner");
+    function testInitialRoleSetter() public view {
+        assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }
 
-    function testSetOwnerSuccess(address rdm) public {
-        midnight.setOwner(rdm);
-        assertEq(midnight.owner(), rdm, "owner should be transferred");
+    function testSetRoleSetterSuccess(address rdm) public {
+        midnight.setRoleSetter(rdm);
+        assertEq(midnight.roleSetter(), rdm, "role setter should be transferred");
     }
 
-    function testSetOwnerOnlyOwner(address rdm) public {
+    function testSetRoleSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
-        midnight.setOwner(makeAddr("newOwner"));
+        vm.expectRevert("only role setter");
+        midnight.setRoleSetter(makeAddr("newRoleSetter"));
     }
 
     function testSetFeeSetterSuccess(address feeSetter) public {
@@ -28,10 +28,10 @@ contract SettersTest is BaseTest {
         assertEq(midnight.feeSetter(), feeSetter);
     }
 
-    function testSetFeeSetterOnlyOwner(address rdm) public {
+    function testSetFeeSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
+        vm.expectRevert("only role setter");
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
@@ -53,14 +53,14 @@ contract SettersTest is BaseTest {
         oneEightyDaysFee = bound(oneEightyDaysFee, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
         threeSixtyDaysFee = bound(threeSixtyDaysFee, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
 
-        Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: loanToken,
             maturity: block.timestamp + 1 days,
-            collaterals: collaterals,
+            collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)
@@ -100,7 +100,7 @@ contract SettersTest is BaseTest {
     function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("value too high");
+        vm.expectRevert("trading fee too high");
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
@@ -132,22 +132,22 @@ contract SettersTest is BaseTest {
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
-    function testSetFeeRecipientSuccess(address feeRecipient) public {
-        midnight.setFeeRecipient(feeRecipient);
-        assertEq(midnight.feeRecipient(), feeRecipient, "fee recipient set");
+    function testSetFeeClaimerSuccess(address feeClaimer) public {
+        midnight.setFeeClaimer(feeClaimer);
+        assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
 
-    function testSetFeeRecipientOnlyOwner(address rdm) public {
+    function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
-        midnight.setFeeRecipient(makeAddr("newRecipient"));
+        vm.expectRevert("only role setter");
+        midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
     // Default trading fee tests
 
     function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert("not created");
+        vm.expectRevert("obligation not created");
         midnight.tradingFee(bytes32(0), 0);
     }
 
@@ -178,14 +178,14 @@ contract SettersTest is BaseTest {
         midnight.setDefaultTradingFee(loanToken, 6, threeSixtyDaysFee);
 
         // touch obligation with this loan token
-        Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: loanToken,
             maturity: block.timestamp + 1 days,
-            collaterals: collaterals,
+            collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)
@@ -214,7 +214,7 @@ contract SettersTest is BaseTest {
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("value too high");
+        vm.expectRevert("trading fee too high");
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
 
@@ -235,14 +235,14 @@ contract SettersTest is BaseTest {
         fee5 = bound(fee5, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
         fee6 = bound(fee6, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
 
-        Collateral[] memory cols = new Collateral[](1);
-        cols[0] = Collateral({
+        CollateralParams[] memory cols = new CollateralParams[](1);
+        cols[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: address(0),
             maturity: block.timestamp + 1 days,
-            collaterals: cols,
+            collateralParams: cols,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)
@@ -287,14 +287,14 @@ contract SettersTest is BaseTest {
     function testSetContinuousFeeOnlyFeeSetter(address rdm) public {
         vm.assume(rdm != address(this));
 
-        Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
-            collaterals: collaterals,
+            collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)
@@ -314,14 +314,14 @@ contract SettersTest is BaseTest {
     function testSetContinuousFeeTooHigh(uint256 fee) public {
         fee = bound(fee, MAX_CONTINUOUS_FEE + 1, type(uint256).max);
 
-        Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
-            collaterals: collaterals,
+            collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)
@@ -344,14 +344,14 @@ contract SettersTest is BaseTest {
         midnight.setDefaultContinuousFee(address(loanToken), fee);
         assertEq(midnight.defaultContinuousFee(address(loanToken)), fee, "default fee updated");
 
-        Collateral[] memory collaterals = new Collateral[](1);
-        collaterals[0] = Collateral({
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Obligation memory obligation = Obligation({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
-            collaterals: collaterals,
+            collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
             liquidatorGate: address(0)

@@ -78,10 +78,10 @@ ghost ghostPrice(address) returns uint256;
 
 definition WAD() returns uint256 = 1000000000000000000;
 
-definition collateralMatches(Midnight.Obligation obligation, uint256 index) returns bool = (index < globalObligationCollateralLength => obligation.collaterals[index].oracle == globalObligationCollateralOracle[index] && obligation.collaterals[index].token == globalObligationCollateralToken[index] && obligation.collaterals[index].lltv == globalObligationCollateralLLTV[index] && obligation.collaterals[index].maxLif == globalObligationCollateralMaxLif[index]);
+definition collateralMatches(Midnight.Obligation obligation, uint256 index) returns bool = (index < globalObligationCollateralLength => obligation.collateralParams[index].oracle == globalObligationCollateralOracle[index] && obligation.collateralParams[index].token == globalObligationCollateralToken[index] && obligation.collateralParams[index].lltv == globalObligationCollateralLLTV[index] && obligation.collateralParams[index].maxLif == globalObligationCollateralMaxLif[index]);
 
 function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
-    return obligation.loanToken == globalObligationLoanToken && obligation.collaterals.length == globalObligationCollateralLength && collateralMatches(obligation, 0) && collateralMatches(obligation, 1) && collateralMatches(obligation, 2) && obligation.maturity == globalObligationMaturity && obligation.rcfThreshold == globalObligationRcfThreshold && obligation.enterGate == globalObligationEnterGate && obligation.liquidatorGate == globalObligationLiquidatorGate;
+    return obligation.loanToken == globalObligationLoanToken && obligation.collateralParams.length == globalObligationCollateralLength && collateralMatches(obligation, 0) && collateralMatches(obligation, 1) && collateralMatches(obligation, 2) && obligation.maturity == globalObligationMaturity && obligation.rcfThreshold == globalObligationRcfThreshold && obligation.enterGate == globalObligationEnterGate && obligation.liquidatorGate == globalObligationLiquidatorGate;
 }
 
 function summaryToId(Midnight.Obligation obligation, uint256 chainId, address morpho) returns (bytes32) {
@@ -127,15 +127,15 @@ rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selec
 rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     require equalsGlobalObligation(obligation);
 
-    // Sound: touchObligation enforces maxLif >= WAD for all collaterals (ExactMath.spec).
+    // Sound: touchObligation enforces maxLif >= WAD for all collateralParams (ExactMath.spec).
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
-    require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD();
+    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD();
 
     // Sound: ExactMath.spec proves maxLif * lltv <= WAD * (WAD - 1) when lltv < WAD (lifTimesLltvStrictBound).
-    require obligation.collaterals[collateralIndex].lltv < WAD() => to_mathint(obligation.collaterals[collateralIndex].maxLif) * to_mathint(obligation.collaterals[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
+    require obligation.collateralParams[collateralIndex].lltv < WAD() => to_mathint(obligation.collateralParams[collateralIndex].maxLif) * to_mathint(obligation.collateralParams[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
 
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
-    require ghostPrice(obligation.collaterals[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
+    require ghostPrice(obligation.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
 
     require !divisionByZero;

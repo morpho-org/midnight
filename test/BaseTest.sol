@@ -3,7 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {ERC20} from "./erc20s/ERC20.sol";
+import {ERC20NoRevert} from "./erc20s/ERC20NoRevert.sol";
+import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
+import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
+import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -13,8 +17,6 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
-    EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH,
     LLTV_0,
     LLTV_1,
     LLTV_2,
@@ -25,9 +27,11 @@ import {
     LLTV_7,
     LLTV_8
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, Signature, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-
+import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
+import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {EcrecoverAuthorizer} from "../src/authorizers/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
@@ -46,9 +50,15 @@ abstract contract BaseTest is Test {
     address internal otherBorrower;
     address internal otherLender;
     address internal liquidator = makeAddr("liquidator");
+    EcrecoverRatifier internal ecrecoverRatifier;
+    EcrecoverAuthorizer internal ecrecoverAuthorizer;
+
+    bytes internal emptySig;
 
     function setUp() public virtual {
         midnight = new Midnight();
+        ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
+        ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
 
         midnight.setFeeSetter(address(this));
 
@@ -62,9 +72,38 @@ abstract contract BaseTest is Test {
         (otherLender, _privateKey) = makeAddrAndKey("otherLender");
         privateKey[otherLender] = _privateKey;
 
-        loanToken = new ERC20("loan", "loan");
-        collateralToken1 = new ERC20("collat1", "collat1");
-        collateralToken2 = new ERC20("collat2", "collat2");
+        vm.prank(borrower);
+
+        midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
+        vm.prank(otherBorrower);
+        midnight.setIsAuthorized(otherBorrower, address(ecrecoverRatifier), true);
+        vm.prank(otherLender);
+        midnight.setIsAuthorized(otherLender, address(ecrecoverRatifier), true);
+
+        uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
+        if (tokenType == 1) {
+            loanToken = ERC20(address(new ERC20NoRevert()));
+            collateralToken1 = ERC20(address(new ERC20NoRevert()));
+            collateralToken2 = ERC20(address(new ERC20NoRevert()));
+        } else if (tokenType == 2) {
+            loanToken = ERC20(address(new ERC20USDT()));
+            collateralToken1 = ERC20(address(new ERC20USDT()));
+            collateralToken2 = ERC20(address(new ERC20USDT()));
+        } else if (tokenType == 3) {
+            loanToken = ERC20(address(new ERC20RevertToZero()));
+            collateralToken1 = ERC20(address(new ERC20RevertToZero()));
+            collateralToken2 = ERC20(address(new ERC20RevertToZero()));
+        } else if (tokenType == 4) {
+            loanToken = ERC20(address(new ERC20NoReturn()));
+            collateralToken1 = ERC20(address(new ERC20NoReturn()));
+            collateralToken2 = ERC20(address(new ERC20NoReturn()));
+        } else {
+            loanToken = new ERC20("loan", "loan");
+            collateralToken1 = new ERC20("collat1", "collat1");
+            collateralToken2 = new ERC20("collat2", "collat2");
+        }
 
         oracle1 = new Oracle();
         oracle2 = new Oracle();
@@ -88,16 +127,16 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 oraclePrice = Oracle(obligation.collaterals[0].oracle).price();
+        uint256 oraclePrice = Oracle(obligation.collateralParams[0].oracle).price();
         uint256 collateral =
-            debt.mulDivUp(WAD, obligation.collaterals[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
-        deal(address(obligation.collaterals[0].token), _borrower, collateral);
+            debt.mulDivUp(WAD, obligation.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        deal(address(obligation.collateralParams[0].token), _borrower, collateral);
 
-        vm.prank(_borrower);
-        ERC20(obligation.collaterals[0].token).approve(address(midnight), collateral);
-
-        vm.prank(_borrower);
+        vm.startPrank(_borrower);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), 0);
+        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
         midnight.supplyCollateral(obligation, 0, collateral, _borrower);
+        vm.stopPrank();
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
@@ -119,6 +158,7 @@ abstract contract BaseTest is Test {
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -132,20 +172,24 @@ abstract contract BaseTest is Test {
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
         loanToken.approve(address(midnight), type(uint256).max);
-
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligation = obligation;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
+        badBorrowerOffer.ratifier = address(ecrecoverRatifier);
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.tick = MAX_TICK;
 
-        authorize(badBorrower, address(this));
+        vm.prank(badBorrower);
 
-        deal(obligation.collaterals[0].token, address(this), 135);
+        midnight.setIsAuthorized(badBorrower, address(ecrecoverRatifier), true);
+        vm.prank(badBorrower);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
+
+        deal(obligation.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(obligation, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
@@ -155,26 +199,41 @@ abstract contract BaseTest is Test {
 
         take(100, unluckyLender, badBorrowerOffer);
 
-        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
+        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
         midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
 
         // then empty the market (borrow side only).
-        authorize(badBorrower, address(this));
+        vm.prank(badBorrower);
+        midnight.setIsAuthorized(badBorrower, address(this), true);
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower);
+        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, hex"");
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
-        Oracle(obligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
     function toId(Obligation memory obligation) internal view returns (bytes32) {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function authorize(address from, address to) internal {
-        vm.prank(from);
-        midnight.setIsAuthorized(from, to, true);
+    function sig(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
+    }
+
+    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
+        return new bytes32[](0);
+    }
+
+    // assumes the offer is the first one!
+    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](1);
+        _path[0] = keccak256(abi.encode(offers[1]));
+        return _path;
+    }
+
+    function root(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
@@ -185,44 +244,37 @@ abstract contract BaseTest is Test {
         return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
     }
 
-    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
-        return new bytes32[](0);
+    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
     }
 
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory res = new bytes32[](1);
-        res[0] = keccak256(abi.encode(offers[1]));
-        return res;
-    }
-
-    function domainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(midnight)));
-    }
-
-    function sig(bytes32 _root, uint256 _privateKey) internal view returns (Signature memory) {
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract)
+        internal
+        view
+        returns (Signature memory)
+    {
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(), structHash));
-        Signature memory signature;
-        (signature.v, signature.r, signature.s) = vm.sign(_privateKey, messageHash);
-        return signature;
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
+        Signature memory _signature;
+        (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
+        return _signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
 
-    function sig(Offer[2] memory offers) internal view returns (Signature memory) {
+    function sig(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return sig(_root, privateKey[offers[0].maker]);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
 
-    function sortCollaterals(Collateral[] memory arr) internal pure returns (Collateral[] memory) {
+    function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
         for (uint256 i = 1; i < arr.length; i++) {
             uint256 j = i;
             while (j > 0 && bytes20(arr[j].token) < bytes20(arr[j - 1].token)) {
-                Collateral memory temp = arr[j];
+                CollateralParams memory temp = arr[j];
                 arr[j] = arr[j - 1];
                 arr[j - 1] = temp;
                 j--;
@@ -237,18 +289,20 @@ abstract contract BaseTest is Test {
         return tiers[seed % 9];
     }
 
-    /// @dev Returns an obligation with sorted, unique collaterals, valid lltv/maxLif, and a creatable TTM.
+    /// @dev Returns an obligation with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
     function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
-        uint256 len = obligation.collaterals.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collaterals.length;
-        Collateral[] memory collaterals = new Collateral[](len);
+        uint256 len =
+            obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+        CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
-            collaterals[i].token = address(uint160(uint256(keccak256(abi.encode(obligation.collaterals[i].token, i)))));
-            uint256 lltv = allowedLltv(obligation.collaterals[i].lltv);
-            collaterals[i].lltv = lltv;
-            collaterals[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collateralParams[i].token =
+                address(uint160(uint256(keccak256(abi.encode(obligation.collateralParams[i].token, i)))));
+            uint256 lltv = allowedLltv(obligation.collateralParams[i].lltv);
+            collateralParams[i].lltv = lltv;
+            collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
-        collaterals = sortCollaterals(collaterals);
-        obligation.collaterals = collaterals;
+        collateralParams = sortCollateralParams(collateralParams);
+        obligation.collateralParams = collateralParams;
         return obligation;
     }
 
@@ -261,6 +315,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;

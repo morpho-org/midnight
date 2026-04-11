@@ -56,11 +56,13 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
 
       - name: Copy solc
         run: |
           forge build
-          cp ~/.svm/0.8.31/solc-0.8.31 /usr/local/bin
+          cp ~/.svm/0.8.34/solc-0.8.34 /usr/local/bin
 
       - name: Verify ${{ matrix.conf }}
         run: certoraRun certora/confs/${{ matrix.conf }}.conf

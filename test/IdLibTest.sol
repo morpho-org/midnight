@@ -15,14 +15,22 @@ contract IdLibTest is Test {
     ) public pure {
         bool sameLoanToken = obligation1.loanToken == obligation2.loanToken;
         bool sameMaturity = obligation1.maturity == obligation2.maturity;
-        bool sameCollaterals = obligation1.collaterals.length == obligation2.collaterals.length;
+        bool sameCollaterals = obligation1.collateralParams.length == obligation2.collateralParams.length;
         bool sameRcfThreshold = obligation1.rcfThreshold == obligation2.rcfThreshold;
         if (sameCollaterals) {
-            for (uint256 i = 0; i < obligation1.collaterals.length; i++) {
-                if (obligation1.collaterals[i].token != obligation2.collaterals[i].token) sameCollaterals = false;
-                if (obligation1.collaterals[i].lltv != obligation2.collaterals[i].lltv) sameCollaterals = false;
-                if (obligation1.collaterals[i].maxLif != obligation2.collaterals[i].maxLif) sameCollaterals = false;
-                if (obligation1.collaterals[i].oracle != obligation2.collaterals[i].oracle) sameCollaterals = false;
+            for (uint256 i = 0; i < obligation1.collateralParams.length; i++) {
+                if (obligation1.collateralParams[i].token != obligation2.collateralParams[i].token) {
+                    sameCollaterals = false;
+                }
+                if (obligation1.collateralParams[i].lltv != obligation2.collateralParams[i].lltv) {
+                    sameCollaterals = false;
+                }
+                if (obligation1.collateralParams[i].maxLif != obligation2.collateralParams[i].maxLif) {
+                    sameCollaterals = false;
+                }
+                if (obligation1.collateralParams[i].oracle != obligation2.collateralParams[i].oracle) {
+                    sameCollaterals = false;
+                }
             }
         }
 

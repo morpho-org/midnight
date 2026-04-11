@@ -4,18 +4,14 @@ pragma solidity >=0.5.0;
 
 struct Obligation {
     address loanToken;
-    // Must be sorted by address.
-    Collateral[] collaterals;
+    CollateralParams[] collateralParams;
     uint256 maturity;
-    // The recovery close factor is deactivated for a collateral if the liquidation could leave a collateral value that
-    // would not be enough to repay rcfThreshold units.
     uint256 rcfThreshold;
-    // Optional gates (address(0) = unrestricted).
     address enterGate;
     address liquidatorGate;
 }
 
-struct Collateral {
+struct CollateralParams {
     address token;
     uint256 lltv;
     uint256 maxLif;
@@ -34,25 +30,27 @@ struct Offer {
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
+    address ratifier;
     bool reduceOnly;
     uint256 maxUnits;
     uint256 maxSellerAssets;
     uint256 maxBuyerAssets;
 }
 
-struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossIndex;
-    uint256 withdrawable;
-    bool created;
-    uint16[7] fees;
+    uint128 withdrawable;
+    uint128 continuousFeeCredit;
+    uint16 fee0;
+    uint16 fee1;
+    uint16 fee2;
+    uint16 fee3;
+    uint16 fee4;
+    uint16 fee5;
+    uint16 fee6;
     uint32 continuousFee;
+    bool created;
 }
 
 struct Position {
@@ -65,4 +63,79 @@ struct Position {
     uint128[128] collateral;
 }
 
-interface IMidnight {}
+interface IMidnight {
+    // forgefmt: disable-start
+    /// STORAGE GETTERS ///
+    function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 activatedCollaterals);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossIndex, uint128 withdrawable, uint128 continuousFeeCredit, uint16 fee0, uint16 fee1, uint16 fee2, uint16 fee3, uint16 fee4, uint16 fee5, uint16 fee6, uint32 continuousFee, bool created);
+    function consumed(address user, bytes32 group) external view returns (uint256);
+    function session(address user) external view returns (bytes32);
+    function isAuthorized(address authorizer, address authorized) external view returns (bool);
+    function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
+    function defaultContinuousFee(address loanToken) external view returns (uint32);
+    function claimableTradingFee(address token) external view returns (uint256);
+    function feeClaimer() external view returns (address);
+    function roleSetter() external view returns (address);
+    function feeSetter() external view returns (address);
+
+    /// MULTICALL ///
+
+    function multicall(bytes[] calldata calls) external;
+
+    /// ADMIN FUNCTIONS ///
+
+    function setRoleSetter(address newRoleSetter) external;
+    function setFeeSetter(address newFeeSetter) external;
+    function setFeeClaimer(address newFeeClaimer) external;
+    function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
+    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
+    function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
+    function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external;
+    function claimTradingFee(address token, uint256 amount, address receiver) external;
+    function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
+
+    /// ENTRY-POINTS ///
+
+    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
+    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external;
+    function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
+    function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
+    function liquidate(Obligation calldata obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes calldata data) external returns (uint256, uint256);
+    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
+    function shuffleSession(address onBehalf) external;
+    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
+    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external;
+    function touchObligation(Obligation memory obligation) external returns (bytes32);
+
+    /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
+
+    function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
+    function updatePosition(Obligation memory obligation, address user) external;
+
+    /// OTHER VIEW FUNCTIONS ///
+
+    function userLossIndex(bytes32 id, address user) external view returns (uint128);
+    function activatedCollaterals(bytes32 id, address user) external view returns (uint128);
+    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
+    function toId(Obligation memory obligation) external view returns (bytes32);
+    function toObligation(bytes32 id) external view returns (Obligation memory);
+    function creditOf(bytes32 id, address user) external view returns (uint256);
+    function debtOf(bytes32 id, address user) external view returns (uint256);
+    function totalUnits(bytes32 id) external view returns (uint256);
+    function lossIndex(bytes32 id) external view returns (uint128);
+    function obligationCreated(bytes32 id) external view returns (bool);
+    function withdrawable(bytes32 id) external view returns (uint256);
+    function tradingFees(bytes32 id) external view returns (uint16[7] memory);
+    function continuousFee(bytes32 id) external view returns (uint32);
+    function continuousFeeCredit(bytes32 id) external view returns (uint256);
+    function pendingFee(bytes32 id, address user) external view returns (uint128);
+    function lastAccrual(bytes32 id, address user) external view returns (uint128);
+    function liquidationLocked(bytes32 id, address user) external view returns (bool);
+    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
+    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
+    function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256);
+    function maxTradingFee(uint256 index) external pure returns (uint256);
+    function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
+    // forgefmt: disable-end
+}
