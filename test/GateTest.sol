@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -44,29 +44,29 @@ contract GateTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
 
         gatedObligation.loanToken = address(loanToken);
         gatedObligation.maturity = block.timestamp + 100;
-        gatedObligation.collaterals
+        gatedObligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        gatedObligation.collaterals = sortCollaterals(gatedObligation.collaterals);
+        gatedObligation.collateralParams = sortCollateralParams(gatedObligation.collateralParams);
         gatedObligation.enterGate = address(gate);
         gatedObligation.liquidatorGate = address(gate);
 
@@ -76,6 +76,7 @@ contract GateTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.obligation = gatedObligation;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -84,6 +85,7 @@ contract GateTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.obligation = gatedObligation;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -125,6 +127,36 @@ contract GateTest is BaseTest {
         assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should have debt");
     }
 
+    function testEnterGateAllowsTakeWhenLenderHadCreditBefore(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        gate.setWhitelisted(lender, true);
+        gate.setWhitelisted(borrower, true);
+        collateralize(gatedObligation, borrower, units);
+        take(units, lender, borrowerOffer);
+
+        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should already have credit");
+
+        gate.setWhitelisted(lender, false);
+        gate.setWhitelisted(borrower, false);
+
+        take(0, otherBorrower, lenderOffer);
+    }
+
+    function testEnterGateAllowsTakeWhenBorrowerHadDebtBefore(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        gate.setWhitelisted(lender, true);
+        gate.setWhitelisted(borrower, true);
+        collateralize(gatedObligation, borrower, units);
+        take(units, lender, borrowerOffer);
+
+        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should already have debt");
+
+        gate.setWhitelisted(lender, false);
+        gate.setWhitelisted(borrower, false);
+
+        take(0, otherLender, borrowerOffer);
+    }
+
     // --- No gate check on exit  ---
 
     function testNoEnterGateCheckWhenBorrowerIsExitingBorrower(uint256 units) public {
@@ -142,6 +174,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.obligation = gatedObligation;
+        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
 
@@ -168,6 +201,7 @@ contract GateTest is BaseTest {
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.obligation = gatedObligation;
+        otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
@@ -183,6 +217,7 @@ contract GateTest is BaseTest {
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
         exitOffer.obligation = gatedObligation;
+        exitOffer.ratifier = address(ecrecoverRatifier);
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
 
@@ -204,7 +239,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower);
+        midnight.repay(gatedObligation, units, borrower, hex"");
 
         assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
     }
@@ -219,7 +254,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower);
+        midnight.repay(gatedObligation, units, borrower, hex"");
 
         gate.setWhitelisted(lender, false);
 
@@ -240,7 +275,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, borrower, units);
         take(units, lender, borrowerOffer);
 
-        Oracle(gatedObligation.collaterals[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+        Oracle(gatedObligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
 
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
@@ -257,7 +292,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, borrower, units);
         take(units, lender, borrowerOffer);
 
-        Oracle(gatedObligation.collaterals[0].oracle).setPrice(0);
+        Oracle(gatedObligation.collateralParams[0].oracle).setPrice(0);
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");
@@ -275,6 +310,7 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.obligation = obligation;
+        ungatedLenderOffer.ratifier = address(ecrecoverRatifier);
         ungatedLenderOffer.expiry = block.timestamp + 200;
         ungatedLenderOffer.tick = MAX_TICK;
 
