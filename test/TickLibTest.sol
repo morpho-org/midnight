@@ -26,11 +26,14 @@ contract TickLibTest is BaseTest {
     }
 
     function testReturnJumps() public pure {
-        for (uint256 i = 220; i <= 770; i++) {
+        for (uint256 i = 250; i <= 800; i++) {
             uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
-                currentReturn.mulDivDown(1e18, previousReturn), 1.025e18, 0.1e18, string.concat("tick ", vm.toString(i))
+                currentReturn.mulDivDown(1e18, previousReturn),
+                0.975e18,
+                0.005e18,
+                string.concat("tick ", vm.toString(i))
             );
         }
     }
