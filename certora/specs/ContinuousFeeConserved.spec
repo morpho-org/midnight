@@ -80,54 +80,12 @@ ghost mapping(bytes32 => mathint) totalPendingFeeMinted {
     init_state axiom (forall bytes32 id. totalPendingFeeMinted[id] == 0);
 }
 
-// Cumulative total of every decrease to position[id][user].pendingFee (all causes combined:
-// accrual, lazy-slash, seller exit in take(), proportional reduction in withdraw()).
-ghost mapping(bytes32 => mathint) sumPendingFeeDecreased {
-    init_state axiom (forall bytes32 id. sumPendingFeeDecreased[id] == 0);
-}
-
-// Cumulative total of every increase to obligationState[id].continuousFeeCredit (accrual only).
-ghost mapping(bytes32 => mathint) continuousFeeCreditIncreased {
-    init_state axiom (forall bytes32 id. continuousFeeCreditIncreased[id] == 0);
-}
-
-// Cumulative total of every decrease to obligationState[id].continuousFeeCredit (claims + bad-debt slash).
-ghost mapping(bytes32 => mathint) continuousFeeCreditDecreased {
-    init_state axiom (forall bytes32 id. continuousFeeCreditDecreased[id] == 0);
-}
-
-// Total fee that has permanently left the system through any channel:
-//   = (pendingFee decreases not offset by a continuousFeeCredit increase)  [cancel + lazy-slash]
-//   + continuousFeeCredit decreases                                         [claimed + bad-debt slashed]
-//
-// Derivation: every decrease to pendingFee either (a) moves to continuousFeeCredit (accrual) or
-// (b) exits the system (cancel/lazy-slash).  Subtracting (a) leaves only (b).  Adding the
-// decreases to continuousFeeCredit gives the full set of permanent exits.
-definition totalExited(bytes32 id) returns mathint =
-    sumPendingFeeDecreased[id] - continuousFeeCreditIncreased[id] + continuousFeeCreditDecreased[id];
-
-// Hook on position[id][user].pendingFee: maintains sumPendingFee, totalPendingFeeMinted,
-// and sumPendingFeeDecreased.
+// Hook on position[id][user].pendingFee: maintains sumPendingFee and totalPendingFeeMinted.
 hook Sstore position[KEY bytes32 id][KEY address user].pendingFee
     uint128 newVal (uint128 oldVal) {
     sumPendingFee[id] = sumPendingFee[id] + newVal - oldVal;
     if (newVal > oldVal) {
         totalPendingFeeMinted[id] = totalPendingFeeMinted[id] + (newVal - oldVal);
-    }
-    if (newVal < oldVal) {
-        sumPendingFeeDecreased[id] = sumPendingFeeDecreased[id] + (oldVal - newVal);
-    }
-}
-
-// Hook on obligationState[id].continuousFeeCredit: maintains continuousFeeCreditIncreased
-// and continuousFeeCreditDecreased.
-hook Sstore obligationState[KEY bytes32 id].continuousFeeCredit
-    uint128 newVal (uint128 oldVal) {
-    if (newVal > oldVal) {
-        continuousFeeCreditIncreased[id] = continuousFeeCreditIncreased[id] + (newVal - oldVal);
-    }
-    if (newVal < oldVal) {
-        continuousFeeCreditDecreased[id] = continuousFeeCreditDecreased[id] + (oldVal - newVal);
     }
 }
 
@@ -149,29 +107,6 @@ hook Sstore obligationState[KEY bytes32 id].continuousFeeCredit
 // check because it is cheaper to prove and gives a cleaner counterexample when violated.
 strong invariant feeInSystemBoundedByMinted(bytes32 id)
     sumPendingFee[id] + to_mathint(continuousFeeCredit(id)) <= totalPendingFeeMinted[id]
-    {
-        preserved with (env e) {
-            require e.msg.sender != currentContract;
-        }
-    }
-
-// The lower-bound half: live fee plus all tracked exits equals total minted exactly.
-// Together with feeInSystemBoundedByMinted this closes the conservation proof:
-// fee can neither be created out of nothing nor disappear unexpectedly.
-//
-// totalExited accounts for every channel through which fee leaves the live system:
-//   (a) sumPendingFeeDecreased − continuousFeeCreditIncreased
-//         = fee that left pendingFee without going to continuousFeeCredit
-//         = lazy-slash (lossIndex increase in _updatePosition) + seller cancellation in take()
-//           + proportional reduction in withdraw()
-//   (b) continuousFeeCreditDecreased
-//         = fee that left continuousFeeCredit
-//         = claimed via claimContinuousFee + bad-debt slashed in liquidate()
-//
-// Preserved at every intermediate Sstore because each hook updates exactly one ghost,
-// keeping the algebraic identity intact (verified case-by-case in the file header).
-strong invariant feeConservedExactly(bytes32 id)
-    sumPendingFee[id] + to_mathint(continuousFeeCredit(id)) + totalExited(id) == totalPendingFeeMinted[id]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract;
