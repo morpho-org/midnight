@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     function _.price() external => NONDET;

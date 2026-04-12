@@ -3,8 +3,6 @@
 using Midnight as Midnight;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function Midnight.maxLif(uint256, uint256) external returns (uint256) envfree;
 }
 

@@ -4,8 +4,6 @@ using Utils as Utils;
 using Midnight as Midnight;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;

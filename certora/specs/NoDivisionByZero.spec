@@ -17,8 +17,6 @@
 import "BitmapSummaries.spec";
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function _.price() external => ghostPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);

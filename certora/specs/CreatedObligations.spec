@@ -4,7 +4,6 @@ using Utils as Utils;
 using Midnight as Midnight;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
     function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;

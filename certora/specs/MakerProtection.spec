@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => CVL_tickToPrice(tick);
     function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => CVL_tradingFee(id, timeToMaturity);

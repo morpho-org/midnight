@@ -3,8 +3,6 @@
 import "BitmapSummaries.spec";
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
