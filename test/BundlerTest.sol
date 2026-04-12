@@ -92,6 +92,67 @@ contract BundlerTest is BaseTest {
         takeBundler.bundleTakeUnits(
             midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
         );
+
+        vm.prank(address(0xdead));
+        vm.expectRevert("unauthorized");
+        takeBundler.bundleTakeBuyerAssets(midnight, 100, borrower, address(0), takes, 0, type(uint256).max);
+
+        vm.prank(address(0xdead));
+        vm.expectRevert("unauthorized");
+        takeBundler.bundleTakeSellerAssets(midnight, 100, borrower, address(0), takes, 0, type(uint256).max);
+    }
+
+    /// @dev Two sequential sell-offer calls must both succeed and both end with zero Midnight allowance. The revoke
+    /// is critical because `midnight` is a caller-supplied parameter — leaving a standing approval would let an
+    /// attacker pass their own contract as `midnight` to trap a max allowance.
+    function testAllowanceRevokedOnEveryCall() public {
+        _zeroObligationTradingFees();
+        _convertOffersToSell(100, 100);
+        collateralize(obligation, borrower, 100);
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+
+        assertEq(loanToken.allowance(address(takeBundler), address(midnight)), 0, "precondition");
+
+        _primeLenderAsBuyerTaker(1);
+        vm.prank(lender);
+        takeBundler.bundleTakeBuyerAssets(midnight, 1, lender, address(0), takes, 0, type(uint256).max);
+        assertEq(loanToken.allowance(address(takeBundler), address(midnight)), 0, "revoked after first");
+
+        _primeLenderAsBuyerTaker(1);
+        vm.prank(lender);
+        takeBundler.bundleTakeBuyerAssets(midnight, 1, lender, address(0), takes, 0, type(uint256).max);
+        assertEq(loanToken.allowance(address(takeBundler), address(midnight)), 0, "revoked after second");
+    }
+
+    /// @dev Fees are snapshotted on the obligation at first touch, so the obligation-level values must be rewritten
+    /// rather than the defaults.
+    function _zeroObligationTradingFees() internal {
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+    }
+
+    function _convertOffersToSell(uint256 offerUnits0, uint256 offerUnits1) internal {
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = offerUnits0;
+        offers[1].buy = false;
+        offers[1].maker = borrower;
+        offers[1].receiverIfMakerIsSeller = borrower;
+        offers[1].maxUnits = offerUnits1;
+    }
+
+    function _primeLenderAsBuyerTaker(uint256 amount) internal {
+        deal(address(loanToken), lender, amount);
+        vm.prank(lender);
+        loanToken.approve(address(takeBundler), amount);
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, address(takeBundler), true);
     }
 
     function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
@@ -138,6 +199,112 @@ contract BundlerTest is BaseTest {
                 midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
             );
         }
+    }
+
+    function testBundleTakeUnitsSellOffers(uint256 offerUnits0, uint256 offerUnits1, uint256 targetUnits) public {
+        _zeroObligationTradingFees();
+
+        targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) / 2);
+        _convertOffersToSell(offerUnits0, offerUnits1);
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
+        uint256 fromOffer1 = targetUnits - fromOffer0;
+        uint256 expectedBuyerAssets = fromOffer0.mulDivUp(price, WAD) + fromOffer1.mulDivUp(price, WAD);
+
+        // Extra slack on the pull so the sweep has something to refund.
+        uint256 slack = 12345;
+        uint256 maxBuyerAssets = expectedBuyerAssets + slack;
+        _primeLenderAsBuyerTaker(maxBuyerAssets);
+        collateralize(obligation, borrower, targetUnits + 1);
+        _authorizeBundler();
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0],
+            units: offerUnits0,
+            sig: sig([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = TakeBundler.Take({
+            offer: offers[1],
+            units: offerUnits1,
+            sig: sig([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
+
+        if (offerUnits1 >= targetUnits - fromOffer0) {
+            vm.prank(lender);
+            takeBundler.bundleTakeUnits(
+                midnight, targetUnits, lender, address(0), takes, 0, maxBuyerAssets, 0, type(uint256).max
+            );
+
+            uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+            uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+            assertEq(consumed0, fromOffer0, "consumed offer 0");
+            assertEq(consumed0 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+            assertEq(midnight.debtOf(id, borrower), targetUnits, "debt");
+            assertEq(
+                lenderBalanceBefore - loanToken.balanceOf(lender),
+                expectedBuyerAssets,
+                "lender paid buyer assets (slack refunded)"
+            );
+            assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler drained");
+        } else {
+            vm.prank(lender);
+            vm.expectRevert("insufficient liquidity");
+            takeBundler.bundleTakeUnits(
+                midnight, targetUnits, lender, address(0), takes, 0, maxBuyerAssets, 0, type(uint256).max
+            );
+        }
+    }
+
+    function testBundlerSweepsLeftoverDonations() public {
+        _zeroObligationTradingFees();
+
+        uint256 donation = 777e18;
+        uint256 target = 10;
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+        collateralize(obligation, borrower, target * 2 + 10);
+        _authorizeBundler();
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+
+        // Buy-offer path: sweep drains bundler to taker.
+        deal(address(loanToken), address(takeBundler), donation);
+        uint256 borrowerBefore = loanToken.balanceOf(borrower);
+        vm.prank(borrower);
+        takeBundler.bundleTakeUnits(
+            midnight, target, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
+        );
+        assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler drained");
+        assertGe(loanToken.balanceOf(borrower) - borrowerBefore, donation, "donation swept");
+
+        // Sell-offer path: pull + sweep must drain both residual and donation to lender.
+        _convertOffersToSell(100, 100);
+        TakeBundler.Take[] memory sellTakes = new TakeBundler.Take[](1);
+        sellTakes[0] = TakeBundler.Take({
+            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        });
+        uint256 slack = 7;
+        uint256 maxBuyerAssets = target + slack;
+        _primeLenderAsBuyerTaker(maxBuyerAssets);
+        deal(address(loanToken), address(takeBundler), donation);
+        uint256 lenderBefore = loanToken.balanceOf(lender);
+        vm.prank(lender);
+        takeBundler.bundleTakeUnits(
+            midnight, target, lender, address(0), sellTakes, 0, maxBuyerAssets, 0, type(uint256).max
+        );
+        assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler drained (sell)");
+        assertEq(loanToken.balanceOf(lender), lenderBefore + donation - target, "donation + slack swept");
     }
 
     function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
@@ -370,5 +537,65 @@ contract BundlerTest is BaseTest {
         takeBundler.bundleTakeUnits(
             midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
         );
+    }
+
+    function testBundleTakeBuyerAssetsSellOffers(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets)
+        public
+    {
+        _zeroObligationTradingFees();
+
+        targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
+        _convertOffersToSell(offerUnits0, offerUnits1);
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 units = targetBuyerAssets.mulDivDown(WAD, price);
+        uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
+
+        collateralize(obligation, borrower, units + 1);
+        _primeLenderAsBuyerTaker(targetBuyerAssets);
+        _authorizeBundler();
+
+        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
+        takes[0] = TakeBundler.Take({
+            offer: offers[0],
+            units: offerUnits0,
+            sig: sig([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = TakeBundler.Take({
+            offer: offers[1],
+            units: offerUnits1,
+            sig: sig([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        uint256 lenderBalanceBefore = loanToken.balanceOf(lender);
+        uint256 borrowerBalanceBefore = loanToken.balanceOf(borrower);
+
+        if (offerUnits1 >= units - fromOffer0) {
+            vm.prank(lender);
+            takeBundler.bundleTakeBuyerAssets(
+                midnight, targetBuyerAssets, lender, address(0), takes, 0, type(uint256).max
+            );
+
+            uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+            uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+            assertEq(consumed0, fromOffer0, "consumed offer 0");
+            assertEq(consumed0 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+            assertEq(lenderBalanceBefore - loanToken.balanceOf(lender), targetBuyerAssets, "lender paid");
+            assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler drained");
+            // Maker is seller with receiverIfMakerIsSeller == borrower; the trading fee stays on Midnight.
+            uint256 borrowerGain = loanToken.balanceOf(borrower) - borrowerBalanceBefore;
+            assertGt(borrowerGain, 0, "borrower received proceeds");
+            assertLe(borrowerGain, targetBuyerAssets, "proceeds bounded");
+        } else {
+            vm.prank(lender);
+            vm.expectRevert("insufficient liquidity");
+            takeBundler.bundleTakeBuyerAssets(
+                midnight, targetBuyerAssets, lender, address(0), takes, 0, type(uint256).max
+            );
+        }
     }
 }
