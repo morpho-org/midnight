@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);

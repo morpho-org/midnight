@@ -3,8 +3,6 @@
 using Utils as Utils;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function feeClaimer() external returns (address) envfree;
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
