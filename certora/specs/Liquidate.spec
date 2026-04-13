@@ -44,7 +44,7 @@ ghost CVL_price(address) returns uint256;
 
 // RULES ///
 
-/// Credit, debt, and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
+/// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
     bytes32 id;
