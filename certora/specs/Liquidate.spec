@@ -21,11 +21,11 @@ methods {
 
 /// HELPERS ///
 
-persistent ghost bytes32 lastId;
+persistent ghost bytes32 liqId;
 
 function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
     bytes32 id;
-    lastId = id;
+    liqId = id;
     return id;
 }
 
@@ -42,27 +42,27 @@ ghost summaryPrice(address) returns uint256;
 /// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 /// Also show that liquidate can only be called on liquidatable positions.
-rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
+rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, bytes data) {
     bytes32 id;
-    bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
+    address user;
+    uint256 collateralIndex;
+
+    bool wasLiquidatable = isLiquidatable(e, obligation, id, liqUser);
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-
-    // Choose id after the call to match the one used in liquidate.
-    require id == lastId, "id should be derived from obligation";
+    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, data);
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
     uint256 collateralAfter = collateral(id, user, collateralIndex);
 
-    assert wasLiquidatable;
+    assert id == liqId => wasLiquidatable;
     assert creditAfter == creditBefore;
-    assert debtAfter == debtBefore || user == borrower;
-    assert collateralAfter == collateralBefore || user == borrower;
+    assert debtAfter == debtBefore || (id == liqId && user == liqUser);
+    assert collateralAfter == collateralBefore || (id == liqId && user == liqUser && collateralIndex == liqIndex);
     assert debtAfter <= debtBefore;
     assert collateralAfter <= collateralBefore;
 }
