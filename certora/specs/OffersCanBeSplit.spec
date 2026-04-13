@@ -74,14 +74,14 @@ persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
 
     // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
     // Needed for pendingFee split proof where the first arg is buyerCreditIncrease (not obligationUnits).
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
-        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
-        to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d))
-        && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
 }
 
 // ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
 persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
+    // Identity: ceil(a * x / x) == a (needed when all remaining credit is consumed: sellerCreditDecrease == sellerCredit).
+    axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivUp(a, x, x) == a;
+
     // Zero 2nd arg: ceil(a * 0 / c) == 0 (needed for _updatePosition no-op).
     axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivUp(a, 0, c) == 0;
 
@@ -93,10 +93,7 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 
     // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
     // Needed for pendingFee split proof where the first arg is sellerCreditDecrease (not obligationUnits).
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
-        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
-        to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d))
-        && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d)) && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
