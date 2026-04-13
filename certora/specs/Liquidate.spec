@@ -3,11 +3,16 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function _.price() external => CVL_price(calledContract) expect(uint256);
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
+    // Oracle summary: we assume the price does not change during the execution of a transaction.
+    function _.price() external => PER_CALLEE_CONSTANT;
+
+    // UtilsLib summaries: msb, mulDivDown, and mulDivUp are deterministic
     function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => CVL_msb(bitmap);
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
+
+    // IdLib summary: remember the last id returned by toId.
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
@@ -16,18 +21,13 @@ methods {
 
 /// HELPERS ///
 
-// IdLib summary: remember the last id returned by toId.
-
 persistent ghost bytes32 lastId;
 
 function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
-    // non-deterministic id
     bytes32 id;
     lastId = id;
     return id;
 }
-
-// UtilsLib summaries: msb, mulDivDown, and mulDivUp are deterministic
 
 ghost CVL_msb(uint128) returns uint256;
 
@@ -35,17 +35,17 @@ ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
 
 ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 
-// Oracle summary: we assume the price does not change during the execution of a transaction.
-
 ghost CVL_price(address) returns uint256;
 
 // RULES ///
 
 /// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
+/// Also show that liquidate can only be called on liquidatable positions.
 rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, address user) {
     bytes32 id;
     bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
+
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
@@ -59,21 +59,10 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 debtAfter = debtOf(id, user);
     uint256 collateralAfter = collateral(id, user, collateralIndex);
 
+    assert wasLiquidatable;
     assert creditAfter == creditBefore;
-    assert debtAfter == debtBefore || (user == borrower && wasLiquidatable);
-    assert collateralAfter == collateralBefore || (user == borrower && wasLiquidatable);
+    assert debtAfter == debtBefore || user == borrower;
+    assert collateralAfter == collateralBefore || user == borrower;
     assert debtAfter <= debtBefore;
     assert collateralAfter <= collateralBefore;
-}
-
-// liquidate should revert if the position is not liquidatable.
-rule liquidateRevertsWhenNotLiquidatable(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    bytes32 id;
-    bool wasLiquidatable = isLiquidatable(e, obligation, id, borrower);
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
-
-    // it's okay to check only after the call that the prover chose the correct id.
-    require id == lastId, "id should be derived from obligation";
-
-    assert wasLiquidatable, "liquidate cannot succeed when the borrower is not liquidatable";
 }
