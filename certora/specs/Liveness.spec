@@ -378,10 +378,10 @@ filtered {
 
 /// CALLBACK REVERT PROPAGATION ///
 
-/// If the callback reverts, callback-enabled take (with non-zero taker callback) reverts.
+/// If the callback reverts, callback-enabled take (with non-zero taker or maker callback) reverts.
 rule callbackRevertCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require forceCallbackRevert, "callback reverts";
-    require takerCallback != 0, "callback-enabled take";
+    require takerCallback != 0 || offer.callback != 0, "callback-enabled take";
 
     take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
@@ -420,7 +420,7 @@ rule callbackRevertCausesFlashLoanRevert(env e, address token, uint256 assets, a
 /// If a buy/sell callback returns something other than CALLBACK_SUCCESS, callback-enabled take reverts.
 rule callbackBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require forceCallbackBadReturn, "callback returns bad value";
-    require takerCallback != 0, "callback-enabled take";
+    require takerCallback != 0 || offer.callback != 0, "callback-enabled take";
 
     take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
