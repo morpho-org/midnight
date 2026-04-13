@@ -21,11 +21,16 @@ methods {
     // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes piecewise interpolation.
     function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
-    // Same (root, sig) on all take calls; CONSTANT ensures identical signer and removes ecrecover complexity.
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => CONSTANT;
-
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    // Callbacks and token transfers: NONDET removes external call complexity.
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
 }
 
 /// GHOSTS ///
@@ -41,7 +46,7 @@ function CVL_toId() returns bytes32 {
 /// Splitting an offer does not punish the maker or favor the taker on asset amounts.
 /// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal when split, taker receives less or equal when split.
 /// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal when split, taker pays more or equal when split.
-rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
     storage initState = lastStorage;
@@ -52,16 +57,16 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     // Path 1: take the full amount A.
     uint256 buyerAssetsA;
     uint256 sellerAssetsA;
-    buyerAssetsA, sellerAssetsA, _ = take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsA, sellerAssetsA, _ = take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     // Path 2: take B then C from the initial state.
     uint256 buyerAssetsB;
     uint256 sellerAssetsB;
-    buyerAssetsB, sellerAssetsB, _ = take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof) at initState;
+    buyerAssetsB, sellerAssetsB, _ = take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
 
     uint256 buyerAssetsC;
     uint256 sellerAssetsC;
-    buyerAssetsC, sellerAssetsC, _ = take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    buyerAssetsC, sellerAssetsC, _ = take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     // Maker is buyer: splitting should not make them pay more.
     assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
