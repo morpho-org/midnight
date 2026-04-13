@@ -1533,13 +1533,10 @@ contract TakeTest is BaseTest {
         // Use a very long maturity so continuousFee * TTM > WAD.
         midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
 
-        CollateralParams[] memory longCollateralParams = new CollateralParams[](2);
-        longCollateralParams[0] = obligation.collateralParams[0];
-        longCollateralParams[1] = obligation.collateralParams[1];
         Obligation memory longObligation;
         longObligation.loanToken = address(loanToken);
         longObligation.maturity = block.timestamp + 200 * 365 days;
-        longObligation.collateralParams = longCollateralParams;
+        longObligation.collateralParams = obligation.collateralParams;
 
         uint256 units = 1e18;
         Offer memory bOffer;
