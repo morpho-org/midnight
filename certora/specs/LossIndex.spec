@@ -12,9 +12,22 @@ methods {
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    function _.price() external => NONDET;
+
     // Deterministic toId needed to link obligation arguments to stored state.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
+    // Callbacks and external calls assumed non-reentrant.
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
 }
 
 /// HELPERS ///
@@ -35,8 +48,6 @@ rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, callda
 }
 
 /// In `liquidate`, the obligation's lossIndex changes if and only if bad debt is realized (totalUnits decreases).
-/// The reverse direction relies on the strict mulDivDown bound: floor(x * y / d) < x when y < d and x > 0.
-/// Excludes the degenerate saturated state (lossIndex == max_uint128) documented in Midnight.sol.
 rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
     bytes32 id = summaryToId(obligation);
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
@@ -55,7 +66,6 @@ rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 c
 /// LOSS INDEX: UPDATE POSITION EFFECTS ///
 
 /// `updatePosition` can only decrease the user's credit through slashing and fee accrual.
-/// This implies that the slash computation does not revert from underflow or overflow, given userLossIndex <= obligationLossIndex and  pendingFee <= credit.
 rule updatePositionDecreasesCredit(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
