@@ -27,8 +27,17 @@ methods {
     // Read-only health check does not affect position state; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
+    // End-of-take liquidation check: depends on isHealthy (already NONDET) and transient lock; NONDET removes the chain.
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+
     // Same offer.tick across all take calls; CONSTANT ensures identical return value.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
+
+    // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes 7-way piecewise interpolation.
+    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
     // Callbacks and token transfers: NONDET removes external call complexity.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
