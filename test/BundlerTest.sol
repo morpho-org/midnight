@@ -49,7 +49,7 @@ contract BundlerTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = midnight.touchObligation(obligation);
@@ -57,7 +57,7 @@ contract BundlerTest is BaseTest {
         offers.push();
         offers[0].buy = true;
         offers[0].maker = lender;
-        offers[0].obligation = obligation;
+        copyObligation(offers[0].obligation, obligation);
         offers[0].ratifier = address(ecrecoverRatifier);
         offers[0].expiry = block.timestamp + 200;
         offers[0].tick = MAX_TICK;
@@ -65,7 +65,7 @@ contract BundlerTest is BaseTest {
         offers.push();
         offers[1].buy = true;
         offers[1].maker = lender;
-        offers[1].obligation = obligation;
+        copyObligation(offers[1].obligation, obligation);
         offers[1].ratifier = address(ecrecoverRatifier);
         offers[1].expiry = block.timestamp + 200;
         offers[1].tick = MAX_TICK;
@@ -90,7 +90,8 @@ contract BundlerTest is BaseTest {
         vm.prank(address(0xdead));
         vm.expectRevert("unauthorized");
         takeBundler.bundleTakeUnits(
-            midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
+            midnight, 100, borrower, address(0), takes,
+            TakeBundler.BundleTakeUnitsLimits(0, type(uint256).max, 0, type(uint256).max)
         );
     }
 
@@ -123,7 +124,8 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             takeBundler.bundleTakeUnits(
-                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
+                midnight, units, borrower, borrower, takes,
+                TakeBundler.BundleTakeUnitsLimits(0, type(uint256).max, 0, type(uint256).max)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -135,7 +137,8 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert("insufficient liquidity");
             takeBundler.bundleTakeUnits(
-                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
+                midnight, units, borrower, borrower, takes,
+                TakeBundler.BundleTakeUnitsLimits(0, type(uint256).max, 0, type(uint256).max)
             );
         }
     }
@@ -318,7 +321,8 @@ contract BundlerTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("buyer assets above max");
         takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max
+            midnight, targetUnits, borrower, borrower, takes,
+            TakeBundler.BundleTakeUnitsLimits(0, maxBuyerAssets, 0, type(uint256).max)
         );
     }
 
@@ -368,7 +372,8 @@ contract BundlerTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("buyer assets below min");
         takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
+            midnight, targetUnits, borrower, borrower, takes,
+            TakeBundler.BundleTakeUnitsLimits(minBuyerAssets, type(uint256).max, 0, type(uint256).max)
         );
     }
 }

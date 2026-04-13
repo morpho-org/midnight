@@ -54,7 +54,7 @@ contract OtherFunctionsTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         vm.prank(borrower);

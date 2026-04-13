@@ -14,6 +14,50 @@ import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
+struct SlashResult {
+    uint128 postSlashCredit;
+    uint128 postSlashPending;
+}
+
+struct LiquidateVars {
+    uint256 maxDebt;
+    uint256 liquidatedCollatPrice;
+    uint256 originalDebt;
+    uint256 badDebt;
+    uint256 seizedAssets;
+    uint256 repaidUnits;
+}
+
+struct TakeParams {
+    uint256 units;
+    address taker;
+    address takerCallback;
+    bytes takerCallbackData;
+    address receiverIfTakerIsSeller;
+    bytes ratifierData;
+    bytes32 root;
+    bytes32[] proof;
+}
+
+struct TakeVars {
+    address buyer;
+    address buyerCallback;
+    bytes buyerCallbackData;
+    address seller;
+    address sellerCallback;
+    bytes sellerCallbackData;
+    address receiver;
+    uint256 timeToMaturity;
+    uint256 buyerAssets;
+    uint256 sellerAssets;
+    uint256 newConsumed;
+    uint256 buyerCreditIncrease;
+    uint256 sellerCreditDecrease;
+    uint256 sellerDebtIncrease;
+    uint128 buyerPendingFeeIncrease;
+    uint128 sellerPendingFeeDecrease;
+}
+
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
 /// - `collateralParams.length > 0`: at least one collateral is required.
@@ -117,7 +161,7 @@ contract Midnight is IMidnight {
     /// STORAGE ///
 
     mapping(bytes32 id => mapping(address user => Position)) public position;
-    mapping(bytes32 id => ObligationState) public obligationState;
+    mapping(bytes32 id => ObligationState) internal _obligationStates;
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
     mapping(address user => bytes32) public session;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
@@ -133,6 +177,12 @@ contract Midnight is IMidnight {
     constructor() {
         roleSetter = msg.sender;
         emit EventsLib.Constructor(roleSetter);
+    }
+
+    /// STORAGE GETTER ///
+
+    function obligationState(bytes32 id) external view returns (ObligationState memory) {
+        return _obligationStates[id];
     }
 
     /// MULTICALL ///
@@ -169,7 +219,7 @@ contract Midnight is IMidnight {
     }
 
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         require(msg.sender == feeSetter, "only fee setter");
         require(index <= 6, "invalid index");
         require(newTradingFee <= maxTradingFee(index), "trading fee too high");
@@ -198,7 +248,7 @@ contract Midnight is IMidnight {
     }
 
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         require(msg.sender == feeSetter, "only fee setter");
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, "continuous fee too high");
         require(_obligationState.created, "obligation not created");
@@ -224,7 +274,7 @@ contract Midnight is IMidnight {
 
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
         bytes32 id = toId(obligation);
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         require(msg.sender == feeClaimer, "only fee claimer");
         require(_obligationState.created, "obligation not created");
 
@@ -258,105 +308,122 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
+        return _take(
+            TakeParams({
+                units: units,
+                taker: taker,
+                takerCallback: takerCallback,
+                takerCallbackData: takerCallbackData,
+                receiverIfTakerIsSeller: receiverIfTakerIsSeller,
+                ratifierData: ratifierData,
+                root: root,
+                proof: proof
+            }),
+            offer
+        );
+    }
+
+    function _take(TakeParams memory params, Offer memory offer) internal returns (uint256, uint256, uint256) {
         bytes32 id = touchObligation(offer.obligation);
-        ObligationState storage _obligationState = obligationState[id];
-        require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
-        require(taker == msg.sender || isAuthorized[taker][msg.sender], "taker unauthorized");
+        require(
+            UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max"
+        );
+        require(params.taker == msg.sender || isAuthorized[params.taker][msg.sender], "taker unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
-        require(offer.maker != taker, "cannot self take");
-        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), "invalid proof");
+        require(offer.maker != params.taker, "cannot self take");
+        require(
+            UtilsLib.isLeaf(params.root, keccak256(abi.encode(offer)), params.proof), "invalid proof"
+        );
         require(offer.session == session[offer.maker], "invalid session");
         require(isAuthorized[offer.maker][offer.ratifier], "ratifier unauthorized");
-        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, "not ratified");
+        require(
+            IRatifier(offer.ratifier).onRatify(offer, params.root, params.ratifierData) == CALLBACK_SUCCESS,
+            "not ratified"
+        );
 
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData,
-            address receiver
-        ) = offer.buy
-            ? (
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                taker,
-                takerCallback,
-                takerCallbackData,
-                receiverIfTakerIsSeller
-            )
-            : (
-                taker,
-                takerCallback,
-                takerCallbackData,
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                offer.receiverIfMakerIsSeller
-            );
+        TakeVars memory vars;
 
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-
-        uint256 newConsumed;
-        if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, "consumed seller assets");
-        } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
+        if (offer.buy) {
+            vars.buyer = offer.maker;
+            vars.buyerCallback = offer.callback;
+            vars.buyerCallbackData = offer.callbackData;
+            vars.seller = params.taker;
+            vars.sellerCallback = params.takerCallback;
+            vars.sellerCallbackData = params.takerCallbackData;
+            vars.receiver = params.receiverIfTakerIsSeller;
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, "consumed units");
+            vars.buyer = params.taker;
+            vars.buyerCallback = params.takerCallback;
+            vars.buyerCallbackData = params.takerCallbackData;
+            vars.seller = offer.maker;
+            vars.sellerCallback = offer.callback;
+            vars.sellerCallbackData = offer.callbackData;
+            vars.receiver = offer.receiverIfMakerIsSeller;
         }
 
-        Position storage buyerPos = position[id][buyer];
-        Position storage sellerPos = position[id][seller];
+        _computeTakeAmounts(offer, id, params.units, vars);
 
-        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
-        if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
+        if (offer.maxSellerAssets > 0) {
+            vars.newConsumed = consumed[offer.maker][offer.group] += vars.sellerAssets;
+            require(vars.newConsumed <= offer.maxSellerAssets, "consumed seller assets");
+        } else if (offer.maxBuyerAssets > 0) {
+            vars.newConsumed = consumed[offer.maker][offer.group] += vars.buyerAssets;
+            require(vars.newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
+        } else {
+            vars.newConsumed = consumed[offer.maker][offer.group] += params.units;
+            require(vars.newConsumed <= offer.maxUnits, "consumed units");
+        }
 
-        uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
-        uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
-        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-        uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
-            ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
-            : 0;
+        {
+            ObligationState storage _obligationState = _obligationStates[id];
+            Position storage buyerPos = position[id][vars.buyer];
+            Position storage sellerPos = position[id][vars.seller];
 
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.pendingFee += buyerPendingFeeIncrease;
-        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
+            if (hasCredit(id, vars.buyer) || params.units > buyerPos.debt) {
+                _updatePosition(offer.obligation, id, vars.buyer);
+            }
+            if (hasCredit(id, vars.seller)) _updatePosition(offer.obligation, id, vars.seller);
 
-        sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
+            vars.buyerCreditIncrease = UtilsLib.zeroFloorSub(params.units, buyerPos.debt);
+            vars.sellerCreditDecrease = UtilsLib.min(params.units, sellerPos.credit);
+            vars.sellerDebtIncrease = params.units - vars.sellerCreditDecrease;
+            vars.buyerPendingFeeIncrease = UtilsLib.toUint128(
+                vars.buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * vars.timeToMaturity, WAD)
+            );
+            vars.sellerPendingFeeDecrease = sellerPos.credit > 0
+                ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(vars.sellerCreditDecrease, sellerPos.credit))
+                : 0;
 
-        _obligationState.totalUnits =
-            UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+            buyerPos.debt -= UtilsLib.toUint128(params.units - vars.buyerCreditIncrease);
+            buyerPos.pendingFee += vars.buyerPendingFeeIncrease;
+            buyerPos.credit += UtilsLib.toUint128(vars.buyerCreditIncrease);
 
-        require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
+            sellerPos.pendingFee -= vars.sellerPendingFeeDecrease;
+            sellerPos.credit -= UtilsLib.toUint128(vars.sellerCreditDecrease);
+            sellerPos.debt += UtilsLib.toUint128(vars.sellerDebtIncrease);
+
+            _obligationState.totalUnits =
+                UtilsLib.toUint128(_obligationState.totalUnits + vars.buyerCreditIncrease - vars.sellerCreditDecrease);
+
+            require(buyerPos.pendingFee <= buyerPos.credit, "buyer pendingFee exceeds credit");
+        }
+
         if (offer.reduceOnly) {
-            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, "maker credit or debt increased");
+            require(
+                offer.buy ? vars.buyerCreditIncrease == 0 : vars.sellerDebtIncrease == 0,
+                "maker credit or debt increased"
+            );
         }
 
         require(
-            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
+            offer.obligation.enterGate == address(0) || vars.buyerCreditIncrease == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(vars.buyer),
             "buyer gated from increasing credit"
         );
         require(
-            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
+            offer.obligation.enterGate == address(0) || vars.sellerDebtIncrease == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(vars.seller),
             "seller gated from increasing debt"
         );
 
@@ -364,51 +431,68 @@ contract Midnight is IMidnight {
             msg.sender,
             id,
             offer.maker,
-            taker,
+            params.taker,
             offer.buy,
-            buyerAssets,
-            sellerAssets,
-            units,
-            receiver,
+            vars.buyerAssets,
+            vars.sellerAssets,
+            params.units,
+            vars.receiver,
             offer.group,
-            newConsumed,
-            buyerPendingFeeIncrease,
-            sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease
+            vars.newConsumed,
+            vars.buyerPendingFeeIncrease,
+            vars.sellerPendingFeeDecrease,
+            vars.buyerCreditIncrease,
+            vars.sellerCreditDecrease
         );
 
-        bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
-        if (buyerCallback != address(0)) {
+        bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, vars.seller, true);
+        if (vars.buyerCallback != address(0)) {
             require(
-                ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(vars.buyerCallback).onBuy(
+                    id, offer.obligation, vars.buyer, vars.buyerAssets, params.units, vars.buyerCallbackData
+                ) == CALLBACK_SUCCESS,
                 "invalid callback"
             );
         }
 
-        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
+        {
+            address payer =
+                vars.buyerCallback != address(0) ? vars.buyerCallback : (offer.buy ? vars.buyer : msg.sender);
+            SafeTransferLib.safeTransferFrom(
+                offer.obligation.loanToken, payer, address(this), vars.buyerAssets - vars.sellerAssets
+            );
+            claimableTradingFee[offer.obligation.loanToken] += vars.buyerAssets - vars.sellerAssets;
+            SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, vars.receiver, vars.sellerAssets);
+        }
 
-        if (sellerCallback != address(0)) {
+        if (vars.sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(vars.sellerCallback).onSell(
+                    id, offer.obligation, vars.seller, vars.sellerAssets, params.units, vars.sellerCallbackData
+                ) == CALLBACK_SUCCESS,
                 "invalid callback"
             );
         }
-        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(!isLiquidatable(offer.obligation, id, seller), "seller is liquidatable");
+        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, vars.seller, false);
+        require(!isLiquidatable(offer.obligation, id, vars.seller), "seller is liquidatable");
 
-        return (buyerAssets, sellerAssets, units);
+        return (vars.buyerAssets, vars.sellerAssets, params.units);
+    }
+
+    function _computeTakeAmounts(Offer memory offer, bytes32 id, uint256 units, TakeVars memory vars) internal view {
+        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
+        vars.timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 _tradingFee = tradingFee(id, vars.timeToMaturity);
+        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _tradingFee;
+        vars.buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        vars.sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
         bytes32 id = touchObligation(obligation);
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         _updatePosition(obligation, id, onBehalf);
 
@@ -432,7 +516,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
 
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
-        obligationState[id].withdrawable += UtilsLib.toUint128(units);
+        _obligationStates[id].withdrawable += UtilsLib.toUint128(units);
 
         emit EventsLib.Repay(msg.sender, id, units, onBehalf);
 
@@ -511,7 +595,7 @@ contract Midnight is IMidnight {
         bytes calldata data
     ) external returns (uint256, uint256) {
         bytes32 id = touchObligation(obligation);
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         Position storage _position = position[id][borrower];
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), "inconsistent input");
         require(
@@ -520,40 +604,29 @@ contract Midnight is IMidnight {
             "liquidator gated from liquidating"
         );
 
-        uint256 maxDebt;
-        uint256 liquidatedCollatPrice;
-        uint256 originalDebt = _position.debt;
-        uint256 badDebt = originalDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory _collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(_collateralParam.oracle).price();
-            if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 _collateral = _position.collateral[i];
-            maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
-            badDebt = badDebt.zeroFloorSub(
-                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
-            );
-            bitmap = bitmap.clearBit(i);
-        }
+        LiquidateVars memory vars;
+        vars.originalDebt = _position.debt;
+        vars.badDebt = vars.originalDebt;
+        vars.seizedAssets = seizedAssets;
+        vars.repaidUnits = repaidUnits;
+        _computeLiquidationLoop(obligation, collateralIndex, _position, vars);
 
         require(
-            originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (block.timestamp > obligation.maturity || originalDebt > maxDebt),
+            vars.originalDebt > 0 && !liquidationLocked(id, borrower)
+                && (block.timestamp > obligation.maturity || vars.originalDebt > vars.maxDebt),
             "not liquidatable"
         );
 
-        if (badDebt > 0) {
+        if (vars.badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
-            _position.debt -= uint128(badDebt);
+            _position.debt -= uint128(vars.badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
             uint256 oldLossIndex = _obligationState.lossIndex;
             _obligationState.lossIndex = UtilsLib.toUint128(
                 type(uint128).max
-                    - (type(uint128).max - oldLossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                    - (type(uint128).max - oldLossIndex).mulDivDown(oldTotalUnits - vars.badDebt, oldTotalUnits)
             );
-            _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
+            _obligationState.totalUnits -= UtilsLib.toUint128(vars.badDebt);
             _obligationState.continuousFeeCredit = oldLossIndex < type(uint128).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
@@ -562,66 +635,116 @@ contract Midnight is IMidnight {
                 : 0;
         }
 
-        if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = obligation.collateralParams[collateralIndex].maxLif;
-            uint256 lif = originalDebt > maxDebt
-                ? _maxLif
-                : UtilsLib.min(
-                    _maxLif, WAD + (_maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF
-                );
-
-            if (seizedAssets > 0) {
-                repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
-            } else {
-                seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
-            }
-
-            if (block.timestamp <= obligation.maturity) {
-                uint256 lltv = obligation.collateralParams[collateralIndex].lltv;
-                // Rounded up to avoid consecutive max liquidations.
-                // Acknowledged that the position could be slightly healthy after a liquidation.
-                // Note that debt >= maxDebt in this branch.
-                uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
-                    : type(uint256).max;
-                require(
-                    repaidUnits <= maxRepaid
-                        || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < obligation.rcfThreshold,
-                    "recovery close factor conditions violated"
-                );
-            }
-
-            uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
-            _position.collateral[collateralIndex] = newCollateral;
-            if (newCollateral == 0 && seizedAssets > 0) {
-                _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
-            }
-            _obligationState.withdrawable += UtilsLib.toUint128(repaidUnits);
-            _position.debt -= UtilsLib.toUint128(repaidUnits);
+        if (vars.repaidUnits > 0 || vars.seizedAssets > 0) {
+            _applyLiquidationRepayment(obligation, collateralIndex, _obligationState, _position, vars);
         }
 
         emit EventsLib.Liquidate(
             msg.sender,
             id,
             obligation.collateralParams[collateralIndex].token,
-            seizedAssets,
-            repaidUnits,
+            vars.seizedAssets,
+            vars.repaidUnits,
             borrower,
-            badDebt,
+            vars.badDebt,
             _obligationState.lossIndex
         );
 
-        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, msg.sender, seizedAssets);
+        SafeTransferLib.safeTransfer(
+            obligation.collateralParams[collateralIndex].token, msg.sender, vars.seizedAssets
+        );
 
         if (data.length > 0) {
-            ICallbacks(msg.sender)
-                .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+            ICallbacks(msg.sender).onLiquidate(
+                id, obligation, collateralIndex, vars.seizedAssets, vars.repaidUnits, borrower, data
+            );
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), vars.repaidUnits);
 
-        return (seizedAssets, repaidUnits);
+        return (vars.seizedAssets, vars.repaidUnits);
+    }
+
+    function _computeLiquidationLoop(
+        Obligation calldata obligation,
+        uint256 collateralIndex,
+        Position storage _position,
+        LiquidateVars memory vars
+    ) internal view {
+        uint128 bitmap = _position.activatedCollaterals;
+        while (bitmap != 0) {
+            uint256 i = UtilsLib.msb(bitmap);
+            CollateralParams memory _collateralParam = obligation.collateralParams[i];
+            uint256 price = IOracle(_collateralParam.oracle).price();
+            if (i == collateralIndex) vars.liquidatedCollatPrice = price;
+            uint256 _collateral = _position.collateral[i];
+            vars.maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
+            vars.badDebt = vars.badDebt.zeroFloorSub(
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
+            );
+            bitmap = bitmap.clearBit(i);
+        }
+    }
+
+    function _applyLiquidationRepayment(
+        Obligation calldata obligation,
+        uint256 collateralIndex,
+        ObligationState storage _obligationState,
+        Position storage _position,
+        LiquidateVars memory vars
+    ) internal {
+        uint256 lif;
+        {
+            uint256 _maxLif = obligation.collateralParams[collateralIndex].maxLif;
+            lif = vars.originalDebt > vars.maxDebt
+                ? _maxLif
+                : UtilsLib.min(
+                    _maxLif, WAD + (_maxLif - WAD) * (block.timestamp - obligation.maturity) / TIME_TO_MAX_LIF
+                );
+        }
+
+        if (vars.seizedAssets > 0) {
+            vars.repaidUnits =
+                vars.seizedAssets.mulDivUp(vars.liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
+        } else {
+            vars.seizedAssets =
+                vars.repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, vars.liquidatedCollatPrice);
+        }
+
+        if (block.timestamp <= obligation.maturity) {
+            _checkRecoveryCloseFactor(obligation, collateralIndex, _position, vars, lif);
+        }
+
+        uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(vars.seizedAssets);
+        _position.collateral[collateralIndex] = newCollateral;
+        if (newCollateral == 0 && vars.seizedAssets > 0) {
+            _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
+        }
+        _obligationState.withdrawable += UtilsLib.toUint128(vars.repaidUnits);
+        _position.debt -= UtilsLib.toUint128(vars.repaidUnits);
+    }
+
+    function _checkRecoveryCloseFactor(
+        Obligation calldata obligation,
+        uint256 collateralIndex,
+        Position storage _position,
+        LiquidateVars memory vars,
+        uint256 lif
+    ) internal view {
+        uint256 lltv = obligation.collateralParams[collateralIndex].lltv;
+        // Rounded up to avoid consecutive max liquidations.
+        // Acknowledged that the position could be slightly healthy after a liquidation.
+        // Note that debt >= maxDebt in this branch.
+        uint256 maxRepaid = lltv < WAD
+            ? (_position.debt - vars.maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
+            : type(uint256).max;
+        require(
+            vars.repaidUnits <= maxRepaid
+                || _position.collateral[collateralIndex].mulDivDown(
+                    vars.liquidatedCollatPrice, ORACLE_PRICE_SCALE
+                ).mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < obligation.rcfThreshold,
+            "recovery close factor conditions violated"
+        );
     }
 
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
@@ -657,7 +780,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
-        if (!obligationState[id].created) {
+        if (!_obligationStates[id].created) {
             require(obligation.collateralParams.length > 0, "no collateralParams");
             require(obligation.collateralParams.length <= MAX_COLLATERALS, "too many collateralParams");
             address previousCollateralToken;
@@ -674,7 +797,7 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
-            ObligationState storage _obligationState = obligationState[id];
+            ObligationState storage _obligationState = _obligationStates[id];
             _obligationState.created = true;
             uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
             _obligationState.fee0 = _defaultTradingFees[0];
@@ -702,27 +825,36 @@ contract Midnight is IMidnight {
         returns (uint128, uint128, uint128)
     {
         Position storage _position = position[id][user];
-        uint128 credit = _position.credit;
-        uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
-            : 0;
-        uint128 _pendingFee = _position.pendingFee;
-        uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
+        SlashResult memory slash = _computeSlash(_position, _obligationStates[id].lossIndex);
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
         // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
         uint128 fee = _lastAccrual < obligation.maturity
-            ? uint128(postSlashPending.mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual))
+            ? uint128(uint256(slash.postSlashPending).mulDivDown(accrualEnd - _lastAccrual, obligation.maturity - _lastAccrual))
             : 0;
+        return (slash.postSlashCredit - fee, slash.postSlashPending - fee, fee);
+    }
+
+    function _computeSlash(Position storage _position, uint128 oblLossIndex)
+        internal
+        view
+        returns (SlashResult memory)
+    {
+        uint128 credit = _position.credit;
+        uint128 _lossIndex = _position.lossIndex;
+        uint256 postSlashCredit = _lossIndex < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - oblLossIndex, type(uint128).max - _lossIndex)
+            : 0;
+        uint128 _pendingFee = _position.pendingFee;
+        uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         // forge-lint: disable-next-item(unsafe-typecast) as credit and pending are <= uint128 position fields
-        return (uint128(postSlashCredit) - fee, uint128(postSlashPending) - fee, fee);
+        return SlashResult(uint128(postSlashCredit), uint128(postSlashPending));
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
     function updatePosition(Obligation memory obligation, address user) external {
         bytes32 id = toId(obligation);
-        require(obligationState[id].created, "obligation not created");
+        require(_obligationStates[id].created, "obligation not created");
         _updatePosition(obligation, id, user);
     }
 
@@ -736,10 +868,10 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
-        _position.lossIndex = obligationState[id].lossIndex;
+        _position.lossIndex = _obligationStates[id].lossIndex;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
-        obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
+        _obligationStates[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
     }
@@ -769,7 +901,7 @@ contract Midnight is IMidnight {
     /// @dev Reverts if the id is not a valid id of a touched obligation.
     /// @dev Returns the obligation corresponding to the given id.
     function toObligation(bytes32 id) external view returns (Obligation memory) {
-        require(obligationState[id].created, "obligation not created");
+        require(_obligationStates[id].created, "obligation not created");
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Obligation));
     }
@@ -783,39 +915,39 @@ contract Midnight is IMidnight {
     }
 
     function totalUnits(bytes32 id) external view returns (uint256) {
-        return obligationState[id].totalUnits;
+        return _obligationStates[id].totalUnits;
     }
 
     function lossIndex(bytes32 id) external view returns (uint128) {
-        return obligationState[id].lossIndex;
+        return _obligationStates[id].lossIndex;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
-        return obligationState[id].created;
+        return _obligationStates[id].created;
     }
 
     function withdrawable(bytes32 id) external view returns (uint256) {
-        return obligationState[id].withdrawable;
+        return _obligationStates[id].withdrawable;
     }
 
     function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
         return [
-            obligationState[id].fee0,
-            obligationState[id].fee1,
-            obligationState[id].fee2,
-            obligationState[id].fee3,
-            obligationState[id].fee4,
-            obligationState[id].fee5,
-            obligationState[id].fee6
+            _obligationStates[id].fee0,
+            _obligationStates[id].fee1,
+            _obligationStates[id].fee2,
+            _obligationStates[id].fee3,
+            _obligationStates[id].fee4,
+            _obligationStates[id].fee5,
+            _obligationStates[id].fee6
         ];
     }
 
     function continuousFee(bytes32 id) external view returns (uint32) {
-        return obligationState[id].continuousFee;
+        return _obligationStates[id].continuousFee;
     }
 
     function continuousFeeCredit(bytes32 id) external view returns (uint256) {
-        return obligationState[id].continuousFeeCredit;
+        return _obligationStates[id].continuousFeeCredit;
     }
 
     function pendingFee(bytes32 id, address user) external view returns (uint128) {
@@ -868,7 +1000,7 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        ObligationState storage _obligationState = obligationState[id];
+        ObligationState storage _obligationState = _obligationStates[id];
         require(_obligationState.created, "obligation not created");
 
         if (timeToMaturity >= 360 days) return _obligationState.fee6 * FEE_STEP;

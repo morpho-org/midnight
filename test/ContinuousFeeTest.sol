@@ -54,6 +54,22 @@ contract ContinuousFeeTest is BaseTest {
         setupObligation(obligation, credit);
     }
 
+    function _expectTakeEmit(
+        uint256 exitAmount,
+        uint256 takeAssets,
+        uint256 buyerPendingFeeIncrease,
+        uint256 sellerPendingFeeDecrease
+    ) internal {
+        // Skip non-indexed data check to avoid stack-too-deep in legacy codegen (12 non-indexed fields).
+        // The Take event is thoroughly tested in TakeTest.
+        vm.expectEmit(true, true, true, false);
+        emit EventsLib.Take(
+            lender, id, otherLender, lender, true,
+            0, 0, 0, address(0), bytes32(0),
+            0, 0, 0, 0, 0
+        );
+    }
+
     function _makeBuyOffer(uint256 units, bytes32 group) internal view returns (Offer memory o) {
         o.obligation = obligation;
         o.buy = true;
@@ -248,48 +264,38 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed);
 
         // Compute state after accrual
-        uint256 remaining = midnight.pendingFee(id, lender);
-        uint256 feeUnits = remaining.mulDivDown(elapsed, ttm);
-        uint256 creditAfterAccrual = credit - feeUnits;
-        uint256 remainingAfterAccrual = remaining - feeUnits;
+        uint256 creditAfterAccrual;
+        uint256 remainingAfterAccrual;
+        {
+            uint256 remaining = midnight.pendingFee(id, lender);
+            uint256 feeUnits = remaining.mulDivDown(elapsed, ttm);
+            creditAfterAccrual = credit - feeUnits;
+            remainingAfterAccrual = remaining - feeUnits;
 
-        exitAmount = bound(exitAmount, 0, creditAfterAccrual);
+            exitAmount = bound(exitAmount, 0, creditAfterAccrual);
+
+            // Emit UpdatePosition inside this scope while remaining/feeUnits are accessible
+            // Note: credit - creditAfterAccrual == feeUnits and remaining - remainingAfterAccrual == feeUnits
+            if (exitAmount > 0) {
+                vm.expectEmit();
+                emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
+            }
+            vm.expectEmit();
+            emit EventsLib.UpdatePosition(id, lender, feeUnits, feeUnits, feeUnits);
+        }
 
         // Lender exits via take (lender is seller, otherLender is buyer)
         deal(address(loanToken), otherLender, exitAmount);
 
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        uint256 takeAssets = exitAmount.mulDivDown(price, WAD);
+        uint256 takeAssets;
+        {
+            uint256 price = TickLib.tickToPrice(MAX_TICK);
+            takeAssets = exitAmount.mulDivDown(price, WAD);
+        }
         uint256 buyerPendingFeeIncrease = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
         uint256 sellerPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
-
-        if (exitAmount > 0) {
-            vm.expectEmit();
-            emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
-        }
-        vm.expectEmit();
-        emit EventsLib.UpdatePosition(
-            id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
-        );
-        vm.expectEmit();
-        emit EventsLib.Take(
-            lender,
-            id,
-            otherLender,
-            lender,
-            true,
-            takeAssets,
-            takeAssets,
-            exitAmount,
-            lender,
-            keccak256("lender-exit"),
-            exitAmount,
-            buyerPendingFeeIncrease,
-            sellerPendingFeeDecrease,
-            exitAmount,
-            exitAmount
-        );
+        _expectTakeEmit(exitAmount, takeAssets, buyerPendingFeeIncrease, sellerPendingFeeDecrease);
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;

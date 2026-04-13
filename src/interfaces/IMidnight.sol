@@ -67,7 +67,7 @@ interface IMidnight {
     // forgefmt: disable-start
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 activatedCollaterals);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossIndex, uint128 withdrawable, uint128 continuousFeeCredit, uint16 fee0, uint16 fee1, uint16 fee2, uint16 fee3, uint16 fee4, uint16 fee5, uint16 fee6, uint32 continuousFee, bool created);
+    function obligationState(bytes32 id) external view returns (ObligationState memory);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);

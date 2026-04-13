@@ -39,14 +39,14 @@ contract TakeAmountsTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
 
         offer.buy = false;
         offer.maxUnits = type(uint256).max;
-        offer.obligation = obligation;
+        copyObligation(offer.obligation, obligation);
         offer.ratifier = address(ecrecoverRatifier);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;

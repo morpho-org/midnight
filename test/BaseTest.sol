@@ -283,6 +283,31 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
+    function copyObligation(Obligation storage dst, Obligation storage src) internal {
+        dst.loanToken = src.loanToken;
+        dst.maturity = src.maturity;
+        dst.rcfThreshold = src.rcfThreshold;
+        dst.enterGate = src.enterGate;
+        dst.liquidatorGate = src.liquidatorGate;
+        // Clear and re-push collateralParams to avoid memory-to-storage array copy
+        while (dst.collateralParams.length > 0) dst.collateralParams.pop();
+        for (uint256 i; i < src.collateralParams.length; i++) {
+            dst.collateralParams.push(src.collateralParams[i]);
+        }
+    }
+
+    function sortCollateralParamsInPlace(CollateralParams[] storage arr) internal {
+        for (uint256 i = 1; i < arr.length; i++) {
+            uint256 j = i;
+            while (j > 0 && bytes20(arr[j].token) < bytes20(arr[j - 1].token)) {
+                CollateralParams memory temp = arr[j];
+                arr[j] = arr[j - 1];
+                arr[j - 1] = temp;
+                j--;
+            }
+        }
+    }
+
     /// @dev Returns an allowed LLTV tier based on a seed value.
     function allowedLltv(uint256 seed) internal pure returns (uint256) {
         uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];

@@ -55,7 +55,7 @@ contract LiquidationTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);

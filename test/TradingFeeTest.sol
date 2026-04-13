@@ -56,11 +56,11 @@ contract TradingFeeTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
 
         id = toId(obligation);
 
-        lenderOffer.obligation = obligation;
+        copyObligation(lenderOffer.obligation, obligation);
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
@@ -68,7 +68,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 200;
 
-        borrowerOffer.obligation = obligation;
+        copyObligation(borrowerOffer.obligation, obligation);
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
@@ -165,8 +165,8 @@ contract TradingFeeTest is BaseTest {
         midnight.setDefaultTradingFee(address(loanToken), 2, fee7Days);
 
         id = midnight.touchObligation(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        copyObligation(lenderOffer.obligation, obligation);
+        copyObligation(borrowerOffer.obligation, obligation);
         borrowerOffer.tick = sellerTick;
 
         uint256 tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
@@ -194,8 +194,8 @@ contract TradingFeeTest is BaseTest {
         maturity = bound(maturity, 0, block.timestamp - 1);
         obligation.maturity = maturity;
         id = toId(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        copyObligation(lenderOffer.obligation, obligation);
+        copyObligation(borrowerOffer.obligation, obligation);
 
         midnight.setDefaultTradingFee(address(loanToken), 0, fee0Day);
         borrowerOffer.tick = sellerTick;
@@ -216,8 +216,8 @@ contract TradingFeeTest is BaseTest {
 
         obligation.maturity = maturity;
         id = toId(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        copyObligation(lenderOffer.obligation, obligation);
+        copyObligation(borrowerOffer.obligation, obligation);
 
         midnight.setDefaultTradingFee(address(loanToken), 6, fee360Days);
         borrowerOffer.tick = sellerTick;

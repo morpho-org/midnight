@@ -51,7 +51,7 @@ contract TakeTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
         id = toId(obligation);
@@ -60,7 +60,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.obligation = obligation;
+        copyObligation(lenderOffer.obligation, obligation);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -69,7 +69,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
-        otherLenderOffer.obligation = obligation;
+        copyObligation(otherLenderOffer.obligation, obligation);
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
@@ -78,7 +78,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        copyObligation(borrowerOffer.obligation, obligation);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -86,7 +86,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
-        otherBorrowerOffer.obligation = obligation;
+        copyObligation(otherBorrowerOffer.obligation, obligation);
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
     }
@@ -1548,9 +1548,11 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
-        address collateralToken = obligation.collateralParams[collateralIndex].token;
-        ERC20(collateralToken).approve(msg.sender, collateralAmount);
-        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+        {
+            address collateralToken = obligation.collateralParams[collateralIndex].token;
+            ERC20(collateralToken).approve(msg.sender, collateralAmount);
+            Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+        }
 
         Oracle oracle = Oracle(obligation.collateralParams[collateralIndex].oracle);
         uint256 healthyPrice = oracle.price();
@@ -1587,6 +1589,33 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
     bool public liquidateSucceeded;
     string public liquidateError;
 
+    function _copyOfferToStorage(Offer storage dst, Offer memory src) internal {
+        dst.buy = src.buy;
+        dst.maker = src.maker;
+        dst.start = src.start;
+        dst.expiry = src.expiry;
+        dst.tick = src.tick;
+        dst.group = src.group;
+        dst.session = src.session;
+        dst.callback = src.callback;
+        dst.callbackData = src.callbackData;
+        dst.receiverIfMakerIsSeller = src.receiverIfMakerIsSeller;
+        dst.ratifier = src.ratifier;
+        dst.reduceOnly = src.reduceOnly;
+        dst.maxUnits = src.maxUnits;
+        dst.maxSellerAssets = src.maxSellerAssets;
+        dst.maxBuyerAssets = src.maxBuyerAssets;
+        dst.obligation.loanToken = src.obligation.loanToken;
+        dst.obligation.maturity = src.obligation.maturity;
+        dst.obligation.rcfThreshold = src.obligation.rcfThreshold;
+        dst.obligation.enterGate = src.obligation.enterGate;
+        dst.obligation.liquidatorGate = src.obligation.liquidatorGate;
+        while (dst.obligation.collateralParams.length > 0) dst.obligation.collateralParams.pop();
+        for (uint256 i; i < src.obligation.collateralParams.length; i++) {
+            dst.obligation.collateralParams.push(src.obligation.collateralParams[i]);
+        }
+    }
+
     Offer internal storedOffer;
     bytes internal storedSig;
     bytes32 internal storedRoot;
@@ -1606,7 +1635,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         uint256 _collateralAmount,
         uint256 _repaidUnits
     ) external {
-        storedOffer = _offer;
+        _copyOfferToStorage(storedOffer, _offer);
         storedSig = _sig;
         storedRoot = _root;
         storedProof = _proof;
@@ -1623,15 +1652,20 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         if (!reentered) {
             uint256 idx = storedCollateralIndex;
-            address collateralToken = obligation.collateralParams[idx].token;
-            ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
-            Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+            {
+                address collateralToken = obligation.collateralParams[idx].token;
+                ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
+                Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+            }
 
             reentered = true;
-            Offer memory nestedOffer = storedOffer;
-            bytes32[] memory nestedProof = storedProof;
-            Midnight(msg.sender)
-                .take(innerUnits, seller, address(this), "", seller, nestedOffer, storedSig, storedRoot, nestedProof);
+            {
+                Offer memory nestedOffer = storedOffer;
+                bytes32[] memory nestedProof = storedProof;
+                Midnight(msg.sender).take(
+                    innerUnits, seller, address(this), "", seller, nestedOffer, storedSig, storedRoot, nestedProof
+                );
+            }
 
             Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
             uint256 healthyPrice = oracle.price();
@@ -1718,12 +1752,39 @@ contract RatifyCallback is IRatifier {
     Offer internal _recordedOffer;
     bytes32 public returnValue = CALLBACK_SUCCESS;
 
+    function _copyOfferToStorage(Offer storage dst, Offer memory src) internal {
+        dst.buy = src.buy;
+        dst.maker = src.maker;
+        dst.start = src.start;
+        dst.expiry = src.expiry;
+        dst.tick = src.tick;
+        dst.group = src.group;
+        dst.session = src.session;
+        dst.callback = src.callback;
+        dst.callbackData = src.callbackData;
+        dst.receiverIfMakerIsSeller = src.receiverIfMakerIsSeller;
+        dst.ratifier = src.ratifier;
+        dst.reduceOnly = src.reduceOnly;
+        dst.maxUnits = src.maxUnits;
+        dst.maxSellerAssets = src.maxSellerAssets;
+        dst.maxBuyerAssets = src.maxBuyerAssets;
+        dst.obligation.loanToken = src.obligation.loanToken;
+        dst.obligation.maturity = src.obligation.maturity;
+        dst.obligation.rcfThreshold = src.obligation.rcfThreshold;
+        dst.obligation.enterGate = src.obligation.enterGate;
+        dst.obligation.liquidatorGate = src.obligation.liquidatorGate;
+        while (dst.obligation.collateralParams.length > 0) dst.obligation.collateralParams.pop();
+        for (uint256 i; i < src.obligation.collateralParams.length; i++) {
+            dst.obligation.collateralParams.push(src.obligation.collateralParams[i]);
+        }
+    }
+
     function recordedOffer() public view returns (Offer memory) {
         return _recordedOffer;
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory data) external returns (bytes32) {
-        _recordedOffer = offer;
+        _copyOfferToStorage(_recordedOffer, offer);
 
         if (data.length > 0) {
             Signature memory signature = abi.decode(data, (Signature));

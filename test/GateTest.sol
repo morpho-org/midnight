@@ -53,7 +53,7 @@ contract GateTest is BaseTest {
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
+        sortCollateralParamsInPlace(obligation.collateralParams);
 
         gatedObligation.loanToken = address(loanToken);
         gatedObligation.maturity = block.timestamp + 100;
@@ -66,7 +66,7 @@ contract GateTest is BaseTest {
                     maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
                 })
             );
-        gatedObligation.collateralParams = sortCollateralParams(gatedObligation.collateralParams);
+        sortCollateralParamsInPlace(gatedObligation.collateralParams);
         gatedObligation.enterGate = address(gate);
         gatedObligation.liquidatorGate = address(gate);
 
@@ -75,7 +75,7 @@ contract GateTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.obligation = gatedObligation;
+        copyObligation(lenderOffer.obligation, gatedObligation);
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -84,7 +84,7 @@ contract GateTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = gatedObligation;
+        copyObligation(borrowerOffer.obligation, gatedObligation);
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
