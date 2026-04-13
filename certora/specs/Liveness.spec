@@ -32,7 +32,7 @@ methods {
     // Token transfer summaries: ghost-controlled
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => CVL_safeTransferFrom();
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => CVL_safeTransfer();
-        
+
     // Internal library summaries
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
@@ -58,12 +58,16 @@ persistent ghost CVL_mulDivUpGhost(uint256, uint256, uint256) returns uint256 {
 }
 
 function CVL_mulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0) { revert(); }
+    if (d == 0) {
+        revert();
+    }
     return CVL_mulDivDownGhost(a, b, d);
 }
 
 function CVL_mulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0) { revert(); }
+    if (d == 0) {
+        revert();
+    }
     return CVL_mulDivUpGhost(a, b, d);
 }
 
@@ -71,13 +75,21 @@ function CVL_mulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 // Persistent ghosts survive callback havocs, ensuring forced behavior persists through the entire transaction.
 
 persistent ghost bool forceOracleRevert;
+
 persistent ghost bool forceOracleReturnZero;
+
 persistent ghost bool forceCanIncreaseCreditFalse;
+
 persistent ghost bool forceCanIncreaseDebtFalse;
+
 persistent ghost bool forceCanLiquidateFalse;
+
 persistent ghost bool forceCallbackRevert;
+
 persistent ghost bool forceCallbackBadReturn;
+
 persistent ghost bool forceTransferRevert;
+
 persistent ghost bool forceTransferFromRevert;
 
 /// SUMMARIES ///
@@ -91,8 +103,12 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
 }
 
 function CVL_oraclePrice() returns uint256 {
-    if (forceOracleRevert) { revert(); }
-    if (forceOracleReturnZero) { return 0; }
+    if (forceOracleRevert) {
+        revert();
+    }
+    if (forceOracleReturnZero) {
+        return 0;
+    }
     uint256 price;
     return price;
 }
@@ -100,7 +116,9 @@ function CVL_oraclePrice() returns uint256 {
 function CVL_canIncreaseCredit() returns bool {
     if (forceCanIncreaseCreditFalse) {
         bool shouldRevert;
-        if (shouldRevert) { revert(); }
+        if (shouldRevert) {
+            revert();
+        }
         return false;
     }
     bool result;
@@ -110,7 +128,9 @@ function CVL_canIncreaseCredit() returns bool {
 function CVL_canIncreaseDebt() returns bool {
     if (forceCanIncreaseDebtFalse) {
         bool shouldRevert;
-        if (shouldRevert) { revert(); }
+        if (shouldRevert) {
+            revert();
+        }
         return false;
     }
     bool result;
@@ -120,7 +140,9 @@ function CVL_canIncreaseDebt() returns bool {
 function CVL_canLiquidate() returns bool {
     if (forceCanLiquidateFalse) {
         bool shouldRevert;
-        if (shouldRevert) { revert(); }
+        if (shouldRevert) {
+            revert();
+        }
         return false;
     }
     bool result;
@@ -128,7 +150,9 @@ function CVL_canLiquidate() returns bool {
 }
 
 function CVL_callbackBytes32() returns bytes32 {
-    if (forceCallbackRevert) { revert(); }
+    if (forceCallbackRevert) {
+        revert();
+    }
     if (forceCallbackBadReturn) {
         bytes32 bad;
         require bad != to_bytes32(0xee60b2e8d46b15beabf6792dae952096e6cb7b86b90ca90f7c00aa15c812ff1a), "not CALLBACK_SUCCESS";
@@ -139,15 +163,21 @@ function CVL_callbackBytes32() returns bytes32 {
 }
 
 function CVL_callbackVoid() {
-    if (forceCallbackRevert) { revert(); }
+    if (forceCallbackRevert) {
+        revert();
+    }
 }
 
 function CVL_safeTransferFrom() {
-    if (forceTransferFromRevert) { revert(); }
+    if (forceTransferFromRevert) {
+        revert();
+    }
 }
 
 function CVL_safeTransfer() {
-    if (forceTransferRevert) { revert(); }
+    if (forceTransferRevert) {
+        revert();
+    }
 }
 
 /// ORACLE REVERT PROPAGATION ///
@@ -319,14 +349,13 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Obligation obligation, uint
 
 /// If transferFrom reverts, take, repay, supplyCollateral, liquidate, and flashLoan all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
-    filtered { f ->
-        f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+filtered {
+    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         || f.selector == sig:repay(Midnight.Obligation, uint256, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
-    }
-{
+} {
     require forceTransferFromRevert, "transferFrom reverts";
     f@withrevert(e, args);
     assert lastReverted;
@@ -334,20 +363,18 @@ rule transferFromRevertPropagation(method f, env e, calldataarg args)
 
 /// If transfer reverts, withdraw, withdrawCollateral, fee claims, liquidate, and flashLoan all revert.
 rule transferRevertPropagation(method f, env e, calldataarg args)
-    filtered { f ->
-        f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
+filtered {
+    f -> f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
         || f.selector == sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         || f.selector == sig:claimTradingFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
         || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
-    }
-{
+} {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);
     assert lastReverted;
 }
-
 
 /// CALLBACK REVERT PROPAGATION ///
 
