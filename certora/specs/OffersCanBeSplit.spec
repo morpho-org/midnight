@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -12,8 +10,6 @@ methods {
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function obligationState(bytes32 id) external returns (uint128, uint128, uint256, bool, uint32) envfree;
-    function Utils.passiveFeeRecipient() external returns (address) envfree;
 
     // Axioms capture only the properties needed for the split proof (identity, zero-input, boundedness).
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
@@ -28,14 +24,19 @@ methods {
     // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
-    // Same (root, sig) on all take calls; CONSTANT ensures identical signer and removes ecrecover complexity.
-    function signer(bytes32, Midnight.Signature memory) internal returns (address) => CONSTANT;
-
     // Read-only health check does not affect position state; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Same offer.tick across all take calls; CONSTANT ensures identical return value.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
+
+    // Callbacks and token transfers: NONDET removes external call complexity.
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
 }
 
 /// GHOSTS ///
@@ -91,7 +92,7 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
 /// pendingFee and consumed can differ by at most 1 between the two paths due to floor/ceil rounding in mulDivDown/mulDivUp.
-rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
+rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
     // block.timestamp must fit in uint128 (Midnight.sol:640 casts it; checked in Solidity 0.8.31).
@@ -99,16 +100,9 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
 
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
-    address passiveFeeRecipient = Utils.passiveFeeRecipient();
-
-    // Exclude passive fee recipient aliasing: _updatePosition writes to position[id][PFR].credit (Midnight.sol:682),
-    // so if buyer or seller coincides with PFR, cross-position side-effects break the split-invariance property.
-    require buyer != passiveFeeRecipient, "buyer must not be passive fee recipient";
-    require seller != passiveFeeRecipient, "seller must not be passive fee recipient";
 
     // Valid obligation state: not fully slashed otherwise it would not function correctly.
-    uint128 obLossIndex;
-    _, obLossIndex, _, _, _ = obligationState(ghostId);
+    uint128 obLossIndex = currentContract.obligationState[ghostId].lossIndex;
     require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
 
     // Valid position state: position lossIndex <= obligation lossIndex (monotonicity invariant).
@@ -124,7 +118,7 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     storage initState = lastStorage;
 
     // Path 1: take the full amount A.
-    take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     uint256 creditOfBuyer1 = creditOf(ghostId, buyer);
     uint256 debtOfBuyer1 = debtOf(ghostId, buyer);
@@ -138,12 +132,11 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint128 lastAccrualSeller1 = lastAccrual(ghostId, seller);
     uint128 pendingFeeBuyer1 = pendingFee(ghostId, buyer);
     uint128 pendingFeeSeller1 = pendingFee(ghostId, seller);
-    uint256 creditOfPassiveFeeRecipient1 = creditOf(ghostId, passiveFeeRecipient);
 
     // Path 2: take B then C from the initial state.
-    take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof) at initState;
+    take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
 
-    take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, signature, root, proof);
+    take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     assert creditOfBuyer1 == creditOf(ghostId, buyer);
     assert debtOfBuyer1 == debtOf(ghostId, buyer);
@@ -160,5 +153,4 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1;
     mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(ghostId, seller));
     assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1;
-    assert creditOfPassiveFeeRecipient1 == creditOf(ghostId, passiveFeeRecipient);
 }
