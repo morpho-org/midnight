@@ -19,21 +19,6 @@
 //   - cancelled when credit is withdrawn in withdraw()
 //   - lost to lazy-slash realisation when _updatePosition is called after a lossIndex increase
 //
-// How the invariant closes the loop the per-function rules leave open:
-//   The per-function rules below constrain each function's effect on continuousFeeCredit in
-//   isolation, but they say nothing about the aggregate of pendingFee across all users.  A bug
-//   that inflated continuousFeeCredit without a corresponding pendingFee minting event in take()
-//   would not be caught by the directional rules alone.  The invariant catches exactly that:
-//   every unit still live in the system must be traceable to a buyerPendingFeeIncrease event.
-//
-// Why strong invariant holds at every intermediate Sstore:
-//   In _updatePosition the two writes are ordered:
-//     (1) position[id][user].pendingFee = newPendingFee   -- sumPendingFee drops by accrued+slash
-//     (2) obligationState[id].continuousFeeCredit += accrued  -- credit rises by accrued
-//   Between (1) and (2) the LHS has dipped by (accrued+slash), so LHS ≤ prior LHS ≤ RHS. ✓
-//   After (2) LHS rises by accrued only, net LHS change = -slash ≤ 0. ✓
-//   In take(), buyerPos.pendingFee += buyerPendingFeeIncrease triggers both sumPendingFee and
-//   totalPendingFeeMinted to increase by the same amount, keeping equality on the margin. ✓
 
 using Utils as Utils;
 
@@ -81,8 +66,7 @@ ghost mapping(bytes32 => mathint) totalPendingFeeMinted {
 }
 
 // Hook on position[id][user].pendingFee: maintains sumPendingFee and totalPendingFeeMinted.
-hook Sstore position[KEY bytes32 id][KEY address user].pendingFee
-    uint128 newVal (uint128 oldVal) {
+hook Sstore position[KEY bytes32 id][KEY address user].pendingFee uint128 newVal (uint128 oldVal) {
     sumPendingFee[id] = sumPendingFee[id] + newVal - oldVal;
     if (newVal > oldVal) {
         totalPendingFeeMinted[id] = totalPendingFeeMinted[id] + (newVal - oldVal);
@@ -92,19 +76,6 @@ hook Sstore position[KEY bytes32 id][KEY address user].pendingFee
 /// CONSERVATION INVARIANT ///
 
 // Total live fee (pending + credited) never exceeds total fee ever minted into pending.
-//
-// Preserved at every intermediate Sstore (strong invariant) because:
-//   - Decreases to sumPendingFee never increase the LHS beyond the prior value.
-//   - Increases to sumPendingFee (buyer minting) are matched one-for-one by increases to RHS.
-//   - Increases to continuousFeeCredit (accrual by amount `fee`) are always ≤ the preceding
-//     pendingFee decrease, because:
-//       pendingFeeDecrease = (oldPendingFee − postSlashPending) + fee ≥ fee = accrued
-//     since oldPendingFee ≥ postSlashPending (slashing only reduces pending).
-//     Net LHS change across both Sstores = accrued − pendingFeeDecrease = −slash ≤ 0. ✓
-//   - Decreases to continuousFeeCredit (claims, slashing) only shrink the LHS.
-// The upper-bound half: live fee never exceeds total minted.
-// Implied by feeConservedExactly below (since totalExited >= 0), but kept as a standalone
-// check because it is cheaper to prove and gives a cleaner counterexample when violated.
 strong invariant feeInSystemBoundedByMinted(bytes32 id)
     sumPendingFee[id] + to_mathint(continuousFeeCredit(id)) <= totalPendingFeeMinted[id]
     {
@@ -212,6 +183,8 @@ rule liquidateWithoutBadDebtPreservesFeeCredit(env e, Midnight.Obligation obliga
 
 /// GLOBAL CONSERVATION : no other function touches continuousFeeCredit ///
 
+// continuousFeeCredit can only be modified by the five functions with explicit per-function rules.
+// Together with those rules this closes the continuousFeeCredit side of the bypass argument.
 rule onlyExpectedFunctionsChangeFeeCredit(method f, env e, calldataarg args, bytes32 id)
 filtered {
     f -> !f.isView
@@ -224,4 +197,18 @@ filtered {
     uint256 feeCreditBefore = continuousFeeCredit(id);
     f(e, args);
     assert continuousFeeCredit(id) == feeCreditBefore;
+}
+
+/// GLOBAL CONSERVATION : no other function touches pendingFee ///
+
+rule onlyExpectedFunctionsChangePendingFee(method f, env e, calldataarg args, bytes32 id, address user)
+filtered {
+    f -> !f.isView
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+        && f.selector != sig:updatePosition(Midnight.Obligation, address).selector
+        && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
+} {
+    uint128 pendingFeeBefore = pendingFee(id, user);
+    f(e, args);
+    assert pendingFee(id, user) == pendingFeeBefore;
 }
