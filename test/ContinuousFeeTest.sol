@@ -485,4 +485,34 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.creditOf(id, lender), newCredit, "view matches credit");
         assertEq(midnight.pendingFee(id, lender), newPendingFee, "view matches pendingFee");
     }
+
+    function testUpdatePositionRevertsIfObligationNotCreated() public {
+        vm.expectRevert("obligation not created");
+        midnight.updatePosition(obligation, borrower);
+    }
+
+    function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
+        vm.prank(feeClaimer);
+        vm.expectRevert("obligation not created");
+        midnight.claimContinuousFee(obligation, 0, feeClaimer);
+    }
+
+    function testLastAccrualGetter(uint256 elapsed) public {
+        uint256 credit = 1e18;
+        uint256 feeRate = MAX_CONTINUOUS_FEE;
+        uint256 ttm = 100 days;
+        elapsed = bound(elapsed, 1, ttm - 1);
+        setupLender(credit, feeRate, ttm);
+
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after take");
+
+        skip(elapsed);
+        midnight.updatePosition(obligation, lender);
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
+    }
+
+    function testLastAccrualZeroForFreshPosition() public {
+        setupLender(1e18, 0, 100 days);
+        assertEq(midnight.lastAccrual(id, makeAddr("nobody")), 0, "lastAccrual zero for fresh position");
+    }
 }
