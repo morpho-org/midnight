@@ -1559,17 +1559,7 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert("buyer pendingFee exceeds credit");
         vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            address(0),
-            hex"",
-            lender,
-            bOffer,
-            sig([bOffer]),
-            root([bOffer]),
-            proof([bOffer])
-        );
+        midnight.take(units, lender, address(0), hex"", lender, bOffer, sig([bOffer]), root([bOffer]), proof([bOffer]));
     }
 }
 
