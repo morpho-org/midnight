@@ -38,7 +38,7 @@ contract ApprovalRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.prank(lender);
-        approvalRatifier.setApproval(_root, true);
+        approvalRatifier.setApproval(lender, _root, true);
 
         assertTrue(approvalRatifier.approved(lender, _root));
     }

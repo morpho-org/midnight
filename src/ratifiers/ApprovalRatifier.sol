@@ -17,10 +17,6 @@ contract ApprovalRatifier is IRatifier {
         MIDNIGHT = _midnight;
     }
 
-    function setApproval(bytes32 root, bool newApproval) external {
-        setApproval(msg.sender, root, newApproval);
-    }
-
     function setApproval(address maker, bytes32 root, bool newApproval) public {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), "unauthorized");
         approved[maker][root] = newApproval;
