@@ -12,9 +12,6 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
-    function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
-    function isLiquidatable(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool);
-    function _.canLiquidate(address) external => NONDET;
 }
 
 /// HELPERS ///
