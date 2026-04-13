@@ -12,7 +12,7 @@ methods {
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
-    // zeroFloorSub feeds into timeToMaturity (only used by tradingFee, already CONSTANT) and buyerCreditIncrease (affects position state, not return values). NONDET is safe for this property.
+    // zeroFloorSub feeds into timeToMaturity (used by tradingFee, already CONSTANT) and buyerCreditIncrease (affects position state, not return values). NONDET is safe for this property.
     function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
 
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
@@ -21,8 +21,21 @@ methods {
     // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes piecewise interpolation.
     function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
+    // Return values are computed before _updatePosition is called; NONDET eliminates its full inlining (the single heaviest internal function).
+    function _updatePosition(Midnight.Obligation memory, bytes32, address) internal => NONDET;
+
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    // End-of-take liquidation check: irrelevant to return values; removes transient storage + oracle call chain.
+    function isLiquidatable(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+
+    // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+
+    // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
+    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
+    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
     // Callbacks and token transfers: NONDET removes external call complexity.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
@@ -37,6 +50,33 @@ methods {
 
 persistent ghost bytes32 ghostId;
 
+// ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
+persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
+    axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivDown(a, 0, c) == 0;
+    axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivDown(0, b, c) == 0;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
+
+    // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
+        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
+        to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d))
+        && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
+}
+
+// ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
+persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivUp(a, 0, c) == 0;
+    axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivUp(0, b, c) == 0;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
+
+    // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d.
+        d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) =>
+        to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d))
+        && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
+}
+
 /// SUMMARY FUNCTIONS ///
 
 function CVL_toId() returns bytes32 {
@@ -49,10 +89,15 @@ function CVL_toId() returns bytes32 {
 rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
-    storage initState = lastStorage;
-
-    // block.timestamp must fit in uint128 (Midnight.sol:640 casts it; checked in Solidity 0.8.31).
+    // block.timestamp must fit in uint128 (Midnight.sol casts it).
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
+
+    // Solver hints: instantiate the sub/super-additivity axioms for the specific A/B/C split.
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1;
+
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d));
+
+    storage initState = lastStorage;
 
     // Path 1: take the full amount A.
     uint256 buyerAssetsA;
