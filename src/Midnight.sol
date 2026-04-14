@@ -720,17 +720,22 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
-    function updatePosition(Obligation memory obligation, address user) external {
+    /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
+    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128) {
         bytes32 id = toId(obligation);
         require(obligationState[id].created, "obligation not created");
-        _updatePosition(obligation, id, user);
+        return _updatePosition(obligation, id, user);
     }
 
     /// @dev Expects the obligation to be touched.
     /// @dev Expects the id to correspond to the obligation's id.
-    function _updatePosition(Obligation memory obligation, bytes32 id, address user) internal {
+    /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
+    function _updatePosition(Obligation memory obligation, bytes32 id, address user)
+        internal
+        returns (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee)
+    {
         Position storage _position = position[id][user];
-        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
+        (newCredit, newPendingFee, accruedFee) = updatePositionView(obligation, id, user);
 
         uint128 creditDecrease = _position.credit - newCredit;
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
