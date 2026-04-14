@@ -73,6 +73,7 @@ contract ContinuousFeeTest is BaseTest {
 
         setupLender(credit, feeRate, ttm);
         uint256 remaining = midnight.pendingFee(id, lender);
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after take");
 
         vm.warp(block.timestamp + elapsed);
         uint256 expectedFee = remaining.mulDivDown(elapsed, ttm);
@@ -95,6 +96,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
 
         // Fee accumulated in continuousFeeCredit
         if (expectedFee > 0) {
@@ -495,20 +497,6 @@ contract ContinuousFeeTest is BaseTest {
         vm.prank(feeClaimer);
         vm.expectRevert("obligation not created");
         midnight.claimContinuousFee(obligation, 0, feeClaimer);
-    }
-
-    function testLastAccrualGetter(uint256 elapsed) public {
-        uint256 credit = 1e18;
-        uint256 feeRate = MAX_CONTINUOUS_FEE;
-        uint256 ttm = 100 days;
-        elapsed = bound(elapsed, 1, ttm - 1);
-        setupLender(credit, feeRate, ttm);
-
-        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after take");
-
-        skip(elapsed);
-        midnight.updatePosition(obligation, lender);
-        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
     }
 
     function testLastAccrualZeroForFreshPosition() public {
