@@ -2,8 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {Midnight} from "../Midnight.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
@@ -24,7 +23,7 @@ contract TakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     function bundleTakeUnits(
-        Midnight midnight,
+        IMidnight midnight,
         uint256 targetUnits,
         address taker,
         address receiverIfTakerIsSeller,
@@ -72,7 +71,7 @@ contract TakeBundler {
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
     /// @dev Requires a non-empty takes array.
     function bundleTakeBuyerAssets(
-        Midnight midnight,
+        IMidnight midnight,
         uint256 targetBuyerAssets,
         address taker,
         address receiverIfTakerIsSeller,
@@ -119,7 +118,7 @@ contract TakeBundler {
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
     /// @dev Requires a non-empty takes array.
     function bundleTakeSellerAssets(
-        Midnight midnight,
+        IMidnight midnight,
         uint256 targetSellerAssets,
         address taker,
         address receiverIfTakerIsSeller,
