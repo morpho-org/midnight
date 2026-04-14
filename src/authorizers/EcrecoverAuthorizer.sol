@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.34;
+pragma solidity ^0.8.26;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
 import {Authorization, Signature, AUTHORIZATION_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "../interfaces/IEcrecover.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 event SetIsAuthorized(
     address indexed caller, address indexed authorizer, address indexed authorized, bool isAuthorized, uint256 nonce
@@ -18,8 +19,8 @@ contract EcrecoverAuthorizer {
     }
 
     function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external {
-        require(block.timestamp <= authorization.deadline, "expired");
-        require(authorization.nonce == nonce[authorization.authorizer]++, "invalid nonce");
+        require(block.timestamp <= authorization.deadline, ErrorsLib.Expired());
+        require(authorization.nonce == nonce[authorization.authorizer]++, ErrorsLib.InvalidNonce());
 
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
@@ -29,7 +30,7 @@ contract EcrecoverAuthorizer {
             signer != address(0)
                 && (signer == authorization.authorizer
                     || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer)),
-            "invalid signature"
+            ErrorsLib.InvalidSignature()
         );
 
         emit SetIsAuthorized(
