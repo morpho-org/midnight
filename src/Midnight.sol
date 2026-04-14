@@ -6,20 +6,8 @@ import {UtilsLib} from "./libraries/UtilsLib.sol";
 import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
-import {
-    WAD,
-    ORACLE_PRICE_SCALE,
-    FEE_STEP,
-    MAX_CONTINUOUS_FEE,
-    TIME_TO_MAX_LIF,
-    MAX_COLLATERALS,
-    MAX_COLLATERALS_PER_BORROWER,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
-    LIQUIDATION_LOCK_SLOT,
-    CALLBACK_SUCCESS,
-    isLltvAllowed
-} from "./libraries/ConstantsLib.sol";
+// forge-lint: disable-next-item(unaliased-plain-import)
+import "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Position} from "./interfaces/IMidnight.sol";
 import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
