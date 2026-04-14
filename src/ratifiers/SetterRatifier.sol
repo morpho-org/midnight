@@ -3,17 +3,24 @@
 pragma solidity 0.8.34;
 
 import {IRatifier} from "../interfaces/IRatifier.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
-contract ApprovalRatifier is IRatifier {
+contract SetterRatifier is IRatifier {
     event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
+
+    address public immutable MIDNIGHT;
 
     mapping(address maker => mapping(bytes32 root => bool)) public approved;
 
-    function setApproval(bytes32 root, bool newApproval) external {
-        approved[msg.sender][root] = newApproval;
-        emit SetApproval(msg.sender, root, newApproval);
+    constructor(address _midnight) {
+        MIDNIGHT = _midnight;
+    }
+
+    function setApproval(address maker, bytes32 root, bool newApproval) public {
+        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), "unauthorized");
+        approved[maker][root] = newApproval;
+        emit SetApproval(maker, root, newApproval);
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
