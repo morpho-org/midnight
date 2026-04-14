@@ -32,7 +32,8 @@ contract TakeBundler {
         uint256 minBuyerAssets,
         uint256 maxBuyerAssets,
         uint256 minSellerAssets,
-        uint256 maxSellerAssets
+        uint256 maxSellerAssets,
+        bool allowPartialFill
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
 
@@ -59,7 +60,7 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledUnits == targetUnits, "insufficient liquidity");
+        require(allowPartialFill || totalFilledUnits == targetUnits, "insufficient liquidity");
         require(totalBuyerAssets >= minBuyerAssets, "buyer assets below min");
         require(totalBuyerAssets <= maxBuyerAssets, "buyer assets above max");
         require(totalSellerAssets >= minSellerAssets, "seller assets below min");
@@ -78,7 +79,8 @@ contract TakeBundler {
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minUnits,
-        uint256 maxUnits
+        uint256 maxUnits,
+        bool allowPartialFill
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
@@ -109,7 +111,7 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledBuyerAssets == targetBuyerAssets, "insufficient liquidity");
+        require(allowPartialFill || totalFilledBuyerAssets == targetBuyerAssets, "insufficient liquidity");
         require(totalUnits >= minUnits, "units below min");
         require(totalUnits <= maxUnits, "units above max");
     }
@@ -125,7 +127,8 @@ contract TakeBundler {
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minUnits,
-        uint256 maxUnits
+        uint256 maxUnits,
+        bool allowPartialFill
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
@@ -156,7 +159,7 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledSellerAssets == targetSellerAssets, "insufficient liquidity");
+        require(allowPartialFill || totalFilledSellerAssets == targetSellerAssets, "insufficient liquidity");
         require(totalUnits >= minUnits, "units below min");
         require(totalUnits <= maxUnits, "units above max");
     }
