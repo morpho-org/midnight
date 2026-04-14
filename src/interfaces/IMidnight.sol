@@ -120,11 +120,9 @@ interface IMidnight {
     function feeSetter() external view returns (address);
 
     /// MULTICALL ///
-
     function multicall(bytes[] calldata calls) external;
 
     /// ADMIN FUNCTIONS ///
-
     function setRoleSetter(address newRoleSetter) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
@@ -136,7 +134,6 @@ interface IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-
     function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
     function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external;
@@ -150,12 +147,10 @@ interface IMidnight {
     function touchObligation(Obligation memory obligation) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
-
     function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
     function updatePosition(Obligation memory obligation, address user) external;
 
     /// OTHER VIEW FUNCTIONS ///
-
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
     function activatedCollaterals(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);

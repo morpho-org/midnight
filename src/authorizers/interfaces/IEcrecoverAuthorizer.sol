@@ -16,11 +16,9 @@ interface IEcrecoverAuthorizer {
     );
 
     /// STORAGE GETTERS ///
-
     function MIDNIGHT() external view returns (address);
     function nonce(address authorizer) external view returns (uint256);
 
     /// FUNCTIONS ///
-
     function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external;
 }
