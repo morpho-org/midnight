@@ -2,9 +2,9 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.26;
 
-import {ErrorsLib} from "./ErrorsLib.sol";
-
 library UtilsLib {
+    error Uint128Overflow();
+
     /// @dev Returns true if at most one of `x` and `y` is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
         assembly {
@@ -63,7 +63,7 @@ library UtilsLib {
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
-        require(x <= type(uint128).max, ErrorsLib.Uint128Overflow());
+        require(x <= type(uint128).max, Uint128Overflow());
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
         return uint128(x);
     }

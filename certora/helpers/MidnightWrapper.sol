@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Midnight} from "../../src/Midnight.sol";
-import {Position, CollateralParams, Obligation} from "../../src/interfaces/IMidnight.sol";
+import {Position, CollateralParams, Obligation} from "../../src/IMidnight.sol";
 import {IOracle} from "../../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";

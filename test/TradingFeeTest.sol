@@ -5,10 +5,9 @@ pragma solidity ^0.8.4;
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 // The maximum debt from a trade must fit in uint128, and the required collateral (debt / lltv)
 // must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3.
@@ -203,7 +202,7 @@ contract TradingFeeTest is BaseTest {
 
         collateralize(obligation, borrower, MAX_DEBT);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -262,7 +261,7 @@ contract TradingFeeTest is BaseTest {
     function testClaimTradingFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.OnlyFeeClaimer.selector);
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
         midnight.claimTradingFee(address(loanToken), 0, caller);
     }
 

@@ -8,7 +8,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
 } from "../src/interfaces/IEcrecover.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {IEcrecoverAuthorizer} from "../src/authorizers/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverAuthorizerTest is BaseTest {
@@ -77,7 +77,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);
@@ -89,7 +89,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.deadline = block.timestamp - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert(ErrorsLib.Expired.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.Expired.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
@@ -98,7 +98,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.nonce = 999; // wrong nonce
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert(ErrorsLib.InvalidNonce.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidNonce.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 

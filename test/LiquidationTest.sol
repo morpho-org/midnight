@@ -9,13 +9,12 @@ import {
     LLTV_8,
     LIQUIDATION_CURSOR_LOW
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
@@ -102,7 +101,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert(ErrorsLib.NotLiquidatable.selector);
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
@@ -143,7 +142,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        vm.expectRevert(ErrorsLib.InconsistentInput.selector);
+        vm.expectRevert(IMidnight.InconsistentInput.selector);
         midnight.liquidate(obligation, 0, 1, 1, borrower, "");
     }
 
@@ -464,7 +463,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
         repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
-        vm.expectRevert(ErrorsLib.RecoveryCloseFactorConditionsViolated.selector);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         repaid = bound(repaid, 0, min(maxR, units));
@@ -537,7 +536,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         // Full liquidation should revert because remaining debt >= rcfThreshold.
-        vm.expectRevert(ErrorsLib.RecoveryCloseFactorConditionsViolated.selector);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, units, borrower, "");
     }
 
@@ -553,7 +552,7 @@ contract LiquidationTest is BaseTest {
         // At exact maturity: recovery close factor applies.
         if (maxRepaid < units) {
             vm.warp(obligation.maturity);
-            vm.expectRevert(ErrorsLib.RecoveryCloseFactorConditionsViolated.selector);
+            vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
             midnight.liquidate(obligation, 0, 0, units, borrower, "");
         }
 
