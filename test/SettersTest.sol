@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 
 import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {IMidnight, Obligation, CollateralParams} from "../src/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
     function testInitialRoleSetter() public view {
