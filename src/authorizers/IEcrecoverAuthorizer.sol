@@ -5,6 +5,11 @@ pragma solidity ^0.8.4;
 import {Authorization, Signature} from "../interfaces/IEcrecover.sol";
 
 interface IEcrecoverAuthorizer {
+    /// ERRORS ///
+    error Expired();
+    error InvalidNonce();
+    error InvalidSignature();
+
     /// EVENTS ///
     event SetIsAuthorized(
         address indexed caller, address indexed authorizer, address indexed authorized, bool isAuthorized, uint256 nonce

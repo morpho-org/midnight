@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {EcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -11,8 +11,6 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/ratifiers/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -902,7 +900,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
+        vm.expectRevert(EcrecoverRatifier.InvalidSignature.selector);
         Signature memory _sig = Signature({v: 1, r: 0, s: 0});
         vm.prank(borrower);
         midnight.take(
@@ -1080,7 +1078,7 @@ contract TakeTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
 
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(EcrecoverRatifier.Unauthorized.selector);
         vm.prank(sender);
         midnight.take(
             100,
