@@ -118,13 +118,13 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// RULES ///
 
-rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, bytes).selector } {
     require !divisionByZero;
     f(e, args);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
 
-rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address callback, bytes data) {
     require equalsGlobalObligation(obligation);
 
     // Sound: touchObligation enforces maxLif >= WAD for all collateralParams (ExactMath.spec).
@@ -139,6 +139,6 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
     require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
 
     require !divisionByZero;
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, callback, data);
     assert !divisionByZero, "division by zero detected in mulDivDown or mulDivUp";
 }
