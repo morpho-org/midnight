@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Midnight} from "../Midnight.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {Midnight} from "../../Midnight.sol";
+import {Offer} from "../../interfaces/IMidnight.sol";
 
 struct Take {
     uint256 units;
