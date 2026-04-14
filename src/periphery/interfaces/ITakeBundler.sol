@@ -25,7 +25,6 @@ interface ITakeBundler {
     error UnitsBelowMin();
 
     /// FUNCTIONS ///
-
     function bundleTakeUnits(
         Midnight midnight,
         uint256 targetUnits,
