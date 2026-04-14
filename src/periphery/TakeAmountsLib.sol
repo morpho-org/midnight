@@ -2,7 +2,7 @@
 pragma solidity 0.8.34;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer} from "../IMidnight.sol";
+import {Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";

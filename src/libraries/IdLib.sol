@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.26;
 
-import {Obligation} from "../IMidnight.sol";
+import {Obligation} from "../interfaces/IMidnight.sol";
 
 library IdLib {
     error SStore2DeploymentFailed();

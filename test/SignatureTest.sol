@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
-import {Offer} from "../src/IMidnight.sol";
+import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
