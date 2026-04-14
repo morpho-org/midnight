@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {BaseTest} from "./BaseTest.sol";
-import {IMidnight} from "../src/interfaces/IMidnight.sol";
+import {IMidnight} from "../src/IMidnight.sol";
 
 contract MulticallTest is BaseTest {
     function testMulticallSuccess() public {

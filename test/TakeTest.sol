@@ -2,14 +2,14 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
-import {IRatifier} from "../src/interfaces/IRatifier.sol";
+import {IRatifier} from "../src/ratifiers/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";

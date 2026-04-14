@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Authorization, Signature} from "./IEcrecover.sol";
+import {Authorization, Signature} from "../interfaces/IEcrecover.sol";
 
 interface IEcrecoverAuthorizer {
     /// EVENTS ///

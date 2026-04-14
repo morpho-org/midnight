@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IRatifier} from "../interfaces/IRatifier.sol";
-import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
+import {IRatifier} from "./IRatifier.sol";
+import {IMidnight, Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../interfaces/IEcrecover.sol";
 

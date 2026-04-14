@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer} from "./IMidnight.sol";
+import {Offer} from "../IMidnight.sol";
 
 struct Take {
     uint256 units;

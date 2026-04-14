@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";

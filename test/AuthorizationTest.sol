@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {IMidnight, Obligation, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams, Offer} from "../src/IMidnight.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";

@@ -3,7 +3,7 @@
 pragma solidity 0.8.34;
 
 import {Midnight} from "../Midnight.sol";
-import {ITakeBundler, Take} from "../interfaces/ITakeBundler.sol";
+import {ITakeBundler, Take} from "./ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 

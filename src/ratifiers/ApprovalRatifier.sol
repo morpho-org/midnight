@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IRatifier} from "../interfaces/IRatifier.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {IRatifier} from "./IRatifier.sol";
+import {Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract ApprovalRatifier is IRatifier {

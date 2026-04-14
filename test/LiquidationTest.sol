@@ -9,7 +9,7 @@ import {
     LLTV_8,
     LIQUIDATION_CURSOR_LOW
 } from "../src/libraries/ConstantsLib.sol";
-import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";

@@ -2,12 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
-import {ITakeBundler, Take} from "../src/interfaces/ITakeBundler.sol";
+import {ITakeBundler, Take} from "../src/periphery/ITakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract BundlerTest is BaseTest {
