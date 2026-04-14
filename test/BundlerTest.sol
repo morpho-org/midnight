@@ -7,7 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
-import {ITakeBundler, Take} from "../src/periphery/ITakeBundler.sol";
+import {ITakeBundler, Take} from "../src/periphery/interfaces/ITakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract BundlerTest is BaseTest {
