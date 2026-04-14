@@ -3,17 +3,17 @@
 pragma solidity ^0.8.0;
 
 import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.sol";
-import {ApprovalRatifier} from "../src/ratifiers/ApprovalRatifier.sol";
+import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
-contract ApprovalRatifierTest is BaseTest {
-    ApprovalRatifier internal approvalRatifier;
+contract SetterRatifierTest is BaseTest {
+    SetterRatifier internal setterRatifier;
 
     function setUp() public override {
         super.setUp();
-        approvalRatifier = new ApprovalRatifier(address(midnight));
+        setterRatifier = new SetterRatifier(address(midnight));
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -28,7 +28,7 @@ contract ApprovalRatifierTest is BaseTest {
         offer.obligation = obligation;
         offer.buy = true;
         offer.maker = maker;
-        offer.ratifier = address(approvalRatifier);
+        offer.ratifier = address(setterRatifier);
         offer.maxUnits = type(uint256).max;
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
@@ -38,9 +38,9 @@ contract ApprovalRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.prank(lender);
-        approvalRatifier.setApproval(lender, _root, true);
+        setterRatifier.setApproval(lender, _root, true);
 
-        assertTrue(approvalRatifier.approved(lender, _root));
+        assertTrue(setterRatifier.approved(lender, _root));
     }
 
     function testOnRatifyAuthorizedSetterCanApproveOnBehalf() public {
@@ -51,9 +51,9 @@ contract ApprovalRatifierTest is BaseTest {
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        approvalRatifier.setApproval(lender, _root, true);
+        setterRatifier.setApproval(lender, _root, true);
 
-        bytes32 result = approvalRatifier.onRatify(offer, _root, "");
+        bytes32 result = setterRatifier.onRatify(offer, _root, "");
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -62,12 +62,12 @@ contract ApprovalRatifierTest is BaseTest {
         bytes32 _root = keccak256(abi.encode(offer));
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(approvalRatifier), true);
+        midnight.setIsAuthorized(lender, address(setterRatifier), true);
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        approvalRatifier.setApproval(lender, _root, true);
+        setterRatifier.setApproval(lender, _root, true);
 
         vm.prank(borrower);
         midnight.take(0, borrower, address(0), hex"", borrower, offer, emptySig, _root, proof([offer]));
@@ -78,6 +78,6 @@ contract ApprovalRatifierTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("unauthorized");
-        approvalRatifier.setApproval(lender, _root, true);
+        setterRatifier.setApproval(lender, _root, true);
     }
 }

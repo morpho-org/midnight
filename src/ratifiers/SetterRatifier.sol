@@ -6,7 +6,7 @@ import {IRatifier} from "../interfaces/IRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
-contract ApprovalRatifier is IRatifier {
+contract SetterRatifier is IRatifier {
     event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
 
     address public immutable MIDNIGHT;
