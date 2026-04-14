@@ -5,6 +5,7 @@ pragma solidity ^0.8.4;
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
 import {Offer} from "../src/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract SignatureTest is BaseTest {
@@ -44,7 +45,7 @@ contract SignatureTest is BaseTest {
 
         Signature memory badSig;
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
         ecrecoverRatifier.onRatify(offer, root, abi.encode(badSig));
     }
 }

@@ -5,6 +5,7 @@ pragma solidity 0.8.34;
 import {IRatifier} from "./IRatifier.sol";
 import {Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract ApprovalRatifier is IRatifier {
     event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
@@ -17,7 +18,7 @@ contract ApprovalRatifier is IRatifier {
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
-        require(approved[offer.maker][root], "not approved");
+        require(approved[offer.maker][root], ErrorsLib.NotApproved());
         return CALLBACK_SUCCESS;
     }
 }

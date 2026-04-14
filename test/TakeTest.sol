@@ -11,6 +11,7 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/ratifiers/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
@@ -901,7 +902,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
         Signature memory _sig = Signature({v: 1, r: 0, s: 0});
         vm.prank(borrower);
         midnight.take(
@@ -1079,7 +1080,7 @@ contract TakeTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ErrorsLib.Unauthorized.selector);
         vm.prank(sender);
         midnight.take(
             100,
