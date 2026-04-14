@@ -7,9 +7,9 @@ methods {
 
     // Deterministic toId summary using a ghost that takes simple types (no struct).
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
+
     // Skip obligation creation logic: removes the collateral-validation loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
-
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);

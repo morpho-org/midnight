@@ -68,7 +68,6 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
     collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
 
-
 /// LIF BOUNDARIES ///
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input).
