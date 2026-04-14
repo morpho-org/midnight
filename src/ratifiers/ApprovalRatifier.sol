@@ -2,12 +2,13 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IRatifier} from "../interfaces/IRatifier.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {IRatifier} from "./IRatifier.sol";
+import {Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract ApprovalRatifier is IRatifier {
+    error Unauthorized();
+
     event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
 
     mapping(address maker => mapping(bytes32 root => bool)) public approved;
@@ -18,7 +19,7 @@ contract ApprovalRatifier is IRatifier {
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
-        require(approved[offer.maker][root], ErrorsLib.NotApproved());
+        require(approved[offer.maker][root], Unauthorized());
         return CALLBACK_SUCCESS;
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
@@ -27,7 +27,7 @@ import {
     LLTV_7,
     LLTV_8
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";

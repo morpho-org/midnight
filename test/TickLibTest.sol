@@ -6,7 +6,6 @@ import {console} from "forge-std/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 contract TickLibTest is BaseTest {
     using UtilsLib for uint256;
@@ -53,7 +52,7 @@ contract TickLibTest is BaseTest {
     /// forge-config: default.allow_internal_expect_revert = true
     function testTickToPriceOutOfRange(uint256 tick) public {
         tick = bound(tick, MAX_TICK + 1, type(uint256).max);
-        vm.expectRevert(ErrorsLib.TickOutOfRange.selector);
+        vm.expectRevert(TickLib.TickOutOfRange.selector);
         TickLib.tickToPrice(tick);
     }
 
@@ -62,7 +61,7 @@ contract TickLibTest is BaseTest {
     /// forge-config: default.allow_internal_expect_revert = true
     function testPriceToTickGreaterThanOne(uint256 price) public {
         price = bound(price, 1 ether + 1, type(uint256).max);
-        vm.expectRevert(ErrorsLib.PriceGreaterThanOne.selector);
+        vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
         TickLib.priceToTick(price);
     }
 
