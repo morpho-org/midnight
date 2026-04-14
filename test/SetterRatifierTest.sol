@@ -38,9 +38,9 @@ contract SetterRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.prank(lender);
-        setterRatifier.setApproval(lender, _root, true);
+        setterRatifier.setIsRatified(lender, _root, true);
 
-        assertTrue(setterRatifier.approved(lender, _root));
+        assertTrue(setterRatifier.isRatified(lender, _root));
     }
 
     function testOnRatifyAuthorizedSetterCanApproveOnBehalf() public {
@@ -51,7 +51,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        setterRatifier.setApproval(lender, _root, true);
+        setterRatifier.setIsRatified(lender, _root, true);
 
         bytes32 result = setterRatifier.onRatify(offer, _root, "");
         assertEq(result, CALLBACK_SUCCESS);
@@ -67,7 +67,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        setterRatifier.setApproval(lender, _root, true);
+        setterRatifier.setIsRatified(lender, _root, true);
 
         vm.prank(borrower);
         midnight.take(0, borrower, address(0), hex"", borrower, offer, emptySig, _root, proof([offer]));
@@ -78,6 +78,6 @@ contract SetterRatifierTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("unauthorized");
-        setterRatifier.setApproval(lender, _root, true);
+        setterRatifier.setIsRatified(lender, _root, true);
     }
 }

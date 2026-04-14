@@ -11,20 +11,20 @@ contract SetterRatifier is IRatifier {
 
     address public immutable MIDNIGHT;
 
-    mapping(address maker => mapping(bytes32 root => bool)) public approved;
+    mapping(address maker => mapping(bytes32 root => bool)) public isRatified;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
     }
 
-    function setApproval(address maker, bytes32 root, bool newApproval) public {
+    function setIsRatified(address maker, bytes32 root, bool newApproval) public {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), "unauthorized");
-        approved[maker][root] = newApproval;
+        isRatified[maker][root] = newApproval;
         emit SetApproval(maker, root, newApproval);
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
-        require(approved[offer.maker][root], "not approved");
+        require(isRatified[offer.maker][root], "not approved");
         return CALLBACK_SUCCESS;
     }
 }
