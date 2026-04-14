@@ -4,7 +4,6 @@ pragma solidity ^0.8.4;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 
 contract UtilsLibTest is Test {
     function testFuzzCountBits(uint128 bitmap) public pure {
@@ -104,7 +103,7 @@ contract UtilsLibTest is Test {
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
-        vm.expectRevert(ErrorsLib.Uint128Overflow.selector);
+        vm.expectRevert(UtilsLib.Uint128Overflow.selector);
         UtilsLib.toUint128(x);
     }
 

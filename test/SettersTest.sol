@@ -4,8 +4,7 @@ pragma solidity ^0.8.4;
 
 import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
     function testInitialRoleSetter() public view {
@@ -20,7 +19,7 @@ contract SettersTest is BaseTest {
     function testSetRoleSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setRoleSetter(makeAddr("newRoleSetter"));
     }
 
@@ -32,7 +31,7 @@ contract SettersTest is BaseTest {
     function testSetFeeSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
@@ -89,19 +88,19 @@ contract SettersTest is BaseTest {
     }
 
     function testSetTradingFeeInvalidIndex(bytes32 id) public {
-        vm.expectRevert(ErrorsLib.InvalidFeeIndex.selector);
+        vm.expectRevert(IMidnight.InvalidFeeIndex.selector);
         midnight.setObligationTradingFee(id, 7, 0);
     }
 
     function testSetDefaultTradingFeeInvalidIndex(address loanToken) public {
-        vm.expectRevert(ErrorsLib.InvalidFeeIndex.selector);
+        vm.expectRevert(IMidnight.InvalidFeeIndex.selector);
         midnight.setDefaultTradingFee(loanToken, 7, 0);
     }
 
     function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert(ErrorsLib.TradingFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
@@ -109,7 +108,7 @@ contract SettersTest is BaseTest {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(ErrorsLib.FeeNotMultipleOfFeeStep.selector);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setObligationTradingFee(id, index, fee);
     }
 
@@ -117,19 +116,19 @@ contract SettersTest is BaseTest {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(ErrorsLib.FeeNotMultipleOfFeeStep.selector);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setDefaultTradingFee(loanToken, index, fee);
     }
 
     function testSetObligationTradingFeeObligationNotCreated(bytes32 id) public {
-        vm.expectRevert(ErrorsLib.ObligationNotCreated.selector);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyFeeSetter.selector);
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
@@ -141,14 +140,14 @@ contract SettersTest is BaseTest {
     function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
     // Default trading fee tests
 
     function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert(ErrorsLib.ObligationNotCreated.selector);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.tradingFee(bytes32(0), 0);
     }
 
@@ -208,14 +207,14 @@ contract SettersTest is BaseTest {
     function testSetDefaultTradingFeeOnlyFeeSetter(address rdm, address loanToken) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyFeeSetter.selector);
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setDefaultTradingFee(loanToken, 0, 0);
     }
 
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert(ErrorsLib.TradingFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
 
@@ -304,11 +303,11 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(obligation);
 
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyFeeSetter.selector);
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setObligationContinuousFee(id, 100);
 
         vm.prank(rdm);
-        vm.expectRevert(ErrorsLib.OnlyFeeSetter.selector);
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setDefaultContinuousFee(address(loanToken), 100);
     }
 
@@ -330,10 +329,10 @@ contract SettersTest is BaseTest {
         midnight.touchObligation(obligation);
         bytes32 id = toId(obligation);
 
-        vm.expectRevert(ErrorsLib.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
         midnight.setObligationContinuousFee(id, fee);
 
-        vm.expectRevert(ErrorsLib.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
         midnight.setDefaultContinuousFee(address(loanToken), fee);
     }
 

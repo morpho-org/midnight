@@ -3,21 +3,12 @@
 pragma solidity 0.8.34;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {ITakeBundler, Take} from "../interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
-contract TakeBundler {
+contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
-
-    struct Take {
-        uint256 units;
-        Offer offer;
-        bytes sig;
-        bytes32 root;
-        bytes32[] proof;
-    }
 
     /// @dev Iterates through orders, filling up to targetUnits units total.
     /// @dev Assumes offers are all buy or all sell and share the same obligation id.
@@ -35,7 +26,7 @@ contract TakeBundler {
         uint256 minSellerAssets,
         uint256 maxSellerAssets
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), ErrorsLib.Unauthorized());
+        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
 
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
@@ -60,11 +51,11 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledUnits == targetUnits, ErrorsLib.InsufficientLiquidity());
-        require(totalBuyerAssets >= minBuyerAssets, ErrorsLib.BuyerAssetsBelowMin());
-        require(totalBuyerAssets <= maxBuyerAssets, ErrorsLib.BuyerAssetsAboveMax());
-        require(totalSellerAssets >= minSellerAssets, ErrorsLib.SellerAssetsBelowMin());
-        require(totalSellerAssets <= maxSellerAssets, ErrorsLib.SellerAssetsAboveMax());
+        require(totalFilledUnits == targetUnits, InsufficientLiquidity());
+        require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
+        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
+        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
+        require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets buyer assets.
@@ -81,7 +72,7 @@ contract TakeBundler {
         uint256 minUnits,
         uint256 maxUnits
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), ErrorsLib.Unauthorized());
+        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
 
         uint256 totalFilledBuyerAssets;
@@ -110,9 +101,9 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledBuyerAssets == targetBuyerAssets, ErrorsLib.InsufficientLiquidity());
-        require(totalUnits >= minUnits, ErrorsLib.UnitsBelowMin());
-        require(totalUnits <= maxUnits, ErrorsLib.UnitsAboveMax());
+        require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(totalUnits >= minUnits, UnitsBelowMin());
+        require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets seller assets.
@@ -128,7 +119,7 @@ contract TakeBundler {
         uint256 minUnits,
         uint256 maxUnits
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), ErrorsLib.Unauthorized());
+        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
 
         uint256 totalFilledSellerAssets;
@@ -157,8 +148,8 @@ contract TakeBundler {
             } catch {}
         }
 
-        require(totalFilledSellerAssets == targetSellerAssets, ErrorsLib.InsufficientLiquidity());
-        require(totalUnits >= minUnits, ErrorsLib.UnitsBelowMin());
-        require(totalUnits <= maxUnits, ErrorsLib.UnitsAboveMax());
+        require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(totalUnits >= minUnits, UnitsBelowMin());
+        require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 }

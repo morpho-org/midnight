@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
@@ -13,7 +13,6 @@ import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
@@ -323,7 +322,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -336,7 +335,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -397,7 +396,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, otherBorrower, borrowerOffer);
     }
 
@@ -412,7 +411,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, borrower, otherBorrowerOffer);
     }
 
@@ -491,7 +490,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maxUnits = exitUnits;
         otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert(ErrorsLib.MakerCreditOrDebtIncreased.selector);
+        vm.expectRevert(IMidnight.MakerCreditOrDebtIncreased.selector);
         take(exitUnits, borrower, otherBorrowerOffer);
     }
 
@@ -526,7 +525,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maxUnits = exitUnits;
         otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert(ErrorsLib.MakerCreditOrDebtIncreased.selector);
+        vm.expectRevert(IMidnight.MakerCreditOrDebtIncreased.selector);
         take(exitUnits, lender, otherLenderOffer);
     }
 
@@ -546,7 +545,7 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(secondRevertingTake, lender, borrowerOffer);
 
         take(secondPassingTake, lender, borrowerOffer);
@@ -566,7 +565,7 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(secondRevertingTake, borrower, lenderOffer);
 
         take(secondPassingTake, borrower, lenderOffer);
@@ -585,7 +584,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(secondFill + 1, lender, borrowerOffer2);
 
         take(secondFill, lender, borrowerOffer2);
@@ -604,7 +603,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert(ErrorsLib.ConsumedUnits.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(secondFill + 1, borrower, lenderOffer2);
 
         take(secondFill, borrower, lenderOffer2);
@@ -674,7 +673,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(100, lender, borrowerOffer);
     }
 
@@ -687,7 +686,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -701,7 +700,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -715,7 +714,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert(ErrorsLib.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -723,7 +722,7 @@ contract TakeTest is BaseTest {
         vm.prank(lender);
         midnight.shuffleSession(lender);
 
-        vm.expectRevert(ErrorsLib.InvalidSession.selector);
+        vm.expectRevert(IMidnight.InvalidSession.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -731,14 +730,14 @@ contract TakeTest is BaseTest {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
-        vm.expectRevert(ErrorsLib.OfferNotStarted.selector);
+        vm.expectRevert(IMidnight.OfferNotStarted.selector);
         take(0, borrower, badOffer);
     }
 
     function testTakeOfferExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
-        vm.expectRevert(ErrorsLib.OfferExpired.selector);
+        vm.expectRevert(IMidnight.OfferExpired.selector);
         take(0, borrower, lenderOffer);
     }
 
@@ -748,7 +747,7 @@ contract TakeTest is BaseTest {
         privateKey[taker] = pkey;
         lenderOffer.maker = taker;
 
-        vm.expectRevert(ErrorsLib.SelfTake.selector);
+        vm.expectRevert(IMidnight.SelfTake.selector);
         take(0, taker, lenderOffer);
     }
 
@@ -762,7 +761,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
 
-        vm.expectRevert(ErrorsLib.ConsumedSellerAssets.selector);
+        vm.expectRevert(IMidnight.ConsumedSellerAssets.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -787,7 +786,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
 
-        vm.expectRevert(ErrorsLib.ConsumedBuyerAssets.selector);
+        vm.expectRevert(IMidnight.ConsumedBuyerAssets.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -861,7 +860,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 0;
 
-        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -873,7 +872,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxSellerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -886,7 +885,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(ErrorsLib.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -894,7 +893,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidRoot(bytes32 invalidRoot) public {
         vm.assume(invalidRoot != root([lenderOffer]));
-        vm.expectRevert(ErrorsLib.InvalidProof.selector);
+        vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), invalidRoot, new bytes32[](0)
@@ -978,7 +977,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
-        vm.expectRevert(ErrorsLib.InvalidProof.selector);
+        vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), _path
@@ -988,7 +987,7 @@ contract TakeTest is BaseTest {
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
         vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
-        vm.expectRevert(ErrorsLib.InvalidProof.selector);
+        vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -1139,7 +1138,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
-        vm.expectRevert(ErrorsLib.NotRatified.selector);
+        vm.expectRevert(IMidnight.NotRatified.selector);
         vm.prank(sender);
         midnight.take(
             0,
@@ -1159,7 +1158,7 @@ contract TakeTest is BaseTest {
         vm.assume(taker != sender);
         vm.assume(!midnight.isAuthorized(taker, sender));
 
-        vm.expectRevert(ErrorsLib.TakerUnauthorized.selector);
+        vm.expectRevert(IMidnight.TakerUnauthorized.selector);
         vm.prank(sender);
         midnight.take(
             100,
@@ -1296,7 +1295,7 @@ contract TakeTest is BaseTest {
         );
 
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateErrorSelector(), ErrorsLib.NotLiquidatable.selector);
+        assertEq(callback.liquidateErrorSelector(), IMidnight.NotLiquidatable.selector);
         assertEq(midnight.debtOf(id, borrower), units);
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
@@ -1347,7 +1346,7 @@ contract TakeTest is BaseTest {
 
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
-        assertEq(callback.liquidateErrorSelector(), ErrorsLib.NotLiquidatable.selector);
+        assertEq(callback.liquidateErrorSelector(), IMidnight.NotLiquidatable.selector);
         assertTrue(midnight.liquidationLocked(id, borrower) == false);
         assertEq(midnight.debtOf(id, borrower), 2 * units);
         assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
@@ -1362,7 +1361,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert(ErrorsLib.InvalidCallback.selector);
+        vm.expectRevert(IMidnight.InvalidCallback.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1490,7 +1489,7 @@ contract TakeTest is BaseTest {
 
         Signature memory badSig;
 
-        vm.expectRevert(ErrorsLib.RatifierUnauthorized.selector);
+        vm.expectRevert(IMidnight.RatifierUnauthorized.selector);
         vm.prank(borrower);
         midnight.take(
             units,

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {BaseTest} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {IMidnight} from "../src/interfaces/IMidnight.sol";
 
 contract MulticallTest is BaseTest {
     function testMulticallSuccess() public {
@@ -24,7 +24,7 @@ contract MulticallTest is BaseTest {
         data[1] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
 
         vm.prank(midnight.roleSetter());
-        vm.expectRevert(ErrorsLib.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.multicall(data);
     }
 

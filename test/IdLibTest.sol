@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
