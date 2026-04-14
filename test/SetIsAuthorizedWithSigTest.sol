@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {
     Authorization,
@@ -8,6 +8,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
 } from "../src/interfaces/IEcrecover.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverAuthorizerTest is BaseTest {
@@ -76,7 +77,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(ErrorsLib.InvalidSignature.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);
@@ -88,7 +89,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.deadline = block.timestamp - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert("expired");
+        vm.expectRevert(ErrorsLib.Expired.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
@@ -97,7 +98,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.nonce = 999; // wrong nonce
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert("invalid nonce");
+        vm.expectRevert(ErrorsLib.InvalidNonce.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
