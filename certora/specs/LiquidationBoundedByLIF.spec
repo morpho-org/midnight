@@ -7,7 +7,7 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function collateralOf(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
@@ -65,16 +65,16 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
 /// INVARIANTS ///
 
 /// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
-strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 idx)
-    idx < 128 => (collateralOf(id, user, idx) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, idx));
+strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
+
 
 /// LIF BOUNDARIES ///
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input).
-/// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap,
-/// liquidatedCollatPrice is 0, and mulDivDown(..., 0) reverts (division by zero), making the rule true.
+/// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
 rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
-    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
 
@@ -82,20 +82,18 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligat
     uint256 repaidResult;
     seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, data);
 
-    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+    mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
 
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
 /// Liquidation profit is bounded by maxLif (seizedAssets input)
 rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, bytes data) {
-    mathint maxLif = obligation.collaterals[collateralIndex].maxLif;
+    mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
 
     // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec,
-    // which validates the bitmap abstraction from BitmapSummaries.spec against Bitmap.spec.
-    // liquidate reverts when collateralIndex >= 128, so the invariant is a no-op in that case.
     bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
     requireInvariant nonZeroCollateralsAreActivated(id0, borrower, collateralIndex);
 
@@ -103,7 +101,7 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     uint256 repaidResult;
     seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, data);
 
-    mathint price = summaryPrice(obligation.collaterals[collateralIndex].oracle);
+    mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
 
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
