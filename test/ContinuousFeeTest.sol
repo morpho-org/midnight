@@ -329,7 +329,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, hex"");
+        midnight.repay(obligation, credit, borrower, address(0), hex"");
 
         uint256 pendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
@@ -417,7 +417,7 @@ contract ContinuousFeeTest is BaseTest {
         // Repay so withdrawable covers the claim.
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, hex"");
+        midnight.repay(obligation, credit, borrower, address(0), hex"");
 
         address receiver = makeAddr("receiver");
         uint256 totalUnitsBefore = midnight.totalUnits(id);

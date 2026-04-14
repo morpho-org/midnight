@@ -95,9 +95,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
 /// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
 /// that token.
-/// @dev If a callback reverts, or if a buy/sell callback returns something other than `CALLBACK_SUCCESS`,
-/// callback-enabled `take`, `repay`, `liquidate`, and `flashLoan` revert.
-///
+/// @dev If a callback reverts, or if a callback returns something other than `CALLBACK_SUCCESS`, callback-enabled
+/// `take`, `repay`, `liquidate`, and `flashLoan` revert.
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, and fee claimer.
 /// @dev The fee setter can set the default and per-obligation trading fee and continuous fee.
@@ -427,7 +426,9 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external {
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
+        external
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
         bytes32 id = touchObligation(obligation);
 
@@ -436,8 +437,11 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Repay(msg.sender, id, units, onBehalf);
 
-        if (data.length > 0) {
-            ICallbacks(msg.sender).onRepay(id, obligation, units, onBehalf, data);
+        if (callback != address(0)) {
+            require(
+                ICallbacks(callback).onRepay(id, obligation, units, onBehalf, data) == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
@@ -508,6 +512,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        address callback,
         bytes calldata data
     ) external returns (uint256, uint256) {
         bytes32 id = touchObligation(obligation);
@@ -614,9 +619,13 @@ contract Midnight is IMidnight {
 
         SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, msg.sender, seizedAssets);
 
-        if (data.length > 0) {
-            ICallbacks(msg.sender)
-                .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+        if (callback != address(0)) {
+            require(
+                ICallbacks(callback)
+                    .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data)
+                == CALLBACK_SUCCESS,
+                "invalid callback"
+            );
         }
 
         SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
@@ -650,7 +659,7 @@ contract Midnight is IMidnight {
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
         SafeTransferLib.safeTransfer(token, msg.sender, assets);
-        IFlashLoanCallback(callback).onFlashLoan(token, assets, data);
+        require(IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS, "invalid callback");
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
