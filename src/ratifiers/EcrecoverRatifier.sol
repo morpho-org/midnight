@@ -2,13 +2,15 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IRatifier} from "../interfaces/IRatifier.sol";
-import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
+import {IRatifier} from "./IRatifier.sol";
+import {IMidnight, Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../interfaces/IEcrecover.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract EcrecoverRatifier is IRatifier {
+    error InvalidSignature();
+    error Unauthorized();
+
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -21,10 +23,8 @@ contract EcrecoverRatifier is IRatifier {
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
-        require(_signer != address(0), ErrorsLib.InvalidSignature());
-        require(
-            _signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), ErrorsLib.Unauthorized()
-        );
+        require(_signer != address(0), InvalidSignature());
+        require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), Unauthorized());
         return CALLBACK_SUCCESS;
     }
 }

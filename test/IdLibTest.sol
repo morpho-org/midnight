@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
-import {Obligation} from "../src/interfaces/IMidnight.sol";
+import {Obligation} from "../src/IMidnight.sol";
 
 // toObligation is tested in OtherFunctionsTest.sol, to test actual implementation (avoid introducing mocks).
 contract IdLibTest is Test {

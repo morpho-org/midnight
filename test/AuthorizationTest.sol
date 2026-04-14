@@ -2,9 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Obligation, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams, Offer} from "../src/IMidnight.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -64,7 +63,7 @@ contract AuthorizationTest is BaseTest {
         // Attacker tries to withdraw lender's units
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.withdraw(obligation, units, lender, lender);
     }
 
@@ -83,7 +82,7 @@ contract AuthorizationTest is BaseTest {
         // Attacker tries to withdraw user's collateral
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.withdrawCollateral(obligation, 0, collateralAmount, user, user);
     }
 
@@ -146,7 +145,7 @@ contract AuthorizationTest is BaseTest {
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
 
         vm.prank(operator);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.supplyCollateral(obligation, 0, collateralAmount, user);
 
         // User authorizes operator
@@ -214,7 +213,7 @@ contract AuthorizationTest is BaseTest {
         // Attacker tries to take on behalf of taker
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
-        vm.expectRevert(ErrorsLib.TakerUnauthorized.selector);
+        vm.expectRevert(IMidnight.TakerUnauthorized.selector);
         midnight.take(units, taker, address(0), hex"", address(0), offer, sig([offer]), root([offer]), proof([offer]));
     }
 
@@ -260,7 +259,7 @@ contract AuthorizationTest is BaseTest {
         loanToken.approve(address(midnight), units);
 
         vm.prank(authorized);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.repay(obligation, units, borrower, hex"");
 
         vm.prank(borrower);
@@ -276,7 +275,7 @@ contract AuthorizationTest is BaseTest {
         vm.assume(user != authorized);
 
         vm.prank(authorized);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.setConsumed(bytes32(0), 100, user);
 
         vm.prank(user);
@@ -292,7 +291,7 @@ contract AuthorizationTest is BaseTest {
         vm.assume(user != authorized);
 
         vm.prank(authorized);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.shuffleSession(user);
 
         vm.prank(user);
@@ -308,7 +307,7 @@ contract AuthorizationTest is BaseTest {
         vm.assume(user != authorized);
 
         vm.prank(authorized);
-        vm.expectRevert(ErrorsLib.Unauthorized.selector);
+        vm.expectRevert(IMidnight.Unauthorized.selector);
         midnight.setIsAuthorized(user, newAuthorized, true);
 
         vm.prank(user);
