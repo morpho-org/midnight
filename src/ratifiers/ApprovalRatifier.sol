@@ -5,7 +5,6 @@ pragma solidity 0.8.34;
 import {IRatifier} from "./IRatifier.sol";
 import {Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract ApprovalRatifier is IRatifier {
     error Unauthorized();
