@@ -3,7 +3,12 @@
 pragma solidity ^0.8.4;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
-import {EcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {
+    EcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH,
+    ROOT_TYPEHASH
+} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";

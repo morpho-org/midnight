@@ -6,6 +6,7 @@ import {IRatifier} from "./IRatifier.sol";
 import {IMidnight, Offer} from "../IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../interfaces/IEcrecover.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract EcrecoverRatifier is IRatifier {
     error InvalidSignature();
