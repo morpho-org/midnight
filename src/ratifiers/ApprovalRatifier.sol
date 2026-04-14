@@ -7,7 +7,7 @@ import {Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract ApprovalRatifier is IRatifier {
-    error Unauthorized();
+    error RootNotApproved();
 
     event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
 
@@ -19,7 +19,7 @@ contract ApprovalRatifier is IRatifier {
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
-        require(approved[offer.maker][root], Unauthorized());
+        require(approved[offer.maker][root], RootNotApproved());
         return CALLBACK_SUCCESS;
     }
 }
