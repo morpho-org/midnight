@@ -2,9 +2,10 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.4;
 
-import {Obligation} from "../../src/IMidnight.sol";
+import {Obligation} from "../../src/interfaces/IMidnight.sol";
 import {IdLib} from "../../src/libraries/IdLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
+
 contract Utils {
     function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
         return keccak256(abi.encode(obligation));

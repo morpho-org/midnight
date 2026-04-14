@@ -3,7 +3,7 @@
 pragma solidity 0.8.34;
 
 import {IRatifier} from "./IRatifier.sol";
-import {Offer} from "../IMidnight.sol";
+import {Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract ApprovalRatifier is IRatifier {

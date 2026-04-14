@@ -6,7 +6,7 @@ import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {IMidnight, Obligation, Offer, CollateralParams} from "../src/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
