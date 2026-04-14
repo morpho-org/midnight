@@ -3,7 +3,7 @@
 pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
-import {IEcrecoverAuthorizer} from "./IEcrecoverAuthorizer.sol";
+import {IEcrecoverAuthorizer} from "./interfaces/IEcrecoverAuthorizer.sol";
 import {Authorization, Signature, AUTHORIZATION_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "../interfaces/IEcrecover.sol";
 
 contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
