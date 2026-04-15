@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.4;
+pragma solidity >=0.5.0;
 
 import {Midnight} from "../../Midnight.sol";
 import {Offer} from "../../interfaces/IMidnight.sol";
