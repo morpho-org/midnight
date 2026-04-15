@@ -17,7 +17,7 @@ methods {
      */
     function _.price() external => summaryPrice(calledContract) expect(uint256);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address morpho) internal returns (bytes32) => summaryToId(obligation, chainId, morpho);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
     /* Summarize mulDivDown and mulDivUp to simplify the verification task.
      * Use a ghost function that ensures mulDivDown/Up behaves deterministically and
@@ -136,9 +136,9 @@ function getGlobalObligation() returns (Midnight.Obligation) {
     return obligation;
 }
 
-function summaryToId(Midnight.Obligation obligation, uint256 chainId, address morpho) returns (bytes32) {
+function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalObligation(obligation) && morpho == currentContract) {
+    if (equalsGlobalObligation(obligation) && midnight == currentContract) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";

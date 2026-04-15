@@ -13,7 +13,7 @@ contract TakeBundler {
     struct Take {
         uint256 units;
         Offer offer;
-        bytes sig;
+        bytes ratifierData;
         bytes32 root;
         bytes32[] proof;
     }
@@ -47,7 +47,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
+                takes[i].ratifierData,
                 takes[i].root,
                 takes[i].proof
             ) returns (
@@ -98,7 +98,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
+                takes[i].ratifierData,
                 takes[i].root,
                 takes[i].proof
             ) returns (
@@ -145,7 +145,7 @@ contract TakeBundler {
                 "",
                 receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
+                takes[i].ratifierData,
                 takes[i].root,
                 takes[i].proof
             ) returns (
