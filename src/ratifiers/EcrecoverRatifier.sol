@@ -2,15 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IRatifier} from "../interfaces/IRatifier.sol";
+import {IEcrecoverRatifier} from "./interfaces/IEcrecoverRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../interfaces/IEcrecover.sol";
 
-contract EcrecoverRatifier is IRatifier {
-    error InvalidSignature();
-    error Unauthorized();
-
+contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {

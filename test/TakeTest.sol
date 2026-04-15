@@ -3,12 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {
-    EcrecoverRatifier,
-    Signature,
-    EIP712_DOMAIN_TYPEHASH,
-    ROOT_TYPEHASH
-} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -905,7 +901,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert(EcrecoverRatifier.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
         Signature memory _sig = Signature({v: 1, r: 0, s: 0});
         vm.prank(borrower);
         midnight.take(
@@ -1083,7 +1079,7 @@ contract TakeTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
 
-        vm.expectRevert(EcrecoverRatifier.Unauthorized.selector);
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         vm.prank(sender);
         midnight.take(
             100,
