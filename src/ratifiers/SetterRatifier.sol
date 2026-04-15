@@ -16,7 +16,7 @@ contract SetterRatifier is ISetterRatifier {
     }
 
     function setIsRatified(address maker, bytes32 root, bool newIsRatified) public {
-        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), "unauthorized");
+        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRatified[maker][root] = newIsRatified;
         emit SetIsRatified(maker, root, newIsRatified);
     }
