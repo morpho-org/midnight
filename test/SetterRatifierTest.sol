@@ -43,7 +43,7 @@ contract SetterRatifierTest is BaseTest {
         assertTrue(setterRatifier.isRatified(lender, _root));
     }
 
-    function testOnRatifyAuthorizedSetterCanApproveOnBehalf() public {
+    function testOnRatifyAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
 
@@ -57,7 +57,7 @@ contract SetterRatifierTest is BaseTest {
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    function testTakeAuthorizedSetterCanApproveOnBehalf() public {
+    function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
 
