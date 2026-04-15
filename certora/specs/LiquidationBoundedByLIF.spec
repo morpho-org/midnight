@@ -8,15 +8,16 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
-    // Deterministic toId summary using a ghost that takes simple types (no struct).
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
+    // Deterministic toId summary using a wrapper that extracts all scalar Obligation fields.
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation);
 
     // Skip obligation creation logic: removes the collateral-validation loop.
-    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryObligationId(obligation.loanToken, obligation.maturity);
+    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -34,7 +35,9 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost summaryObligationId(address, uint256) returns bytes32;
+function summaryToId(Midnight.Obligation obligation) returns bytes32 {
+    return Utils.hashObligation(obligation);
+}
 
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
@@ -93,7 +96,7 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation,
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
 
     // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec,
-    bytes32 id0 = summaryObligationId(obligation.loanToken, obligation.maturity);
+    bytes32 id0 = summaryToId(obligation);
     requireInvariant nonZeroCollateralsAreActivated(id0, borrower, collateralIndex);
 
     uint256 seizedResult;
