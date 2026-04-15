@@ -10,7 +10,7 @@ The primer below describes how CVL actually behaves — read it before reasoning
 - A `rule` passes iff every `assert` holds on every execution path that satisfies all preceding `require`s. A counterexample is a concrete trace (env, args, method choice) that satisfies the `require`s and falsifies an `assert`.
 - A rule can be *vacuous*: if the `require`s exclude every path, it passes trivially. Vacuity is silent unless a sanity rule is run.
 - `satisfy p` is the dual of `assert`: the Prover must find at least one feasible path where `p` holds. A rule with only `satisfy` and no `assert` therefore does not check any universal property.
-- An `invariant I` is proven by induction over methods: base case checks `I` after the constructor; inductive step assumes `I`, runs an arbitrary method `f`, then asserts `I` again. There is no temporal reasoning beyond this.
+- CVL has both *weak* and *strong* invariants. A weak invariant is proven by induction over methods: base case checks it after the constructor; inductive step assumes it, runs an arbitrary method `f`, then asserts it again. By default invariants are checked only for `public`/`external` non-`view`/non-`pure` methods. A strong invariant adds checks around unresolved external calls that may modify the current contract's state. There is no temporal reasoning beyond this.
 - A `preserved` block injects extra `require`s into the inductive step for one method. Those assumptions are *not* verified elsewhere — the Prover trusts them. Unsound `preserved` is the most common source of fake invariant proofs.
 - `requireInvariant J` assumes another invariant `J` at that point. It's sound only because `J` was itself proven by the same induction scheme.
 - A *parametric rule* (one with a `method f` parameter) is expanded into one sub-rule per method in scope. A `filtered { f -> ... }` clause drops methods from that expansion; filtered-out methods are simply not checked.
@@ -34,7 +34,7 @@ The primer below describes how CVL actually behaves — read it before reasoning
 
 - A ghost is an SMT variable (possibly a function `uint → uint`, etc.), not contract state. It exists only in the spec and can be updated by hooks or CVL assignments.
 - On an *unresolved* external call, the Prover havocs all non-persistent ghosts (assumes they take any value consistent with their axioms). `persistent ghost` declarations survive havoc.
-- Hooks fire on EVM-level events: `Sload`, `Sstore`, `CALL`, `REVERT`, etc. They match by storage slot / selector / opcode. Signature or layout drift silently disables a hook — it does not error.
+- Hooks fire on EVM-level events: `Sload`, `Sstore`, `CALL`, `REVERT`, etc. They match by storage slot / selector / opcode. Signature or layout drift silently disables a hook — it does not error. Hooks are not triggered by CVL code, including CVL access to Solidity storage, and hooks are not recursive.
 - Inside an `Sstore` hook, the bound names conventionally written as old/new values refer to the pre-write and post-write values at that slot.
 - A two-state ghost function can be referenced as `g@old` / `g@new` inside `havoc g assuming ...`, letting you specify how the ghost changes across a havoc (e.g. `havoc g assuming g@new(x) == g@old(x) + 1`).
 - `axiom P` constrains the ghost in every state the Prover considers — adding an unsatisfiable axiom makes every rule vacuously pass. `init_state axiom P` only constrains the ghost in the base case of invariant induction, which is almost always what you want for "starts at zero"-style facts.
@@ -64,7 +64,7 @@ The primer below describes how CVL actually behaves — read it before reasoning
 
 #### Multi-contract setup
 
-- `currentContract` is the main verified contract (set in the `.conf`). Other contracts are linked by `using Foo as foo;`. Parametric rules iterate over methods of `currentContract` only unless explicitly told otherwise.
+- `currentContract` is the main verified contract (set in the `.conf`). Other contracts are linked by `using Foo as foo;`. By default, invariants and parametric rules range over methods of all contracts in the scene; `--parametric_contracts` narrows that set.
 - Inside hooks, `executingContract` can differ from `currentContract` when a hook fires during a sub-call.
 
 ### What to focus on
