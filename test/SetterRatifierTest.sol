@@ -34,7 +34,7 @@ contract SetterRatifierTest is BaseTest {
         offer.tick = MAX_TICK;
     }
 
-    function testSetApprovalMaker() public {
+    function testSetIsRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
         vm.prank(lender);
@@ -73,7 +73,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.take(0, borrower, address(0), hex"", borrower, offer, emptySig, _root, proof([offer]));
     }
 
-    function testSetApprovalUnauthorizedOnBehalf() public {
+    function testSetIsRatifiedUnauthorizedOnBehalf() public {
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
