@@ -70,8 +70,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 co
     assert repaidUnits > 0 => (seizedResult + 1) * price > repaidResult * ORACLE_PRICE_SCALE();
 
     // lif == maxLif when borrower is unhealthy or >= 15 min post-maturity: full liquidation incentive factor applies.
-    assert repaidUnits > 0 && maxLifReached
-        => (seizedResult + 1) * price * WAD() + WAD() * ORACLE_PRICE_SCALE() > repaidResult * ORACLE_PRICE_SCALE() * maxLif;
+    assert repaidUnits > 0 && maxLifReached => (seizedResult + 1) * price * WAD() + WAD() * ORACLE_PRICE_SCALE() > repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
@@ -92,6 +91,5 @@ rule liquidationLifSeizedAssets(env e, Midnight.Obligation obligation, uint256 c
     assert seizedAssets > 0 => seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 
     // lif == maxLif when borrower is unhealthy or >= 15 min post-maturity: full liquidation incentive factor applies.
-    assert seizedAssets > 0 && maxLifReached
-        => seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
+    assert seizedAssets > 0 && maxLifReached => seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
 }
