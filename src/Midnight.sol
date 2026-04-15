@@ -386,7 +386,7 @@ contract Midnight is IMidnight {
             require(
                 ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidCallback()
+                InvalidBuyCallback()
             );
         }
 
@@ -399,7 +399,7 @@ contract Midnight is IMidnight {
             require(
                 ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidCallback()
+                InvalidSellCallback()
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
