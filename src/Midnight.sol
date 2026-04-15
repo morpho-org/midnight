@@ -504,6 +504,7 @@ contract Midnight is IMidnight {
     /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
     /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
     /// TIME_TO_MAX_LIF.
+    /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
