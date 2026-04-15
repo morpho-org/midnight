@@ -53,7 +53,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
-    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, data);
+    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, callback, data);
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);
