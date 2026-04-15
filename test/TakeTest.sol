@@ -1142,7 +1142,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
-        vm.expectRevert(IMidnight.NotRatified.selector);
+        vm.expectRevert(IMidnight.RatifierFail.selector);
         vm.prank(sender);
         midnight.take(
             0,
