@@ -10,7 +10,7 @@ import {
     LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -102,7 +102,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert("not liquidatable");
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(obligation, 0, 0, 0, borrower, address(0), "");
     }
 
@@ -143,7 +143,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        vm.expectRevert("inconsistent input");
+        vm.expectRevert(IMidnight.InconsistentInput.selector);
         midnight.liquidate(obligation, 0, 1, 1, borrower, address(0), "");
     }
 
@@ -466,7 +466,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
         repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, address(0), "");
 
         repaid = bound(repaid, 0, min(maxR, units));
@@ -539,7 +539,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         // Full liquidation should revert because remaining debt >= rcfThreshold.
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, units, borrower, address(0), "");
     }
 
@@ -555,7 +555,7 @@ contract LiquidationTest is BaseTest {
         // At exact maturity: recovery close factor applies.
         if (maxRepaid < units) {
             vm.warp(obligation.maturity);
-            vm.expectRevert("recovery close factor conditions violated");
+            vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
             midnight.liquidate(obligation, 0, 0, units, borrower, address(0), "");
         }
 

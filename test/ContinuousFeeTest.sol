@@ -6,7 +6,7 @@ import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
@@ -439,7 +439,7 @@ contract ContinuousFeeTest is BaseTest {
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
         midnight.claimContinuousFee(obligation, 0, caller);
     }
 
@@ -489,13 +489,13 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testUpdatePositionRevertsIfObligationNotCreated() public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.updatePosition(obligation, borrower);
     }
 
     function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
         vm.prank(feeClaimer);
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.claimContinuousFee(obligation, 0, feeClaimer);
     }
 

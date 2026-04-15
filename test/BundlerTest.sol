@@ -7,6 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
+import {ITakeBundler, Take} from "../src/periphery/interfaces/ITakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract BundlerTest is BaseTest {
@@ -82,13 +83,13 @@ contract BundlerTest is BaseTest {
     }
 
     function testUnauthorized() public {
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
             offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
         });
 
         vm.prank(address(0xdead));
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ITakeBundler.Unauthorized.selector);
         takeBundler.bundleTakeUnits(
             midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
         );
@@ -102,15 +103,15 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, units);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
             sig: sig([offers[1]]),
@@ -133,7 +134,7 @@ contract BundlerTest is BaseTest {
             assertEq(midnight.debtOf(id, borrower), units, "debt");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.bundleTakeUnits(
                 midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
             );
@@ -152,15 +153,15 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, units);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
             sig: sig([offers[1]]),
@@ -183,7 +184,7 @@ contract BundlerTest is BaseTest {
             assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets, "lender balance");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.bundleTakeBuyerAssets(
                 midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
@@ -204,15 +205,15 @@ contract BundlerTest is BaseTest {
         // Extra collateral headroom for the potential extra unit of debt.
         collateralize(obligation, borrower, units + 1);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
             sig: sig([offers[1]]),
@@ -241,7 +242,7 @@ contract BundlerTest is BaseTest {
             assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower balance");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.bundleTakeSellerAssets(
                 midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
@@ -297,15 +298,15 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, targetUnits);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
             sig: sig([offers[1]]),
@@ -316,7 +317,7 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets above max");
+        vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
         takeBundler.bundleTakeUnits(
             midnight, targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max
         );
@@ -347,15 +348,15 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, targetUnits);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
             sig: sig([offers[1]]),
@@ -366,7 +367,7 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets below min");
+        vm.expectRevert(ITakeBundler.BuyerAssetsBelowMin.selector);
         takeBundler.bundleTakeUnits(
             midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
         );
