@@ -7,24 +7,24 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract SetterRatifier is IRatifier {
-    event SetApproval(address indexed maker, bytes32 indexed root, bool newApproval);
+    event SetIsRatified(address indexed maker, bytes32 indexed root, bool newIsRatified);
 
     address public immutable MIDNIGHT;
 
-    mapping(address maker => mapping(bytes32 root => bool)) public approved;
+    mapping(address maker => mapping(bytes32 root => bool)) public isRatified;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
     }
 
-    function setApproval(address maker, bytes32 root, bool newApproval) public {
+    function setIsRatified(address maker, bytes32 root, bool newIsRatified) public {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), "unauthorized");
-        approved[maker][root] = newApproval;
-        emit SetApproval(maker, root, newApproval);
+        isRatified[maker][root] = newIsRatified;
+        emit SetIsRatified(maker, root, newIsRatified);
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
-        require(approved[offer.maker][root], "not approved");
+        require(isRatified[offer.maker][root], "not ratified");
         return CALLBACK_SUCCESS;
     }
 }
