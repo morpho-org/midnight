@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract SignatureTest is BaseTest {
@@ -45,7 +45,7 @@ contract SignatureTest is BaseTest {
 
         Signature memory badSig;
 
-        vm.expectRevert(EcrecoverRatifier.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
         ecrecoverRatifier.onRatify(offer, root, abi.encode(badSig));
     }
 }
