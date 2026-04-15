@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
@@ -1503,6 +1503,83 @@ contract TakeTest is BaseTest {
             new bytes32[](0)
         );
     }
+
+    function testBuyBuyerCallbackRevertsOnInvalidReturn(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        borrowerOffer.maxUnits = units;
+        borrowerOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 assets = units.mulDivUp(price, WAD);
+        address callback = address(new InvalidBuyCallback());
+        deal(address(loanToken), callback, assets);
+        collateralize(obligation, borrower, units);
+
+        vm.expectRevert("invalid callback");
+        vm.prank(lender);
+        midnight.take(
+            units,
+            lender,
+            callback,
+            hex"",
+            address(0),
+            borrowerOffer,
+            sig([borrowerOffer]),
+            root([borrowerOffer]),
+            proof([borrowerOffer])
+        );
+    }
+
+    function testBuyerPendingFeeExceedsCredit() public {
+        // Use a very long maturity so continuousFee * TTM > WAD.
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
+
+        Obligation memory longObligation;
+        longObligation.loanToken = address(loanToken);
+        longObligation.maturity = block.timestamp + 200 * 365 days;
+        longObligation.collateralParams = obligation.collateralParams;
+
+        uint256 units = 1e18;
+        Offer memory bOffer;
+        bOffer.obligation = longObligation;
+        bOffer.buy = false;
+        bOffer.maker = borrower;
+        bOffer.receiverIfMakerIsSeller = borrower;
+        bOffer.maxUnits = units;
+        bOffer.ratifier = address(ecrecoverRatifier);
+        bOffer.start = block.timestamp;
+        bOffer.expiry = block.timestamp + 200;
+        bOffer.tick = MAX_TICK;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
+        collateralize(longObligation, borrower, units);
+
+        vm.expectRevert("buyer pendingFee exceeds credit");
+        vm.prank(lender);
+        midnight.take(units, lender, address(0), hex"", lender, bOffer, sig([bOffer]), root([bOffer]), proof([bOffer]));
+    }
+}
+
+contract InvalidBuyCallback is ICallbacks {
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return bytes32(0);
+    }
+
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
+
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract BorrowCallback is ICallbacks {
