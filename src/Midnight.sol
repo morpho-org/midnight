@@ -732,10 +732,10 @@ contract Midnight is IMidnight {
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function _updatePosition(Obligation memory obligation, bytes32 id, address user)
         internal
-        returns (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee)
+        returns (uint128, uint128, uint128)
     {
         Position storage _position = position[id][user];
-        (newCredit, newPendingFee, accruedFee) = updatePositionView(obligation, id, user);
+        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
 
         uint128 creditDecrease = _position.credit - newCredit;
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
@@ -747,6 +747,8 @@ contract Midnight is IMidnight {
         obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
+
+        return (newCredit, newPendingFee, accruedFee);
     }
 
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
