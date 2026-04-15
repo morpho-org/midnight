@@ -14,8 +14,11 @@ methods {
 
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
 
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
     function _updatePosition(Midnight.Obligation memory, bytes32 id, address user) internal => summaryUpdatePosition(id, user);
+    function hasCredit(bytes32 id, address user) internal returns (bool) => summaryHasCredit(id, user);
 }
 
 /// GHOSTS ///
@@ -37,16 +40,21 @@ function summaryUpdatePosition(bytes32 id, address user) {
     updated[id][user] = true;
 }
 
+/// Summary for hasCredit:  circumvent the load hook for credit checks.
+function summaryHasCredit(bytes32 id, address user) returns (bool) {
+    return currentContract.position[id][user].credit > 0;
+}
+
 /// HOOKS ///
 
 hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && newVal != oldVal) {
         creditStoredBeforeUpdate[id][user] = true;
     }
 }
 
 hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
-    if (!updated[id][user]) {
+    if (!updated[id][user] && val != 0) {
         creditLoadedBeforeUpdate[id][user] = true;
     }
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.31;
+pragma solidity 0.8.34;
 
 import {Midnight} from "../Midnight.sol";
-import {Offer, Signature} from "../interfaces/IMidnight.sol";
+import {Offer} from "../interfaces/IMidnight.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
@@ -15,7 +15,7 @@ contract TakeBundler {
     struct Take {
         uint256 units;
         Offer offer;
-        Signature sig;
+        bytes sig;
         bytes32 root;
         bytes32[] proof;
     }
