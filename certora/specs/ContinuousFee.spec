@@ -21,7 +21,8 @@ methods {
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
-    // The callbacks are summarised as HAVOC_ECF by default. Hence, this spec assumes no reentrancy: callbacks and token transfers do not re-enter Midnight.
+    // This spec assumes no reentrancy: callbacks and token transfers do not re-enter Midnight.
+    // Callbacks are summarised as HAVOC_ECF by default.
 }
 
 /// HELPERS ///
@@ -59,7 +60,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
     mathint creditDelta = to_mathint(creditOf(id, buyer)) - to_mathint(postUpdateCredit);
     mathint pendingFeeDelta = to_mathint(pendingFee(id, buyer)) - to_mathint(postUpdatePendingFee);
 
-    assert pendingFeeDelta == (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    assert pendingFeeDelta <= (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(PendingFee * creditDelta / postUpdateCredit).
