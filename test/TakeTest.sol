@@ -1577,9 +1577,17 @@ contract InvalidBuyCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
+    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
+        return CALLBACK_SUCCESS;
+    }
 
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
+    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external pure returns (bytes32) {
+        return CALLBACK_SUCCESS;
+    }
 }
 
 contract BorrowCallback is ICallbacks {
