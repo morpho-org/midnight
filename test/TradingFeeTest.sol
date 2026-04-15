@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
@@ -202,7 +202,7 @@ contract TradingFeeTest is BaseTest {
 
         collateralize(obligation, borrower, MAX_DEBT);
 
-        vm.expectRevert("seller is liquidatable");
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -261,7 +261,7 @@ contract TradingFeeTest is BaseTest {
     function testClaimTradingFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
         midnight.claimTradingFee(address(loanToken), 0, caller);
     }
 

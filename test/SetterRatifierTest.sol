@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.sol";
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
+import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -77,7 +78,7 @@ contract SetterRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ISetterRatifier.Unauthorized.selector);
         setterRatifier.setIsRatified(lender, _root, true);
     }
 }
