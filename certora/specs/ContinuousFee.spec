@@ -9,8 +9,10 @@ methods {
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
+    // Over-approximate view functions by summarising to NONDET.
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => NONDET;
@@ -18,6 +20,8 @@ methods {
     // summaries over-approximating the behavior of transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
+
+    // The callbacks are summarised as HAVOC_ECF by default. Hence, this spec assumes no reentrancy: callbacks and token transfers do not re-enter Midnight.
 }
 
 /// HELPERS ///
