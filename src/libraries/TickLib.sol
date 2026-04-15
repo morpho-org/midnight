@@ -8,6 +8,9 @@ uint256 constant MAX_TICK = 1046;
 library TickLib {
     using TickLib for uint256;
 
+    error PriceGreaterThanOne();
+    error TickOutOfRange();
+
     /// @dev Returns (`x` + `d` - 1) / `d` rounded to the nearest integer with ties rounded down, without checking for
     /// overflow.
     function divHalfDownUnchecked(uint256 x, uint256 d) internal pure returns (uint256) {
@@ -36,7 +39,7 @@ library TickLib {
     }
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
-        require(tick <= MAX_TICK, "tick out of range");
+        require(tick <= MAX_TICK, TickOutOfRange());
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
@@ -47,7 +50,7 @@ library TickLib {
 
     /// @dev Returns the lowest tick with a higher price.
     function priceToTick(uint256 price) internal pure returns (uint256) {
-        require(price <= 1e18, "Price is greater than one");
+        require(price <= 1e18, PriceGreaterThanOne());
         uint256 low = 0;
         uint256 high = MAX_TICK;
         while (low != high) {
