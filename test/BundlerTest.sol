@@ -86,7 +86,7 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: 100,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
@@ -110,14 +110,14 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -160,14 +160,14 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -212,14 +212,14 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -305,14 +305,14 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -355,14 +355,14 @@ contract BundlerTest is BaseTest {
         takes[0] = TakeBundler.Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = TakeBundler.Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
