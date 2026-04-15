@@ -66,7 +66,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferNoCode() public {
-        vm.expectRevert("no code");
+        vm.expectRevert(SafeTransferLib.NoCode.selector);
         this.safeTransfer(address(1), address(1), 1);
     }
 
@@ -81,7 +81,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferReturnedFalse() public {
-        vm.expectRevert("transfer returned false");
+        vm.expectRevert(SafeTransferLib.TransferReturnedFalse.selector);
         this.safeTransfer(address(tokenFalse), address(1), 1);
     }
 
@@ -96,7 +96,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferFromNoCode() public {
-        vm.expectRevert("no code");
+        vm.expectRevert(SafeTransferLib.NoCode.selector);
         this.safeTransferFrom(address(1), address(1), address(1), 1);
     }
 
@@ -111,7 +111,7 @@ contract SafeTransferLibTest is Test {
     }
 
     function testSafeTransferFromReturnedFalse() public {
-        vm.expectRevert("transferFrom returned false");
+        vm.expectRevert(SafeTransferLib.TransferFromReturnedFalse.selector);
         this.safeTransferFrom(address(tokenFalse), address(1), address(1), 1);
     }
 
