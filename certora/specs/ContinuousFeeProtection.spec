@@ -108,6 +108,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
     assert continuousFeeCredit(id) == continuousFeeCreditBefore + buyerAccruedFee + sellerAccruedFee;
 }
 
+// take should not change the return values of updatePositionView (i.e., post-update credit, pending fee, and accrued fee) of a third party.
 rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
@@ -129,7 +130,7 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
     uint256 userAccruedFeeAfter;
     postUpdateCreditAfter, postUpdatePendingFeeAfter, userAccruedFeeAfter = updatePositionView(e, offer.obligation, id, user);
 
-    assert postUpdateCreditBefore == postUpdateCreditAfter, "take should not change credit of third party";
-    assert postUpdatePendingFeeBefore == postUpdatePendingFeeAfter, "take should not change pending fee of third party";
-    assert userAccruedFeeBefore == userAccruedFeeAfter, "take should not change accrued fee of third party";
+    assert postUpdateCreditBefore == postUpdateCreditAfter;
+    assert postUpdatePendingFeeBefore == postUpdatePendingFeeAfter;
+    assert userAccruedFeeBefore == userAccruedFeeAfter;
 }
