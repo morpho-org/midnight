@@ -489,13 +489,13 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function testUpdatePositionRevertsIfObligationNotCreated() public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.updatePosition(obligation, borrower);
     }
 
     function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
         vm.prank(feeClaimer);
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.claimContinuousFee(obligation, 0, feeClaimer);
     }
 

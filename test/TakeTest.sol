@@ -1554,7 +1554,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(longObligation, borrower, units);
 
-        vm.expectRevert("buyer pendingFee exceeds credit");
+        vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
         vm.prank(lender);
         midnight.take(units, lender, address(0), hex"", lender, bOffer, sig([bOffer]), root([bOffer]), proof([bOffer]));
     }
