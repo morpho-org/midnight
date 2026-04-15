@@ -262,7 +262,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(
-            UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZeroMax()
+            UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         require(block.timestamp >= offer.start, OfferNotStarted());

@@ -860,7 +860,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 0;
 
-        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZero.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -872,7 +872,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxSellerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZero.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -885,7 +885,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZeroMax.selector);
+        vm.expectRevert(IMidnight.MultipleNonZero.selector);
         take(units, borrower, lenderOffer);
     }
 
