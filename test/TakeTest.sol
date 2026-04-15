@@ -9,7 +9,7 @@ import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {ITakeCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -1560,7 +1560,7 @@ contract TakeTest is BaseTest {
     }
 }
 
-contract InvalidBuyCallback is ICallbacks {
+contract InvalidBuyCallback is ITakeCallback {
     function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
         external
         pure
@@ -1576,13 +1576,9 @@ contract InvalidBuyCallback is ICallbacks {
     {
         return CALLBACK_SUCCESS;
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract BorrowCallback is ICallbacks {
+contract BorrowCallback is ITakeCallback {
     bytes public recordedData;
     bytes32 public recordedId;
 
@@ -1607,13 +1603,9 @@ contract BorrowCallback is ICallbacks {
     {
         return CALLBACK_SUCCESS;
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract ReentrantLiquidateBorrowCallback is ICallbacks {
+contract ReentrantLiquidateBorrowCallback is ITakeCallback {
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
 
@@ -1651,13 +1643,9 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
     {
         return CALLBACK_SUCCESS;
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract NestedTakeReentrantLiquidateCallback is ICallbacks {
+contract NestedTakeReentrantLiquidateCallback is ITakeCallback {
     bool public reentered;
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
@@ -1732,13 +1720,9 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
     {
         return CALLBACK_SUCCESS;
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract LendCallback is ICallbacks {
+contract LendCallback is ITakeCallback {
     bytes public recordedData;
 
     bytes32 public recordedId;
@@ -1761,13 +1745,9 @@ contract LendCallback is ICallbacks {
     {
         return CALLBACK_SUCCESS;
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract InvalidSellCallback is ICallbacks {
+contract InvalidSellCallback is ITakeCallback {
     function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
         external
         pure
@@ -1783,10 +1763,6 @@ contract InvalidSellCallback is ICallbacks {
     {
         return bytes32(0);
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract RatifyCallback is IRatifier {

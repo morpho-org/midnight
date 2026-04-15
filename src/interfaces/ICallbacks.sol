@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
 
 import {Obligation} from "./IMidnight.sol";
 
-interface ICallbacks {
+interface ITakeCallback {
     function onBuy(
         bytes32 id,
         Obligation memory obligation,
@@ -21,6 +21,9 @@ interface ICallbacks {
         uint256 units,
         bytes memory data
     ) external returns (bytes32);
+}
+
+interface ILiquidateCallback {
     function onLiquidate(
         bytes32 id,
         Obligation memory obligation,
@@ -30,6 +33,9 @@ interface ICallbacks {
         address borrower,
         bytes memory data
     ) external;
+}
+
+interface IRepayCallback {
     function onRepay(
         bytes32 obligationId,
         Obligation memory obligation,
