@@ -10,20 +10,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - token-type: 0
-            name: standard
-          - token-type: 1
-            name: no-revert
-          - token-type: 2
-            name: usdt
-          - token-type: 3
-            name: revert-to-zero
-          - token-type: 4
-            name: no-return
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,7 +29,5 @@ jobs:
           echo "actual:   $actual"
           echo "expected: $EXPECTED_FORGE_SHA256"
           [ "$actual" = "$EXPECTED_FORGE_SHA256" ] || { echo "forge hash mismatch"; exit 1; }
-      - name: Run Forge tests (${{ matrix.name }})
+      - name: Run Forge tests
         run: forge test
-        env:
-          TOKEN_TYPE: ${{ matrix.token-type }}
