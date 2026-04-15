@@ -84,7 +84,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
-        midnight.withdraw(obligation, 0, lender, lender);
+        uint256 returnedPendingFeeDecrease = midnight.withdraw(obligation, 0, lender, lender);
+        assertEq(returnedPendingFeeDecrease, 0, "returned pendingFeeDecrease");
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after withdraw");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after withdraw");
         vm.revertToState(snap);
@@ -121,7 +122,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
-        midnight.withdraw(obligation, 0, lender, lender);
+        uint256 returnedPendingFeeDecrease = midnight.withdraw(obligation, 0, lender, lender);
+        assertEq(returnedPendingFeeDecrease, 0, "returned pendingFeeDecrease");
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (withdraw)");
         assertEq(midnight.pendingFee(id, lender), 0, "remaining is zero (withdraw)");
         vm.revertToState(snap);
@@ -341,7 +343,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, pendingFeeDecrease);
         vm.prank(lender);
-        midnight.withdraw(obligation, withdrawAmount, lender, lender);
+        uint256 returnedPendingFeeDecrease = midnight.withdraw(obligation, withdrawAmount, lender, lender);
+        assertEq(returnedPendingFeeDecrease, pendingFeeDecrease, "returned pendingFeeDecrease");
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - pendingFeeDecrease : 0;
 

@@ -1509,10 +1509,15 @@ contract BorrowCallback is ICallbacks {
     bytes public recordedData;
     bytes32 public recordedId;
 
-    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
-        external
-        returns (bytes32)
-    {
+    function onSell(
+        bytes32 id,
+        Obligation memory obligation,
+        address seller,
+        uint256,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external returns (bytes32) {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         recordedData = data;
@@ -1523,7 +1528,7 @@ contract BorrowCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1541,10 +1546,15 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
     string public liquidateError;
     bytes public liquidateRevertData;
 
-    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
-        external
-        returns (bytes32)
-    {
+    function onSell(
+        bytes32 id,
+        Obligation memory obligation,
+        address seller,
+        uint256,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external returns (bytes32) {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
@@ -1569,7 +1579,7 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1616,7 +1626,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         storedRepaidUnits = _repaidUnits;
     }
 
-    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory)
+    function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, uint256, bytes memory)
         external
         returns (bytes32)
     {
@@ -1649,7 +1659,7 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1667,10 +1677,15 @@ contract LendCallback is ICallbacks {
 
     bytes32 public recordedId;
 
-    function onBuy(bytes32 id, Obligation memory obligation, address, uint256 buyerAssets, uint256, bytes memory data)
-        external
-        returns (bytes32)
-    {
+    function onBuy(
+        bytes32 id,
+        Obligation memory obligation,
+        address,
+        uint256 buyerAssets,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external returns (bytes32) {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         recordedData = data;
@@ -1678,7 +1693,7 @@ contract LendCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1692,7 +1707,7 @@ contract LendCallback is ICallbacks {
 }
 
 contract InvalidSellCallback is ICallbacks {
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onBuy(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1700,7 +1715,7 @@ contract InvalidSellCallback is ICallbacks {
         return CALLBACK_SUCCESS;
     }
 
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
+    function onSell(bytes32, Obligation memory, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)

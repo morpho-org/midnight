@@ -306,16 +306,16 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, "consumed seller assets");
+            require(
+                (consumed[offer.maker][offer.group] += sellerAssets) <= offer.maxSellerAssets, "consumed seller assets"
+            );
         } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, "consumed buyer assets");
+            require(
+                (consumed[offer.maker][offer.group] += buyerAssets) <= offer.maxBuyerAssets, "consumed buyer assets"
+            );
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, "consumed units");
+            require((consumed[offer.maker][offer.group] += units) <= offer.maxUnits, "consumed units");
         }
 
         Position storage buyerPos = position[id][buyer];
@@ -371,7 +371,7 @@ contract Midnight is IMidnight {
             units,
             receiver,
             offer.group,
-            newConsumed,
+            consumed[offer.maker][offer.group],
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             buyerCreditIncrease,
@@ -381,8 +381,9 @@ contract Midnight is IMidnight {
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             require(
-                ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(buyerCallback)
+                    .onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerPendingFeeIncrease, buyerCallbackData)
+                == CALLBACK_SUCCESS,
                 "invalid callback"
             );
         }
@@ -394,8 +395,10 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ICallbacks(sellerCallback)
+                    .onSell(
+                        id, offer.obligation, seller, sellerAssets, units, sellerPendingFeeDecrease, sellerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 "invalid callback"
             );
         }
@@ -406,7 +409,10 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Will revert if there are no withdrawable funds.
-    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
+    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver)
+        external
+        returns (uint256)
+    {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], "unauthorized");
@@ -425,6 +431,8 @@ contract Midnight is IMidnight {
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
+
+        return pendingFeeDecrease;
     }
 
     function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external {
