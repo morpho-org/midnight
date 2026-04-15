@@ -83,7 +83,7 @@ interface IMidnight {
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
-    error MultipleNonZeroMax();
+    error MultipleNonZero();
     error NoCollateralParams();
     error NotLiquidatable();
     error ObligationNotCreated();
