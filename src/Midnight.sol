@@ -271,7 +271,7 @@ contract Midnight is IMidnight {
         require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), InvalidProof());
         require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, NotRatified());
+        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
         (
             address buyer,
