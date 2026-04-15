@@ -8,4 +8,7 @@ interface IEcrecoverRatifier is IRatifier {
     /// ERRORS ///
     error InvalidSignature();
     error Unauthorized();
+
+    /// STORAGE GETTERS ///
+    function MIDNIGHT() external view returns (address);
 }
