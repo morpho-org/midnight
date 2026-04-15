@@ -22,7 +22,7 @@ jobs:
           version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
 
       - name: Check formatting
-        run: forge fmt --check
+        run: forge fmt src test script certora --check
 
   lint:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
           version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
 
       - name: Run forge lint
-        run: forge lint --deny notes
+        run: forge lint src test script certora --deny notes
 
   sizes:
     runs-on: ubuntu-latest
