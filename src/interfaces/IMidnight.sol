@@ -86,13 +86,13 @@ interface IMidnight {
     error MultipleNonZeroMax();
     error NoCollateralParams();
     error NotLiquidatable();
-    error NotRatified();
     error ObligationNotCreated();
     error OfferExpired();
     error OfferNotStarted();
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
     error OnlyRoleSetter();
+    error RatifierFail();
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
     error SelfTake();
