@@ -29,5 +29,12 @@ jobs:
           echo "actual:   $actual"
           echo "expected: $EXPECTED_FORGE_SHA256"
           [ "$actual" = "$EXPECTED_FORGE_SHA256" ] || { echo "forge hash mismatch"; exit 1; }
+      - name: Install solc 0.8.34 into svm cache
+        run: |
+          mkdir -p "$HOME/.svm/0.8.34"
+          curl -fsSL -o "$HOME/.svm/0.8.34/solc-0.8.34" \
+            https://github.com/ethereum/solidity/releases/download/v0.8.34/solc-static-linux
+          chmod +x "$HOME/.svm/0.8.34/solc-0.8.34"
+          "$HOME/.svm/0.8.34/solc-0.8.34" --version
       - name: Run Forge tests
         run: forge test
