@@ -8,22 +8,22 @@ contract MulticallTest is BaseTest {
     function testMulticallSuccess() public {
         bytes[] memory data = new bytes[](2);
         data[0] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
-        data[1] = abi.encodeCall(midnight.setOwner, (makeAddr("newOwner")));
+        data[1] = abi.encodeCall(midnight.setRoleSetter, (makeAddr("newRoleSetter")));
 
-        vm.prank(midnight.owner());
+        vm.prank(midnight.roleSetter());
         midnight.multicall(data);
 
-        assertEq(midnight.owner(), makeAddr("newOwner"), "wrong owner");
+        assertEq(midnight.roleSetter(), makeAddr("newRoleSetter"), "wrong role setter");
         assertEq(midnight.feeSetter(), makeAddr("newFeeSetter"), "wrong fee setter");
     }
 
     function testMulticallFailing() public {
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeCall(midnight.setOwner, (makeAddr("newOwner")));
+        data[0] = abi.encodeCall(midnight.setRoleSetter, (makeAddr("newRoleSetter")));
         data[1] = abi.encodeCall(midnight.setFeeSetter, (makeAddr("newFeeSetter")));
 
-        vm.prank(midnight.owner());
-        vm.expectRevert("only owner");
+        vm.prank(midnight.roleSetter());
+        vm.expectRevert("only role setter");
         midnight.multicall(data);
     }
 

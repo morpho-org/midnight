@@ -18,7 +18,8 @@ methods {
     function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
     function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -85,8 +86,8 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, Midnight.Signature signature, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, signature, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
     assert obligationIsCreated(offer.obligation);
 }
 
