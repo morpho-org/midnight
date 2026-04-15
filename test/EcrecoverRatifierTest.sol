@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverRatifierTest is BaseTest {
@@ -50,7 +51,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = keccak256(abi.encode(offer));
         bytes memory data = signRoot(_root, borrower);
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 
@@ -59,7 +60,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = keccak256(abi.encode(offer));
         bytes memory data = abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}));
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 
@@ -69,7 +70,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory data = signRoot(_root, lender);
 
         bytes32 wrongRoot = keccak256("wrong");
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         ecrecoverRatifier.onRatify(offer, wrongRoot, data);
     }
 
@@ -89,7 +90,7 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, false);
 
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         ecrecoverRatifier.onRatify(offer, _root, data);
     }
 }
