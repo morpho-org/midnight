@@ -64,6 +64,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint128).max;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 200;
 
@@ -72,6 +73,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint128).max;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.tick = 1;
         borrowerOffer.expiry = block.timestamp + 200;
 

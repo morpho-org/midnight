@@ -7,20 +7,20 @@ import {BaseTest} from "./BaseTest.sol";
 import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
-    function testInitialOwner() public view {
-        assertEq(midnight.owner(), address(this), "deployer should be initial owner");
+    function testInitialRoleSetter() public view {
+        assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }
 
-    function testSetOwnerSuccess(address rdm) public {
-        midnight.setOwner(rdm);
-        assertEq(midnight.owner(), rdm, "owner should be transferred");
+    function testSetRoleSetterSuccess(address rdm) public {
+        midnight.setRoleSetter(rdm);
+        assertEq(midnight.roleSetter(), rdm, "role setter should be transferred");
     }
 
-    function testSetOwnerOnlyOwner(address rdm) public {
+    function testSetRoleSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
-        midnight.setOwner(makeAddr("newOwner"));
+        vm.expectRevert("only role setter");
+        midnight.setRoleSetter(makeAddr("newRoleSetter"));
     }
 
     function testSetFeeSetterSuccess(address feeSetter) public {
@@ -28,10 +28,10 @@ contract SettersTest is BaseTest {
         assertEq(midnight.feeSetter(), feeSetter);
     }
 
-    function testSetFeeSetterOnlyOwner(address rdm) public {
+    function testSetFeeSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
+        vm.expectRevert("only role setter");
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
@@ -100,7 +100,7 @@ contract SettersTest is BaseTest {
     function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("value too high");
+        vm.expectRevert("trading fee too high");
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
@@ -137,17 +137,17 @@ contract SettersTest is BaseTest {
         assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
 
-    function testSetFeeClaimerOnlyOwner(address rdm) public {
+    function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only owner");
+        vm.expectRevert("only role setter");
         midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
     // Default trading fee tests
 
     function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert("not created");
+        vm.expectRevert("obligation not created");
         midnight.tradingFee(bytes32(0), 0);
     }
 
@@ -214,7 +214,7 @@ contract SettersTest is BaseTest {
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("value too high");
+        vm.expectRevert("trading fee too high");
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
 

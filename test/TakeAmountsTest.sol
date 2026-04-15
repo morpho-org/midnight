@@ -47,6 +47,7 @@ contract TakeAmountsTest is BaseTest {
         offer.buy = false;
         offer.maxUnits = type(uint128).max;
         offer.obligation = obligation;
+        offer.ratifier = address(ecrecoverRatifier);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 
