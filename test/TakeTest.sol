@@ -1361,7 +1361,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert(IMidnight.InvalidCallback.selector);
+        vm.expectRevert(IMidnight.InvalidSellCallback.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1514,7 +1514,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert("invalid callback");
+        vm.expectRevert(IMidnight.InvalidBuyCallback.selector);
         vm.prank(lender);
         midnight.take(
             units,

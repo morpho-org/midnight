@@ -75,7 +75,8 @@ interface IMidnight {
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
     error InconsistentInput();
-    error InvalidCallback();
+    error InvalidBuyCallback();
+    error InvalidSellCallback();
     error InvalidFeeIndex();
     error InvalidMaxLif();
     error InvalidProof();
