@@ -2,171 +2,150 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {Midnight} from "../Midnight.sol";
-import {Offer} from "../interfaces/IMidnight.sol";
+import {IMidnight} from "../interfaces/IMidnight.sol";
+import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
-contract TakeBundler {
+contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
 
-    struct Take {
-        uint256 units;
-        Offer offer;
-        bytes sig;
-        bytes32 root;
-        bytes32[] proof;
-    }
-
-    /// @dev Fills sell offers (taker is buyer) to hit the non-zero target dimension.
-    /// @dev Exactly one of `targetUnits`, `targetBuyerAssets`, `targetSellerAssets` should be non-zero.
-    /// @dev Assumes all offers are sell offers and share the same obligation id.
-    /// @dev The taker must have authorized this bundler and msg.sender (if different) on Midnight.
-    /// @dev Per-take reverts are swallowed: the offer is skipped.
-    function buy(
-        Midnight midnight,
-        address taker,
-        Take[] calldata takes,
+    /// @dev Iterates through orders, filling up to targetUnits units total.
+    /// @dev Assumes offers are all buy or all sell and share the same obligation id.
+    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    function bundleTakeUnits(
+        address midnight,
         uint256 targetUnits,
-        uint256 targetBuyerAssets,
-        uint256 targetSellerAssets,
-        uint256 minUnits,
-        uint256 maxUnits,
+        address taker,
+        address receiverIfTakerIsSeller,
+        Take[] calldata takes,
         uint256 minBuyerAssets,
         uint256 maxBuyerAssets,
         uint256 minSellerAssets,
         uint256 maxSellerAssets
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
-        _fill(
-            midnight,
-            taker,
-            address(0),
-            takes,
-            targetUnits,
-            targetBuyerAssets,
-            targetSellerAssets,
-            minUnits,
-            maxUnits,
-            minBuyerAssets,
-            maxBuyerAssets,
-            minSellerAssets,
-            maxSellerAssets
-        );
-    }
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
-    /// @dev Fills buy offers (taker is seller) to hit the non-zero target dimension.
-    /// @dev Exactly one of `targetUnits`, `targetBuyerAssets`, `targetSellerAssets` should be non-zero.
-    /// @dev Assumes all offers are buy offers and share the same obligation id.
-    /// @dev The taker must have authorized this bundler and msg.sender (if different) on Midnight.
-    /// @dev Per-take reverts are swallowed: the offer is skipped.
-    function sell(
-        Midnight midnight,
-        address taker,
-        address receiver,
-        Take[] calldata takes,
-        uint256 targetUnits,
-        uint256 targetBuyerAssets,
-        uint256 targetSellerAssets,
-        uint256 minUnits,
-        uint256 maxUnits,
-        uint256 minBuyerAssets,
-        uint256 maxBuyerAssets,
-        uint256 minSellerAssets,
-        uint256 maxSellerAssets
-    ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
-        _fill(
-            midnight,
-            taker,
-            receiver,
-            takes,
-            targetUnits,
-            targetBuyerAssets,
-            targetSellerAssets,
-            minUnits,
-            maxUnits,
-            minBuyerAssets,
-            maxBuyerAssets,
-            minSellerAssets,
-            maxSellerAssets
-        );
-    }
-
-    /// @dev Iterates through `takes`, filling up to the non-zero target. Reverts if the target is not met exactly, or
-    /// if any bound is violated.
-    function _fill(
-        Midnight midnight,
-        address taker,
-        address receiver,
-        Take[] calldata takes,
-        uint256 targetUnits,
-        uint256 targetBuyerAssets,
-        uint256 targetSellerAssets,
-        uint256 minUnits,
-        uint256 maxUnits,
-        uint256 minBuyerAssets,
-        uint256 maxBuyerAssets,
-        uint256 minSellerAssets,
-        uint256 maxSellerAssets
-    ) internal {
-        require(UtilsLib.atMostOneNonZero(targetUnits, targetBuyerAssets, targetSellerAssets), "multiple targets");
-
-        bytes32 id;
-        if (takes.length > 0 && (targetBuyerAssets > 0 || targetSellerAssets > 0)) {
-            id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
-        }
-
-        uint256 filledUnits;
-        uint256 filledBuyerAssets;
-        uint256 filledSellerAssets;
-        for (uint256 i; i < takes.length; i++) {
-            uint256 unitsToTake;
-            if (targetUnits > 0) {
-                if (filledUnits == targetUnits) break;
-                unitsToTake = targetUnits - filledUnits;
-            } else if (targetBuyerAssets > 0) {
-                if (filledBuyerAssets == targetBuyerAssets) break;
-                unitsToTake = TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, targetBuyerAssets - filledBuyerAssets
-                );
-            } else if (targetSellerAssets > 0) {
-                if (filledSellerAssets == targetSellerAssets) break;
-                unitsToTake = TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, targetSellerAssets - filledSellerAssets
-                );
-            } else {
-                break;
-            }
-
-            try midnight.take(
-                UtilsLib.min(unitsToTake, takes[i].units),
+        uint256 totalFilledUnits;
+        uint256 totalBuyerAssets;
+        uint256 totalSellerAssets;
+        for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            try IMidnight(midnight).take(
+                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
                 taker,
                 address(0),
                 "",
-                receiver,
+                receiverIfTakerIsSeller,
                 takes[i].offer,
-                takes[i].sig,
+                takes[i].ratifierData,
                 takes[i].root,
                 takes[i].proof
-            ) returns (
-                uint256 fb, uint256 fs, uint256 fu
-            ) {
-                filledUnits += fu;
-                filledBuyerAssets += fb;
-                filledSellerAssets += fs;
+            ) returns (uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits) {
+                totalFilledUnits += filledUnits;
+                totalBuyerAssets += filledBuyerAssets;
+                totalSellerAssets += filledSellerAssets;
             } catch {}
         }
 
-        if (targetUnits > 0) require(filledUnits == targetUnits, "insufficient liquidity");
-        else if (targetBuyerAssets > 0) require(filledBuyerAssets == targetBuyerAssets, "insufficient liquidity");
-        else if (targetSellerAssets > 0) require(filledSellerAssets == targetSellerAssets, "insufficient liquidity");
+        require(totalFilledUnits == targetUnits, InsufficientLiquidity());
+        require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
+        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
+        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
+        require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
+    }
 
-        require(filledUnits >= minUnits, "units below min");
-        require(filledUnits <= maxUnits, "units above max");
-        require(filledBuyerAssets >= minBuyerAssets, "buyer assets below min");
-        require(filledBuyerAssets <= maxBuyerAssets, "buyer assets above max");
-        require(filledSellerAssets >= minSellerAssets, "seller assets below min");
-        require(filledSellerAssets <= maxSellerAssets, "seller assets above max");
+    /// @dev Same as bundleTakeUnits but targets buyer assets.
+    /// @dev Not usable if buyerPrice > WAD, because not all buyerAssets are reachable then.
+    /// @dev buyerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
+    /// tradingFee) are not caught by the try/catch and will abort the bundle.
+    /// @dev Requires a non-empty takes array.
+    function bundleTakeBuyerAssets(
+        address midnight,
+        uint256 targetBuyerAssets,
+        address taker,
+        address receiverIfTakerIsSeller,
+        Take[] calldata takes,
+        uint256 minUnits,
+        uint256 maxUnits
+    ) external {
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
+        // fees.
+
+        uint256 totalFilledBuyerAssets;
+        uint256 totalUnits;
+        for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+            try IMidnight(midnight).take(
+                UtilsLib.min(
+                    TakeAmountsLib.buyerAssetsToUnits(
+                        midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                    ),
+                    takes[i].units
+                ),
+                taker,
+                address(0),
+                "",
+                receiverIfTakerIsSeller,
+                takes[i].offer,
+                takes[i].ratifierData,
+                takes[i].root,
+                takes[i].proof
+            ) returns (uint256 filledBuyerAssets, uint256, uint256 filledUnits) {
+                totalFilledBuyerAssets += filledBuyerAssets;
+                totalUnits += filledUnits;
+            } catch {}
+        }
+
+        require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(totalUnits >= minUnits, UnitsBelowMin());
+        require(totalUnits <= maxUnits, UnitsAboveMax());
+    }
+
+    /// @dev Same as bundleTakeUnits but targets seller assets.
+    /// @dev sellerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
+    /// tradingFee) are not caught by the try/catch and will abort the bundle.
+    /// @dev Requires a non-empty takes array.
+    function bundleTakeSellerAssets(
+        address midnight,
+        uint256 targetSellerAssets,
+        address taker,
+        address receiverIfTakerIsSeller,
+        Take[] calldata takes,
+        uint256 minUnits,
+        uint256 maxUnits
+    ) external {
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
+        // fees.
+
+        uint256 totalFilledSellerAssets;
+        uint256 totalUnits;
+        for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+            try IMidnight(midnight).take(
+                UtilsLib.min(
+                    TakeAmountsLib.sellerAssetsToUnits(
+                        midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                    ),
+                    takes[i].units
+                ),
+                taker,
+                address(0),
+                "",
+                receiverIfTakerIsSeller,
+                takes[i].offer,
+                takes[i].ratifierData,
+                takes[i].root,
+                takes[i].proof
+            ) returns (uint256, uint256 filledSellerAssets, uint256 filledUnits) {
+                totalFilledSellerAssets += filledSellerAssets;
+                totalUnits += filledUnits;
+            } catch {}
+        }
+
+        require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(totalUnits >= minUnits, UnitsBelowMin());
+        require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 }
