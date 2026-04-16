@@ -14,18 +14,14 @@ struct Take {
 
 interface ITakeBundler {
     /// ERRORS ///
-    error BuyerAssetsAboveMax();
-    error BuyerAssetsBelowMin();
     error InsufficientLiquidity();
     error PriceAboveMax();
     error PriceBelowMin();
-    error SellerAssetsAboveMax();
-    error SellerAssetsBelowMin();
     error Unauthorized();
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets, bool skipRevertOnPartialFill) external;
+    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerPrice, uint256 maxBuyerPrice, uint256 minSellerPrice, uint256 maxSellerPrice, bool skipRevertOnPartialFill) external;
     function bundleTakeBuyerAssets(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool skipRevertOnPartialFill) external;
     function bundleTakeSellerAssets(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool skipRevertOnPartialFill) external;
     // forgefmt: disable-end

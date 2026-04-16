@@ -313,14 +313,14 @@ contract BundlerTest is BaseTest {
         uint256 targetUnits,
         uint256 tick0,
         uint256 tick1,
-        uint256 maxBuyerAssets
+        uint256 maxPrice
     ) public {
         uint256 minTick = _minTick();
         tick0 = bound(tick0, minTick, MAX_TICK);
         tick1 = bound(tick1, minTick, MAX_TICK);
         // Ensure buyerAssets > 0 so the max bound actually triggers.
-        uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
-        targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
+        uint256 lowestPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
+        targetUnits = bound(targetUnits, WAD / lowestPrice + 1, uint256(type(uint128).max) * 3 / 4);
         offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;
         offers[1].maxUnits = offerUnits1;
@@ -330,8 +330,9 @@ contract BundlerTest is BaseTest {
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
 
         uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
-        vm.assume(expected > 0);
-        maxBuyerAssets = bound(maxBuyerAssets, 0, expected - 1);
+        uint256 expectedPrice = expected.mulDivUp(WAD, targetUnits);
+        vm.assume(expectedPrice > 0);
+        maxPrice = bound(maxPrice, 0, expectedPrice - 1);
 
         collateralize(obligation, borrower, targetUnits);
 
@@ -354,9 +355,9 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
+        vm.expectRevert(ITakeBundler.PriceAboveMax.selector);
         takeBundler.bundleTakeUnits(
-            address(midnight), targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max, false
+            address(midnight), targetUnits, borrower, borrower, takes, 0, maxPrice, 0, type(uint256).max, false
         );
     }
 
@@ -366,7 +367,7 @@ contract BundlerTest is BaseTest {
         uint256 targetUnits,
         uint256 tick0,
         uint256 tick1,
-        uint256 minBuyerAssets
+        uint256 minPrice
     ) public {
         uint256 minTick = _minTick();
         tick0 = bound(tick0, minTick, MAX_TICK);
@@ -381,7 +382,8 @@ contract BundlerTest is BaseTest {
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
 
         uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
-        minBuyerAssets = bound(minBuyerAssets, expected + 1, type(uint256).max);
+        uint256 expectedPrice = expected.mulDivDown(WAD, targetUnits);
+        minPrice = bound(minPrice, expectedPrice + 1, type(uint256).max);
 
         collateralize(obligation, borrower, targetUnits);
 
@@ -404,18 +406,9 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert(ITakeBundler.BuyerAssetsBelowMin.selector);
+        vm.expectRevert(ITakeBundler.PriceBelowMin.selector);
         takeBundler.bundleTakeUnits(
-            address(midnight),
-            targetUnits,
-            borrower,
-            borrower,
-            takes,
-            minBuyerAssets,
-            type(uint256).max,
-            0,
-            type(uint256).max,
-            false
+            address(midnight), targetUnits, borrower, borrower, takes, minPrice, type(uint256).max, 0, type(uint256).max, false
         );
     }
 }

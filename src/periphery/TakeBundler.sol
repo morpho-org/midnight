@@ -16,16 +16,17 @@ contract TakeBundler is ITakeBundler {
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    /// @dev Reverts if totalFilledUnits is 0 (division by zero in the price check).
     function bundleTakeUnits(
         address midnight,
         uint256 targetUnits,
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minBuyerAssets,
-        uint256 maxBuyerAssets,
-        uint256 minSellerAssets,
-        uint256 maxSellerAssets,
+        uint256 minBuyerPrice,
+        uint256 maxBuyerPrice,
+        uint256 minSellerPrice,
+        uint256 maxSellerPrice,
         bool skipRevertOnPartialFill
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -55,10 +56,10 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(skipRevertOnPartialFill || totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
-        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
-        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
-        require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
+        require(totalBuyerAssets.mulDivDown(WAD, totalFilledUnits) >= minBuyerPrice, PriceBelowMin());
+        require(totalBuyerAssets.mulDivUp(WAD, totalFilledUnits) <= maxBuyerPrice, PriceAboveMax());
+        require(totalSellerAssets.mulDivDown(WAD, totalFilledUnits) >= minSellerPrice, PriceBelowMin());
+        require(totalSellerAssets.mulDivUp(WAD, totalFilledUnits) <= maxSellerPrice, PriceAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets buyer assets.
