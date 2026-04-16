@@ -28,7 +28,7 @@ The primer below describes how CVL actually behaves — read it before reasoning
 - `calldataarg args` is an opaque bundle of arguments. You cannot inspect or constrain its fields; it only exists to call a `method f` parametrically.
 - `f(e, args)` targets `currentContract` by default. Call other contracts via `other.f(e, args)` where `other` is declared with `using OtherContract as other;`.
 - Addresses drawn nondeterministically may coincide with known contracts unless explicitly constrained (`require addr != currentContract`, etc.). The Prover does *not* assume addresses are distinct.
-- `envfree` tells the Prover a method doesn't read `env`; such calls omit the `env` argument. The Prover statically checks this, but a declaration mismatch with the actual Solidity is still possible and fails silently.
+- `envfree` tells the Prover a method doesn't read `env`; such calls omit the `env` argument. The Prover statically checks this.
 
 #### Ghosts, hooks, havoc
 
