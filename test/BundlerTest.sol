@@ -171,9 +171,7 @@ contract BundlerTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            takeBundler.bundleTakeBuyerAssets(
-                address(midnight), targetBuyerAssets, borrower, borrower, takes, 0, MAX
-            );
+            takeBundler.bundleTakeBuyerAssets(address(midnight), targetBuyerAssets, borrower, borrower, takes, 0, MAX);
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
@@ -183,9 +181,7 @@ contract BundlerTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
-            takeBundler.bundleTakeBuyerAssets(
-                address(midnight), targetBuyerAssets, borrower, borrower, takes, 0, MAX
-            );
+            takeBundler.bundleTakeBuyerAssets(address(midnight), targetBuyerAssets, borrower, borrower, takes, 0, MAX);
         }
     }
 
@@ -225,9 +221,7 @@ contract BundlerTest is BaseTest {
         uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
-            takeBundler.bundleTakeSellerAssets(
-                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, MAX
-            );
+            takeBundler.bundleTakeSellerAssets(address(midnight), targetSellerAssets, borrower, borrower, takes, 0, MAX);
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
@@ -237,9 +231,7 @@ contract BundlerTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
-            takeBundler.bundleTakeSellerAssets(
-                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, MAX
-            );
+            takeBundler.bundleTakeSellerAssets(address(midnight), targetSellerAssets, borrower, borrower, takes, 0, MAX);
         }
     }
 

@@ -32,17 +32,20 @@ contract TakeBundler is ITakeBundler {
         uint256 totalBuyerAssets;
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
-            try IMidnight(midnight).take(
-                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].ratifierData,
-                takes[i].root,
-                takes[i].proof
-            ) returns (uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits) {
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits
+            ) {
                 totalFilledUnits += filledUnits;
                 totalBuyerAssets += filledBuyerAssets;
                 totalSellerAssets += filledSellerAssets;
@@ -77,22 +80,25 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
-            try IMidnight(midnight).take(
-                UtilsLib.min(
-                    TakeAmountsLib.buyerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.buyerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].ratifierData,
-                takes[i].root,
-                takes[i].proof
-            ) returns (uint256 filledBuyerAssets, uint256, uint256 filledUnits) {
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+            ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
                 totalUnits += filledUnits;
             } catch {}
@@ -123,22 +129,25 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
-            try IMidnight(midnight).take(
-                UtilsLib.min(
-                    TakeAmountsLib.sellerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.sellerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].ratifierData,
-                takes[i].root,
-                takes[i].proof
-            ) returns (uint256, uint256 filledSellerAssets, uint256 filledUnits) {
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256, uint256 filledSellerAssets, uint256 filledUnits
+            ) {
                 totalFilledSellerAssets += filledSellerAssets;
                 totalUnits += filledUnits;
             } catch {}
