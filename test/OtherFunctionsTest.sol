@@ -3,7 +3,13 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {
+    IBuyCallback,
+    ISellCallback,
+    ILiquidateCallback,
+    IRepayCallback,
+    IFlashLoanCallback
+} from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
@@ -653,11 +659,12 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {
-        bytes4[4] memory selectors = [
-            ICallbacks.onBuy.selector,
-            ICallbacks.onSell.selector,
-            ICallbacks.onLiquidate.selector,
-            ICallbacks.onRepay.selector
+        bytes4[5] memory selectors = [
+            IBuyCallback.onBuy.selector,
+            ISellCallback.onSell.selector,
+            ILiquidateCallback.onLiquidate.selector,
+            IRepayCallback.onRepay.selector,
+            IFlashLoanCallback.onFlashLoan.selector
         ];
         for (uint256 i = 0; i < selectors.length; i++) {
             vm.prank(msgSender);
