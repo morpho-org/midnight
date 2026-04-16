@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {Midnight} from "../Midnight.sol";
+import {IMidnight} from "../interfaces/IMidnight.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
@@ -16,7 +16,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     function bundleTakeUnits(
-        Midnight midnight,
+        address midnight,
         uint256 targetUnits,
         address taker,
         address receiverIfTakerIsSeller,
@@ -26,23 +26,24 @@ contract TakeBundler is ITakeBundler {
         uint256 minSellerAssets,
         uint256 maxSellerAssets
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
-            try midnight.take(
-                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].sig,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
                 uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
@@ -64,7 +65,7 @@ contract TakeBundler is ITakeBundler {
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
     /// @dev Requires a non-empty takes array.
     function bundleTakeBuyerAssets(
-        Midnight midnight,
+        address midnight,
         uint256 targetBuyerAssets,
         address taker,
         address receiverIfTakerIsSeller,
@@ -72,28 +73,30 @@ contract TakeBundler is ITakeBundler {
         uint256 minUnits,
         uint256 maxUnits
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
-        bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
+        // fees.
 
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
-            try midnight.take(
-                UtilsLib.min(
-                    TakeAmountsLib.buyerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.buyerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].sig,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
                 uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
@@ -111,7 +114,7 @@ contract TakeBundler is ITakeBundler {
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
     /// @dev Requires a non-empty takes array.
     function bundleTakeSellerAssets(
-        Midnight midnight,
+        address midnight,
         uint256 targetSellerAssets,
         address taker,
         address receiverIfTakerIsSeller,
@@ -119,28 +122,30 @@ contract TakeBundler is ITakeBundler {
         uint256 minUnits,
         uint256 maxUnits
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
-        bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
+        // fees.
 
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
-            try midnight.take(
-                UtilsLib.min(
-                    TakeAmountsLib.sellerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.sellerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].sig,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
                 uint256, uint256 filledSellerAssets, uint256 filledUnits
             ) {
                 totalFilledSellerAssets += filledSellerAssets;

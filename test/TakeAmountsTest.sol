@@ -96,7 +96,7 @@ contract TakeAmountsTest is BaseTest {
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
-        uint256 units = TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, targetBuyerAssets);
+        uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, units);
         offer.maker = borrower;
@@ -118,7 +118,7 @@ contract TakeAmountsTest is BaseTest {
         tick = bound(tick, 1, _maxTick(tradingFee));
 
         offer.tick = tick;
-        uint256 units = TakeAmountsLib.sellerAssetsToUnits(midnight, id, offer, targetSellerAssets);
+        uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
         deal(address(loanToken), lender, type(uint256).max);
         collateralize(obligation, borrower, units);
         offer.maker = borrower;
@@ -146,7 +146,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
         offer.tick = tick;
-        uint256 units = TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, targetBuyerAssets);
+        uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
         (uint256 buyerAssets,,) = take(units, borrower, offer);
@@ -169,7 +169,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
         offer.tick = tick;
-        uint256 units = TakeAmountsLib.sellerAssetsToUnits(midnight, id, offer, targetSellerAssets);
+        uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
         (, uint256 sellerAssets,) = take(units, borrower, offer);
