@@ -51,6 +51,7 @@ contract TickGatingTest is BaseTest {
         offer.obligation = obligation;
         offer.buy = true;
         offer.maker = lender;
+        offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = type(uint256).max;
         offer.expiry = block.timestamp + 200;
         offer.tick = tick;
