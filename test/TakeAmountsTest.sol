@@ -54,12 +54,12 @@ contract TakeAmountsTest is BaseTest {
         createBadDebt(obligation); // to create non trivial lossIndex.
     }
 
-    function _setFees(uint256 fee0, uint256 fee1) internal returns (uint256 tradingFee) {
-        fee0 = bound(fee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        fee1 = bound(fee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+    function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {
+        tradingFee0 = bound(tradingFee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee1 = bound(tradingFee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
         midnight.touchObligation(obligation);
-        midnight.setObligationTradingFee(id, 0, fee0);
-        midnight.setObligationTradingFee(id, 1, fee1);
+        midnight.setObligationTradingFee(id, 0, tradingFee0);
+        midnight.setObligationTradingFee(id, 1, tradingFee1);
         tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
     }
 
@@ -85,10 +85,13 @@ contract TakeAmountsTest is BaseTest {
 
     // buyerIsLender = true: buyer = taker (lender, no debt), seller = maker (borrower).
 
-    function testBuyerAssetsToUnitsBuyerIsLender(uint256 targetBuyerAssets, uint256 tick, uint256 fee0, uint256 fee1)
-        public
-    {
-        uint256 tradingFee = _setFees(fee0, fee1);
+    function testBuyerAssetsToUnitsBuyerIsLender(
+        uint256 targetBuyerAssets,
+        uint256 tick,
+        uint256 tradingFee0,
+        uint256 tradingFee1
+    ) public {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
@@ -104,10 +107,13 @@ contract TakeAmountsTest is BaseTest {
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
 
-    function testSellerAssetsToUnitsBuyerIsLender(uint256 targetSellerAssets, uint256 tick, uint256 fee0, uint256 fee1)
-        public
-    {
-        uint256 tradingFee = _setFees(fee0, fee1);
+    function testSellerAssetsToUnitsBuyerIsLender(
+        uint256 targetSellerAssets,
+        uint256 tick,
+        uint256 tradingFee0,
+        uint256 tradingFee1
+    ) public {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
@@ -125,10 +131,13 @@ contract TakeAmountsTest is BaseTest {
 
     // buyerIsLender = false: buyer = taker (borrower, has debt), seller = maker (lender, has units).
 
-    function testBuyerAssetsToUnitsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 tick, uint256 fee0, uint256 fee1)
-        public
-    {
-        uint256 tradingFee = _setFees(fee0, fee1);
+    function testBuyerAssetsToUnitsBuyerIsBorrower(
+        uint256 targetBuyerAssets,
+        uint256 tick,
+        uint256 tradingFee0,
+        uint256 tradingFee1
+    ) public {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
@@ -148,10 +157,10 @@ contract TakeAmountsTest is BaseTest {
     function testSellerAssetsToUnitsBuyerIsBorrower(
         uint256 targetSellerAssets,
         uint256 tick,
-        uint256 fee0,
-        uint256 fee1
+        uint256 tradingFee0,
+        uint256 tradingFee1
     ) public {
-        uint256 tradingFee = _setFees(fee0, fee1);
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 1, _maxTick(tradingFee));
 
@@ -170,8 +179,10 @@ contract TakeAmountsTest is BaseTest {
 
     // buyerPrice >= WAD: not all buyerAssets are reachable, but snapped values are.
 
-    function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
-        uint256 tradingFee = _setFees(fee0, fee1);
+    function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 tradingFee0, uint256 tradingFee1)
+        public
+    {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
@@ -188,8 +199,10 @@ contract TakeAmountsTest is BaseTest {
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }
 
-    function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 fee0, uint256 fee1) public {
-        uint256 tradingFee = _setFees(fee0, fee1);
+    function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 tradingFee0, uint256 tradingFee1)
+        public
+    {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
         _createPosition(1e36);
