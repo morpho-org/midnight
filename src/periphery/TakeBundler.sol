@@ -6,6 +6,7 @@ import {Midnight} from "../Midnight.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
+import {WAD} from "../libraries/ConstantsLib.sol";
 
 contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
@@ -70,8 +71,8 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
+        uint256 minPrice,
+        uint256 maxPrice,
         bool allowPartialFill
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
@@ -104,8 +105,11 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(allowPartialFill || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
+        if (totalUnits > 0) {
+            uint256 effectivePrice = totalFilledBuyerAssets.mulDivDown(WAD, totalUnits);
+            require(effectivePrice >= minPrice, PriceBelowMin());
+            require(effectivePrice <= maxPrice, PriceAboveMax());
+        }
     }
 
     /// @dev Same as bundleTakeUnits but targets seller assets.
@@ -118,8 +122,8 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
+        uint256 minPrice,
+        uint256 maxPrice,
         bool allowPartialFill
     ) external {
         require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), Unauthorized());
@@ -152,7 +156,10 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(allowPartialFill || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
+        if (totalUnits > 0) {
+            uint256 effectivePrice = totalFilledSellerAssets.mulDivDown(WAD, totalUnits);
+            require(effectivePrice >= minPrice, PriceBelowMin());
+            require(effectivePrice <= maxPrice, PriceAboveMax());
+        }
     }
 }

@@ -257,22 +257,22 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, target);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: available,
             sig: sig([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1], units: 0, sig: sig([offers[1]]), root: root([offers[1]]), proof: proof([offers[1]])
         });
 
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("insufficient liquidity");
+        vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
         takeBundler.bundleTakeUnits(
             midnight, target, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max, false
         );

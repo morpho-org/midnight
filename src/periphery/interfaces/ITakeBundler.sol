@@ -18,16 +18,16 @@ interface ITakeBundler {
     error BuyerAssetsAboveMax();
     error BuyerAssetsBelowMin();
     error InsufficientLiquidity();
+    error PriceAboveMax();
+    error PriceBelowMin();
     error SellerAssetsAboveMax();
     error SellerAssetsBelowMin();
     error Unauthorized();
-    error UnitsAboveMax();
-    error UnitsBelowMin();
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function bundleTakeUnits(Midnight midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets) external;
-    function bundleTakeBuyerAssets(Midnight midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
-    function bundleTakeSellerAssets(Midnight midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
+    function bundleTakeUnits(Midnight midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets, bool allowPartialFill) external;
+    function bundleTakeBuyerAssets(Midnight midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool allowPartialFill) external;
+    function bundleTakeSellerAssets(Midnight midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool allowPartialFill) external;
     // forgefmt: disable-end
 }
