@@ -409,7 +409,7 @@ contract Midnight is IMidnight {
                 require(
                     ICallbacks(sellerCallback)
                         .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                        == CALLBACK_SUCCESS,
                     InvalidSellCallback()
                 );
             }
@@ -418,8 +418,8 @@ contract Midnight is IMidnight {
         require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
 
         // MVP limits.
-        require(buyerAssets <= maxTakeableAssets[offer.obligation.loanToken], "exceeds max takeable");
-        require(_obligationState.totalUnits <= maxTotalUnits[offer.obligation.loanToken], "exceeds max total units");
+        require(buyerAssets <= maxTakeableAssets[offer.obligation.loanToken], MaxTakeableAssetsExceeded());
+        require(_obligationState.totalUnits <= maxTotalUnits[offer.obligation.loanToken], MaxTotalUnitsExceeded());
 
         return (buyerAssets, sellerAssets, units);
     }
@@ -484,7 +484,7 @@ contract Midnight is IMidnight {
 
         require(
             _position.collateral[collateralIndex] <= maxCollateralPerUser[collateralToken],
-            "exceeds max collateral per user"
+            CollateralPerUserExceeded()
         );
 
         SafeTransferLib.safeTransferFrom(collateralToken, msg.sender, address(this), assets);

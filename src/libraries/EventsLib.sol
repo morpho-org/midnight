@@ -15,7 +15,6 @@ library EventsLib {
     event SetMaxTotalUnits(address indexed token, uint128 maxTotalUnits);
     event SetMaxTakeableAssets(address indexed token, uint256 maxTakeableAssets);
     event SetMaxCollateralPerUser(address indexed token, uint256 maxCollateralPerUser);
-    event SetFeeRecipient(address indexed feeRecipient);
     event SetFeeClaimer(address indexed feeClaimer);
     event SetObligationContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
