@@ -488,6 +488,39 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.pendingFee(id, lender), newPendingFee, "view matches pendingFee");
     }
 
+    function testUpdatePositionReturnsUpdatedValues(
+        uint256 credit,
+        uint256 feeRate,
+        uint256 ttm,
+        uint256 elapsed,
+        bool withBadDebt
+    ) public {
+        credit = bound(credit, 100, MAX_CREDIT);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        ttm = bound(ttm, 10, 360 days);
+        elapsed = bound(elapsed, 1, ttm - 1);
+
+        setupLender(credit, feeRate, ttm);
+
+        if (withBadDebt) createBadDebt(obligation);
+
+        vm.warp(block.timestamp + elapsed);
+
+        (uint128 expectedCredit, uint128 expectedPendingFee, uint128 expectedAccruedFee) =
+            midnight.updatePositionView(obligation, id, lender);
+        uint256 expectedContinuousFeeCredit = midnight.continuousFeeCredit(id) + expectedAccruedFee;
+
+        (uint128 returnedCredit, uint128 returnedPendingFee, uint128 returnedAccruedFee) =
+            midnight.updatePosition(obligation, lender);
+
+        assertEq(returnedCredit, expectedCredit, "returned credit");
+        assertEq(returnedPendingFee, expectedPendingFee, "returned pendingFee");
+        assertEq(returnedAccruedFee, expectedAccruedFee, "returned accruedFee");
+        assertEq(midnight.creditOf(id, lender), returnedCredit, "stored credit");
+        assertEq(midnight.pendingFee(id, lender), returnedPendingFee, "stored pendingFee");
+        assertEq(midnight.continuousFeeCredit(id), expectedContinuousFeeCredit, "continuousFeeCredit");
+    }
+
     function testUpdatePositionRevertsIfObligationNotCreated() public {
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.updatePosition(obligation, borrower);
