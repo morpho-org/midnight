@@ -116,9 +116,9 @@ interface IMidnight {
     function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
-    function feeClaimer() external view returns (address);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
+    function feeClaimer() external view returns (address);
 
     /// MULTICALL ///
     function multicall(bytes[] calldata calls) external;
@@ -149,7 +149,7 @@ interface IMidnight {
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
     function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
-    function updatePosition(Obligation memory obligation, address user) external;
+    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
