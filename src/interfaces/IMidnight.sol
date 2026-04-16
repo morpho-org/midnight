@@ -116,9 +116,9 @@ interface IMidnight {
     function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
-    function feeClaimer() external view returns (address);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
+    function feeClaimer() external view returns (address);
 
     /// MULTICALL ///
     function multicall(bytes[] calldata calls) external;

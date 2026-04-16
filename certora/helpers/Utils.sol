@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
-import {IdLib} from "../../src/libraries/IdLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 
 contract Utils {
