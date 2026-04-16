@@ -1816,11 +1816,11 @@ contract RatifyCallback is IRatifier {
         return _recordedOffer;
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory data) external returns (bytes32) {
+    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external returns (bytes32) {
         _recordedOffer = offer;
 
-        if (data.length > 0) {
-            Signature memory signature = abi.decode(data, (Signature));
+        if (ratifierData.length > 0) {
+            Signature memory signature = abi.decode(ratifierData, (Signature));
             bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
