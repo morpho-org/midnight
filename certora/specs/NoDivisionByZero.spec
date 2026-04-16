@@ -80,9 +80,9 @@ function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
     return obligation.loanToken == globalObligationLoanToken && obligation.collateralParams.length == globalObligationCollateralLength && collateralMatches(obligation, 0) && collateralMatches(obligation, 1) && collateralMatches(obligation, 2) && obligation.maturity == globalObligationMaturity && obligation.rcfThreshold == globalObligationRcfThreshold && obligation.enterGate == globalObligationEnterGate && obligation.liquidatorGate == globalObligationLiquidatorGate;
 }
 
-function summaryToId(Midnight.Obligation obligation, uint256 chainId, address morpho) returns (bytes32) {
+function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalObligation(obligation) && morpho == currentContract) {
+    if (equalsGlobalObligation(obligation) && midnight == currentContract) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";

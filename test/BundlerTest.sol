@@ -85,7 +85,11 @@ contract BundlerTest is BaseTest {
     function testUnauthorized() public {
         Take[] memory takes = new Take[](1);
         takes[0] = Take({
-            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+            offer: offers[0],
+            units: 100,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
         });
 
         vm.prank(address(0xdead));
@@ -107,14 +111,14 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -157,14 +161,14 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -209,14 +213,14 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -302,14 +306,14 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -352,14 +356,14 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });

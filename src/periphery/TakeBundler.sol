@@ -40,7 +40,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     receiverIfTakerIsSeller,
                     takes[i].offer,
-                    takes[i].sig,
+                    takes[i].ratifierData,
                     takes[i].root,
                     takes[i].proof
                 ) returns (
@@ -93,7 +93,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     receiverIfTakerIsSeller,
                     takes[i].offer,
-                    takes[i].sig,
+                    takes[i].ratifierData,
                     takes[i].root,
                     takes[i].proof
                 ) returns (
@@ -142,7 +142,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     receiverIfTakerIsSeller,
                     takes[i].offer,
-                    takes[i].sig,
+                    takes[i].ratifierData,
                     takes[i].root,
                     takes[i].proof
                 ) returns (

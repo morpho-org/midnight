@@ -14,8 +14,8 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         MIDNIGHT = _midnight;
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory data) external view returns (bytes32) {
-        Signature memory sig = abi.decode(data, (Signature));
+    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external view returns (bytes32) {
+        Signature memory sig = abi.decode(ratifierData, (Signature));
         bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
