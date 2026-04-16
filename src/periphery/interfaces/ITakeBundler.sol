@@ -25,8 +25,8 @@ interface ITakeBundler {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets, bool allowPartialFill) external;
-    function bundleTakeBuyerAssets(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool allowPartialFill) external;
-    function bundleTakeSellerAssets(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool allowPartialFill) external;
+    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets, bool skipRevertOnPartialFill) external;
+    function bundleTakeBuyerAssets(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool skipRevertOnPartialFill) external;
+    function bundleTakeSellerAssets(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minPrice, uint256 maxPrice, bool skipRevertOnPartialFill) external;
     // forgefmt: disable-end
 }

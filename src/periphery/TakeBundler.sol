@@ -26,7 +26,7 @@ contract TakeBundler is ITakeBundler {
         uint256 maxBuyerAssets,
         uint256 minSellerAssets,
         uint256 maxSellerAssets,
-        bool allowPartialFill
+        bool skipRevertOnPartialFill
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
@@ -54,7 +54,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(allowPartialFill || totalFilledUnits == targetUnits, InsufficientLiquidity());
+        require(skipRevertOnPartialFill || totalFilledUnits == targetUnits, InsufficientLiquidity());
         require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
         require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
         require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
@@ -74,7 +74,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minPrice,
         uint256 maxPrice,
-        bool allowPartialFill
+        bool skipRevertOnPartialFill
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
@@ -107,12 +107,9 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(allowPartialFill || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        if (totalUnits > 0) {
-            uint256 effectivePrice = totalFilledBuyerAssets.mulDivDown(WAD, totalUnits);
-            require(effectivePrice >= minPrice, PriceBelowMin());
-            require(effectivePrice <= maxPrice, PriceAboveMax());
-        }
+        require(skipRevertOnPartialFill || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(totalFilledBuyerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
+        require(totalFilledBuyerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets seller assets.
@@ -127,7 +124,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minPrice,
         uint256 maxPrice,
-        bool allowPartialFill
+        bool skipRevertOnPartialFill
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
@@ -160,11 +157,8 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(allowPartialFill || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        if (totalUnits > 0) {
-            uint256 effectivePrice = totalFilledSellerAssets.mulDivDown(WAD, totalUnits);
-            require(effectivePrice >= minPrice, PriceBelowMin());
-            require(effectivePrice <= maxPrice, PriceAboveMax());
-        }
+        require(skipRevertOnPartialFill || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(totalFilledSellerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
+        require(totalFilledSellerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
     }
 }
