@@ -66,6 +66,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev Not usable if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev buyerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
+    /// @dev Reverts if totalUnits is 0 (division by zero in the price check).
     /// @dev Requires a non-empty takes array.
     function bundleTakeBuyerAssets(
         address midnight,
@@ -116,6 +117,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev Same as bundleTakeUnits but targets seller assets.
     /// @dev sellerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
+    /// @dev Reverts if totalUnits is 0 (division by zero in the price check).
     /// @dev Requires a non-empty takes array.
     function bundleTakeSellerAssets(
         address midnight,
