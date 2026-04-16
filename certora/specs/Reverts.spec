@@ -28,11 +28,10 @@ methods {
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => CVL_callbackVoid() expect void;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => CVL_callbackVoid() expect void;
     function _.onFlashLoan(address, uint256, bytes) external => CVL_callbackVoid() expect void;
-
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
@@ -427,6 +426,16 @@ rule callbackRevertCausesFlashLoanRevert(env e, address token, uint256 assets, a
 rule callbackRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require takerCallback != 0 || offer.callback != 0, "callback-enabled take";
+
+    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert lastReverted;
+}
+
+/// If onRatify reverts or returns something other than CALLBACK_SUCCESS, take reverts.
+rule ratifierRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    require forceCallbackRevert || forceCallbackBadReturn, "ratifier reverts or returns bad value";
+    require offer.ratifier != 0, "ratifier is set";
 
     take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
