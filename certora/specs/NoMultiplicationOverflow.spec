@@ -7,18 +7,18 @@
 // The multiplication x * y must not exceed type(uint256).max, or the transaction reverts.
 //
 // maxLif(uint256, uint256) is excluded: it is a pure function callable with arbitrary inputs.
-// Internal calls use WAD-scale values where its intermediate multiplications
-// (WAD * WAD = 1e36 and cursor * (WAD - lltv) <= WAD^2 = 1e36) cannot overflow uint256.
+// Internal calls use WAD-scale values where its intermediate multiplications (WAD * WAD = 1e36 and cursor * (WAD - lltv) <= WAD^2 = 1e36) cannot overflow uint256.
 //
 // The toId summary follows the approach from CreatedObligations.spec and encodes
-// obligation field bounds (lltv, maxLif, maturity) proven in other specs.
+// obligation field bounds (lltv, maxLif) proven in other specs, plus the realistic
+// timestamp range assumption used by this overflow-focused proof.
 
 using Utils as Utils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // Oracle prices bounded to uint128: collateral * price fits in uint256 ((2^128-1)^2 < 2^256-1).
+    // Oracle prices are assumed to fit in uint128 for this proof (see linked team discussion).
     function _.price() external => boundedPrice() expect(uint256);
 
     // Deterministic toId: links calldata obligations to validated state from touchObligation.
@@ -49,14 +49,14 @@ persistent ghost bool mulOverflow;
 
 /// HOOKS ///
 
-// lossIndex > 0: the protocol stops behaving correctly if this reaches 0 (documented).
+// lossIndex < max: the protocol stops behaving correctly if this reaches max (documented).
 hook Sload uint128 value obligationState[KEY bytes32 id].lossIndex {
-    require value > 0;
+    require value < max_uint128;
 }
 
 // Follows from userLossIndexLeqObligationLossIndex in Midnight.spec and the hook above.
 hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossIndex {
-    require value > 0;
+    require value < max_uint128;
 }
 
 /// SUMMARIES ///
@@ -65,7 +65,7 @@ definition WAD() returns uint256 = 1000000000000000000;
 
 // Proven in CreatedObligations.spec (createdObligationsHaveLltvLessThanOrEqualToOne)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
-// Maturity bounded to uint64: max_uint128 * max_uint32 * max_uint64 = 2^224 < 2^256 (realistic timestamps, not enforced on-chain).
+// Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].lltv <= WAD();
     require forall uint256 i. i < obligation.collaterals.length => obligation.collaterals[i].maxLif >= WAD() && obligation.collaterals[i].maxLif <= 2 * WAD();
@@ -113,7 +113,7 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     mathint product = to_mathint(x) * y;
-    if (product > max_uint256) {
+    if (product > max_uint256 || d > 0 && product + d - 1 > max_uint256) {
         mulOverflow = true;
     }
 
