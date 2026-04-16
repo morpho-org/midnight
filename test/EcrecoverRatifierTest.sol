@@ -27,9 +27,9 @@ contract EcrecoverRatifierTest is BaseTest {
     function testOnRatifyMakerSigns() public view {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
-        bytes memory data = signRoot(_root, lender);
+        bytes memory ratifierData = signRoot(_root, lender);
 
-        bytes32 result = ecrecoverRatifier.onRatify(offer, _root, data);
+        bytes32 result = ecrecoverRatifier.onRatify(offer, _root, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -40,38 +40,38 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(lender);
 
         midnight.setIsAuthorized(lender, borrower, true);
-        bytes memory data = signRoot(_root, borrower);
+        bytes memory ratifierData = signRoot(_root, borrower);
 
-        bytes32 result = ecrecoverRatifier.onRatify(offer, _root, data);
+        bytes32 result = ecrecoverRatifier.onRatify(offer, _root, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testOnRatifyUnauthorizedSigner() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
-        bytes memory data = signRoot(_root, borrower);
+        bytes memory ratifierData = signRoot(_root, borrower);
 
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, _root, data);
+        ecrecoverRatifier.onRatify(offer, _root, ratifierData);
     }
 
     function testOnRatifyInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
-        bytes memory data = abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}));
+        bytes memory ratifierData = abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}));
 
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, _root, data);
+        ecrecoverRatifier.onRatify(offer, _root, ratifierData);
     }
 
     function testOnRatifyWrongRoot() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256(abi.encode(offer));
-        bytes memory data = signRoot(_root, lender);
+        bytes memory ratifierData = signRoot(_root, lender);
 
         bytes32 wrongRoot = keccak256("wrong");
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, wrongRoot, data);
+        ecrecoverRatifier.onRatify(offer, wrongRoot, ratifierData);
     }
 
     function testOnRatifyRevokeAuthorizationInvalidates() public {
@@ -81,16 +81,16 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(lender);
 
         midnight.setIsAuthorized(lender, borrower, true);
-        bytes memory data = signRoot(_root, borrower);
+        bytes memory ratifierData = signRoot(_root, borrower);
 
         // Works while authorized.
-        ecrecoverRatifier.onRatify(offer, _root, data);
+        ecrecoverRatifier.onRatify(offer, _root, ratifierData);
 
         // Revoke.
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, false);
 
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, _root, data);
+        ecrecoverRatifier.onRatify(offer, _root, ratifierData);
     }
 }

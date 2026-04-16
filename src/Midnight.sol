@@ -178,13 +178,13 @@ contract Midnight is IMidnight {
         require(_obligationState.created, ObligationNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
         uint16 toStore = uint16(newTradingFee / FEE_STEP);
-        if (index == 0) _obligationState.fee0 = toStore;
-        else if (index == 1) _obligationState.fee1 = toStore;
-        else if (index == 2) _obligationState.fee2 = toStore;
-        else if (index == 3) _obligationState.fee3 = toStore;
-        else if (index == 4) _obligationState.fee4 = toStore;
-        else if (index == 5) _obligationState.fee5 = toStore;
-        else if (index == 6) _obligationState.fee6 = toStore;
+        if (index == 0) _obligationState.tradingFee0 = toStore;
+        else if (index == 1) _obligationState.tradingFee1 = toStore;
+        else if (index == 2) _obligationState.tradingFee2 = toStore;
+        else if (index == 3) _obligationState.tradingFee3 = toStore;
+        else if (index == 4) _obligationState.tradingFee4 = toStore;
+        else if (index == 5) _obligationState.tradingFee5 = toStore;
+        else if (index == 6) _obligationState.tradingFee6 = toStore;
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
@@ -681,13 +681,13 @@ contract Midnight is IMidnight {
             ObligationState storage _obligationState = obligationState[id];
             _obligationState.created = true;
             uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
-            _obligationState.fee0 = _defaultTradingFees[0];
-            _obligationState.fee1 = _defaultTradingFees[1];
-            _obligationState.fee2 = _defaultTradingFees[2];
-            _obligationState.fee3 = _defaultTradingFees[3];
-            _obligationState.fee4 = _defaultTradingFees[4];
-            _obligationState.fee5 = _defaultTradingFees[5];
-            _obligationState.fee6 = _defaultTradingFees[6];
+            _obligationState.tradingFee0 = _defaultTradingFees[0];
+            _obligationState.tradingFee1 = _defaultTradingFees[1];
+            _obligationState.tradingFee2 = _defaultTradingFees[2];
+            _obligationState.tradingFee3 = _defaultTradingFees[3];
+            _obligationState.tradingFee4 = _defaultTradingFees[4];
+            _obligationState.tradingFee5 = _defaultTradingFees[5];
+            _obligationState.tradingFee6 = _defaultTradingFees[6];
             _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation);
 
@@ -811,13 +811,13 @@ contract Midnight is IMidnight {
 
     function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
         return [
-            obligationState[id].fee0,
-            obligationState[id].fee1,
-            obligationState[id].fee2,
-            obligationState[id].fee3,
-            obligationState[id].fee4,
-            obligationState[id].fee5,
-            obligationState[id].fee6
+            obligationState[id].tradingFee0,
+            obligationState[id].tradingFee1,
+            obligationState[id].tradingFee2,
+            obligationState[id].tradingFee3,
+            obligationState[id].tradingFee4,
+            obligationState[id].tradingFee5,
+            obligationState[id].tradingFee6
         ];
     }
 
@@ -882,16 +882,16 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.created, ObligationNotCreated());
 
-        if (timeToMaturity >= 360 days) return _obligationState.fee6 * FEE_STEP;
+        if (timeToMaturity >= 360 days) return _obligationState.tradingFee6 * FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.fee0 * FEE_STEP, _obligationState.fee1 * FEE_STEP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.fee1 * FEE_STEP, _obligationState.fee2 * FEE_STEP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.fee2 * FEE_STEP, _obligationState.fee3 * FEE_STEP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.fee3 * FEE_STEP, _obligationState.fee4 * FEE_STEP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.fee4 * FEE_STEP, _obligationState.fee5 * FEE_STEP) :
-                                        (180 days, 360 days, _obligationState.fee5 * FEE_STEP, _obligationState.fee6 * FEE_STEP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.tradingFee0 * FEE_STEP, _obligationState.tradingFee1 * FEE_STEP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.tradingFee1 * FEE_STEP, _obligationState.tradingFee2 * FEE_STEP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.tradingFee2 * FEE_STEP, _obligationState.tradingFee3 * FEE_STEP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.tradingFee3 * FEE_STEP, _obligationState.tradingFee4 * FEE_STEP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.tradingFee4 * FEE_STEP, _obligationState.tradingFee5 * FEE_STEP) :
+                                        (180 days, 360 days, _obligationState.tradingFee5 * FEE_STEP, _obligationState.tradingFee6 * FEE_STEP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);

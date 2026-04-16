@@ -896,7 +896,15 @@ contract TakeTest is BaseTest {
         vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), invalidRoot, new bytes32[](0)
+            100,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            lenderOffer,
+            ratifierData([lenderOffer]),
+            invalidRoot,
+            new bytes32[](0)
         );
     }
 
@@ -937,7 +945,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer], vm.addr(otherPrivateKey)),
+            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -967,7 +975,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer], vm.addr(otherPrivateKey)),
+            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -980,7 +988,15 @@ contract TakeTest is BaseTest {
         vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, sig([lenderOffer]), root([lenderOffer]), _path
+            100,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            lenderOffer,
+            ratifierData([lenderOffer]),
+            root([lenderOffer]),
+            _path
         );
     }
 
@@ -996,7 +1012,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            sig([lenderOffer, otherOffer]),
+            ratifierData([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
             _path
         );
@@ -1017,7 +1033,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            sig([lenderOffer, otherOffer]),
+            ratifierData([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
             proof([lenderOffer, otherOffer])
         );
@@ -1047,7 +1063,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1088,7 +1104,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer], vm.addr(otherSecretKey)),
+            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1120,7 +1136,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer], vm.addr(otherSecretKey)),
+            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1147,7 +1163,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            sig([lenderOffer], vm.addr(signerPrivateKey)),
+            ratifierData([lenderOffer], vm.addr(signerPrivateKey)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1167,7 +1183,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1184,7 +1200,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1205,7 +1221,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1257,7 +1273,7 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral),
             borrower,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1289,7 +1305,7 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral, repaidUnits),
             borrower,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1322,7 +1338,7 @@ contract TakeTest is BaseTest {
 
         callback.prepare(
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer]),
             units,
@@ -1339,7 +1355,7 @@ contract TakeTest is BaseTest {
             "",
             borrower,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1370,7 +1386,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1412,7 +1428,7 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets),
             address(0),
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
@@ -1523,7 +1539,7 @@ contract TakeTest is BaseTest {
             hex"",
             address(0),
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
@@ -1556,7 +1572,9 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
         vm.prank(lender);
-        midnight.take(units, lender, address(0), hex"", lender, bOffer, sig([bOffer]), root([bOffer]), proof([bOffer]));
+        midnight.take(
+            units, lender, address(0), hex"", lender, bOffer, ratifierData([bOffer]), root([bOffer]), proof([bOffer])
+        );
     }
 }
 
@@ -1798,11 +1816,11 @@ contract RatifyCallback is IRatifier {
         return _recordedOffer;
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory data) external returns (bytes32) {
+    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external returns (bytes32) {
         _recordedOffer = offer;
 
-        if (data.length > 0) {
-            Signature memory signature = abi.decode(data, (Signature));
+        if (ratifierData.length > 0) {
+            Signature memory signature = abi.decode(ratifierData, (Signature));
             bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
