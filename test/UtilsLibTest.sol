@@ -103,7 +103,7 @@ contract UtilsLibTest is Test {
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(UtilsLib.CastOverflow.selector);
         UtilsLib.toUint128(x);
     }
 
