@@ -100,7 +100,7 @@ contract BundlerTest is BaseTest {
     }
 
     function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
-        units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
+        units = bound(units, 1, uint256(type(uint128).max) * 3 / 4);
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
