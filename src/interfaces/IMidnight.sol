@@ -149,7 +149,7 @@ interface IMidnight {
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
     function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
-    function updatePosition(Obligation memory obligation, address user) external;
+    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
