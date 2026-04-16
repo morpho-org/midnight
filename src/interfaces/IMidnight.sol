@@ -64,6 +64,48 @@ struct Position {
 }
 
 interface IMidnight {
+    /// ERRORS ///
+    error AlreadyConsumed();
+    error BuyerGatedFromIncreasingCredit();
+    error BuyerPendingFeeExceedsCredit();
+    error CollateralParamsNotSorted();
+    error ConsumedBuyerAssets();
+    error ConsumedSellerAssets();
+    error ConsumedUnits();
+    error ContinuousFeeTooHigh();
+    error FeeNotMultipleOfFeeStep();
+    error InconsistentInput();
+    error InvalidBuyCallback();
+    error InvalidSellCallback();
+    error InvalidFeeIndex();
+    error InvalidMaxLif();
+    error InvalidProof();
+    error InvalidSession();
+    error LiquidatorGatedFromLiquidating();
+    error LltvNotAllowed();
+    error MakerCreditOrDebtIncreased();
+    error MultipleNonZero();
+    error NoCollateralParams();
+    error NotLiquidatable();
+    error ObligationNotCreated();
+    error OfferExpired();
+    error OfferNotStarted();
+    error OnlyFeeClaimer();
+    error OnlyFeeSetter();
+    error OnlyRoleSetter();
+    error RatifierFail();
+    error RatifierUnauthorized();
+    error RecoveryCloseFactorConditionsViolated();
+    error SelfTake();
+    error SellerGatedFromIncreasingDebt();
+    error SellerIsLiquidatable();
+    error TakerUnauthorized();
+    error TooManyActivatedCollaterals();
+    error TooManyCollateralParams();
+    error TradingFeeTooHigh();
+    error Unauthorized();
+    error UnhealthyBorrower();
+
     // forgefmt: disable-start
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 activatedCollaterals);
@@ -74,12 +116,14 @@ interface IMidnight {
     function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
-    function feeClaimer() external view returns (address);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
+    function feeClaimer() external view returns (address);
+
+    /// MULTICALL ///
+    function multicall(bytes[] calldata calls) external;
 
     /// ADMIN FUNCTIONS ///
-
     function setRoleSetter(address newRoleSetter) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
@@ -91,7 +135,6 @@ interface IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-
     function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
     function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external;
@@ -105,12 +148,10 @@ interface IMidnight {
     function touchObligation(Obligation memory obligation) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
-
     function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
-    function updatePosition(Obligation memory obligation, address user) external;
+    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
-
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
     function activatedCollaterals(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);

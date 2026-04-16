@@ -3,6 +3,8 @@
 using Utils as Utils;
 
 methods {
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;

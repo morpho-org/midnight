@@ -124,9 +124,15 @@ abstract contract BaseTest is Test {
         collateralToken2.approve(address(midnight), type(uint256).max);
 
         // Set MVP limits to max so existing tests are not blocked.
-        midnight.setLimits(address(loanToken), type(uint128).max, type(uint256).max, type(uint256).max);
-        midnight.setLimits(address(collateralToken1), type(uint128).max, type(uint256).max, type(uint256).max);
-        midnight.setLimits(address(collateralToken2), type(uint128).max, type(uint256).max, type(uint256).max);
+        midnight.setMaxTotalUnits(address(loanToken), type(uint128).max);
+        midnight.setMaxTakeableAssets(address(loanToken), type(uint256).max);
+        midnight.setMaxCollateralPerUser(address(loanToken), type(uint256).max);
+        midnight.setMaxTotalUnits(address(collateralToken1), type(uint128).max);
+        midnight.setMaxTakeableAssets(address(collateralToken1), type(uint256).max);
+        midnight.setMaxCollateralPerUser(address(collateralToken1), type(uint256).max);
+        midnight.setMaxTotalUnits(address(collateralToken2), type(uint128).max);
+        midnight.setMaxTakeableAssets(address(collateralToken2), type(uint256).max);
+        midnight.setMaxCollateralPerUser(address(collateralToken2), type(uint256).max);
     }
 
     // helpers.

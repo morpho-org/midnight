@@ -7,7 +7,6 @@ interface IHavoc {
 }
 
 contract Havoc {
-
     function callHavoc(address account) external {
         (IHavoc(account)).havocAll();
     }

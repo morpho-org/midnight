@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
     function _.price() external => NONDET;
 
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -15,7 +17,7 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
-    function _updatePosition(Midnight.Obligation memory, bytes32 id, address user) internal => summaryUpdatePosition(id, user);
+    function _updatePosition(Midnight.Obligation memory, bytes32 id, address user) internal returns (uint128, uint128, uint128) => summaryUpdatePosition(id, user);
     function hasCredit(bytes32 id, address user) internal returns (bool) => summaryHasCredit(id, user);
 }
 
@@ -34,8 +36,12 @@ persistent ghost mapping(bytes32 => mapping(address => bool)) creditLoadedBefore
 
 /// Summary for _updatePosition: just sets the updated ghost flag.
 /// The original function body is replaced, so its internal credit reads/writes do not fire hooks.
-function summaryUpdatePosition(bytes32 id, address user) {
+function summaryUpdatePosition(bytes32 id, address user) returns (uint128, uint128, uint128) {
     updated[id][user] = true;
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    return (newCredit, newPendingFee, accruedFee);
 }
 
 /// Summary for hasCredit:  circumvent the load hook for credit checks.

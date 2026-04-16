@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
     function tradingFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
