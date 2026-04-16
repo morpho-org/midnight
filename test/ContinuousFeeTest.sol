@@ -6,7 +6,7 @@ import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
@@ -73,6 +73,7 @@ contract ContinuousFeeTest is BaseTest {
 
         setupLender(credit, feeRate, ttm);
         uint256 remaining = midnight.pendingFee(id, lender);
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after take");
 
         vm.warp(block.timestamp + elapsed);
         uint256 expectedFee = remaining.mulDivDown(elapsed, ttm);
@@ -95,6 +96,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
 
         // Fee accumulated in continuousFeeCredit
         if (expectedFee > 0) {
@@ -437,7 +439,7 @@ contract ContinuousFeeTest is BaseTest {
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
         midnight.claimContinuousFee(obligation, 0, caller);
     }
 
@@ -484,5 +486,21 @@ contract ContinuousFeeTest is BaseTest {
 
         assertEq(midnight.creditOf(id, lender), newCredit, "view matches credit");
         assertEq(midnight.pendingFee(id, lender), newPendingFee, "view matches pendingFee");
+    }
+
+    function testUpdatePositionRevertsIfObligationNotCreated() public {
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.updatePosition(obligation, borrower);
+    }
+
+    function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
+        vm.prank(feeClaimer);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.claimContinuousFee(obligation, 0, feeClaimer);
+    }
+
+    function testLastAccrualZeroForFreshPosition() public {
+        setupLender(1e18, 0, 100 days);
+        assertEq(midnight.lastAccrual(id, makeAddr("nobody")), 0, "lastAccrual zero for fresh position");
     }
 }
