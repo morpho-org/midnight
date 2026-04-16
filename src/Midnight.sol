@@ -117,7 +117,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
 /// @dev If `isHealthy` is not short-circuited (i.e. the reverting oracle is reached before `maxDebt >= debt`),
-/// `isHealthy`, `withdrawCollateral` when the borrower has debt, and `take` whenever the seller still has debt all revert.
+/// `isHealthy`, `withdrawCollateral` when the borrower has debt, and `take` whenever the seller still has debt
+/// all revert.
 /// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
 /// @dev If all activated collateral oracles return 0 on `price`, `isHealthy` returns false when the borrower has debt,
 /// `withdrawCollateral` reverts when the borrower has debt, and `take` reverts when the seller has debt.
