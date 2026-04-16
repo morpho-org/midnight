@@ -126,7 +126,7 @@ contract TradingFeeTest is BaseTest {
         assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testDefaultFee(uint256 units, uint256 sellerTick, uint256 tradingFee) public {
+    function testDefaultTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee) public {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
@@ -149,20 +149,25 @@ contract TradingFeeTest is BaseTest {
         assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testSevenDayTtmFee(uint256 units, uint256 sellerTick, uint256 fee1Day, uint256 fee7Days) public {
+    function testSevenDayTtmTradingFee(
+        uint256 units,
+        uint256 sellerTick,
+        uint256 tradingFee1Day,
+        uint256 tradingFee7Days
+    ) public {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee1Day = bound(fee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        fee7Days = bound(fee7Days, fee1Day, midnight.maxTradingFee(2)) / 1e12 * 1e12;
+        tradingFee1Day = bound(tradingFee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee7Days = bound(tradingFee7Days, tradingFee1Day, midnight.maxTradingFee(2)) / 1e12 * 1e12;
 
         obligation.maturity = block.timestamp + 3 days;
 
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
         // Must be set before touchObligation, which snapshots defaultFees at creation time.
-        midnight.setDefaultTradingFee(address(loanToken), 1, fee1Day);
-        midnight.setDefaultTradingFee(address(loanToken), 2, fee7Days);
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee1Day);
+        midnight.setDefaultTradingFee(address(loanToken), 2, tradingFee7Days);
 
         id = midnight.touchObligation(obligation);
         lenderOffer.obligation = obligation;
@@ -185,19 +190,21 @@ contract TradingFeeTest is BaseTest {
         assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testPostMaturityFee(uint256 units, uint256 sellerTick, uint256 fee0Day, uint256 maturity) public {
+    function testPostMaturityTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee0Day, uint256 maturity)
+        public
+    {
         units = bound(units, 1, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee0Day = bound(fee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee0Day = bound(tradingFee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
         maturity = bound(maturity, 0, block.timestamp - 1);
         obligation.maturity = maturity;
         id = toId(obligation);
         lenderOffer.obligation = obligation;
         borrowerOffer.obligation = obligation;
 
-        midnight.setDefaultTradingFee(address(loanToken), 0, fee0Day);
+        midnight.setDefaultTradingFee(address(loanToken), 0, tradingFee0Day);
         borrowerOffer.tick = sellerTick;
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -206,12 +213,14 @@ contract TradingFeeTest is BaseTest {
         take(units, lender, borrowerOffer);
     }
 
-    function testEarlyFee(uint256 units, uint256 sellerTick, uint256 fee360Days, uint256 maturity) public {
+    function testEarlyTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee360Days, uint256 maturity)
+        public
+    {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee360Days = bound(fee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        tradingFee360Days = bound(tradingFee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
         maturity = bound(maturity, block.timestamp + 360 days, block.timestamp + 36500 days);
 
         obligation.maturity = maturity;
@@ -219,10 +228,10 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.obligation = obligation;
         borrowerOffer.obligation = obligation;
 
-        midnight.setDefaultTradingFee(address(loanToken), 6, fee360Days);
+        midnight.setDefaultTradingFee(address(loanToken), 6, tradingFee360Days);
         borrowerOffer.tick = sellerTick;
 
-        uint256 tradingFee = fee360Days;
+        uint256 tradingFee = tradingFee360Days;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
