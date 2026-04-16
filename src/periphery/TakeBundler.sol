@@ -27,7 +27,7 @@ contract TakeBundler is ITakeBundler {
         uint256 maxBuyerPrice,
         uint256 minSellerPrice,
         uint256 maxSellerPrice,
-        bool skipRevertOnPartialFill
+        bool skipRevertOnTargetNotMet
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
@@ -55,7 +55,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(skipRevertOnPartialFill || totalFilledUnits == targetUnits, InsufficientLiquidity());
+        require(skipRevertOnTargetNotMet || totalFilledUnits == targetUnits, InsufficientLiquidity());
         require(totalBuyerAssets.mulDivDown(WAD, totalFilledUnits) >= minBuyerPrice, PriceBelowMin());
         require(totalBuyerAssets.mulDivUp(WAD, totalFilledUnits) <= maxBuyerPrice, PriceAboveMax());
         require(totalSellerAssets.mulDivDown(WAD, totalFilledUnits) >= minSellerPrice, PriceBelowMin());
@@ -76,7 +76,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minPrice,
         uint256 maxPrice,
-        bool skipRevertOnPartialFill
+        bool skipRevertOnTargetNotMet
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
@@ -109,7 +109,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(skipRevertOnPartialFill || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(skipRevertOnTargetNotMet || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
         require(totalFilledBuyerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
         require(totalFilledBuyerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
     }
@@ -127,7 +127,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minPrice,
         uint256 maxPrice,
-        bool skipRevertOnPartialFill
+        bool skipRevertOnTargetNotMet
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation); // to have the correct trading
@@ -160,7 +160,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(skipRevertOnPartialFill || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(skipRevertOnTargetNotMet || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
         require(totalFilledSellerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
         require(totalFilledSellerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
     }
