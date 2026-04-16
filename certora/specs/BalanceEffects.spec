@@ -37,11 +37,13 @@ methods {
 
 /// UPDATE POSITION ///
 
-/// updatePosition sets user's credit to the post-update value,
-/// only changes credit of user at the obligation id, and accrues fee to continuousFeeCredit.
+/// updatePosition can only decrease user's credit (through slashing and fee accrual),
+/// sets it to the post-update value, only changes credit of user at the obligation id,
+/// and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
+    uint256 creditBefore = creditOf(id, user);
     uint128 updatedUserCredit;
     uint128 userFee;
     updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, user);
@@ -56,6 +58,7 @@ rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, 
     assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
     assert creditOf(id, user) == updatedUserCredit;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
+    assert creditOf(id, user) <= creditBefore;
 }
 
 /// WITHDRAW ///
@@ -148,6 +151,20 @@ rule takeSellerEffects(env e, uint256 units, address taker, address takerCallbac
     assert debtOf(id, seller) <= sellerDebtBefore + units;
     assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
     assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
+}
+
+/// TAKE (DEBT DIRECTION) ///
+
+/// In take, the buyer's debt can only decrease.
+rule takeOnlySellerCanNewlyBecomeBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+    address buyer = offer.buy ? offer.maker : taker;
+
+    uint256 buyerDebtBefore = debtOf(id, buyer);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert debtOf(id, buyer) <= buyerDebtBefore;
 }
 
 /// REPAY ///
