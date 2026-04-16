@@ -11,6 +11,10 @@ methods {
     // Summarize mulDivDown and mulDivUp by ghost functions for prover performance.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // Token transfers happen after return values are computed; irrelevant to the assertion.
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
 /// SUMMARIES ///
