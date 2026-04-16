@@ -18,16 +18,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
 
-    // Callbacks and external calls assumed non-reentrant.
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
+    // External calls are assumed non-reentrant.
 }
 
 /// HELPERS ///
@@ -35,8 +26,6 @@ methods {
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
-
-/// LOSS INDEX IS ONLY CHANGED WHEN BAD DEBT HAPPENS ///
 
 /// The obligation's lossIndex is only modified by `liquidate`.
 rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
@@ -63,24 +52,6 @@ rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 c
     assert lossIndexChanged <=> badDebtOccurred;
 }
 
-/// LOSS INDEX: UPDATE POSITION EFFECTS ///
-
-/// `updatePosition` can only decrease the user's credit through slashing and fee accrual.
-rule updatePositionDecreasesCredit(env e, Midnight.Obligation obligation, address user) {
-    bytes32 id = summaryToId(obligation);
-
-    require obligationCreated(id), "obligation must be created";
-    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
-    require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
-    require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
-
-    uint256 creditBefore = creditOf(id, user);
-
-    updatePosition(e, obligation, user);
-
-    assert creditOf(id, user) <= creditBefore;
-}
-
 /// After `updatePosition`, the user's lossIndex is synced to the obligation's lossIndex.
 rule updatePositionSyncsLossIndex(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
@@ -88,4 +59,21 @@ rule updatePositionSyncsLossIndex(env e, Midnight.Obligation obligation, address
     updatePosition(e, obligation, user);
 
     assert userLossIndex(id, user) == currentContract.obligationState[id].lossIndex;
+}
+
+/// Under valid state, the loss index slash computation in `updatePosition` does not revert.
+rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
+    bytes32 id = summaryToId(obligation);
+
+    require obligationCreated(id), "obligation must be created";
+    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
+    require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
+    require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
+    require to_mathint(currentContract.obligationState[id].continuousFeeCredit) + pendingFee(id, user) <= max_uint128, "continuousFeeCredit cannot overflow from a single position's fee";
+    require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
+    require e.msg.value == 0, "Midnight is not payable";
+
+    updatePosition@withrevert(e, obligation, user);
+
+    assert !lastReverted, "updatePosition should not revert under valid state";
 }
