@@ -75,8 +75,11 @@ interface IMidnight {
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
     error InconsistentInput();
-    error InvalidBuyCallback();
-    error InvalidSellCallback();
+    error WrongBuyCallbackReturnValue();
+    error WrongSellCallbackReturnValue();
+    error WrongRepayCallbackReturnValue();
+    error WrongLiquidateCallbackReturnValue();
+    error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
     error InvalidProof();

@@ -385,7 +385,7 @@ contract Midnight is IMidnight {
             require(
                 ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidBuyCallback()
+                WrongBuyCallbackReturnValue()
             );
         }
 
@@ -398,7 +398,7 @@ contract Midnight is IMidnight {
             require(
                 ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidSellCallback()
+                WrongSellCallbackReturnValue()
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
@@ -443,7 +443,7 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ICallbacks(callback).onRepay(id, obligation, units, onBehalf, data) == CALLBACK_SUCCESS,
-                "invalid callback"
+                WrongRepayCallbackReturnValue()
             );
         }
 
@@ -627,7 +627,7 @@ contract Midnight is IMidnight {
                 ICallbacks(callback)
                     .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data)
                 == CALLBACK_SUCCESS,
-                "invalid callback"
+                WrongLiquidateCallbackReturnValue()
             );
         }
 
@@ -662,7 +662,10 @@ contract Midnight is IMidnight {
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
         SafeTransferLib.safeTransfer(token, msg.sender, assets);
-        require(IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS, "invalid callback");
+        require(
+            IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
+            WrongFlashLoanCallbackReturnValue()
+        );
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
     }
 
