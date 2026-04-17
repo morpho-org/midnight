@@ -9,10 +9,10 @@ uint256 constant BASE_SPACING = 4;
 library TickLib {
     using TickLib for uint256;
 
-    /// @dev Returns `x` / `d` rounded to the nearest integer with ties rounded down, without checking for overflow.
     error PriceGreaterThanOne();
     error TickOutOfRange();
 
+    /// @dev Returns `x` / `d` rounded to the nearest integer with ties rounded down, without checking for overflow.
     function divHalfDownUnchecked(uint256 x, uint256 d) internal pure returns (uint256) {
         unchecked {
             return (x + (d - 1) / 2) / d;
