@@ -290,7 +290,8 @@ contract ContinuousFeeTest is BaseTest {
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             exitAmount,
-            exitAmount
+            exitAmount,
+            address(0)
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 

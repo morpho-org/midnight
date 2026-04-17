@@ -368,23 +368,26 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
-        emit EventsLib.Take(
-            msg.sender,
-            id,
-            offer.maker,
-            taker,
-            offer.buy,
-            buyerAssets,
-            sellerAssets,
-            units,
-            receiver,
-            offer.group,
-            newConsumed,
-            buyerPendingFeeIncrease,
-            sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease
-        );
+        {
+            emit EventsLib.Take(
+                msg.sender,
+                id,
+                offer.maker,
+                taker,
+                offer.buy,
+                buyerAssets,
+                sellerAssets,
+                units,
+                receiver,
+                offer.group,
+                newConsumed,
+                buyerPendingFeeIncrease,
+                sellerPendingFeeDecrease,
+                buyerCreditIncrease,
+                sellerCreditDecrease,
+                buyerCallback
+            );
+        }
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
@@ -445,7 +448,7 @@ contract Midnight is IMidnight {
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
         obligationState[id].withdrawable += UtilsLib.toUint128(units);
 
-        emit EventsLib.Repay(msg.sender, id, units, onBehalf);
+        emit EventsLib.Repay(msg.sender, id, units, onBehalf, callback);
 
         if (callback != address(0)) {
             require(
@@ -626,7 +629,8 @@ contract Midnight is IMidnight {
             repaidUnits,
             borrower,
             badDebt,
-            _obligationState.lossIndex
+            _obligationState.lossIndex,
+            callback
         );
 
         address payer = callback != address(0) ? callback : msg.sender;
@@ -670,7 +674,7 @@ contract Midnight is IMidnight {
     }
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
-        emit EventsLib.FlashLoan(msg.sender, token, assets);
+        emit EventsLib.FlashLoan(msg.sender, token, assets, callback);
         SafeTransferLib.safeTransfer(token, callback, assets);
         require(
             IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,

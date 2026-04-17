@@ -311,7 +311,15 @@ contract LiquidationTest is BaseTest {
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
-            address(this), id, obligation.collateralParams[0].token, 0, 0, borrower, expectedBadDebt, expectedLossIndex
+            address(this),
+            id,
+            obligation.collateralParams[0].token,
+            0,
+            0,
+            borrower,
+            expectedBadDebt,
+            expectedLossIndex,
+            address(0)
         );
         midnight.liquidate(obligation, 0, 0, 0, borrower, address(0), "");
     }
