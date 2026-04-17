@@ -279,33 +279,7 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData,
-            address receiver
-        ) = offer.buy
-            ? (
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                taker,
-                takerCallback,
-                takerCallbackData,
-                receiverIfTakerIsSeller
-            )
-            : (
-                taker,
-                takerCallback,
-                takerCallbackData,
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                offer.receiverIfMakerIsSeller
-            );
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -369,29 +343,33 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
-        {
-            emit EventsLib.Take(
-                msg.sender,
-                id,
-                offer.maker,
-                taker,
-                offer.buy,
-                buyerAssets,
-                sellerAssets,
-                units,
-                receiver,
-                offer.group,
-                newConsumed,
-                buyerPendingFeeIncrease,
-                sellerPendingFeeDecrease,
-                buyerCreditIncrease,
-                sellerCreditDecrease,
-                buyerCallback
-            );
-        }
+        address buyerCallback = offer.buy ? offer.callback : takerCallback;
+        address sellerCallback = offer.buy ? takerCallback : offer.callback;
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
+
+        emit EventsLib.Take(
+            msg.sender,
+            id,
+            offer.maker,
+            taker,
+            offer.buy,
+            buyerAssets,
+            sellerAssets,
+            units,
+            payer,
+            receiver,
+            offer.group,
+            newConsumed,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            buyerCreditIncrease,
+            sellerCreditDecrease
+        );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
+            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
                 IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
@@ -399,12 +377,12 @@ contract Midnight is IMidnight {
             );
         }
 
-        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
+            bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
                 ISellCallback(sellerCallback)
                         .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
@@ -449,7 +427,8 @@ contract Midnight is IMidnight {
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
         obligationState[id].withdrawable += UtilsLib.toUint128(units);
 
-        emit EventsLib.Repay(msg.sender, id, units, onBehalf, callback);
+        address payer = callback != address(0) ? callback : msg.sender;
+        emit EventsLib.Repay(msg.sender, id, units, onBehalf, payer);
 
         if (callback != address(0)) {
             require(
@@ -457,8 +436,6 @@ contract Midnight is IMidnight {
                 WrongRepayCallbackReturnValue()
             );
         }
-
-        address payer = callback != address(0) ? callback : msg.sender;
         SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), units);
     }
 
@@ -622,6 +599,7 @@ contract Midnight is IMidnight {
             _position.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
+        address payer = callback != address(0) ? callback : msg.sender;
         emit EventsLib.Liquidate(
             msg.sender,
             id,
@@ -631,10 +609,8 @@ contract Midnight is IMidnight {
             borrower,
             badDebt,
             _obligationState.lossIndex,
-            callback
+            payer
         );
-
-        address payer = callback != address(0) ? callback : msg.sender;
         SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, payer, seizedAssets);
 
         if (callback != address(0)) {
