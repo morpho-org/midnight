@@ -82,7 +82,9 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
+        midnight.take(
+            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+        );
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -97,7 +99,9 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
+        midnight.take(
+            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+        );
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -114,7 +118,9 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
+        midnight.take(
+            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+        );
 
         // Refine to spacing 2.
         midnight.setObligationSpacing(id, 2);
