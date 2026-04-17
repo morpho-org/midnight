@@ -447,7 +447,8 @@ contract Midnight is IMidnight {
             );
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
+        address payer = callback != address(0) ? callback : msg.sender;
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), units);
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
@@ -621,7 +622,8 @@ contract Midnight is IMidnight {
             _obligationState.lossIndex
         );
 
-        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, msg.sender, seizedAssets);
+        address payer = callback != address(0) ? callback : msg.sender;
+        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, payer, seizedAssets);
 
         if (callback != address(0)) {
             require(
@@ -632,7 +634,7 @@ contract Midnight is IMidnight {
             );
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), repaidUnits);
 
         return (seizedAssets, repaidUnits);
     }
@@ -662,12 +664,12 @@ contract Midnight is IMidnight {
 
     function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
         emit EventsLib.FlashLoan(msg.sender, token, assets);
-        SafeTransferLib.safeTransfer(token, msg.sender, assets);
+        SafeTransferLib.safeTransfer(token, callback, assets);
         require(
             IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
-        SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
+        SafeTransferLib.safeTransferFrom(token, callback, address(this), assets);
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
