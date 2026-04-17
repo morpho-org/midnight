@@ -144,7 +144,9 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer]));
+        return midnight.take(
+            units, taker, address(0), hex"", taker, offer, ratifierData([offer]), root([offer]), proof([offer])
+        );
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -217,7 +219,7 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function sig(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+    function ratifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
         return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
     }
 
@@ -260,12 +262,12 @@ abstract contract BaseTest is Test {
         return _signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (bytes memory) {
+    function ratifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
 
-    function sig(Offer[2] memory offers) internal view returns (bytes memory) {
+    function ratifierData(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
     }
@@ -328,7 +330,7 @@ abstract contract BaseTest is Test {
             hex"",
             borrower,
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );

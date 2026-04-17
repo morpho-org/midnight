@@ -21,10 +21,10 @@ contract FlashLiquidateCallback {
     function onLiquidate(
         bytes32,
         Obligation memory obligation,
-        uint256 collateralIndex,
-        uint256 seizedAssets,
+        uint256,
+        uint256,
         uint256 repaidUnits,
-        address borrower,
+        address,
         bytes memory data
     ) external returns (bytes32) {
         startFlashloan(obligation.loanToken, repaidUnits);

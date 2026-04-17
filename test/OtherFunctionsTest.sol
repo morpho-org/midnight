@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {ICallbacks, IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 
@@ -613,13 +613,13 @@ contract OtherFunctionsTest is BaseTest {
             uint128 _lossIndex,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
-            uint16 fee0,
-            uint16 fee1,
-            uint16 fee2,
-            uint16 fee3,
-            uint16 fee4,
-            uint16 fee5,
-            uint16 fee6,
+            uint16 tradingFee0,
+            uint16 tradingFee1,
+            uint16 tradingFee2,
+            uint16 tradingFee3,
+            uint16 tradingFee4,
+            uint16 tradingFee5,
+            uint16 tradingFee6,
             uint32 _continuousFee,
             bool created
         ) = midnight.obligationState(_id);
@@ -630,13 +630,13 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
-        assertEq(fee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "fee0");
-        assertEq(fee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "fee1");
-        assertEq(fee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "fee2");
-        assertEq(fee3, midnight.defaultTradingFees(_obligation.loanToken, 3), "fee3");
-        assertEq(fee4, midnight.defaultTradingFees(_obligation.loanToken, 4), "fee4");
-        assertEq(fee5, midnight.defaultTradingFees(_obligation.loanToken, 5), "fee5");
-        assertEq(fee6, midnight.defaultTradingFees(_obligation.loanToken, 6), "fee6");
+        assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
+        assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
+        assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");
+        assertEq(tradingFee3, midnight.defaultTradingFees(_obligation.loanToken, 3), "tradingFee3");
+        assertEq(tradingFee4, midnight.defaultTradingFees(_obligation.loanToken, 4), "tradingFee4");
+        assertEq(tradingFee5, midnight.defaultTradingFees(_obligation.loanToken, 5), "tradingFee5");
+        assertEq(tradingFee6, midnight.defaultTradingFees(_obligation.loanToken, 6), "tradingFee6");
     }
 
     function testObligationStateAfterTrade() public {
@@ -654,11 +654,12 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {
-        bytes4[4] memory selectors = [
+        bytes4[5] memory selectors = [
             ICallbacks.onBuy.selector,
             ICallbacks.onSell.selector,
             ICallbacks.onLiquidate.selector,
-            ICallbacks.onRepay.selector
+            ICallbacks.onRepay.selector,
+            IFlashLoanCallback.onFlashLoan.selector
         ];
         for (uint256 i = 0; i < selectors.length; i++) {
             vm.prank(msgSender);
