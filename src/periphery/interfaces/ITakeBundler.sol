@@ -14,19 +14,14 @@ struct Take {
 
 interface ITakeBundler {
     /// ERRORS ///
-    error BuyerAssetsAboveMax();
-    error BuyerAssetsBelowMin();
     error InsufficientLiquidity();
-    error SellerAssetsAboveMax();
-    error SellerAssetsBelowMin();
     error Unauthorized();
-    error UnitsAboveMax();
-    error UnitsBelowMin();
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets) external;
-    function bundleTakeBuyerAssets(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
-    function bundleTakeSellerAssets(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
+    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes) external;
+    function buyAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes) external;
+    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes) external;
+    function sellAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes) external;
     // forgefmt: disable-end
 }
