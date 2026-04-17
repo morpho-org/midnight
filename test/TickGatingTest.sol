@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
@@ -85,7 +85,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, sig([offer]), root([offer]), proof([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -100,7 +100,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, sig([offer]), root([offer]), proof([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -117,7 +117,7 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, sig([offer]), root([offer]), proof([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer]));
 
         // Refine to spacing 2.
         midnight.setObligationSpacing(id, 2);
@@ -184,7 +184,7 @@ contract TickGatingTest is BaseTest {
 
     function testSetTickSetterOnlyOwner() public {
         vm.prank(lender);
-        vm.expectRevert("only owner");
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setTickSetter(lender);
     }
 

@@ -125,7 +125,6 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableTradingFee;
-    address public owner;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -139,7 +138,6 @@ contract Midnight is IMidnight {
     /// CONSTRUCTOR ///
 
     constructor() {
-        owner = msg.sender;
         roleSetter = msg.sender;
         emit EventsLib.Constructor(roleSetter);
     }
@@ -178,7 +176,7 @@ contract Midnight is IMidnight {
     }
 
     function setTickSetter(address newTickSetter) external {
-        require(msg.sender == owner, "only owner");
+        require(msg.sender == roleSetter, OnlyRoleSetter());
         tickSetter = newTickSetter;
         emit EventsLib.SetTickSetter(newTickSetter);
     }
