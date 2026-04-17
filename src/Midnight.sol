@@ -396,8 +396,7 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback)
-                        .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
