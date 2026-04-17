@@ -10,6 +10,7 @@ methods {
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
+    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function _.price() external => NONDET;
@@ -17,6 +18,10 @@ methods {
     // Deterministic toId needed to link obligation arguments to stored state.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+
+    // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
     // External calls are assumed non-reentrant.
 }
@@ -76,4 +81,25 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     updatePosition@withrevert(e, obligation, user);
 
     assert !lastReverted, "updatePosition should not revert under valid state";
+}
+
+/// The loss index arithmetic in `liquidate` does not revert under valid state.
+/// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
+/// Uses activatedCollaterals=0 to skip the collateral loop, ensuring badDebt == position.debt.
+rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
+    bytes32 id = summaryToId(obligation);
+
+    require data.length == 0, "no callback to avoid unrelated external call reverts";
+    require obligationCreated(id), "obligation must be created";
+    require obligation.liquidatorGate == 0, "Assumption:no liquidator gate";
+    require obligation.collateralParams.length > 0, "obligation has at least one collateral (enforced by touchObligation)";
+    require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";
+    require currentContract.position[id][borrower].activatedCollaterals == 0, "Assumption: no active collaterals: skip loop and maximize badDebt";
+    require currentContract.position[id][borrower].debt > 0, "borrower must have debt to enter badDebt > 0 block";
+    require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (system invariant)";
+    require e.msg.value == 0, "Midnight is not payable";
+
+    liquidate@withrevert(e, obligation, 0, 0, 0, borrower, data);
+
+    assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
 }
