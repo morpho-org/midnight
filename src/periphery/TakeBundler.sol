@@ -16,7 +16,6 @@ contract TakeBundler is ITakeBundler {
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev Reverts if totalFilledUnits is 0 (division by zero in the price check).
     function bundleTakeUnits(
         address midnight,
         uint256 targetUnits,
@@ -56,17 +55,16 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(skipRevertOnTargetNotMet || totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets.mulDivDown(WAD, totalFilledUnits) >= minBuyerPrice, PriceBelowMin());
-        require(totalBuyerAssets.mulDivUp(WAD, totalFilledUnits) <= maxBuyerPrice, PriceAboveMax());
-        require(totalSellerAssets.mulDivDown(WAD, totalFilledUnits) >= minSellerPrice, PriceBelowMin());
-        require(totalSellerAssets.mulDivUp(WAD, totalFilledUnits) <= maxSellerPrice, PriceAboveMax());
+        require(totalBuyerAssets * WAD >= minBuyerPrice * totalFilledUnits, PriceBelowMin());
+        require(totalBuyerAssets * WAD <= maxBuyerPrice * totalFilledUnits, PriceAboveMax());
+        require(totalSellerAssets * WAD >= minSellerPrice * totalFilledUnits, PriceBelowMin());
+        require(totalSellerAssets * WAD <= maxSellerPrice * totalFilledUnits, PriceAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets buyer assets.
     /// @dev Not usable if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev buyerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
-    /// @dev Reverts if totalUnits is 0 (division by zero in the price check).
     /// @dev Requires a non-empty takes array.
     function bundleTakeBuyerAssets(
         address midnight,
@@ -110,14 +108,13 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(skipRevertOnTargetNotMet || totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalFilledBuyerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
-        require(totalFilledBuyerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
+        require(totalFilledBuyerAssets * WAD >= minPrice * totalUnits, PriceBelowMin());
+        require(totalFilledBuyerAssets * WAD <= maxPrice * totalUnits, PriceAboveMax());
     }
 
     /// @dev Same as bundleTakeUnits but targets seller assets.
     /// @dev sellerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
     /// tradingFee) are not caught by the try/catch and will abort the bundle.
-    /// @dev Reverts if totalUnits is 0 (division by zero in the price check).
     /// @dev Requires a non-empty takes array.
     function bundleTakeSellerAssets(
         address midnight,
@@ -161,7 +158,7 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(skipRevertOnTargetNotMet || totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalFilledSellerAssets.mulDivDown(WAD, totalUnits) >= minPrice, PriceBelowMin());
-        require(totalFilledSellerAssets.mulDivUp(WAD, totalUnits) <= maxPrice, PriceAboveMax());
+        require(totalFilledSellerAssets * WAD >= minPrice * totalUnits, PriceBelowMin());
+        require(totalFilledSellerAssets * WAD <= maxPrice * totalUnits, PriceAboveMax());
     }
 }
