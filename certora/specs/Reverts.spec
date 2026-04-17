@@ -420,4 +420,3 @@ rule callbackRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address tak
 
     assert lastReverted;
 }
-
