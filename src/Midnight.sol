@@ -128,12 +128,7 @@ contract Midnight is IMidnight {
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
-
-    /// @dev Address that can set tick accessibility levels.
     address public tickSetter;
-
-    /// @dev Default spacing per loan token. Applied when obligations are created.
-    mapping(address loanToken => uint8) public defaultSpacing;
 
     /// CONSTRUCTOR ///
 
@@ -190,17 +185,6 @@ contract Midnight is IMidnight {
         // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
         obligationState[id].spacing = uint8(newSpacing);
         emit EventsLib.SetObligationSpacing(id, newSpacing);
-    }
-
-    /// @dev Sets the default spacing for new obligations with the given loan token.
-    /// @dev Unlike per-obligation spacing (which can only decrease), the default can be freely changed because it only
-    /// affects future obligations at creation time. Existing obligations and their signed offers are never impacted.
-    function setDefaultSpacing(address loanToken, uint256 newSpacing) external {
-        require(msg.sender == tickSetter, "only tick setter");
-        require(newSpacing > 0 && BASE_SPACING % newSpacing == 0, "invalid spacing");
-        // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
-        defaultSpacing[loanToken] = uint8(newSpacing);
-        emit EventsLib.SetDefaultSpacing(loanToken, newSpacing);
     }
 
     /// @dev Overrides the fee of a specific obligation.
@@ -717,9 +701,8 @@ contract Midnight is IMidnight {
 
             ObligationState storage _obligationState = obligationState[id];
             _obligationState.created = true;
-            uint8 _defaultSpacing = defaultSpacing[obligation.loanToken];
             // forge-lint: disable-next-line(unsafe-typecast) as BASE_SPACING < type(uint8).max
-            _obligationState.spacing = _defaultSpacing == 0 ? uint8(BASE_SPACING) : _defaultSpacing;
+            _obligationState.spacing = uint8(BASE_SPACING);
             uint16[7] memory _defaultTradingFees = defaultTradingFees[obligation.loanToken];
             _obligationState.tradingFee0 = _defaultTradingFees[0];
             _obligationState.tradingFee1 = _defaultTradingFees[1];

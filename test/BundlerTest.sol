@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
 import {ITakeBundler, Take} from "../src/periphery/interfaces/ITakeBundler.sol";
@@ -283,8 +283,8 @@ contract BundlerTest is BaseTest {
         uint256 maxBuyerAssets
     ) public {
         uint256 minTick = _minTick();
-        tick0 = bound(tick0, minTick, MAX_TICK);
-        tick1 = bound(tick1, minTick, MAX_TICK);
+        tick0 = bound(tick0, (minTick + BASE_SPACING - 1) / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick1 = bound(tick1, (minTick + BASE_SPACING - 1) / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         // Ensure buyerAssets > 0 so the max bound actually triggers.
         uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
         targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
@@ -336,8 +336,8 @@ contract BundlerTest is BaseTest {
         uint256 minBuyerAssets
     ) public {
         uint256 minTick = _minTick();
-        tick0 = bound(tick0, minTick, MAX_TICK);
-        tick1 = bound(tick1, minTick, MAX_TICK);
+        tick0 = bound(tick0, (minTick + BASE_SPACING - 1) / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick1 = bound(tick1, (minTick + BASE_SPACING - 1) / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
         offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;

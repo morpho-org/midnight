@@ -40,9 +40,6 @@ contract TickGatingTest is BaseTest {
             );
         obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
 
-        // Set default spacing to BASE_SPACING (most restrictive) for this test's loan token.
-        midnight.setDefaultSpacing(address(loanToken), BASE_SPACING);
-
         // Create the obligation so it picks up spacing 4.
         id = midnight.touchObligation(obligation);
     }
@@ -156,28 +153,6 @@ contract TickGatingTest is BaseTest {
     function testSetObligationSpacingRequiresCreated() public {
         vm.expectRevert("obligation not created");
         midnight.setObligationSpacing(bytes32(uint256(42)), 1);
-    }
-
-    // --- setDefaultSpacing governance ---
-
-    function testSetDefaultSpacingOnlyTickSetter() public {
-        vm.prank(lender);
-        vm.expectRevert("only tick setter");
-        midnight.setDefaultSpacing(address(loanToken), 2);
-    }
-
-    function testSetDefaultSpacingInvalid() public {
-        vm.expectRevert("invalid spacing");
-        midnight.setDefaultSpacing(address(loanToken), 3);
-
-        vm.expectRevert("invalid spacing");
-        midnight.setDefaultSpacing(address(loanToken), 0);
-    }
-
-    function testSetDefaultSpacingCanIncrease() public {
-        midnight.setDefaultSpacing(address(loanToken), 1);
-        midnight.setDefaultSpacing(address(loanToken), 2);
-        assertEq(midnight.defaultSpacing(address(loanToken)), 2);
     }
 
     // --- setTickSetter governance ---

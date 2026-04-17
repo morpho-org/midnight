@@ -106,8 +106,6 @@ abstract contract BaseTest is Test {
             collateralToken2 = new ERC20("collat2", "collat2");
         }
 
-        midnight.setDefaultSpacing(address(loanToken), 1);
-
         oracle1 = new Oracle();
         oracle2 = new Oracle();
 

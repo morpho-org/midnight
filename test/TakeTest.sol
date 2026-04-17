@@ -8,7 +8,7 @@ import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
 import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -97,7 +97,7 @@ contract TakeTest is BaseTest {
 
     function testBuy1(uint256 units, uint256 tick) public {
         units = bound(units, 1, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         borrowerOffer.tick = tick;
@@ -117,7 +117,7 @@ contract TakeTest is BaseTest {
 
     function testSell1(uint256 units, uint256 tick) public {
         units = bound(units, 1, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         lenderOffer.tick = tick;
@@ -139,7 +139,7 @@ contract TakeTest is BaseTest {
 
     function testBuy2(uint256 units, uint256 tick, uint256 otherLenderUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivDown(price, WAD);
@@ -163,7 +163,7 @@ contract TakeTest is BaseTest {
 
     function testSell2(uint256 units, uint256 tick, uint256 otherLenderUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivDown(price, WAD);
@@ -209,7 +209,7 @@ contract TakeTest is BaseTest {
 
     function testBuy3(uint256 units, uint256 tick, uint256 existingUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         existingUnits = bound(existingUnits, units, max(units, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
@@ -229,7 +229,7 @@ contract TakeTest is BaseTest {
 
     function testSell3(uint256 units, uint256 tick, uint256 existingUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         existingUnits = bound(existingUnits, units, max(units, maxAssets));
         setupOtherUsers(obligation, existingUnits);
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
@@ -270,7 +270,7 @@ contract TakeTest is BaseTest {
 
     function testBuy4(uint256 units, uint256 tick, uint256 existingUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivUp(price, WAD);
@@ -293,7 +293,7 @@ contract TakeTest is BaseTest {
 
     function testSell4(uint256 units, uint256 tick, uint256 existingUnits) public {
         units = bound(units, 0, maxAssets);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price = TickLib.tickToPrice(tick);
         vm.assume(price > 0.01 ether);
         uint256 buyerAssets = units.mulDivDown(price, WAD);
@@ -614,8 +614,8 @@ contract TakeTest is BaseTest {
     // address(this) makes an arbitrage for 2 crossed offers.
     function testMatch(uint256 units, uint256 tick1, uint256 tick2) public {
         units = bound(units, 1, maxAssets);
-        tick1 = bound(tick1, MAX_TICK / 4, MAX_TICK);
-        tick2 = bound(tick2, MAX_TICK / 4, MAX_TICK);
+        tick1 = bound(tick1, MAX_TICK / 4 / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick2 = bound(tick2, MAX_TICK / 4 / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price1 = TickLib.tickToPrice(tick1);
         uint256 price2 = TickLib.tickToPrice(tick2);
         vm.assume(price1 > price2);
@@ -640,8 +640,8 @@ contract TakeTest is BaseTest {
     // address(this) makes an arbitrage for 2 crossed offers.
     function testMatchInverse(uint256 units, uint256 tick1, uint256 tick2) public {
         units = bound(units, 1, maxAssets);
-        tick1 = bound(tick1, MAX_TICK / 4, MAX_TICK);
-        tick2 = bound(tick2, MAX_TICK / 4, MAX_TICK);
+        tick1 = bound(tick1, MAX_TICK / 4 / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick2 = bound(tick2, MAX_TICK / 4 / BASE_SPACING, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 price1 = TickLib.tickToPrice(tick1);
         uint256 price2 = TickLib.tickToPrice(tick2);
         vm.assume(price2 > price1);
@@ -693,7 +693,7 @@ contract TakeTest is BaseTest {
     function testBuyUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);
@@ -707,7 +707,7 @@ contract TakeTest is BaseTest {
     function testSellUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
         units = bound(units, 1, maxAssets);
         collateralized = bound(collateralized, 0, units / 2);
-        tick = bound(tick, 0, MAX_TICK);
+        tick = bound(tick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         lenderOffer.maxUnits = units;
         lenderOffer.tick = tick;
         uint256 price = TickLib.tickToPrice(tick);

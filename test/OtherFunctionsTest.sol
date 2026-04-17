@@ -624,7 +624,7 @@ contract OtherFunctionsTest is BaseTest {
             bool created
         ) = midnight.obligationState(_id);
 
-        uint8 expectedSpacing = _obligation.loanToken == address(loanToken) ? 1 : 4;
+        uint8 expectedSpacing = 4;
 
         assertTrue(created, "obligation should be created");
         assertEq(totalUnits, 0, "totalUnits");
@@ -655,7 +655,7 @@ contract OtherFunctionsTest is BaseTest {
         assertTrue(created, "should be created");
         assertEq(totalUnits, units, "totalUnits after trade");
         assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after trade");
-        assertEq(spacing, 1, "spacing after trade");
+        assertEq(spacing, 4, "spacing after trade");
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {
