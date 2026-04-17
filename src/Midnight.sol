@@ -505,6 +505,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        address receiver,
         address callback,
         bytes calldata data
     ) external returns (uint256, uint256) {
@@ -600,6 +601,7 @@ contract Midnight is IMidnight {
         }
 
         address payer = callback != address(0) ? callback : msg.sender;
+
         emit EventsLib.Liquidate(
             msg.sender,
             id,
@@ -609,9 +611,11 @@ contract Midnight is IMidnight {
             borrower,
             badDebt,
             _obligationState.lossIndex,
-            payer
+            payer,
+            receiver
         );
-        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, payer, seizedAssets);
+
+        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, receiver, seizedAssets);
 
         if (callback != address(0)) {
             require(

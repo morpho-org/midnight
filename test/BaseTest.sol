@@ -202,7 +202,7 @@ abstract contract BaseTest is Test {
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(0), "");
+        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);

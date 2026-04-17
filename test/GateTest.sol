@@ -280,7 +280,7 @@ contract GateTest is BaseTest {
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, address(0), "");
+        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, address(this), address(0), "");
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
@@ -296,7 +296,7 @@ contract GateTest is BaseTest {
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, address(0), "");
+        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     // --- Default (no gate) tests ---

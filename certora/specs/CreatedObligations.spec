@@ -111,8 +111,8 @@ rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation oblig
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address callback, bytes data) {
-    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, callback, data);
+rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert obligationIsCreated(obligation);
 }
 

@@ -535,7 +535,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.warp(_obligation.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
-        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, address(0), "");
+        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, address(this), address(0), "");
 
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");

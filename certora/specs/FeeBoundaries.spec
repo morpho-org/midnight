@@ -53,7 +53,7 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
         preserved withdrawCollateral(Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
-        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address callback, bytes data) with (env e) {
+        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
         preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
