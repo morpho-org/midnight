@@ -284,7 +284,7 @@ contract ContinuousFeeTest is BaseTest {
             takeAssets,
             takeAssets,
             exitAmount,
-            address(0),
+            otherLender,
             lender,
             keccak256("lender-exit"),
             exitAmount,

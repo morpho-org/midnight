@@ -319,7 +319,7 @@ contract LiquidationTest is BaseTest {
             borrower,
             expectedBadDebt,
             expectedLossIndex,
-            address(0)
+            address(this)
         );
         midnight.liquidate(obligation, 0, 0, 0, borrower, address(0), "");
     }
