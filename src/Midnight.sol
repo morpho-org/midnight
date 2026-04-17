@@ -102,8 +102,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
 /// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
 /// that token.
-/// @dev If a callback reverts, or if a callback returns something other than `CALLBACK_SUCCESS`, callback-enabled
-/// `take`, `repay`, `liquidate`, and `flashLoan` revert.
+/// @dev If a callback reverts or returns something other than `CALLBACK_SUCCESS`, `take`, `repay`, `liquidate`, and
+/// `flashLoan` revert.
+///
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, and fee claimer.
 /// @dev The fee setter can set the default and per-obligation trading fee and continuous fee.
