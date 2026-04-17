@@ -113,7 +113,7 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     mathint product = to_mathint(x) * y;
-    if (product > max_uint256 || d > 0 && product + d - 1 > max_uint256) {
+    if (product > max_uint256 || (d > 0 && product + d - 1 > max_uint256)) {
         mulOverflow = true;
     }
 
