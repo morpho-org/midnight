@@ -72,7 +72,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 /// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
 rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, bytes data) {
     uint256 maxLif = obligation.collateralParams[collateralIndex].maxLif;
-    require maxLif >= WAD(), "maxLif must be at least 1x";
+    require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
     bytes32 id = toId(e, obligation);
     bool maxLifReached = !isHealthy(obligation, id, borrower) || e.block.timestamp >= require_uint256(obligation.maturity + TIME_TO_MAX_LIF());
