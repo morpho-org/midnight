@@ -10,7 +10,13 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Position} from "./interfaces/IMidnight.sol";
-import {ICallbacks, IFlashLoanCallback} from "./interfaces/ICallbacks.sol";
+import {
+    IBuyCallback,
+    ISellCallback,
+    ILiquidateCallback,
+    IRepayCallback,
+    IFlashLoanCallback
+} from "./interfaces/ICallbacks.sol";
 import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
@@ -383,7 +389,7 @@ contract Midnight is IMidnight {
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             require(
-                ICallbacks(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
+                IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
@@ -396,7 +402,8 @@ contract Midnight is IMidnight {
 
         if (sellerCallback != address(0)) {
             require(
-                ICallbacks(sellerCallback).onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                ISellCallback(sellerCallback)
+                        .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
@@ -442,7 +449,7 @@ contract Midnight is IMidnight {
 
         if (callback != address(0)) {
             require(
-                ICallbacks(callback).onRepay(id, obligation, units, onBehalf, data) == CALLBACK_SUCCESS,
+                IRepayCallback(callback).onRepay(id, obligation, units, onBehalf, data) == CALLBACK_SUCCESS,
                 WrongRepayCallbackReturnValue()
             );
         }
@@ -627,7 +634,7 @@ contract Midnight is IMidnight {
 
         if (callback != address(0)) {
             require(
-                ICallbacks(callback)
+                ILiquidateCallback(callback)
                     .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data)
                 == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
