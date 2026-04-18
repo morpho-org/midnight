@@ -39,27 +39,27 @@ function summaryToId(Midnight.Obligation obligation) returns bytes32 {
     return Utils.hashObligation(obligation);
 }
 
+// Axioms proven in MulDiv.spec (mulDivDownRoundsDown, mulDivDownTightBound).
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
 
+// Axioms proven in MulDiv.spec (mulDivUpRoundsUp, mulDivUpTightBound).
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
 }
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0) {
         revert();
     }
     return ghostMulDivDown(x, y, d);
 }
 
 function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0) {
         revert();
     }
     return ghostMulDivUp(x, y, d);

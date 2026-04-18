@@ -36,11 +36,13 @@ definition TIME_TO_MAX_LIF() returns uint256 = 900; // 15 min
 
 persistent ghost summaryPrice(address) returns uint256;
 
+// Axioms proven in MulDiv.spec (mulDivDownTightBound, mulDivDownRoundsDown).
 persistent ghost summaryMulDivDownM(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(a, b, d) * d <= a * b;
 }
 
+// Axioms proven in MulDiv.spec (mulDivUpUpperBound, mulDivUpRoundsUp).
 persistent ghost summaryMulDivUpM(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => summaryMulDivUpM(a, b, d) * d < a * b + d;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => summaryMulDivUpM(a, b, d) * d >= a * b;
@@ -50,18 +52,15 @@ function summaryToId(Midnight.Obligation obligation) returns bytes32 {
     return Utils.hashObligation(obligation);
 }
 
-// Non-deterministic overflow models potential revert on x * y overflow.
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0) {
         revert();
     }
     return summaryMulDivDownM(a, b, d);
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0) {
         revert();
     }
     return summaryMulDivUpM(a, b, d);
@@ -84,10 +83,10 @@ rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 co
     mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
 
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit floor rounding on seizedAssets).
-    assert (seizedResult + 1) * price > repaidResult * ORACLE_PRICE_SCALE();
+    assert repaidUnits > 0 => (seizedResult + 1) * price > repaidResult * ORACLE_PRICE_SCALE();
 
     // lif == maxLif when borrower is unhealthy or >= 15 min post-maturity: full liquidation incentive factor applies.
-    assert maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
+    assert repaidUnits > 0 && maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
 }
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
