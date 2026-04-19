@@ -2,13 +2,20 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMidnight} from "../interfaces/IMidnight.sol";
+import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
+import {IBuyCallback} from "../interfaces/ICallbacks.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
+import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
-contract TakeBundler is ITakeBundler {
+contract TakeBundler is ITakeBundler, IBuyCallback {
     using UtilsLib for uint256;
+
+    /// @dev Transient caller address set before each take and consumed by onBuy.
+    address public transient _caller;
 
     /// @dev Assumes offers are all share the same obligation id.
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
@@ -18,7 +25,6 @@ contract TakeBundler is ITakeBundler {
         address midnight,
         uint256 targetUnits,
         address taker,
-        address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minBuyerAssets,
         uint256 maxBuyerAssets
@@ -28,13 +34,14 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            _caller = msg.sender;
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
                     taker,
-                    address(0),
+                    address(this),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(0),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -96,7 +103,6 @@ contract TakeBundler is ITakeBundler {
         address midnight,
         uint256 targetBuyerAssets,
         address taker,
-        address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minUnits,
         uint256 maxUnits
@@ -108,6 +114,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+            _caller = msg.sender;
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -117,9 +124,9 @@ contract TakeBundler is ITakeBundler {
                         takes[i].units
                     ),
                     taker,
-                    address(0),
+                    address(this),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(0),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -181,5 +188,19 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
         require(totalUnits >= minUnits, UnitsBelowMin());
         require(totalUnits <= maxUnits, UnitsAboveMax());
+    }
+
+    /// @dev Pulls buyerAssets from the caller (stored in transient storage) and approves the Midnight contract to spend
+    /// them. Only callable during an active buy function execution (_caller is set before each take and consumed here).
+    function onBuy(bytes32, Obligation memory obligation, address, uint256 buyerAssets, uint256, bytes memory)
+        external
+        returns (bytes32)
+    {
+        address payer = _caller;
+        require(payer != address(0), Unauthorized());
+        _caller = address(0);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), buyerAssets);
+        IERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
+        return CALLBACK_SUCCESS;
     }
 }
