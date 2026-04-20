@@ -6,6 +6,7 @@ import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.s
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
 import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
@@ -46,7 +47,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testOnRatifyAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = keccak256(abi.encode(offer));
+        bytes32 _root = UtilsLib.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, true);
@@ -60,7 +61,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = keccak256(abi.encode(offer));
+        bytes32 _root = UtilsLib.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, address(setterRatifier), true);

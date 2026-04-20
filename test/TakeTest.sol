@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
 import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
@@ -919,7 +919,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig),
+            abi.encode(_sig, uint256(0)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1748,8 +1748,9 @@ contract RatifyCallback is IRatifier {
         _recordedOffer = offer;
 
         if (ratifierData.length > 0) {
-            Signature memory signature = abi.decode(ratifierData, (Signature));
-            bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
+            bytes32 _rootTypeHash = UtilsLib.rootTypeHash(height);
+            bytes32 structHash = keccak256(abi.encode(_rootTypeHash, root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
             recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);
