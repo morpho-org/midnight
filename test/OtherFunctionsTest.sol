@@ -23,7 +23,8 @@ import {
     MAX_CONTINUOUS_FEE,
     WAD,
     ORACLE_PRICE_SCALE,
-    TIME_TO_MAX_LIF
+    TIME_TO_MAX_LIF,
+    CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
@@ -121,7 +122,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        midnight.repay(obligation, repaid, borrower, hex"");
+        midnight.repay(obligation, repaid, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
@@ -534,7 +535,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.warp(_obligation.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
-        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, "");
+        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, address(this), address(0), "");
 
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
@@ -684,7 +685,7 @@ contract RepayCallback {
         external
     {
         ERC20(obligation.loanToken).approve(address(midnight), units);
-        midnight.repay(obligation, units, onBehalf, data);
+        midnight.repay(obligation, units, onBehalf, address(this), data);
     }
 
     function onRepay(
@@ -693,11 +694,12 @@ contract RepayCallback {
         uint256 units,
         address onBehalf,
         bytes memory data
-    ) external {
+    ) external returns (bytes32) {
         require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedObligationId = obligationId;
         recordedData = data;
         recordedUnits = units;
         recordedOnBehalf = onBehalf;
+        return CALLBACK_SUCCESS;
     }
 }
