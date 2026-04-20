@@ -272,7 +272,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testToObligationRevertsIfNotCreated(bytes32 _id) public {
-        vm.expectRevert();
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.toObligation(_id);
     }
 
