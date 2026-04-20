@@ -239,7 +239,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, hex"");
+        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
     }
@@ -254,7 +254,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, hex"");
+        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
 
         gate.setWhitelisted(lender, false);
 
@@ -280,7 +280,7 @@ contract GateTest is BaseTest {
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, "");
+        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, address(this), address(0), "");
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
@@ -296,7 +296,7 @@ contract GateTest is BaseTest {
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, "");
+        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     // --- Default (no gate) tests ---

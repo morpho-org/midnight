@@ -75,8 +75,11 @@ interface IMidnight {
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
     error InconsistentInput();
-    error InvalidBuyCallback();
-    error InvalidSellCallback();
+    error WrongBuyCallbackReturnValue();
+    error WrongSellCallbackReturnValue();
+    error WrongRepayCallbackReturnValue();
+    error WrongLiquidateCallbackReturnValue();
+    error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
     error InvalidProof();
@@ -137,10 +140,10 @@ interface IMidnight {
     /// ENTRY-POINTS ///
     function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external;
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data) external;
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Obligation calldata obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes calldata data) external returns (uint256, uint256);
+    function liquidate(Obligation calldata obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes calldata data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function shuffleSession(address onBehalf) external;
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;

@@ -16,6 +16,7 @@ interface ITakeBundler {
     /// ERRORS ///
     error BuyerAssetsAboveMax();
     error BuyerAssetsBelowMin();
+    error InconsistentSide();
     error InsufficientLiquidity();
     error SellerAssetsAboveMax();
     error SellerAssetsBelowMin();
@@ -25,8 +26,9 @@ interface ITakeBundler {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function bundleTakeUnits(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 minSellerAssets, uint256 maxSellerAssets) external;
-    function bundleTakeBuyerAssets(address midnight, uint256 targetBuyerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
-    function bundleTakeSellerAssets(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
+    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets) external;
+    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minSellerAssets, uint256 maxSellerAssets) external;
+    function buyBuyerAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
+    function sellSellerAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits) external;
     // forgefmt: disable-end
 }
