@@ -74,7 +74,6 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
-    require to_mathint(currentContract.obligationState[id].continuousFeeCredit) + pendingFee(id, user) <= max_uint128, "continuousFeeCredit cannot overflow from a single position's fee";
     require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
     require e.msg.value == 0, "Midnight is not payable";
 
@@ -96,7 +95,7 @@ rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, addr
     require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";
     require currentContract.position[id][borrower].activatedCollaterals == 0, "Assumption: no active collaterals: skip loop and maximize badDebt";
     require currentContract.position[id][borrower].debt > 0, "borrower must have debt to enter badDebt > 0 block";
-    require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (system invariant)";
+    require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable)";
     require e.msg.value == 0, "Midnight is not payable";
 
     liquidate@withrevert(e, obligation, 0, 0, 0, borrower, borrower, borrower, data);
