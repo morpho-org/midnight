@@ -9,7 +9,7 @@ import {
     LLTV_8,
     LIQUIDATION_CURSOR_LOW
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -101,7 +101,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        vm.expectRevert("position is not liquidatable");
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(obligation, 0, 0, 0, borrower, "");
     }
 
@@ -142,7 +142,7 @@ contract LiquidationTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        vm.expectRevert("inconsistent input");
+        vm.expectRevert(IMidnight.InconsistentInput.selector);
         midnight.liquidate(obligation, 0, 1, 1, borrower, "");
     }
 
@@ -463,7 +463,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
         repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, "");
 
         repaid = bound(repaid, 0, min(maxR, units));
@@ -536,7 +536,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         // Full liquidation should revert because remaining debt >= rcfThreshold.
-        vm.expectRevert("recovery close factor conditions violated");
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(obligation, 0, 0, units, borrower, "");
     }
 
@@ -552,7 +552,7 @@ contract LiquidationTest is BaseTest {
         // At exact maturity: recovery close factor applies.
         if (maxRepaid < units) {
             vm.warp(obligation.maturity);
-            vm.expectRevert("recovery close factor conditions violated");
+            vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
             midnight.liquidate(obligation, 0, 0, units, borrower, "");
         }
 
@@ -879,6 +879,34 @@ contract LiquidationTest is BaseTest {
         // Non-zero seizedAssets exercises the recovery close factor path.
         midnight.liquidate(obligation, 0, 1, 0, borrower, "");
         assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
+    }
+
+    function testIsLiquidatableNoDebt() public {
+        midnight.touchObligation(obligation);
+        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "no debt not liquidatable");
+    }
+
+    function testIsLiquidatableHealthyPreMaturityView(uint256 units) public {
+        units = bound(units, 1, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "healthy pre-maturity not liquidatable");
+    }
+
+    function testIsLiquidatablePostMaturityView(uint256 units) public {
+        units = bound(units, 1, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        vm.warp(obligation.maturity + 1);
+        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "post-maturity with debt is liquidatable");
+    }
+
+    function testIsLiquidatableUnhealthyPreMaturityView(uint256 units) public {
+        units = bound(units, 1, MAX_UNITS);
+        collateralize(obligation, borrower, units);
+        setupObligation(obligation, units);
+        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "unhealthy pre-maturity is liquidatable");
     }
 
     function onLiquidate(

@@ -26,11 +26,14 @@ contract TickLibTest is BaseTest {
     }
 
     function testReturnJumps() public pure {
-        for (uint256 i = 220; i <= 770; i++) {
+        for (uint256 i = 250; i <= 800; i++) {
             uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
-                currentReturn.mulDivDown(1e18, previousReturn), 1.025e18, 0.1e18, string.concat("tick ", vm.toString(i))
+                currentReturn.mulDivDown(1e18, previousReturn),
+                0.975e18,
+                0.005e18,
+                string.concat("tick ", vm.toString(i))
             );
         }
     }
@@ -52,7 +55,7 @@ contract TickLibTest is BaseTest {
     /// forge-config: default.allow_internal_expect_revert = true
     function testTickToPriceOutOfRange(uint256 tick) public {
         tick = bound(tick, MAX_TICK + 1, type(uint256).max);
-        vm.expectRevert("tick out of range");
+        vm.expectRevert(TickLib.TickOutOfRange.selector);
         TickLib.tickToPrice(tick);
     }
 
@@ -61,7 +64,7 @@ contract TickLibTest is BaseTest {
     /// forge-config: default.allow_internal_expect_revert = true
     function testPriceToTickGreaterThanOne(uint256 price) public {
         price = bound(price, 1 ether + 1, type(uint256).max);
-        vm.expectRevert("Price is greater than one");
+        vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
         TickLib.priceToTick(price);
     }
 

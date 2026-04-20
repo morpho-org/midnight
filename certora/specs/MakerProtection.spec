@@ -54,7 +54,7 @@ rule makerFavorableRounding(env e, uint256 units, address taker, address takerCa
 
 // The trading fee cannot be bypassed: the spread between what the buyer pays and what
 // the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
-rule feeIsNotBypassed(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+rule tradingFeeIsNotBypassed(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
 
     uint256 buyerAssets;
