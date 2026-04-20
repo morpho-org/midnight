@@ -200,7 +200,12 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         require(payer != address(0), Unauthorized());
         _caller = address(0);
         SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), buyerAssets);
-        IERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
+
+        // "safeApprove"
+        (bool success, bytes memory returndata) =
+            obligation.loanToken.call(abi.encodeCall(IERC20.approve, (msg.sender, buyerAssets)));
+        require(success && (returndata.length == 0 || abi.decode(returndata, (bool))));
+
         return CALLBACK_SUCCESS;
     }
 }
