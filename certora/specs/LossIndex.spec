@@ -75,6 +75,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
+    require to_mathint(currentContract.obligationState[id].continuousFeeCredit) + to_mathint(pendingFee(id, user)) <= to_mathint(max_uint128), "continuousFeeCredit + accruable fee does not overflow (accruedFee <= pendingFee)";
     require e.msg.value == 0, "Midnight is not payable";
 
     updatePosition@withrevert(e, obligation, user);
@@ -98,7 +99,8 @@ rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, addr
     require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable)";
     require e.msg.value == 0, "Midnight is not payable";
 
-    liquidate@withrevert(e, obligation, 0, 0, 0, borrower, borrower, borrower, data);
+    address zero = 0;
+    liquidate@withrevert(e, obligation, 0, 0, 0, borrower, borrower, zero, data);
 
     assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
 }
