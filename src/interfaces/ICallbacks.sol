@@ -14,14 +14,14 @@ interface ISellCallback {
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Obligation memory obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external;
+    function onLiquidate(bytes32 id, Obligation memory obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {
-    function onRepay(bytes32 obligationId, Obligation memory obligation, uint256 units, address onBehalf, bytes memory data) external;
+    function onRepay(bytes32 id, Obligation memory obligation, uint256 units, address onBehalf, bytes memory data) external returns (bytes32);
 }
-// forgefmt: disable-end
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external;
+    function onFlashLoan(address token, uint256 assets, bytes memory data) external returns (bytes32);
 }
+// forgefmt: disable-end

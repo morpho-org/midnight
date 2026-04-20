@@ -113,13 +113,13 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 // The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
 // The maxLif function is excluded: it is a pure function callable with arbitrary inputs.
-rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
     f(e, args);
     assert true;
 }
 
 // Show that liquidate does not cause a division by zero, in case the oracle price is non-zero and the collateral is active.
-rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require equalsGlobalObligation(obligation);
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
@@ -131,6 +131,6 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
     require ghostPrice(obligation.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert true;
 }
