@@ -2,6 +2,9 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
+import {COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE} from "../interfaces/IEcrecover.sol";
+
 library UtilsLib {
     error CastOverflow();
 
@@ -42,6 +45,16 @@ library UtilsLib {
         return (x * y + (d - 1)) / d;
     }
 
+    function rootTypeHash(uint256 height) internal pure returns (bytes32) {
+        bytes memory brackets = new bytes(3 * height);
+        for (uint256 i = 0; i < height; i++) {
+            brackets[3 * i] = "[";
+            brackets[3 * i + 1] = "2";
+            brackets[3 * i + 2] = "]";
+        }
+        return keccak256(bytes.concat("Root(Offer", brackets, " root)", COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
+    }
+
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
     /// @dev Hash sorts the inputs lexicographically.
     function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
@@ -60,6 +73,59 @@ library UtilsLib {
             mstore(0x20, b)
             value := keccak256(0x00, 0x40)
         }
+    }
+
+    function hashCollateralParams(CollateralParams memory cp) internal pure returns (bytes32) {
+        return keccak256(abi.encode(keccak256(COLLATERAL_PARAMS_TYPE), cp.token, cp.lltv, cp.maxLif, cp.oracle));
+    }
+
+    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
+        bytes32 collateralParamsHash;
+        uint256 len = obligation.collateralParams.length;
+        bytes memory packed = new bytes(len * 32);
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 h = hashCollateralParams(obligation.collateralParams[i]);
+            assembly ("memory-safe") {
+                mstore(add(add(packed, 0x20), mul(i, 0x20)), h)
+            }
+        }
+        collateralParamsHash = keccak256(packed);
+
+        return keccak256(
+            abi.encode(
+                keccak256(OBLIGATION_TYPE),
+                obligation.loanToken,
+                collateralParamsHash,
+                obligation.maturity,
+                obligation.rcfThreshold,
+                obligation.enterGate,
+                obligation.liquidatorGate
+            )
+        );
+    }
+
+    function hashOffer(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256(OFFER_TYPE),
+                hashObligation(offer.obligation),
+                offer.buy,
+                offer.maker,
+                offer.start,
+                offer.expiry,
+                offer.tick,
+                offer.group,
+                offer.session,
+                offer.callback,
+                keccak256(offer.callbackData),
+                offer.receiverIfMakerIsSeller,
+                offer.ratifier,
+                offer.reduceOnly,
+                offer.maxUnits,
+                offer.maxSellerAssets,
+                offer.maxBuyerAssets
+            )
+        );
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
