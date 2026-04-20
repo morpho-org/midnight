@@ -68,11 +68,11 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
         bool fromTopLevelCaller = topLevelCallerAllowed && src == topLevelCaller;
         bool fromSuccessfulBuyerCallback = allowedBuyerCallbackActive && src == allowedBuyerCallback;
         bool fromMakerWithCallbackZero = allowedMakerActive && src == allowedMaker;
-
+    
         if (!(fromTopLevelCaller || fromSuccessfulBuyerCallback || fromMakerWithCallbackZero)) {
             badPullSeen = true;
         }
-
+    
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
     }
