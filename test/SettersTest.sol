@@ -125,6 +125,12 @@ contract SettersTest is BaseTest {
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
+    function testSetObligationContinuousFeeObligationNotCreated(bytes32 id, uint256 fee) public {
+        fee = bound(fee, 0, MAX_CONTINUOUS_FEE);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.setObligationContinuousFee(id, fee);
+    }
+
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
