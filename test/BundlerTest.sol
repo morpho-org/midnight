@@ -110,6 +110,8 @@ contract BundlerTest is BaseTest {
     }
 
     function testUnauthorized() public {
+        offers[0].buy = false;
+
         Take[] memory takes = new Take[](1);
         takes[0] = Take({
             offer: offers[0],

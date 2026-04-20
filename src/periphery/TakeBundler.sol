@@ -34,6 +34,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            require(!takes[i].offer.buy, InconsistentSide());
             _caller = msg.sender;
             try IMidnight(midnight)
                 .take(
@@ -59,7 +60,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
     }
 
-    /// @dev See sellUnitsTarget.
+    /// @dev See buyUnitsTarget.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -74,6 +75,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         uint256 totalFilledUnits;
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -98,7 +100,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
     }
 
-    /// @dev See buyBuyerAssetsTarget.
+    /// @dev See buyUnitsTarget.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
@@ -114,6 +116,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+            require(!takes[i].offer.buy, InconsistentSide());
             _caller = msg.sender;
             try IMidnight(midnight)
                 .take(
@@ -144,7 +147,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
-    /// @dev See sellSellerAssetsTarget.
+    /// @dev See buyUnitsTarget.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
@@ -161,6 +164,7 @@ contract TakeBundler is ITakeBundler, IBuyCallback {
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+            require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
