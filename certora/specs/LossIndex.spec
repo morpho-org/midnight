@@ -33,7 +33,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 }
 
 /// The obligation's lossIndex is only modified by `liquidate`.
-rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector } {
+rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
 
     f(e, args);
@@ -42,14 +42,14 @@ rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, callda
 }
 
 /// In `liquidate`, the obligation's lossIndex changes if and only if bad debt is realized (totalUnits decreases).
-rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
+rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     uint256 totalUnitsBefore = totalUnits(id);
 
     require lossIndexBefore < max_uint128, "obligation lossIndex must not be saturated";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     bool lossIndexChanged = currentContract.obligationState[id].lossIndex != lossIndexBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;
@@ -99,7 +99,7 @@ rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, addr
     require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (system invariant)";
     require e.msg.value == 0, "Midnight is not payable";
 
-    liquidate@withrevert(e, obligation, 0, 0, 0, borrower, data);
+    liquidate@withrevert(e, obligation, 0, 0, 0, borrower, borrower, borrower, data);
 
     assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
 }
