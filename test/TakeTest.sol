@@ -9,7 +9,7 @@ import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
+import {IBuyCallback, ISellCallback, ILiquidateCallback, IRepayCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -1377,7 +1377,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert(IMidnight.InvalidSellCallback.selector);
+        vm.expectRevert(IMidnight.WrongSellCallbackReturnValue.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1530,7 +1530,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.InvalidBuyCallback.selector);
+        vm.expectRevert(IMidnight.WrongBuyCallbackReturnValue.selector);
         vm.prank(lender);
         midnight.take(
             units,
@@ -1626,7 +1626,8 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
-        try Midnight(msg.sender).liquidate(obligation, collateralIndex, 0, repaidUnits, seller, "") returns (
+        try Midnight(msg.sender)
+            .liquidate(obligation, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1694,7 +1695,8 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
-            try Midnight(msg.sender).liquidate(obligation, idx, 0, storedRepaidUnits, seller, "") returns (
+            try Midnight(msg.sender)
+                .liquidate(obligation, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
