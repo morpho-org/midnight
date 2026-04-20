@@ -18,7 +18,6 @@ contract TakeBundler is ITakeBundler {
         address midnight,
         uint256 targetUnits,
         address taker,
-        address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minBuyerAssets,
         uint256 maxBuyerAssets
@@ -34,7 +33,7 @@ contract TakeBundler is ITakeBundler {
                     taker,
                     address(0),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(0),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -52,7 +51,7 @@ contract TakeBundler is ITakeBundler {
         require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
     }
 
-    /// @dev See sellUnitsTarget.
+    /// @dev See buyUnitsTarget.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -91,12 +90,11 @@ contract TakeBundler is ITakeBundler {
         require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
     }
 
-    /// @dev See buyBuyerAssetsTarget.
+    /// @dev See buyUnitsTarget.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
         address taker,
-        address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minUnits,
         uint256 maxUnits
@@ -119,7 +117,7 @@ contract TakeBundler is ITakeBundler {
                     taker,
                     address(0),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(0),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -137,7 +135,7 @@ contract TakeBundler is ITakeBundler {
         require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
-    /// @dev See sellSellerAssetsTarget.
+    /// @dev See buyUnitsTarget.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
