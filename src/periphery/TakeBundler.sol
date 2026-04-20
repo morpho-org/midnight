@@ -27,6 +27,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            require(!takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -66,6 +67,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledUnits;
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -106,6 +108,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+            require(!takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -152,6 +155,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+            require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
