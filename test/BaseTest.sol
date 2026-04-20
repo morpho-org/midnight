@@ -10,6 +10,7 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {SignatureLib} from "../src/libraries/SignatureLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -255,7 +256,7 @@ abstract contract BaseTest is Test {
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(UtilsLib.rootTypeHash(height), _root));
+        bytes32 structHash = keccak256(abi.encode(SignatureLib.rootTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
