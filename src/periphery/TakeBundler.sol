@@ -84,7 +84,7 @@ contract TakeBundler is ITakeBundler {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            SafeTransferLib.safeTransferFrom(token, taker, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -196,7 +196,7 @@ contract TakeBundler is ITakeBundler {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            SafeTransferLib.safeTransferFrom(token, taker, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
