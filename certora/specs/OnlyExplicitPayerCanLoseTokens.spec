@@ -7,13 +7,10 @@ methods {
 
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external
-        => onBuySummary(calledContract) expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
 
-    function _.transfer(address dest, uint256 value) external with(env e)
-        => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
-    function _.transferFrom(address src, address dest, uint256 value) external with(env e)
-        => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
+    function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
+    function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
 }
 
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
@@ -86,18 +83,7 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 /// 1. msg.sender (when !offer.buy and buyerCallback == 0),
 /// 2. the buyerCallback that returned CALLBACK_SUCCESS,
 /// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker's offer was ratified).
-rule takeOnlyExplicitPayer(
-    env e,
-    uint256 units,
-    address taker,
-    address takerCallback,
-    bytes takerCallbackData,
-    address receiverIfTakerIsSeller,
-    Midnight.Offer offer,
-    bytes ratifierData,
-    bytes32 root,
-    bytes32[] proof
-) {
+rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require e.msg.sender != currentContract, "only external calls";
 
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
@@ -116,11 +102,7 @@ rule takeOnlyExplicitPayer(
 }
 
 /// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender.
-rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args)
-filtered {
-    f -> !f.isView
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
-} {
+rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector } {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
