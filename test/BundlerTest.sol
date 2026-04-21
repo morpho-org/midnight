@@ -99,10 +99,11 @@ contract BundlerTest is BaseTest {
 
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
-        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, 0, type(uint256).max);
+        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, 0, type(uint256).max, 0, address(0));
     }
 
     function testSellUnitsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
+        deal(address(loanToken), address(takeBundler), 0);
         units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
@@ -130,7 +131,9 @@ contract BundlerTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
+            takeBundler.sellUnitsTarget(
+                address(midnight), units, borrower, borrower, takes, 0, type(uint256).max, 0, address(0)
+            );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
@@ -140,7 +143,9 @@ contract BundlerTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
-            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
+            takeBundler.sellUnitsTarget(
+                address(midnight), units, borrower, borrower, takes, 0, type(uint256).max, 0, address(0)
+            );
         }
     }
 
@@ -188,7 +193,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             takeBundler.buyBuyerAssetsTarget(
-                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max
+                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max, 0, address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -202,12 +207,13 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.buyBuyerAssetsTarget(
-                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max
+                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max, 0, address(0)
             );
         }
     }
 
     function testSellSellerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
+        deal(address(loanToken), address(takeBundler), 0);
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
@@ -248,7 +254,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
             takeBundler.sellSellerAssetsTarget(
-                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
+                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max, 0, address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -260,7 +266,7 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.sellSellerAssetsTarget(
-                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
+                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max, 0, address(0)
             );
         }
     }
@@ -335,7 +341,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
-        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, 0, maxBuyerAssets);
+        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, 0, maxBuyerAssets, 0, address(0));
     }
 
     function testAveragePriceTooLow(
@@ -388,6 +394,8 @@ contract BundlerTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.BuyerAssetsBelowMin.selector);
-        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, minBuyerAssets, type(uint256).max);
+        takeBundler.buyUnitsTarget(
+            address(midnight), targetUnits, borrower, takes, minBuyerAssets, type(uint256).max, 0, address(0)
+        );
     }
 }

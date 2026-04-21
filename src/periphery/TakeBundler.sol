@@ -4,8 +4,10 @@ pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
+import {WAD} from "../libraries/ConstantsLib.sol";
 
 contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
@@ -20,12 +22,15 @@ contract TakeBundler is ITakeBundler {
         address taker,
         Take[] calldata takes,
         uint256 minBuyerAssets,
-        uint256 maxBuyerAssets
+        uint256 maxBuyerAssets,
+        uint256 referralFeePct,
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
 
         uint256 totalFilledUnits;
-        uint256 totalBuyerAssets;
+        uint256 totalFilledBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -43,13 +48,16 @@ contract TakeBundler is ITakeBundler {
                 uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalBuyerAssets += filledBuyerAssets;
+                totalFilledBuyerAssets += filledBuyerAssets;
             } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
-        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
+        require(totalFilledBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
+        require(totalFilledBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
+
+        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
+        SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
     /// @dev See buyUnitsTarget.
@@ -57,15 +65,18 @@ contract TakeBundler is ITakeBundler {
         address midnight,
         uint256 targetUnits,
         address taker,
-        address receiverIfTakerIsSeller,
+        address receiver,
         Take[] calldata takes,
         uint256 minSellerAssets,
-        uint256 maxSellerAssets
+        uint256 maxSellerAssets,
+        uint256 referralFeePct,
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
 
+        uint256 totalFilledSellerAssets;
         uint256 totalFilledUnits;
-        uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -74,7 +85,7 @@ contract TakeBundler is ITakeBundler {
                     taker,
                     address(0),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(this),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -83,13 +94,18 @@ contract TakeBundler is ITakeBundler {
                 uint256, uint256 filledSellerAssets, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalSellerAssets += filledSellerAssets;
+                totalFilledSellerAssets += filledSellerAssets;
             } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
-        require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
+        require(totalFilledSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
+        require(totalFilledSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
+
+        address loanToken = takes[0].offer.obligation.loanToken;
+        uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
+        SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
+        SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
     }
 
     /// @dev See buyUnitsTarget.
@@ -99,14 +115,17 @@ contract TakeBundler is ITakeBundler {
         address taker,
         Take[] calldata takes,
         uint256 minUnits,
-        uint256 maxUnits
+        uint256 maxUnits,
+        uint256 referralFeePct,
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalUnits;
+        uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -129,13 +148,16 @@ contract TakeBundler is ITakeBundler {
                 uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalUnits += filledUnits;
+                totalFilledUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
+        require(totalFilledUnits >= minUnits, UnitsBelowMin());
+        require(totalFilledUnits <= maxUnits, UnitsAboveMax());
+
+        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
+        SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
     /// @dev See buyUnitsTarget.
@@ -143,17 +165,20 @@ contract TakeBundler is ITakeBundler {
         address midnight,
         uint256 targetSellerAssets,
         address taker,
-        address receiverIfTakerIsSeller,
+        address receiver,
         Take[] calldata takes,
         uint256 minUnits,
-        uint256 maxUnits
+        uint256 maxUnits,
+        uint256 referralFeePct,
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
-        uint256 totalUnits;
+        uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -167,7 +192,7 @@ contract TakeBundler is ITakeBundler {
                     taker,
                     address(0),
                     "",
-                    receiverIfTakerIsSeller,
+                    address(this),
                     takes[i].offer,
                     takes[i].ratifierData,
                     takes[i].root,
@@ -176,12 +201,17 @@ contract TakeBundler is ITakeBundler {
                 uint256, uint256 filledSellerAssets, uint256 filledUnits
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalUnits += filledUnits;
+                totalFilledUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
+        require(totalFilledUnits >= minUnits, UnitsBelowMin());
+        require(totalFilledUnits <= maxUnits, UnitsAboveMax());
+
+        address loanToken = takes[0].offer.obligation.loanToken;
+        uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
+        SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
+        SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
     }
 }
