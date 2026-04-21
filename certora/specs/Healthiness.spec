@@ -29,6 +29,12 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;
 
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
