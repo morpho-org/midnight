@@ -305,9 +305,9 @@ contract BundlerTest is BaseTest {
 
     function _collateralAmount(uint256 collateralIndex, uint256 debt) internal view returns (uint256) {
         uint256 oraclePrice = Oracle(obligation.collateralParams[collateralIndex].oracle).price();
-        return debt.mulDivUp(WAD, obligation.collateralParams[collateralIndex].lltv).mulDivUp(
-            ORACLE_PRICE_SCALE, oraclePrice
-        );
+        return
+            debt.mulDivUp(WAD, obligation.collateralParams[collateralIndex].lltv)
+                .mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
     }
 
     function _supplyBorrowerCollateral(uint256 numCollaterals, uint256 units)
