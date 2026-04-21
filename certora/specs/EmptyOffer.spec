@@ -20,6 +20,7 @@ methods {
 // Useful for padding the offer tree with empty offers.
 rule emptyOfferCantBeTaken(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData, bytes32 root, bytes32[] proof) {
     Midnight.Offer offer = Utils.emptyOffer();
+    require e.block.timestamp > 0, "block.timestamp is always positive";
     take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
     assert lastReverted;
 }
