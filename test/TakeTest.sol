@@ -9,7 +9,7 @@ import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {ICallbacks} from "../src/interfaces/ICallbacks.sol";
+import {IBuyCallback, ISellCallback, ILiquidateCallback, IRepayCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -1377,7 +1377,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert(IMidnight.InvalidSellCallback.selector);
+        vm.expectRevert(IMidnight.WrongSellCallbackReturnValue.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1530,7 +1530,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.InvalidBuyCallback.selector);
+        vm.expectRevert(IMidnight.WrongBuyCallbackReturnValue.selector);
         vm.prank(lender);
         midnight.take(
             units,
@@ -1578,7 +1578,7 @@ contract TakeTest is BaseTest {
     }
 }
 
-contract InvalidBuyCallback is ICallbacks {
+contract InvalidBuyCallback is IBuyCallback {
     function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
         external
         pure
@@ -1586,21 +1586,9 @@ contract InvalidBuyCallback is ICallbacks {
     {
         return bytes32(0);
     }
-
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract BorrowCallback is ICallbacks {
+contract BorrowCallback is ISellCallback {
     bytes public recordedData;
     bytes32 public recordedId;
 
@@ -1617,21 +1605,9 @@ contract BorrowCallback is ICallbacks {
         Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
     }
-
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract ReentrantLiquidateBorrowCallback is ICallbacks {
+contract ReentrantLiquidateBorrowCallback is ISellCallback {
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
 
@@ -1650,7 +1626,8 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
-        try Midnight(msg.sender).liquidate(obligation, collateralIndex, 0, repaidUnits, seller, "") returns (
+        try Midnight(msg.sender)
+            .liquidate(obligation, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1661,21 +1638,9 @@ contract ReentrantLiquidateBorrowCallback is ICallbacks {
         oracle.setPrice(healthyPrice);
         return CALLBACK_SUCCESS;
     }
-
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract NestedTakeReentrantLiquidateCallback is ICallbacks {
+contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     bool public reentered;
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
@@ -1730,7 +1695,8 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
-            try Midnight(msg.sender).liquidate(obligation, idx, 0, storedRepaidUnits, seller, "") returns (
+            try Midnight(msg.sender)
+                .liquidate(obligation, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
@@ -1742,21 +1708,9 @@ contract NestedTakeReentrantLiquidateCallback is ICallbacks {
         }
         return CALLBACK_SUCCESS;
     }
-
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract LendCallback is ICallbacks {
+contract LendCallback is IBuyCallback {
     bytes public recordedData;
 
     bytes32 public recordedId;
@@ -1771,29 +1725,9 @@ contract LendCallback is ICallbacks {
         ERC20(obligation.loanToken).approve(msg.sender, buyerAssets);
         return CALLBACK_SUCCESS;
     }
-
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
-contract InvalidSellCallback is ICallbacks {
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        return CALLBACK_SUCCESS;
-    }
-
+contract InvalidSellCallback is ISellCallback {
     function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
         external
         pure
@@ -1801,10 +1735,6 @@ contract InvalidSellCallback is ICallbacks {
     {
         return bytes32(0);
     }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external {}
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external {}
 }
 
 contract RatifyCallback is IRatifier {

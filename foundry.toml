@@ -2,6 +2,7 @@
 via_ir = true
 optimizer = true
 optimizer_runs = 300
+bytecode_hash = "none"
 evm_version = "osaka"
 fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
 
