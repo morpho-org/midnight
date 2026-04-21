@@ -285,8 +285,8 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        User memory takeUser = User(taker, takerCallback, takerCallbackData);
-        User memory makeUser = User(offer.maker, offer.callback, offer.callbackData);
+        User memory takeUser = User({addr: taker, callback: takerCallback, callbackData: takerCallbackData});
+        User memory makeUser = User({addr: offer.maker, callback: offer.callback, callbackData: offer.callbackData});
         User memory buyer = offer.buy ? makeUser : takeUser;
         User memory seller = offer.buy ? takeUser : makeUser;
 
