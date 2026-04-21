@@ -69,6 +69,7 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev See buyUnitsTarget.
+    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -84,7 +85,7 @@ contract TakeBundler is ITakeBundler {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, taker, address(this), collateralSupplies[i].assets);
+            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -181,6 +182,7 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev See buyUnitsTarget.
+    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
@@ -196,7 +198,7 @@ contract TakeBundler is ITakeBundler {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, taker, address(this), collateralSupplies[i].assets);
+            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
