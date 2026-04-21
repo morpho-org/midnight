@@ -3,8 +3,10 @@
 pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 contract TakeBundler is ITakeBundler {
@@ -24,13 +26,20 @@ contract TakeBundler is ITakeBundler {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+        address loanToken = takes[0].offer.obligation.loanToken;
+        IERC20(loanToken).approve(midnight, type(uint256).max);
+
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            uint256 units = UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units);
+            uint256 expectedBuyerAssets = TakeAmountsLib.unitsToBuyerAssets(midnight, id, takes[i].offer, units);
+            SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), expectedBuyerAssets);
             try IMidnight(midnight)
                 .take(
-                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                    units,
                     taker,
                     address(0),
                     "",
@@ -44,7 +53,9 @@ contract TakeBundler is ITakeBundler {
             ) {
                 totalFilledUnits += filledUnits;
                 totalBuyerAssets += filledBuyerAssets;
-            } catch {}
+            } catch {
+                SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
+            }
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
@@ -104,19 +115,24 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+        address loanToken = takes[0].offer.obligation.loanToken;
+        IERC20(loanToken).approve(midnight, type(uint256).max);
 
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            uint256 units = UtilsLib.min(
+                TakeAmountsLib.buyerAssetsToUnits(
+                    midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                ),
+                takes[i].units
+            );
+            uint256 expectedBuyerAssets = TakeAmountsLib.unitsToBuyerAssets(midnight, id, takes[i].offer, units);
+            SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), expectedBuyerAssets);
             try IMidnight(midnight)
                 .take(
-                    UtilsLib.min(
-                        TakeAmountsLib.buyerAssetsToUnits(
-                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
-                        ),
-                        takes[i].units
-                    ),
+                    units,
                     taker,
                     address(0),
                     "",
@@ -130,7 +146,9 @@ contract TakeBundler is ITakeBundler {
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
                 totalUnits += filledUnits;
-            } catch {}
+            } catch {
+                SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
+            }
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());

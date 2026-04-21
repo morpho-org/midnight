@@ -23,9 +23,6 @@ contract BundlerTest is BaseTest {
         super.setUp();
 
         takeBundler = new TakeBundler();
-        deal(address(loanToken), address(takeBundler), type(uint256).max);
-        vm.prank(address(takeBundler));
-        loanToken.approve(address(midnight), type(uint256).max);
 
         // Set trading fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
@@ -83,6 +80,12 @@ contract BundlerTest is BaseTest {
         midnight.setIsAuthorized(borrower, address(takeBundler), true);
         vm.prank(borrower);
         midnight.setIsAuthorized(borrower, address(this), true);
+    }
+
+    function _fundBuyer() internal {
+        deal(address(loanToken), borrower, type(uint256).max);
+        vm.prank(borrower);
+        loanToken.approve(address(takeBundler), type(uint256).max);
     }
 
     function testUnauthorized() public {
@@ -183,6 +186,7 @@ contract BundlerTest is BaseTest {
             proof: proof([offers[1]])
         });
 
+        _fundBuyer();
         _authorizeBundler();
 
         if (offerUnits1 >= units - fromOffer0) {
@@ -195,9 +199,7 @@ contract BundlerTest is BaseTest {
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
             assertEq(consumed0, fromOffer0, "consumed offer 0");
             assertEq(consumed0 + consumed1, midnight.debtOf(id, lender), "total consumed");
-            assertEq(
-                loanToken.balanceOf(address(takeBundler)), type(uint256).max - targetBuyerAssets, "bundler balance"
-            );
+            assertEq(loanToken.balanceOf(borrower), type(uint256).max - targetBuyerAssets, "borrower balance");
         } else {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
@@ -331,6 +333,7 @@ contract BundlerTest is BaseTest {
             proof: proof([offers[1]])
         });
 
+        _fundBuyer();
         _authorizeBundler();
 
         vm.prank(borrower);
@@ -384,6 +387,7 @@ contract BundlerTest is BaseTest {
             proof: proof([offers[1]])
         });
 
+        _fundBuyer();
         _authorizeBundler();
 
         vm.prank(borrower);
