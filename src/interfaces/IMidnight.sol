@@ -63,6 +63,13 @@ struct Position {
     uint128[128] collateral;
 }
 
+/// @dev Struct used to avoid stack too deep errors in the take function.
+struct User {
+    address addr;
+    address callback;
+    bytes callbackData;
+}
+
 interface IMidnight {
     /// ERRORS ///
     error AlreadyConsumed();

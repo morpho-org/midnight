@@ -9,7 +9,15 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 // forge-lint: disable-next-item(unaliased-plain-import)
 import "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Position} from "./interfaces/IMidnight.sol";
+import {
+    IMidnight,
+    Obligation,
+    Offer,
+    CollateralParams,
+    ObligationState,
+    Position,
+    User
+} from "./interfaces/IMidnight.sol";
 import {
     IBuyCallback,
     ISellCallback,
@@ -117,11 +125,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
 ///
-struct User {
-    address addr;
-    address callback;
-    bytes callbackData;
-}
 
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
