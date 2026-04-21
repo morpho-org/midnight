@@ -4,6 +4,7 @@ pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
 import {ITakeBundler, Take} from "./interfaces/ITakeBundler.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
@@ -23,6 +24,9 @@ contract TakeBundler is ITakeBundler {
         uint256 maxBuyerAssets
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        address loanToken = takes[0].offer.obligation.loanToken;
+
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
 
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
@@ -49,7 +53,8 @@ contract TakeBundler is ITakeBundler {
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
         require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
-        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
+
+        SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - totalBuyerAssets);
     }
 
     /// @dev See buyUnitsTarget.
@@ -104,6 +109,9 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+        address loanToken = takes[0].offer.obligation.loanToken;
+
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), targetBuyerAssets);
 
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
@@ -136,6 +144,8 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
         require(totalUnits >= minUnits, UnitsBelowMin());
         require(totalUnits <= maxUnits, UnitsAboveMax());
+
+        SafeTransferLib.safeTransfer(loanToken, msg.sender, targetBuyerAssets - totalFilledBuyerAssets);
     }
 
     /// @dev See buyUnitsTarget.

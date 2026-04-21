@@ -14,7 +14,6 @@ struct Take {
 
 interface ITakeBundler {
     /// ERRORS ///
-    error BuyerAssetsAboveMax();
     error BuyerAssetsBelowMin();
     error InconsistentSide();
     error InsufficientLiquidity();
