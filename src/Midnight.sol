@@ -117,21 +117,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
 ///
-struct Buyer {
+struct User {
     address addr;
     uint256 assets;
-    uint256 creditIncrease;
-    uint128 pendingFeeIncrease;
     address callback;
-}
-
-struct Seller {
-    address addr;
-    uint256 assets;
-    uint256 creditDecrease;
-    uint256 debtIncrease;
-    uint128 pendingFeeDecrease;
-    address callback;
+    bytes callbackData;
 }
 
 contract Midnight is IMidnight {
@@ -296,9 +286,11 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        Buyer memory buyer;
-        Seller memory seller;
-        (buyer.addr, seller.addr) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
+        User memory takeUser = User({addr: taker, assets: 0, callback: takerCallback, callbackData: takerCallbackData});
+        User memory makeUser =
+            User({addr: offer.maker, assets: 0, callback: offer.callback, callbackData: offer.callbackData});
+        User memory buyer = offer.buy ? takeUser : makeUser;
+        User memory seller = offer.buy ? makeUser : takeUser;
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -326,38 +318,38 @@ contract Midnight is IMidnight {
         if (hasCredit(id, buyer.addr) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer.addr);
         if (hasCredit(id, seller.addr)) _updatePosition(offer.obligation, id, seller.addr);
 
-        buyer.creditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
-        seller.creditDecrease = UtilsLib.min(units, sellerPos.credit);
-        seller.debtIncrease = units - seller.creditDecrease;
-        buyer.pendingFeeIncrease =
-            UtilsLib.toUint128(buyer.creditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        seller.pendingFeeDecrease = sellerPos.credit > 0
-            ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(seller.creditDecrease, sellerPos.credit))
+        uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
+        uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
+        uint256 buyerPendingFeeIncrease =
+            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+        uint256 sellerPendingFeeDecrease = sellerPos.credit > 0
+            ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
-        buyerPos.debt -= UtilsLib.toUint128(units - buyer.creditIncrease);
-        buyerPos.pendingFee += buyer.pendingFeeIncrease;
-        buyerPos.credit += UtilsLib.toUint128(buyer.creditIncrease);
+        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
+        buyerPos.pendingFee += UtilsLib.toUint128(buyerPendingFeeIncrease);
+        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
 
-        sellerPos.pendingFee -= seller.pendingFeeDecrease;
-        sellerPos.credit -= UtilsLib.toUint128(seller.creditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(seller.debtIncrease);
+        sellerPos.pendingFee -= UtilsLib.toUint128(sellerPendingFeeDecrease);
+        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
+        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
 
         _obligationState.totalUnits =
-            UtilsLib.toUint128(_obligationState.totalUnits + buyer.creditIncrease - seller.creditDecrease);
+            UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
         require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
         if (offer.reduceOnly) {
-            require(offer.buy ? buyer.creditIncrease == 0 : seller.debtIncrease == 0, MakerCreditOrDebtIncreased());
+            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
         }
 
         require(
-            offer.obligation.enterGate == address(0) || buyer.creditIncrease == 0
+            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer.addr),
             BuyerGatedFromIncreasingCredit()
         );
         require(
-            offer.obligation.enterGate == address(0) || seller.debtIncrease == 0
+            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
                 || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller.addr),
             SellerGatedFromIncreasingDebt()
         );
@@ -380,10 +372,10 @@ contract Midnight is IMidnight {
             receiver,
             offer.group,
             newConsumed,
-            buyer.pendingFeeIncrease,
-            seller.pendingFeeDecrease,
-            buyer.creditIncrease,
-            seller.creditDecrease
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            buyerCreditIncrease,
+            sellerCreditDecrease
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller.addr, true);
