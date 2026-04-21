@@ -7,7 +7,13 @@ methods {
 
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
+    function _.onFlashLoan(address, uint256, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
+
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
 
     function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
@@ -38,10 +44,11 @@ ghost bool badPullSeen {
     init_state axiom !badPullSeen;
 }
 
-function onBuySummary(address callback) returns (bytes32) {
+function onCallBackSummary(address callback) returns (bytes32) {
+    require callback != 0, "address(0) has no code and cannot return CALLBACK_SUCCESS";
     bytes32 result;
     allowedBuyerCallback = callback;
-    allowedBuyerCallbackActive = callback != 0 && result == Utils.callbackSuccess();
+    allowedBuyerCallbackActive = result == Utils.callbackSuccess();
     return result;
 }
 
@@ -101,7 +108,8 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
     assert !badPullSeen, "tokens pulled from someone other than msg.sender, successful buyerCallback, or ratified maker";
 }
 
-/// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender.
+/// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender
+/// or from a callback that returned CALLBACK_SUCCESS.
 rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector } {
     require e.msg.sender != currentContract, "only external calls";
 
