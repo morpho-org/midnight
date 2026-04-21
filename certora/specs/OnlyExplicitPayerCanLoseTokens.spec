@@ -11,43 +11,38 @@ methods {
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
     function _.onFlashLoan(address, uint256, bytes) external => onCallBackSummary(calledContract) expect(bytes32);
+    function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
+    function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
 
+    // NONDET is sound for onRatify: it is called before any transfer, so even with arbitrary state
+    // changes, it cannot affect who the payer is in subsequent transferFrom calls.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+
+    // NONDET is sound for onSell: it is called after all transferFrom calls in take, so any state
+    // changes cannot retroactively affect the already-executed pulls.
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.price() external => NONDET;
-
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
-    function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
-    function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
+    // Assumption : callbacks make no state changes to the contract
 }
-
-ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
 ghost address topLevelCaller;
 
-ghost bool topLevelCallerAllowed {
-    init_state axiom !topLevelCallerAllowed;
-}
+ghost bool topLevelCallerAllowed;
 
 ghost address allowedBuyerCallback;
 
-ghost bool allowedBuyerCallbackActive {
-    init_state axiom !allowedBuyerCallbackActive;
-}
+ghost bool allowedBuyerCallbackActive;
 
 /// Tracks the maker address from a validated offer.
 ghost address allowedMaker;
 
-ghost bool allowedMakerActive {
-    init_state axiom !allowedMakerActive;
-}
+ghost bool allowedMakerActive;
 
-ghost bool badPullSeen {
-    init_state axiom !badPullSeen;
-}
+ghost bool badPullSeen;
 
 function onCallBackSummary(address callback) returns (bytes32) {
     require callback != 0, "address(0) has no code and cannot return CALLBACK_SUCCESS";
@@ -58,37 +53,27 @@ function onCallBackSummary(address callback) returns (bytes32) {
 }
 
 function CVL_transfer(address token, address src, address dest, uint256 value) returns bool {
-    if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
+    bool success;
+    if (!success) {
         revert();
     }
-
-    bool success;
-    if (success) {
-        tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
-        tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
-    }
-    return success;
+    return true;
 }
 
 function CVL_transferFrom(address token, address src, address dest, uint256 value) returns bool {
-    if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
+    bool success;
+    if (!success) {
         revert();
     }
 
-    bool success;
-    if (success) {
-        bool fromTopLevelCaller = topLevelCallerAllowed && src == topLevelCaller;
-        bool fromSuccessfulBuyerCallback = allowedBuyerCallbackActive && src == allowedBuyerCallback;
-        bool fromMakerWithCallbackZero = allowedMakerActive && src == allowedMaker;
-    
-        if (!(fromTopLevelCaller || fromSuccessfulBuyerCallback || fromMakerWithCallbackZero)) {
-            badPullSeen = true;
-        }
-    
-        tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
-        tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
+    bool fromTopLevelCaller = topLevelCallerAllowed && src == topLevelCaller;
+    bool fromSuccessfulBuyerCallback = allowedBuyerCallbackActive && src == allowedBuyerCallback;
+    bool fromMakerWithCallbackZero = allowedMakerActive && src == allowedMaker;
+
+    if (!(fromTopLevelCaller || fromSuccessfulBuyerCallback || fromMakerWithCallbackZero)) {
+        badPullSeen = true;
     }
-    return success;
+    return true;
 }
 
 /// Proves that in `take`, the only addresses whose tokens can be pulled are:
