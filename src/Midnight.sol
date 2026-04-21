@@ -321,17 +321,17 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-        uint256 buyerPendingFeeIncrease =
+        uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        uint256 sellerPendingFeeDecrease = sellerPos.credit > 0
+        uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.pendingFee += UtilsLib.toUint128(buyerPendingFeeIncrease);
+        buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
 
-        sellerPos.pendingFee -= UtilsLib.toUint128(sellerPendingFeeDecrease);
+        sellerPos.pendingFee -= sellerPendingFeeDecrease;
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
 
@@ -354,8 +354,6 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
-        buyer.callback = offer.buy ? offer.callback : takerCallback;
-        seller.callback = offer.buy ? takerCallback : offer.callback;
         address payer = buyer.callback != address(0) ? buyer.callback : (offer.buy ? buyer.addr : msg.sender);
         address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
@@ -380,10 +378,9 @@ contract Midnight is IMidnight {
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller.addr, true);
         if (buyer.callback != address(0)) {
-            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
                 IBuyCallback(buyer.callback)
-                    .onBuy(id, offer.obligation, buyer.addr, buyer.assets, units, buyerCallbackData)
+                    .onBuy(id, offer.obligation, buyer.addr, buyer.assets, units, buyer.callbackData)
                 == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
@@ -394,10 +391,9 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, seller.assets);
 
         if (seller.callback != address(0)) {
-            bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
                 ISellCallback(seller.callback)
-                    .onSell(id, offer.obligation, seller.addr, seller.assets, units, sellerCallbackData)
+                    .onSell(id, offer.obligation, seller.addr, seller.assets, units, seller.callbackData)
                 == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
