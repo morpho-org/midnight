@@ -113,23 +113,27 @@ library UtilsLib {
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                keccak256(OFFER_TYPE),
-                hashObligation(offer.obligation),
-                offer.buy,
-                offer.maker,
-                offer.start,
-                offer.expiry,
-                offer.tick,
-                offer.group,
-                offer.session,
-                offer.callback,
-                keccak256(offer.callbackData),
-                offer.receiverIfMakerIsSeller,
-                offer.ratifier,
-                offer.reduceOnly,
-                offer.maxUnits,
-                offer.maxSellerAssets,
-                offer.maxBuyerAssets
+                abi.encode(
+                    keccak256(OFFER_TYPE),
+                    hashObligation(offer.obligation),
+                    offer.buy,
+                    offer.maker,
+                    offer.start,
+                    offer.expiry,
+                    offer.tick
+                ),
+                abi.encode(
+                    offer.group,
+                    offer.session,
+                    offer.callback,
+                    keccak256(offer.callbackData),
+                    offer.receiverIfMakerIsSeller,
+                    offer.ratifier,
+                    offer.reduceOnly,
+                    offer.maxUnits,
+                    offer.maxSellerAssets,
+                    offer.maxBuyerAssets
+                )
             )
         );
     }
