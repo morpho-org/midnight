@@ -14,6 +14,11 @@ methods {
 
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.price() external => NONDET;
+
+    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
     function _.transfer(address dest, uint256 value) external with(env e) => CVL_transfer(calledContract, e.msg.sender, dest, value) expect(bool);
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
