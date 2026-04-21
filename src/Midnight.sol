@@ -281,18 +281,13 @@ contract Midnight is IMidnight {
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-
-        address buyerCallback = offer.buy ? offer.callback : takerCallback;
-        address sellerCallback = offer.buy ? takerCallback : offer.callback;
-        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
-        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
@@ -347,6 +342,11 @@ contract Midnight is IMidnight {
                 || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
             SellerGatedFromIncreasingDebt()
         );
+
+        address buyerCallback = offer.buy ? offer.callback : takerCallback;
+        address sellerCallback = offer.buy ? takerCallback : offer.callback;
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         emit EventsLib.Take(
             msg.sender,
