@@ -29,7 +29,7 @@ methods {
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
     // Summarize UtilsLib functions.
-    function Utils.hashOffer(Midnight.Offer) internal returns (bytes32) => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;

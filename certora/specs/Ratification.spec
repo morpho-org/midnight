@@ -24,7 +24,7 @@ methods {
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     // Over-approximate UtilsLib.hashOffer and UtilsLib.rootTypeHash.
-    function UtilsLib.hashOffer(Midnight.Offer) internal returns (bytes32) => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.rootTypeHash(uint256) internal returns (bytes32) => NONDET;
 }
 
