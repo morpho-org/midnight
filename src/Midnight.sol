@@ -286,11 +286,10 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        User memory takeUser = User({addr: taker, assets: 0, callback: takerCallback, callbackData: takerCallbackData});
-        User memory makeUser =
-            User({addr: offer.maker, assets: 0, callback: offer.callback, callbackData: offer.callbackData});
-        User memory buyer = offer.buy ? takeUser : makeUser;
-        User memory seller = offer.buy ? makeUser : takeUser;
+        User memory takeUser = User(taker, 0, takerCallback, takerCallbackData);
+        User memory makeUser = User(offer.maker, 0, offer.callback, offer.callbackData);
+        User memory buyer = offer.buy ? makeUser : takeUser;
+        User memory seller = offer.buy ? takeUser : makeUser;
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
