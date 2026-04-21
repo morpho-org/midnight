@@ -119,7 +119,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 struct User {
     address addr;
-    uint256 assets;
     address callback;
     bytes callbackData;
 }
@@ -286,8 +285,8 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        User memory takeUser = User(taker, 0, takerCallback, takerCallbackData);
-        User memory makeUser = User(offer.maker, 0, offer.callback, offer.callbackData);
+        User memory takeUser = User(taker, takerCallback, takerCallbackData);
+        User memory makeUser = User(offer.maker, offer.callback, offer.callbackData);
         User memory buyer = offer.buy ? makeUser : takeUser;
         User memory seller = offer.buy ? takeUser : makeUser;
 
@@ -296,15 +295,15 @@ contract Midnight is IMidnight {
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        buyer.assets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        seller.assets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += seller.assets;
+            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
             require(newConsumed <= offer.maxSellerAssets, ConsumedSellerAssets());
         } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyer.assets;
+            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
             require(newConsumed <= offer.maxBuyerAssets, ConsumedBuyerAssets());
         } else {
             newConsumed = consumed[offer.maker][offer.group] += units;
@@ -362,8 +361,8 @@ contract Midnight is IMidnight {
             offer.maker,
             taker,
             offer.buy,
-            buyer.assets,
-            seller.assets,
+            buyerAssets,
+            sellerAssets,
             units,
             payer,
             receiver,
@@ -379,20 +378,20 @@ contract Midnight is IMidnight {
         if (buyer.callback != address(0)) {
             require(
                 IBuyCallback(buyer.callback)
-                    .onBuy(id, offer.obligation, buyer.addr, buyer.assets, units, buyer.callbackData)
+                    .onBuy(id, offer.obligation, buyer.addr, buyerAssets, units, buyer.callbackData)
                 == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyer.assets - seller.assets);
-        claimableTradingFee[offer.obligation.loanToken] += buyer.assets - seller.assets;
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, seller.assets);
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
+        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (seller.callback != address(0)) {
             require(
                 ISellCallback(seller.callback)
-                    .onSell(id, offer.obligation, seller.addr, seller.assets, units, seller.callbackData)
+                    .onSell(id, offer.obligation, seller.addr, sellerAssets, units, seller.callbackData)
                 == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
@@ -400,7 +399,7 @@ contract Midnight is IMidnight {
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller.addr, false);
         require(!isLiquidatable(offer.obligation, id, seller.addr), SellerIsLiquidatable());
 
-        return (buyer.assets, seller.assets, units);
+        return (buyerAssets, sellerAssets, units);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
