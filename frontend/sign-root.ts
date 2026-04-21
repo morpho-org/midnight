@@ -63,7 +63,7 @@ function buildTypes(height: number) {
 function defaultOffer(maker: string, number: string) {
   return {
     obligation: {
-      loanToken: "0x" + number.repeat(64),
+      loanToken: "0x" + number.repeat(40),
       collateralParams: [] as unknown[],
       maturity: "0",
       rcfThreshold: "0",
