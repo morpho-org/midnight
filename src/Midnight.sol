@@ -117,7 +117,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
 ///
-
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
