@@ -9,15 +9,7 @@ import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 // forge-lint: disable-next-item(unaliased-plain-import)
 import "./libraries/ConstantsLib.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {
-    IMidnight,
-    Obligation,
-    Offer,
-    CollateralParams,
-    ObligationState,
-    Position,
-    User
-} from "./interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Position} from "./interfaces/IMidnight.sol";
 import {
     IBuyCallback,
     ISellCallback,
@@ -288,18 +280,20 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        User memory takeUser = User({addr: taker, callback: takerCallback, callbackData: takerCallbackData});
-        User memory makeUser = User({addr: offer.maker, callback: offer.callback, callbackData: offer.callbackData});
-        User memory buyer = offer.buy ? makeUser : takeUser;
-        User memory seller = offer.buy ? takeUser : makeUser;
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+
+        address buyerCallback = offer.buy ? offer.callback : takerCallback;
+        address sellerCallback = offer.buy ? takerCallback : offer.callback;
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
@@ -313,11 +307,11 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
         }
 
-        Position storage buyerPos = position[id][buyer.addr];
-        Position storage sellerPos = position[id][seller.addr];
+        Position storage buyerPos = position[id][buyer];
+        Position storage sellerPos = position[id][seller];
 
-        if (hasCredit(id, buyer.addr) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer.addr);
-        if (hasCredit(id, seller.addr)) _updatePosition(offer.obligation, id, seller.addr);
+        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
+        if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
@@ -346,17 +340,14 @@ contract Midnight is IMidnight {
 
         require(
             offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer.addr),
+                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
             BuyerGatedFromIncreasingCredit()
         );
         require(
             offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller.addr),
+                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
             SellerGatedFromIncreasingDebt()
         );
-
-        address payer = buyer.callback != address(0) ? buyer.callback : (offer.buy ? buyer.addr : msg.sender);
-        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         emit EventsLib.Take(
             msg.sender,
@@ -377,12 +368,12 @@ contract Midnight is IMidnight {
             sellerCreditDecrease
         );
 
-        bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller.addr, true);
-        if (buyer.callback != address(0)) {
+        bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
+        if (buyerCallback != address(0)) {
+            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyer.callback)
-                    .onBuy(id, offer.obligation, buyer.addr, buyerAssets, units, buyer.callbackData)
-                == CALLBACK_SUCCESS,
+                IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
+                    == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
@@ -391,16 +382,17 @@ contract Midnight is IMidnight {
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
-        if (seller.callback != address(0)) {
+        if (sellerCallback != address(0)) {
+            bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(seller.callback)
-                    .onSell(id, offer.obligation, seller.addr, sellerAssets, units, seller.callbackData)
-                == CALLBACK_SUCCESS,
+                ISellCallback(sellerCallback)
+                        .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                    == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }
-        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller.addr, false);
-        require(!isLiquidatable(offer.obligation, id, seller.addr), SellerIsLiquidatable());
+        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
+        require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
 
         return (buyerAssets, sellerAssets, units);
     }
