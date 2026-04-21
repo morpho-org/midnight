@@ -8,6 +8,7 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32);
 
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function Utils.hashObligation(Midnight.Obligation) internal returns (bytes32) => NONDET;
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
