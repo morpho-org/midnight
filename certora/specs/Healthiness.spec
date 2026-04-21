@@ -2,7 +2,7 @@
 
 import "BitmapSummaries.spec";
 
-using Havoc as callback;
+using Havoc as havocCallback;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -168,7 +168,7 @@ function genericCallback() {
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
 
-    callback.callHavoc(e, dummy);
+    havocCallback.callHavoc(e, dummy);
 
     // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
     healthyBeforeCallback = savedHealthyBefore;
