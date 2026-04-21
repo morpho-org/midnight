@@ -112,7 +112,7 @@ library UtilsLib {
 
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
-            abi.encode(
+            bytes.concat(
                 abi.encode(
                     keccak256(OFFER_TYPE),
                     hashObligation(offer.obligation),
