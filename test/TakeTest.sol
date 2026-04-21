@@ -1039,6 +1039,84 @@ contract TakeTest is BaseTest {
         );
     }
 
+    // Adding salt to the expiry to test different ordering (see commutativeHash).
+    function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
+        public
+    {
+        units = bound(units, 0, maxAssets);
+        uint256 price = TickLib.tickToPrice(lenderOffer.tick);
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        collateralize(obligation, borrower, units);
+        lenderOffer.maxUnits = units;
+
+        Offer memory offer0 = lenderOffer;
+
+        Offer memory offer1 = lenderOffer;
+        offer1.expiry += bound(saltTimestamp1, 0, type(uint32).max);
+
+        Offer memory offer2 = lenderOffer;
+        offer2.expiry += bound(saltTimestamp2, 0, type(uint32).max);
+
+        Offer memory offer3 = lenderOffer;
+        offer3.expiry += bound(saltTimestamp3, 0, type(uint32).max);
+
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer0,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFirstLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer1,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofSecondLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer2,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofThirdLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer3,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFourthLeaf([offer0, offer1, offer2, offer3])
+        );
+    }
+
     function testTakeNotRatified() public {
         vm.expectRevert();
         vm.prank(borrower);

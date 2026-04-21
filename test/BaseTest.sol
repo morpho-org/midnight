@@ -234,6 +234,38 @@ abstract contract BaseTest is Test {
         return _path;
     }
 
+    // 4 leaves, assumes the offer is the first one
+    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[1]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the second one
+    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[0]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the third one
+    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[3]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the fourth one
+    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[2]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return _path;
+    }
+
     function root(Offer memory offer) internal pure returns (bytes32) {
         return UtilsLib.hashOffer(offer);
     }
@@ -244,6 +276,12 @@ abstract contract BaseTest is Test {
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
         return UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+    }
+
+    function root(Offer[4] memory offers) internal pure returns (bytes32) {
+        bytes32 left = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        bytes32 right = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return UtilsLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -270,6 +308,11 @@ abstract contract BaseTest is Test {
     function ratifierData(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1), uint256(1));
+    }
+
+    function ratifierData(Offer[4] memory offers) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2), uint256(2));
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
