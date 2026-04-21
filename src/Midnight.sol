@@ -318,85 +318,90 @@ contract Midnight is IMidnight {
             sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
         }
 
-        uint256 newConsumed;
-        if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, ConsumedSellerAssets());
-        } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, ConsumedBuyerAssets());
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, ConsumedUnits());
+        {
+            if (offer.maxSellerAssets > 0) {
+                uint256 newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
+                require(newConsumed <= offer.maxSellerAssets, ConsumedSellerAssets());
+            } else if (offer.maxBuyerAssets > 0) {
+                uint256 newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
+                require(newConsumed <= offer.maxBuyerAssets, ConsumedBuyerAssets());
+            } else {
+                uint256 newConsumed = consumed[offer.maker][offer.group] += units;
+                require(newConsumed <= offer.maxUnits, ConsumedUnits());
+            }
         }
 
-        Position storage buyerPos = position[id][buyer];
-        Position storage sellerPos = position[id][seller];
+        {
+            Position storage buyerPos = position[id][buyer];
+            Position storage sellerPos = position[id][seller];
 
-        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
-        if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
+            if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
+            if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
 
-        uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
-        uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
-        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-        uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
-        uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
-            ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
-            : 0;
+            uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
+            uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
+            uint256 sellerDebtIncrease = units - sellerCreditDecrease;
+            uint128 buyerPendingFeeIncrease =
+                UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+            uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
+                ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
+                : 0;
 
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.pendingFee += buyerPendingFeeIncrease;
-        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
+            buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
+            buyerPos.pendingFee += buyerPendingFeeIncrease;
+            buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
 
-        sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
+            sellerPos.pendingFee -= sellerPendingFeeDecrease;
+            sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
+            sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
 
-        _obligationState.totalUnits =
-            UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+            _obligationState.totalUnits =
+                UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
-        require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
-        if (offer.reduceOnly) {
-            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
+            require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
+            if (offer.reduceOnly) {
+                require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
+            }
+
+            require(
+                offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
+                    || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
+                BuyerGatedFromIncreasingCredit()
+            );
+            require(
+                offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
+                    || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
+                SellerGatedFromIncreasingDebt()
+            );
+
+            address buyerCallback = offer.buy ? offer.callback : takerCallback;
+            address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+
+            emit EventsLib.Take(
+                msg.sender,
+                id,
+                offer.maker,
+                taker,
+                offer.buy,
+                buyerAssets,
+                sellerAssets,
+                units,
+                payer,
+                offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller,
+                offer.group,
+                consumed[offer.maker][offer.group],
+                buyerPendingFeeIncrease,
+                sellerPendingFeeDecrease,
+                buyerCreditIncrease,
+                sellerCreditDecrease
+            );
         }
-
-        require(
-            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
-            BuyerGatedFromIncreasingCredit()
-        );
-        require(
-            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
-            SellerGatedFromIncreasingDebt()
-        );
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
         address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
         address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
-        emit EventsLib.Take(
-            msg.sender,
-            id,
-            offer.maker,
-            taker,
-            offer.buy,
-            buyerAssets,
-            sellerAssets,
-            units,
-            payer,
-            receiver,
-            offer.group,
-            newConsumed,
-            buyerPendingFeeIncrease,
-            sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease
-        );
-
-        address buyerCallback = offer.buy ? offer.callback : takerCallback;
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
@@ -494,8 +499,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
         require(
-            _position.collateral[collateralIndex] <= maxCollateralPerUser[collateralToken],
-            CollateralPerUserExceeded()
+            _position.collateral[collateralIndex] <= maxCollateralPerUser[collateralToken], CollateralPerUserExceeded()
         );
 
         SafeTransferLib.safeTransferFrom(collateralToken, msg.sender, address(this), assets);
