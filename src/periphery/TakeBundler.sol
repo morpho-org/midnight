@@ -57,7 +57,9 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
-        SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
+        if (referralFeeAssets > 0) {
+            SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
+        }
     }
 
     /// @dev See buyUnitsTarget.
@@ -104,7 +106,7 @@ contract TakeBundler is ITakeBundler {
 
         address loanToken = takes[0].offer.obligation.loanToken;
         uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
-        SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
+        if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
     }
 
@@ -157,7 +159,9 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
         uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
-        SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
+        if (referralFeeAssets > 0) {
+            SafeTransferLib.safeTransfer(takes[0].offer.obligation.loanToken, referralFeeRecipient, referralFeeAssets);
+        }
     }
 
     /// @dev See buyUnitsTarget.
@@ -211,7 +215,7 @@ contract TakeBundler is ITakeBundler {
 
         address loanToken = takes[0].offer.obligation.loanToken;
         uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
-        SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
+        if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
     }
 }
