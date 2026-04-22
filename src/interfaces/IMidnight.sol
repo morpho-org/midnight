@@ -19,7 +19,7 @@ struct CollateralParams {
 }
 
 struct Offer {
-    Obligation obligation;
+    bytes32 id;
     bool buy;
     address maker;
     uint256 start;
@@ -135,15 +135,15 @@ interface IMidnight {
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external;
     function claimTradingFee(address token, uint256 amount, address receiver) external;
-    function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
+    function claimContinuousFee(bytes32 id, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
     function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
-    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data) external;
-    function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
-    function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Obligation calldata obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes calldata data) external returns (uint256, uint256);
+    function withdraw(bytes32 id, uint256 units, address onBehalf, address receiver) external;
+    function repay(bytes32 id, uint256 units, address onBehalf, address callback, bytes calldata data) external;
+    function supplyCollateral(bytes32 id, uint256 collateralIndex, uint256 assets, address onBehalf) external;
+    function withdrawCollateral(bytes32 id, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
+    function liquidate(bytes32 id, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes calldata data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function shuffleSession(address onBehalf) external;
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
@@ -151,8 +151,8 @@ interface IMidnight {
     function touchObligation(Obligation memory obligation) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
-    function updatePositionView(Obligation memory obligation, bytes32 id, address user) external view returns (uint128, uint128, uint128);
-    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
+    function updatePositionView(bytes32 id, address user) external view returns (uint128, uint128, uint128);
+    function updatePosition(bytes32 id, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
@@ -172,8 +172,8 @@ interface IMidnight {
     function pendingFee(bytes32 id, address user) external view returns (uint128);
     function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
-    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
+    function isLiquidatable(bytes32 id, address borrower) external view returns (bool);
+    function isHealthy(bytes32 id, address borrower) external view returns (bool);
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256);
     function maxTradingFee(uint256 index) external pure returns (uint256);
     function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);

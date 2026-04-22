@@ -229,11 +229,10 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(token, receiver, amount);
     }
 
-    function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
-        bytes32 id = toId(obligation);
+    function claimContinuousFee(bytes32 id, uint256 amount, address receiver) external {
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        require(_obligationState.created, ObligationNotCreated());
+        Obligation memory obligation = toObligation(id);
 
         _obligationState.continuousFeeCredit -= UtilsLib.toUint128(amount);
         _obligationState.totalUnits -= UtilsLib.toUint128(amount);
@@ -265,7 +264,8 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
-        bytes32 id = touchObligation(offer.obligation);
+        bytes32 id = offer.id;
+        Obligation memory obligation = toObligation(id);
         ObligationState storage _obligationState = obligationState[id];
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
@@ -282,7 +282,7 @@ contract Midnight is IMidnight {
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
@@ -304,8 +304,8 @@ contract Midnight is IMidnight {
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
 
-        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.obligation, id, buyer);
-        if (hasCredit(id, seller)) _updatePosition(offer.obligation, id, seller);
+        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(obligation, id, buyer);
+        if (hasCredit(id, seller)) _updatePosition(obligation, id, seller);
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
@@ -333,13 +333,13 @@ contract Midnight is IMidnight {
         }
 
         require(
-            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
+            obligation.enterGate == address(0) || buyerCreditIncrease == 0
+                || IEnterGate(obligation.enterGate).canIncreaseCredit(buyer),
             BuyerGatedFromIncreasingCredit()
         );
         require(
-            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
+            obligation.enterGate == address(0) || sellerDebtIncrease == 0
+                || IEnterGate(obligation.enterGate).canIncreaseDebt(seller),
             SellerGatedFromIncreasingDebt()
         );
 
@@ -371,34 +371,33 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
+                IBuyCallback(buyerCallback).onBuy(id, obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
+        claimableTradingFee[obligation.loanToken] += buyerAssets - sellerAssets;
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(sellerCallback)
-                        .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
+                ISellCallback(sellerCallback).onSell(id, obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
+        require(!_isLiquidatable(obligation, id, seller), SellerIsLiquidatable());
 
         return (buyerAssets, sellerAssets, units);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
-    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
-        bytes32 id = touchObligation(obligation);
+    function withdraw(bytes32 id, uint256 units, address onBehalf, address receiver) external {
+        Obligation memory obligation = toObligation(id);
         ObligationState storage _obligationState = obligationState[id];
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         _updatePosition(obligation, id, onBehalf);
@@ -418,11 +417,9 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
-        external
-    {
+    function repay(bytes32 id, uint256 units, address onBehalf, address callback, bytes calldata data) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
-        bytes32 id = touchObligation(obligation);
+        Obligation memory obligation = toObligation(id);
 
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
         obligationState[id].withdrawable += UtilsLib.toUint128(units);
@@ -440,10 +437,8 @@ contract Midnight is IMidnight {
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
-    function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
-        external
-    {
-        bytes32 id = touchObligation(obligation);
+    function supplyCollateral(bytes32 id, uint256 collateralIndex, uint256 assets, address onBehalf) external {
+        Obligation memory obligation = toObligation(id);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
@@ -463,14 +458,10 @@ contract Midnight is IMidnight {
     }
 
     /// @dev This function does not call any oracle if all the collateral is withdrawn and the borrower has no debt.
-    function withdrawCollateral(
-        Obligation memory obligation,
-        uint256 collateralIndex,
-        uint256 assets,
-        address onBehalf,
-        address receiver
-    ) external {
-        bytes32 id = touchObligation(obligation);
+    function withdrawCollateral(bytes32 id, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver)
+        external
+    {
+        Obligation memory obligation = toObligation(id);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
@@ -482,7 +473,7 @@ contract Midnight is IMidnight {
             _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
         }
 
-        require(isHealthy(obligation, id, onBehalf), UnhealthyBorrower());
+        require(_isHealthy(obligation, id, onBehalf), UnhealthyBorrower());
 
         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
 
@@ -500,7 +491,7 @@ contract Midnight is IMidnight {
     /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
-        Obligation calldata obligation,
+        bytes32 id,
         uint256 collateralIndex,
         uint256 seizedAssets,
         uint256 repaidUnits,
@@ -509,7 +500,7 @@ contract Midnight is IMidnight {
         address callback,
         bytes calldata data
     ) external returns (uint256, uint256) {
-        bytes32 id = touchObligation(obligation);
+        Obligation memory obligation = toObligation(id);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
@@ -523,6 +514,7 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
+
         uint128 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
@@ -536,12 +528,6 @@ contract Midnight is IMidnight {
             );
             bitmap = bitmap.clearBit(i);
         }
-
-        require(
-            originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (block.timestamp > obligation.maturity || originalDebt > maxDebt),
-            NotLiquidatable()
-        );
 
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
@@ -560,6 +546,12 @@ contract Midnight is IMidnight {
                 )
                 : 0;
         }
+
+        require(
+            originalDebt > 0 && !liquidationLocked(id, borrower)
+                && (block.timestamp > obligation.maturity || originalDebt > maxDebt),
+            NotLiquidatable()
+        );
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = obligation.collateralParams[collateralIndex].maxLif;
@@ -704,10 +696,14 @@ contract Midnight is IMidnight {
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
 
-    /// @dev Expects the id to correspond to the obligation's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
-    function updatePositionView(Obligation memory obligation, bytes32 id, address user)
-        public
+    function updatePositionView(bytes32 id, address user) public view returns (uint128, uint128, uint128) {
+        return _updatePositionView(toObligation(id), id, user);
+    }
+
+    /// @dev Expects the id to correspond to the obligation's id.
+    function _updatePositionView(Obligation memory obligation, bytes32 id, address user)
+        internal
         view
         returns (uint128, uint128, uint128)
     {
@@ -731,10 +727,8 @@ contract Midnight is IMidnight {
 
     /// @dev Slashes the position and accrues the continuous fee.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
-    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128) {
-        bytes32 id = toId(obligation);
-        require(obligationState[id].created, ObligationNotCreated());
-        return _updatePosition(obligation, id, user);
+    function updatePosition(bytes32 id, address user) external returns (uint128, uint128, uint128) {
+        return _updatePosition(toObligation(id), id, user);
     }
 
     /// @dev Expects the obligation to be touched.
@@ -745,7 +739,7 @@ contract Midnight is IMidnight {
         returns (uint128, uint128, uint128)
     {
         Position storage _position = position[id][user];
-        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(obligation, id, user);
+        (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = _updatePositionView(obligation, id, user);
 
         uint128 creditDecrease = _position.credit - newCredit;
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
@@ -785,7 +779,7 @@ contract Midnight is IMidnight {
 
     /// @dev Reverts if the id is not a valid id of a touched obligation.
     /// @dev Returns the obligation corresponding to the given id.
-    function toObligation(bytes32 id) external view returns (Obligation memory) {
+    function toObligation(bytes32 id) public view returns (Obligation memory) {
         require(obligationState[id].created, ObligationNotCreated());
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Obligation));
@@ -849,15 +843,22 @@ contract Midnight is IMidnight {
 
     /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
     /// past maturity or not healthy.
-    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
-            && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
+    function isLiquidatable(bytes32 id, address borrower) public view returns (bool) {
+        return _isLiquidatable(toObligation(id), id, borrower);
     }
 
-    /// @dev This function should be called with the id corresponding to the obligation.
+    function _isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) internal view returns (bool) {
+        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
+            && (block.timestamp > obligation.maturity || !_isHealthy(obligation, id, borrower));
+    }
+
     /// @dev This function does not call any oracle if debt is 0.
+    function isHealthy(bytes32 id, address borrower) public view returns (bool) {
+        return _isHealthy(toObligation(id), id, borrower);
+    }
+
     /// @dev Expects the id to correspond to the obligation's id.
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+    function _isHealthy(Obligation memory obligation, bytes32 id, address borrower) internal view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;

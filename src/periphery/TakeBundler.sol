@@ -102,8 +102,7 @@ contract TakeBundler is ITakeBundler {
         uint256 maxUnits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        // touchObligation to have the correct trading fees.
-        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+        bytes32 id = takes[0].offer.id;
 
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
@@ -149,8 +148,7 @@ contract TakeBundler is ITakeBundler {
         uint256 maxUnits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        // touchObligation to have the correct trading fees.
-        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+        bytes32 id = takes[0].offer.id;
 
         uint256 totalFilledSellerAssets;
         uint256 totalUnits;
