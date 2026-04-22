@@ -89,6 +89,7 @@ function defaultOffer(number: string) {
 }
 
 // WARNING: The root should be built by sorting the nodes in ascending order of their hash.
+// By luck, the following offers happen to be correctly sorted already.
 function buildRoot() {
   return [
     [defaultOffer("1"), defaultOffer("2")],
