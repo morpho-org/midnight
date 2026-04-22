@@ -127,10 +127,11 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
+        uint256 preFeeTargetBuyerAssets = targetBuyerAssets.mulDivUp(WAD - referralFeePct, WAD);
 
         uint256 totalFilledBuyerAssets;
         uint256 totalFilledUnits;
-        for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+        for (uint256 i; i < takes.length && totalFilledBuyerAssets < preFeeTargetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
@@ -139,7 +140,7 @@ contract TakeBundler is ITakeBundler {
                 .take(
                     UtilsLib.min(
                         TakeAmountsLib.buyerAssetsToUnits(
-                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                            midnight, id, takes[i].offer, preFeeTargetBuyerAssets - totalFilledBuyerAssets
                         ),
                         takes[i].units
                     ),
@@ -159,7 +160,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(totalFilledBuyerAssets == preFeeTargetBuyerAssets, InsufficientLiquidity());
         require(totalFilledUnits >= minUnits, UnitsBelowMin());
         require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
@@ -183,12 +184,13 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, PctExceeded());
+        require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
+        uint256 preFeeTargetSellerAssets = targetSellerAssets.mulDivUp(WAD, WAD - referralFeePct);
 
         uint256 totalFilledSellerAssets;
         uint256 totalFilledUnits;
-        for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+        for (uint256 i; i < takes.length && totalFilledSellerAssets < preFeeTargetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
@@ -197,7 +199,7 @@ contract TakeBundler is ITakeBundler {
                 .take(
                     UtilsLib.min(
                         TakeAmountsLib.sellerAssetsToUnits(
-                            midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                            midnight, id, takes[i].offer, preFeeTargetSellerAssets - totalFilledSellerAssets
                         ),
                         takes[i].units
                     ),
@@ -217,7 +219,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(totalFilledSellerAssets == preFeeTargetSellerAssets, InsufficientLiquidity());
         require(totalFilledUnits >= minUnits, UnitsBelowMin());
         require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
