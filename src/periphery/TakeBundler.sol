@@ -238,6 +238,7 @@ contract TakeBundler is ITakeBundler {
         require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
+    /// @dev USDT won't break because the allowance is reset to 0 after supplyCollateral.
     function _safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
         if (!success) {
