@@ -728,6 +728,7 @@ contract Midnight is IMidnight {
     /// @dev Slashes the position and accrues the continuous fee.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePosition(bytes32 id, address user) external returns (uint128, uint128, uint128) {
+        require(obligationState[id].created, ObligationNotCreated());
         return _updatePosition(toObligation(id), id, user);
     }
 
