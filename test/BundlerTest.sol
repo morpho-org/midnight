@@ -339,5 +339,4 @@ contract BundlerTest is BaseTest {
         vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
         takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, maxBuyerAssets, 0, address(0));
     }
-
 }

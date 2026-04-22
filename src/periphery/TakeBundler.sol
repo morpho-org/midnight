@@ -127,14 +127,14 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
-        // touchObligation to have the correct trading fees.
-        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledBuyerAssets;
         uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
+            // touchObligation to have the correct trading fees.
+            bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -185,14 +185,14 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
-        // touchObligation to have the correct trading fees.
-        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
         uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
+            // touchObligation to have the correct trading fees.
+            bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
