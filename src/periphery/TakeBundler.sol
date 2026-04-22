@@ -12,7 +12,6 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
 
-    /// @dev Assumes offers are all share the same obligation id.
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -27,14 +26,15 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, PctExceeded());
+        require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
+        bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         uint256 totalFilledUnits;
         uint256 totalFilledBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -58,11 +58,13 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
         require(totalFilledBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
-        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
+        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
-    /// @dev See buyUnitsTarget.
+    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -77,12 +79,13 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
+        bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
         uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
-            require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -111,7 +114,10 @@ contract TakeBundler is ITakeBundler {
         SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
     }
 
-    /// @dev See buyUnitsTarget.
+    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    /// @dev Takes could have different obligations (with the same loan token).
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
@@ -123,7 +129,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, PctExceeded());
+        require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
@@ -161,11 +167,14 @@ contract TakeBundler is ITakeBundler {
         require(totalFilledUnits >= minUnits, UnitsBelowMin());
         require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
-        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD);
+        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
-    /// @dev See buyUnitsTarget.
+    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    /// @dev Takes could have different obligations (with the same loan token).
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,

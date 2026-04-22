@@ -17,6 +17,7 @@ interface ITakeBundler {
     error BuyerAssetsAboveMax();
     error BuyerAssetsBelowMin();
     error InconsistentLoanToken();
+    error InconsistentObligation();
     error InconsistentSide();
     error InsufficientLiquidity();
     error SellerAssetsAboveMax();
