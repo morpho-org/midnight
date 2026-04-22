@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -10,6 +12,7 @@ methods {
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
@@ -20,11 +23,11 @@ methods {
     function UtilsLib.min(uint256 x, uint256 y) internal returns (uint256) => CVL_min(x, y);
     function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => NONDET;
 
-    // Returns a fixed symbolic id; sound because the rule only involves a single obligation.
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
+    // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // Replaces obligation lookup/creation with a fixed id; position update arithmetic is independent of obligation initialization.
-    function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
+    // Replaces obligation lookup/creation with a deterministic id; position update arithmetic is independent of obligation initialization.
+    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
@@ -53,14 +56,10 @@ methods {
     function _.canIncreaseDebt(address) external => NONDET;
 }
 
-/// GHOSTS ///
-
-persistent ghost bytes32 ghostId;
-
 /// SUMMARY FUNCTIONS ///
 
-function CVL_toId() returns bytes32 {
-    return ghostId;
+function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
+    return Utils.hashObligation(obligation);
 }
 
 function CVL_zeroFloorSub(uint256 x, uint256 y) returns uint256 {
@@ -120,60 +119,44 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
 
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
 
+    bytes32 id = summaryToId(offer.obligation);
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    // Buyer and seller are always distinct (enforced by require(offer.maker != taker) in take).
     // Explicit require prevents the solver from exploring aliased-storage paths.
-    require buyer != seller;
+    require buyer != seller, "prover perfomance";
 
-    uint128 obLossIndex = currentContract.obligationState[ghostId].lossIndex;
+    uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
     require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
 
-    // Pre-synced positions: lossIndex already matches obligation, lastAccrual == block.timestamp.
     // This makes _updatePosition a no-op (identity via ghost axioms), dramatically reducing solver work.
-    // Sound precondition: callers can always updatePosition before taking.
-    require userLossIndex(ghostId, buyer) == obLossIndex, "buyer lossIndex synced";
-    require userLossIndex(ghostId, seller) == obLossIndex, "seller lossIndex synced";
-    require to_mathint(lastAccrual(ghostId, buyer)) == to_mathint(e.block.timestamp), "buyer lastAccrual synced";
-    require to_mathint(lastAccrual(ghostId, seller)) == to_mathint(e.block.timestamp), "seller lastAccrual synced";
+    require userLossIndex(id, buyer) == obLossIndex, "buyer lossIndex synced";
+    require userLossIndex(id, seller) == obLossIndex, "seller lossIndex synced";
+    require to_mathint(lastAccrual(id, buyer)) == to_mathint(e.block.timestamp), "buyer lastAccrual synced";
+    require to_mathint(lastAccrual(id, seller)) == to_mathint(e.block.timestamp), "seller lastAccrual synced";
 
     storage initState = lastStorage;
 
     // Path 1: take the full amount A.
     take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    uint256 creditOfBuyer1 = creditOf(ghostId, buyer);
-    uint256 debtOfBuyer1 = debtOf(ghostId, buyer);
-    uint256 creditOfSeller1 = creditOf(ghostId, seller);
-    uint256 debtOfSeller1 = debtOf(ghostId, seller);
-    uint256 totalUnits1 = totalUnits(ghostId);
+    uint256 creditOfBuyer1 = creditOf(id, buyer);
+    uint256 debtOfBuyer1 = debtOf(id, buyer);
+    uint256 creditOfSeller1 = creditOf(id, seller);
+    uint256 debtOfSeller1 = debtOf(id, seller);
+    uint256 totalUnits1 = totalUnits(id);
     uint256 consumed1 = consumed(offer.maker, offer.group);
-    uint128 userLossIndexBuyer1 = userLossIndex(ghostId, buyer);
-    uint128 userLossIndexSeller1 = userLossIndex(ghostId, seller);
-    uint128 lastAccrualBuyer1 = lastAccrual(ghostId, buyer);
-    uint128 lastAccrualSeller1 = lastAccrual(ghostId, seller);
-    uint128 pendingFeeBuyer1 = pendingFee(ghostId, buyer);
-    uint128 pendingFeeSeller1 = pendingFee(ghostId, seller);
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
 
     take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    assert creditOfBuyer1 == creditOf(ghostId, buyer), "buyer credit must match";
-    assert debtOfBuyer1 == debtOf(ghostId, buyer), "buyer debt must match";
-    assert creditOfSeller1 == creditOf(ghostId, seller), "seller credit must match";
-    assert debtOfSeller1 == debtOf(ghostId, seller), "seller debt must match";
-    assert totalUnits1 == totalUnits(ghostId), "totalUnits must match";
+    assert creditOfBuyer1 == creditOf(id, buyer), "buyer credit must match";
+    assert debtOfBuyer1 == debtOf(id, buyer), "buyer debt must match";
+    assert creditOfSeller1 == creditOf(id, seller), "seller credit must match";
+    assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
+    assert totalUnits1 == totalUnits(id), "totalUnits must match";
     mathint consumedDiff = to_mathint(consumed1) - to_mathint(consumed(offer.maker, offer.group));
     assert consumedDiff >= -1 && consumedDiff <= 1, "consumed differs by at most 1";
-    //assert userLossIndexBuyer1 == userLossIndex(ghostId, buyer), "buyer lossIndex must match";
-    //assert userLossIndexSeller1 == userLossIndex(ghostId, seller), "seller lossIndex must match";
-    //assert lastAccrualBuyer1 == lastAccrual(ghostId, buyer), "buyer lastAccrual must match";
-    //assert lastAccrualSeller1 == lastAccrual(ghostId, seller), "seller lastAccrual must match";
-    //mathint pendingFeeBuyerDiff = to_mathint(pendingFeeBuyer1) - to_mathint(pendingFee(ghostId, buyer));
-    //assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1, "buyer pendingFee differs by at most 1";
-    //mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(ghostId, seller));
-    //assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1, "seller pendingFee differs by at most 1";
 }
