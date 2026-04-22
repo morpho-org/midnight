@@ -32,7 +32,7 @@ contract MaxAmountsTest is BaseTest {
             );
         obligation.rcfThreshold = 0;
 
-        id = toId(obligation);
+        id = midnight.touchObligation(obligation);
 
         vm.prank(borrower);
 
@@ -59,10 +59,10 @@ contract MaxAmountsTest is BaseTest {
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
 
-        midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
+        midnight.supplyCollateral(id, 0, collateralAmount, borrower);
 
         Offer memory borrowerOffer;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.id = id;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
@@ -86,10 +86,10 @@ contract MaxAmountsTest is BaseTest {
         uint256 collateralAmount = 1000;
         deal(address(collateralToken1), address(this), collateralAmount);
 
-        midnight.supplyCollateral(obligation, 0, collateralAmount, borrower);
+        midnight.supplyCollateral(id, 0, collateralAmount, borrower);
 
         Offer memory borrowerOffer;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.id = id;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
@@ -111,7 +111,7 @@ contract MaxAmountsTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(this), true);
 
-        midnight.supplyCollateral(obligation, 0, amount, borrower);
+        midnight.supplyCollateral(id, 0, amount, borrower);
 
         assertEq(midnight.collateral(id, borrower, 0), amount, "collateral at max");
     }
@@ -126,6 +126,6 @@ contract MaxAmountsTest is BaseTest {
         midnight.setIsAuthorized(borrower, address(this), true);
 
         vm.expectRevert(UtilsLib.CastOverflow.selector);
-        midnight.supplyCollateral(obligation, 0, amount, borrower);
+        midnight.supplyCollateral(id, 0, amount, borrower);
     }
 }

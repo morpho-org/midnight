@@ -60,7 +60,7 @@ contract TradingFeeTest is BaseTest {
 
         id = toId(obligation);
 
-        lenderOffer.obligation = obligation;
+        lenderOffer.id = id;
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
@@ -68,7 +68,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 200;
 
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.id = id;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
@@ -170,8 +170,8 @@ contract TradingFeeTest is BaseTest {
         midnight.setDefaultTradingFee(address(loanToken), 2, tradingFee7Days);
 
         id = midnight.touchObligation(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        lenderOffer.id = id;
+        borrowerOffer.id = id;
         borrowerOffer.tick = sellerTick;
 
         uint256 tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
@@ -201,8 +201,8 @@ contract TradingFeeTest is BaseTest {
         maturity = bound(maturity, 0, block.timestamp - 1);
         obligation.maturity = maturity;
         id = toId(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        lenderOffer.id = id;
+        borrowerOffer.id = id;
 
         midnight.setDefaultTradingFee(address(loanToken), 0, tradingFee0Day);
         borrowerOffer.tick = sellerTick;
@@ -225,8 +225,8 @@ contract TradingFeeTest is BaseTest {
 
         obligation.maturity = maturity;
         id = toId(obligation);
-        lenderOffer.obligation = obligation;
-        borrowerOffer.obligation = obligation;
+        lenderOffer.id = id;
+        borrowerOffer.id = id;
 
         midnight.setDefaultTradingFee(address(loanToken), 6, tradingFee360Days);
         borrowerOffer.tick = sellerTick;

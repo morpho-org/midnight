@@ -42,11 +42,11 @@ contract TakeAmountsTest is BaseTest {
         obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
-        id = toId(obligation);
+        id = midnight.touchObligation(obligation);
 
         offer.buy = false;
         offer.maxUnits = type(uint256).max;
-        offer.obligation = obligation;
+        offer.id = id;
         offer.ratifier = address(ecrecoverRatifier);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;

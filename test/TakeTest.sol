@@ -54,13 +54,13 @@ contract TakeTest is BaseTest {
         obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
         obligation.rcfThreshold = 0;
 
-        id = toId(obligation);
+        id = midnight.touchObligation(obligation);
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.obligation = obligation;
+        lenderOffer.id = id;
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -69,7 +69,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
-        otherLenderOffer.obligation = obligation;
+        otherLenderOffer.id = id;
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
@@ -78,7 +78,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.id = id;
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -86,7 +86,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
-        otherBorrowerOffer.obligation = obligation;
+        otherBorrowerOffer.id = id;
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
     }
@@ -344,7 +344,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, units);
         assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
         assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
-        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        assertTrue(midnight.isHealthy(id, otherLender), "other lender healthy");
         uint256 totalUnitsBefore = midnight.totalUnits(id);
 
         uint256 timestamp = obligation.maturity + 1;
@@ -367,7 +367,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, units);
         assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
         assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
-        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        assertTrue(midnight.isHealthy(id, otherLender), "other lender healthy");
         uint256 totalUnitsBefore = midnight.totalUnits(id);
 
         uint256 timestamp = obligation.maturity + 1;
@@ -420,7 +420,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, units);
         assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
         assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
-        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        assertTrue(midnight.isHealthy(id, otherLender), "other lender healthy");
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
 
         uint256 timestamp = obligation.maturity + 1;
@@ -441,7 +441,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, units);
         assertEq(midnight.creditOf(id, otherLender), units, "other lender credit");
         assertEq(midnight.debtOf(id, otherLender), 0, "other lender debt");
-        assertTrue(midnight.isHealthy(obligation, id, otherLender), "other lender healthy");
+        assertTrue(midnight.isHealthy(id, otherLender), "other lender healthy");
         uint256 otherBorrowerDebt = midnight.debtOf(id, otherBorrower);
 
         uint256 timestamp = obligation.maturity + 1;
@@ -577,10 +577,12 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = firstFill + secondFill;
         borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
-        borrowerOffer2.obligation.maturity = obligation.maturity + 100;
+        Obligation memory obligation2 = obligation;
+        obligation2.maturity = obligation.maturity + 100;
+        borrowerOffer2.id = midnight.touchObligation(obligation2);
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(borrowerOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(firstFill, lender, borrowerOffer);
 
@@ -596,10 +598,12 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = firstFill + secondFill;
         lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
-        lenderOffer2.obligation.maturity = obligation.maturity + 100;
+        Obligation memory obligation2 = obligation;
+        obligation2.maturity = obligation.maturity + 100;
+        lenderOffer2.id = midnight.touchObligation(obligation2);
         deal(address(loanToken), lender, firstFill + secondFill);
         collateralize(obligation, borrower, firstFill);
-        collateralize(lenderOffer2.obligation, borrower, secondFill);
+        collateralize(obligation2, borrower, secondFill);
 
         take(firstFill, borrower, lenderOffer);
 
@@ -1496,7 +1500,7 @@ contract TakeTest is BaseTest {
         zeroOffer.maker = address(0);
         zeroOffer.ratifier = address(ecrecoverRatifier);
         zeroOffer.maxUnits = units;
-        zeroOffer.obligation = obligation;
+        zeroOffer.id = id;
         zeroOffer.expiry = block.timestamp + 200;
         zeroOffer.tick = 0; // 0 price so any units transfer 0 assets
 
@@ -1556,7 +1560,7 @@ contract TakeTest is BaseTest {
 
         uint256 units = 1e18;
         Offer memory bOffer;
-        bOffer.obligation = longObligation;
+        bOffer.id = midnight.touchObligation(longObligation);
         bOffer.buy = false;
         bOffer.maker = borrower;
         bOffer.receiverIfMakerIsSeller = borrower;
@@ -1602,7 +1606,7 @@ contract BorrowCallback is ISellCallback {
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
-        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        Midnight(msg.sender).supplyCollateral(id, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
     }
 }
@@ -1620,14 +1624,14 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
             abi.decode(data, (uint256, uint256, uint256));
         address collateralToken = obligation.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, collateralAmount);
-        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+        Midnight(msg.sender).supplyCollateral(id, collateralIndex, collateralAmount, seller);
 
         Oracle oracle = Oracle(obligation.collateralParams[collateralIndex].oracle);
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
         try Midnight(msg.sender)
-            .liquidate(obligation, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
+            .liquidate(id, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1683,7 +1687,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             uint256 idx = storedCollateralIndex;
             address collateralToken = obligation.collateralParams[idx].token;
             ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
-            Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+            Midnight(msg.sender).supplyCollateral(id, idx, storedCollateralAmount, seller);
 
             reentered = true;
             Offer memory nestedOffer = storedOffer;
@@ -1696,7 +1700,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
             try Midnight(msg.sender)
-                .liquidate(obligation, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
+                .liquidate(id, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;

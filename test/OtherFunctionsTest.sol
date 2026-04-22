@@ -80,12 +80,12 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         deal(collateralToken, address(this), additionalCollateral);
-        midnight.supplyCollateral(obligation, 0, additionalCollateral, borrower);
+        midnight.supplyCollateral(id, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
 
         vm.prank(borrower);
-        midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
+        midnight.withdrawCollateral(id, 0, withdraw, borrower, borrower);
 
         assertEq(midnight.collateral(id, borrower, 0), initialCollateral - withdraw, "collateral of");
         assertEq(
@@ -103,13 +103,13 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
         deal(collateralToken, address(this), additionalCollateral);
-        midnight.supplyCollateral(obligation, 0, additionalCollateral, borrower);
+        midnight.supplyCollateral(id, 0, additionalCollateral, borrower);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
         withdraw = bound(withdraw, additionalCollateral + 1, initialCollateral);
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.UnhealthyBorrower.selector);
-        midnight.withdrawCollateral(obligation, 0, withdraw, borrower, borrower);
+        midnight.withdrawCollateral(id, 0, withdraw, borrower, borrower);
     }
 
     function testRepay(uint256 units, uint256 repaid) public {
@@ -122,7 +122,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(borrower), repaid);
 
         vm.prank(borrower);
-        midnight.repay(obligation, repaid, borrower, address(0), hex"");
+        midnight.repay(id, repaid, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
@@ -142,7 +142,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         midnight.setIsAuthorized(borrower, address(callback), true);
 
-        callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
+        callback.repay(midnight, obligation, id, repaid, borrower, hex"deadbeef");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(callback.recordedObligationId(), id);
@@ -157,7 +157,7 @@ contract OtherFunctionsTest is BaseTest {
         testRepay(units, withdraw);
 
         vm.prank(lender);
-        midnight.withdraw(obligation, withdraw, lender, lender);
+        midnight.withdraw(id, withdraw, lender, lender);
 
         assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
@@ -173,7 +173,7 @@ contract OtherFunctionsTest is BaseTest {
         address receiver = makeAddr("receiver");
 
         vm.prank(lender);
-        midnight.withdraw(obligation, withdraw, lender, receiver);
+        midnight.withdraw(id, withdraw, lender, receiver);
 
         assertEq(loanToken.balanceOf(lender), 0, "balance of lender");
         assertEq(loanToken.balanceOf(receiver), withdraw, "balance of receiver");
@@ -185,9 +185,10 @@ contract OtherFunctionsTest is BaseTest {
         address collateralToken = obligation.collateralParams[0].token;
         address receiver = makeAddr("receiver");
         deal(collateralToken, address(this), supply);
-        midnight.supplyCollateral(obligation, 0, supply, address(this));
+        midnight.touchObligation(obligation);
+        midnight.supplyCollateral(id, 0, supply, address(this));
 
-        midnight.withdrawCollateral(obligation, 0, withdraw, address(this), receiver);
+        midnight.withdrawCollateral(id, 0, withdraw, address(this), receiver);
 
         assertEq(ERC20(collateralToken).balanceOf(address(this)), 0, "balance of this");
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
@@ -310,11 +311,13 @@ contract OtherFunctionsTest is BaseTest {
         obligationWithRevertingOracle.maturity = block.timestamp + 100;
         obligationWithRevertingOracle.collateralParams = collateralParams;
 
+        bytes32 _id = midnight.touchObligation(obligationWithRevertingOracle);
+
         // Make the oracle revert.
         revertingOracle.stopOracle();
 
         deal(address(collateralToken1), address(this), collateral);
-        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        midnight.supplyCollateral(_id, 0, collateral, borrower);
     }
 
     function testWithdrawCollateralToZeroDoesNotCallOracle(uint256 collateral) public {
@@ -334,16 +337,17 @@ contract OtherFunctionsTest is BaseTest {
         obligationWithRevertingOracle.maturity = block.timestamp + 100;
         obligationWithRevertingOracle.collateralParams = collateralParams;
 
-        deal(address(collateralToken1), address(this), collateral);
-        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        bytes32 _id = midnight.touchObligation(obligationWithRevertingOracle);
 
-        bytes32 _id = toId(obligationWithRevertingOracle);
+        deal(address(collateralToken1), address(this), collateral);
+        midnight.supplyCollateral(_id, 0, collateral, borrower);
+
         assertEq(midnight.collateral(_id, borrower, 0), collateral, "collateral should be set");
 
         revertingOracle.stopOracle();
 
         vm.prank(borrower);
-        midnight.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
+        midnight.withdrawCollateral(_id, 0, collateral, borrower, borrower);
     }
 
     // Bitmap tests.
@@ -436,32 +440,34 @@ contract OtherFunctionsTest is BaseTest {
     function testMaxCollateralsPerBorrower() public {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER + 1;
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+        bytes32 _id = midnight.touchObligation(_obligation);
 
         for (uint256 i = 0; i < MAX_COLLATERALS_PER_BORROWER; i++) {
             address token = _obligation.collateralParams[i].token;
             deal(token, address(this), 1e18);
             ERC20(token).approve(address(midnight), 1e18);
-            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
+            midnight.supplyCollateral(_id, i, 1e18, borrower);
         }
 
         address lastToken = _obligation.collateralParams[numCollaterals - 1].token;
         deal(lastToken, address(this), 1e18);
         ERC20(lastToken).approve(address(midnight), 1e18);
         vm.expectRevert(IMidnight.TooManyActivatedCollaterals.selector);
-        midnight.supplyCollateral(_obligation, numCollaterals - 1, 1e18, borrower);
+        midnight.supplyCollateral(_id, numCollaterals - 1, 1e18, borrower);
     }
 
     function testBitmapCtzSingleCollateral(uint256 collateralIndex) public {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+        bytes32 _id = midnight.touchObligation(_obligation);
 
         address token = _obligation.collateralParams[collateralIndex].token;
         deal(token, address(this), 1e18);
         ERC20(token).approve(address(midnight), 1e18);
-        midnight.supplyCollateral(_obligation, collateralIndex, 1e18, borrower);
+        midnight.supplyCollateral(_id, collateralIndex, 1e18, borrower);
 
-        uint128 bitmap = midnight.activatedCollaterals(toId(_obligation), borrower);
+        uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
 
         assertEq(bitmap, 1 << collateralIndex, "bitmap should have only bit at collateralIndex");
         assertEq(UtilsLib.msb(bitmap), collateralIndex, "msb should equal collateralIndex");
@@ -471,15 +477,15 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         k = bound(k, 1, numCollaterals);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+        bytes32 _id = midnight.touchObligation(_obligation);
 
         for (uint256 i = 0; i < k; i++) {
             address token = _obligation.collateralParams[i].token;
             deal(token, address(this), 1e18);
             ERC20(token).approve(address(midnight), 1e18);
-            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
+            midnight.supplyCollateral(_id, i, 1e18, borrower);
         }
 
-        bytes32 _id = toId(_obligation);
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), k, "countBits should equal number of supplied collateralParams");
         assertEq(UtilsLib.msb(bitmap), k - 1, "msb should equal number of supplied collateralParams - 1");
@@ -489,21 +495,21 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+        bytes32 _id = midnight.touchObligation(_obligation);
 
         // Supply all collateralParams.
         for (uint256 i = 0; i < numCollaterals; i++) {
             address token = _obligation.collateralParams[i].token;
             deal(token, address(this), 1e18);
             ERC20(token).approve(address(midnight), 1e18);
-            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
+            midnight.supplyCollateral(_id, i, 1e18, borrower);
         }
 
-        bytes32 _id = toId(_obligation);
         assertEq(UtilsLib.countBits(midnight.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
 
         // Withdraw one collateral fully.
         vm.prank(borrower);
-        midnight.withdrawCollateral(_obligation, collateralIndex, 1e18, borrower, borrower);
+        midnight.withdrawCollateral(_id, collateralIndex, 1e18, borrower, borrower);
 
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
@@ -514,6 +520,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 numCollaterals = MAX_COLLATERALS_PER_BORROWER;
         collateralIndex = bound(collateralIndex, 0, numCollaterals - 1);
         Obligation memory _obligation = _createMultiCollateralObligation(numCollaterals);
+        bytes32 _id = midnight.touchObligation(_obligation);
 
         for (uint256 i = 0; i < numCollaterals; i++) {
             Oracle(_obligation.collateralParams[i].oracle).setPrice(ORACLE_PRICE_SCALE);
@@ -523,10 +530,9 @@ contract OtherFunctionsTest is BaseTest {
             address token = _obligation.collateralParams[i].token;
             deal(token, address(this), 1e18);
             ERC20(token).approve(address(midnight), 1e18);
-            midnight.supplyCollateral(_obligation, i, 1e18, borrower);
+            midnight.supplyCollateral(_id, i, 1e18, borrower);
         }
 
-        bytes32 _id = toId(_obligation);
         assertEq(UtilsLib.countBits(midnight.activatedCollaterals(_id, borrower)), numCollaterals, "all bits set");
 
         setupObligation(_obligation, 1e18);
@@ -535,7 +541,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.warp(_obligation.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
-        midnight.liquidate(_obligation, collateralIndex, 1e18, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(_id, collateralIndex, 1e18, 0, borrower, address(this), address(0), "");
 
         uint128 bitmap = midnight.activatedCollaterals(_id, borrower);
         assertEq(UtilsLib.countBits(bitmap), numCollaterals - 1, "one bit cleared");
@@ -681,11 +687,16 @@ contract RepayCallback {
     uint256 public recordedUnits;
     address public recordedOnBehalf;
 
-    function repay(Midnight midnight, Obligation memory obligation, uint256 units, address onBehalf, bytes memory data)
-        external
-    {
+    function repay(
+        Midnight midnight,
+        Obligation memory obligation,
+        bytes32 id,
+        uint256 units,
+        address onBehalf,
+        bytes memory data
+    ) external {
         ERC20(obligation.loanToken).approve(address(midnight), units);
-        midnight.repay(obligation, units, onBehalf, address(this), data);
+        midnight.repay(id, units, onBehalf, address(this), data);
     }
 
     function onRepay(

@@ -17,7 +17,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier = new SetterRatifier(address(midnight));
     }
 
-    function makeOffer(address maker) internal view returns (Offer memory offer) {
+    function makeOffer(address maker) internal returns (Offer memory offer) {
         Obligation memory obligation;
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 100;
@@ -26,7 +26,7 @@ contract SetterRatifierTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
 
-        offer.obligation = obligation;
+        offer.id = midnight.touchObligation(obligation);
         offer.buy = true;
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);

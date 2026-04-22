@@ -55,7 +55,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function _makeBuyOffer(uint256 units, bytes32 group) internal view returns (Offer memory o) {
-        o.obligation = obligation;
+        o.id = toId(obligation);
         o.buy = true;
         o.maker = otherLender;
         o.maxUnits = units;
@@ -85,7 +85,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
-        midnight.withdraw(obligation, 0, lender, lender);
+        midnight.withdraw(id, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after withdraw");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after withdraw");
         vm.revertToState(snap);
@@ -93,7 +93,7 @@ contract ContinuousFeeTest is BaseTest {
         // Via direct call
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, lender, expectedFee, expectedFee, expectedFee);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
         assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
@@ -123,7 +123,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
         vm.prank(lender);
-        midnight.withdraw(obligation, 0, lender, lender);
+        midnight.withdraw(id, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (withdraw)");
         assertEq(midnight.pendingFee(id, lender), 0, "remaining is zero (withdraw)");
         vm.revertToState(snap);
@@ -131,7 +131,7 @@ contract ContinuousFeeTest is BaseTest {
         // Via direct call
         vm.expectEmit();
         emit EventsLib.UpdatePosition(id, lender, remaining, remaining, remaining);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (direct)");
         assertEq(midnight.pendingFee(id, lender), 0, "remaining is zero (direct)");
     }
@@ -156,15 +156,15 @@ contract ContinuousFeeTest is BaseTest {
         // Two separate accruals
         uint256 snap = vm.snapshotState();
         vm.warp(block.timestamp + elapsed1);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
         vm.warp(block.timestamp + elapsed2);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
         uint256 creditTwoAccruals = midnight.creditOf(id, lender);
         vm.revertToState(snap);
 
         // Single accrual for same total elapsed
         vm.warp(block.timestamp + elapsed1 + elapsed2);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
         uint256 creditOneAccrual = midnight.creditOf(id, lender);
 
         assertApproxEqAbs(creditTwoAccruals, creditOneAccrual, 2, "two accruals ~ one accrual");
@@ -184,7 +184,7 @@ contract ContinuousFeeTest is BaseTest {
     }
 
     function _makeBorrowOffer(uint256 credit2) internal view returns (Offer memory borrowOffer) {
-        borrowOffer.obligation = obligation;
+        borrowOffer.id = toId(obligation);
         borrowOffer.buy = false;
         borrowOffer.maker = otherBorrower;
         borrowOffer.receiverIfMakerIsSeller = otherBorrower;
@@ -230,7 +230,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Accrue
         vm.warp(block.timestamp + elapsed);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         uint256 expectedFee = blendedRemaining.mulDivDown(elapsed, ttm);
         assertApproxEqAbs(midnight.creditOf(id, lender), credit1 + credit2 - expectedFee, 1, "credit after accrual");
@@ -332,7 +332,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, address(0), hex"");
+        midnight.repay(id, credit, borrower, address(0), hex"");
 
         uint256 pendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
@@ -344,7 +344,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, pendingFeeDecrease);
         vm.prank(lender);
-        midnight.withdraw(obligation, withdrawAmount, lender, lender);
+        midnight.withdraw(id, withdrawAmount, lender, lender);
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - pendingFeeDecrease : 0;
 
@@ -353,7 +353,7 @@ contract ContinuousFeeTest is BaseTest {
 
         if (withdrawAmount == creditAfterAccrual) {
             assertEq(midnight.pendingFee(id, lender), 0, "full withdraw zeroes remaining");
-            midnight.updatePosition(obligation, lender);
+            midnight.updatePosition(id, lender);
             assertEq(midnight.pendingFee(id, lender), 0, "full withdraw stays at zero");
         }
     }
@@ -375,13 +375,13 @@ contract ContinuousFeeTest is BaseTest {
 
         // Phase 1: accrue fees on original credit before the slash.
         vm.warp(block.timestamp + elapsed1);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
 
         // Slash.
         createBadDebt(obligation);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         uint256 creditAfterSlash = midnight.creditOf(id, lender);
         vm.assume(creditAfterSlash < creditBeforeSlash);
@@ -392,7 +392,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed2);
         uint256 accruedFee = pendingAfterSlash.mulDivDown(elapsed2, ttm - elapsed1);
 
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         assertEq(midnight.creditOf(id, lender), creditAfterSlash - accruedFee, "credit after slash and accrual");
         assertApproxEqAbs(
@@ -411,7 +411,7 @@ contract ContinuousFeeTest is BaseTest {
         setupLender(credit, feeRate, ttm);
 
         vm.warp(block.timestamp + elapsed);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         uint256 feeAmount = midnight.continuousFeeCredit(id);
         vm.assume(feeAmount > 0);
@@ -420,7 +420,7 @@ contract ContinuousFeeTest is BaseTest {
         // Repay so withdrawable covers the claim.
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, address(0), hex"");
+        midnight.repay(id, credit, borrower, address(0), hex"");
 
         address receiver = makeAddr("receiver");
         uint256 totalUnitsBefore = midnight.totalUnits(id);
@@ -429,7 +429,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.ClaimContinuousFee(feeClaimer, id, claimAmount, receiver);
         vm.prank(feeClaimer);
-        midnight.claimContinuousFee(obligation, claimAmount, receiver);
+        midnight.claimContinuousFee(id, claimAmount, receiver);
 
         assertEq(loanToken.balanceOf(receiver), claimAmount, "receiver balance");
         assertEq(midnight.continuousFeeCredit(id), feeAmount - claimAmount, "continuousFeeCredit after claim");
@@ -441,7 +441,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
         vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
-        midnight.claimContinuousFee(obligation, 0, caller);
+        midnight.claimContinuousFee(id, 0, caller);
     }
 
     function testClaimContinuousFeeExcessReverts(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
@@ -453,14 +453,14 @@ contract ContinuousFeeTest is BaseTest {
         setupLender(credit, feeRate, ttm);
 
         vm.warp(block.timestamp + elapsed);
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         uint256 feeAmount = midnight.continuousFeeCredit(id);
         vm.assume(feeAmount > 0);
 
         vm.prank(feeClaimer);
         vm.expectRevert();
-        midnight.claimContinuousFee(obligation, feeAmount + 1, feeClaimer);
+        midnight.claimContinuousFee(id, feeAmount + 1, feeClaimer);
     }
 
     function testUpdatePositionViewCorrect(
@@ -481,9 +481,9 @@ contract ContinuousFeeTest is BaseTest {
 
         vm.warp(block.timestamp + elapsed);
 
-        (uint128 newCredit, uint128 newPendingFee,) = midnight.updatePositionView(obligation, id, lender);
+        (uint128 newCredit, uint128 newPendingFee,) = midnight.updatePositionView(id, lender);
 
-        midnight.updatePosition(obligation, lender);
+        midnight.updatePosition(id, lender);
 
         assertEq(midnight.creditOf(id, lender), newCredit, "view matches credit");
         assertEq(midnight.pendingFee(id, lender), newPendingFee, "view matches pendingFee");
@@ -508,11 +508,11 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(block.timestamp + elapsed);
 
         (uint128 expectedCredit, uint128 expectedPendingFee, uint128 expectedAccruedFee) =
-            midnight.updatePositionView(obligation, id, lender);
+            midnight.updatePositionView(id, lender);
         uint256 expectedContinuousFeeCredit = midnight.continuousFeeCredit(id) + expectedAccruedFee;
 
         (uint128 returnedCredit, uint128 returnedPendingFee, uint128 returnedAccruedFee) =
-            midnight.updatePosition(obligation, lender);
+            midnight.updatePosition(id, lender);
 
         assertEq(returnedCredit, expectedCredit, "returned credit");
         assertEq(returnedPendingFee, expectedPendingFee, "returned pendingFee");
@@ -524,13 +524,13 @@ contract ContinuousFeeTest is BaseTest {
 
     function testUpdatePositionRevertsIfObligationNotCreated() public {
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.updatePosition(obligation, borrower);
+        midnight.updatePosition(toId(obligation), borrower);
     }
 
     function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
         vm.prank(feeClaimer);
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.claimContinuousFee(obligation, 0, feeClaimer);
+        midnight.claimContinuousFee(toId(obligation), 0, feeClaimer);
     }
 
     function testLastAccrualZeroForFreshPosition() public {

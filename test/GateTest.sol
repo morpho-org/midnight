@@ -70,12 +70,12 @@ contract GateTest is BaseTest {
         gatedObligation.enterGate = address(gate);
         gatedObligation.liquidatorGate = address(gate);
 
-        gatedId = toId(gatedObligation);
+        gatedId = midnight.touchObligation(gatedObligation);
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.obligation = gatedObligation;
+        lenderOffer.id = gatedId;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -84,7 +84,7 @@ contract GateTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = gatedObligation;
+        borrowerOffer.id = gatedId;
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -173,7 +173,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
-        otherBorrowerOffer.obligation = gatedObligation;
+        otherBorrowerOffer.id = gatedId;
         otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
@@ -200,7 +200,7 @@ contract GateTest is BaseTest {
         otherLenderOffer.buy = true;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
-        otherLenderOffer.obligation = gatedObligation;
+        otherLenderOffer.id = gatedId;
         otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
@@ -216,7 +216,7 @@ contract GateTest is BaseTest {
         exitOffer.maker = otherLender;
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
-        exitOffer.obligation = gatedObligation;
+        exitOffer.id = gatedId;
         exitOffer.ratifier = address(ecrecoverRatifier);
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
@@ -239,7 +239,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
+        midnight.repay(gatedId, units, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
     }
@@ -254,12 +254,12 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
+        midnight.repay(gatedId, units, borrower, address(0), hex"");
 
         gate.setWhitelisted(lender, false);
 
         vm.prank(lender);
-        midnight.withdraw(gatedObligation, units, lender, lender);
+        midnight.withdraw(gatedId, units, lender, lender);
 
         assertEq(midnight.creditOf(gatedId, lender), 0, "lender should have withdrawn");
     }
@@ -280,7 +280,7 @@ contract GateTest is BaseTest {
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(gatedId, 0, 1, 0, borrower, address(this), address(0), "");
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
@@ -296,7 +296,7 @@ contract GateTest is BaseTest {
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(gatedId, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     // --- Default (no gate) tests ---
@@ -309,7 +309,7 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.buy = true;
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
-        ungatedLenderOffer.obligation = obligation;
+        ungatedLenderOffer.id = toId(obligation);
         ungatedLenderOffer.ratifier = address(ecrecoverRatifier);
         ungatedLenderOffer.expiry = block.timestamp + 200;
         ungatedLenderOffer.tick = MAX_TICK;

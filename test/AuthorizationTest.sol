@@ -58,13 +58,13 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower, address(0), hex"");
+        midnight.repay(id, units, borrower, address(0), hex"");
 
         // Attacker tries to withdraw lender's units
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.withdraw(obligation, units, lender, lender);
+        midnight.withdraw(id, units, lender, lender);
     }
 
     function testWithdrawCollateralUnauthorized() public {
@@ -76,14 +76,15 @@ contract AuthorizationTest is BaseTest {
         vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
 
+        midnight.touchObligation(obligation);
         vm.prank(user);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+        midnight.supplyCollateral(id, 0, collateralAmount, user);
 
         // Attacker tries to withdraw user's collateral
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.withdrawCollateral(obligation, 0, collateralAmount, user, user);
+        midnight.withdrawCollateral(id, 0, collateralAmount, user, user);
     }
 
     function testWithdrawAuthorized() public {
@@ -95,7 +96,7 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower, address(0), hex"");
+        midnight.repay(id, units, borrower, address(0), hex"");
 
         // Lender authorizes operator
         address operator = makeAddr("operator");
@@ -104,7 +105,7 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can withdraw on behalf of lender
         vm.prank(operator);
-        midnight.withdraw(obligation, units, lender, operator);
+        midnight.withdraw(id, units, lender, operator);
 
         assertEq(loanToken.balanceOf(operator), units);
     }
@@ -124,12 +125,13 @@ contract AuthorizationTest is BaseTest {
         vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
 
+        midnight.touchObligation(obligation);
         vm.prank(user);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+        midnight.supplyCollateral(id, 0, collateralAmount, user);
 
         // Operator can withdraw on behalf of user
         vm.prank(operator);
-        midnight.withdrawCollateral(obligation, 0, collateralAmount, user, operator);
+        midnight.withdrawCollateral(id, 0, collateralAmount, user, operator);
 
         assertEq(ERC20(collateralToken).balanceOf(operator), collateralAmount);
     }
@@ -144,16 +146,17 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
 
+        midnight.touchObligation(obligation);
         vm.prank(operator);
         vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+        midnight.supplyCollateral(id, 0, collateralAmount, user);
 
         // User authorizes operator
         vm.prank(user);
         midnight.setIsAuthorized(user, operator, true);
 
         vm.prank(operator);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+        midnight.supplyCollateral(id, 0, collateralAmount, user);
 
         assertEq(midnight.collateral(id, user, 0), collateralAmount);
     }
@@ -167,11 +170,11 @@ contract AuthorizationTest is BaseTest {
         skip(99);
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(obligation, units, borrower, address(0), hex"");
+        midnight.repay(id, units, borrower, address(0), hex"");
 
         // Lender can withdraw their own units (no authorization needed)
         vm.prank(lender);
-        midnight.withdraw(obligation, units, lender, lender);
+        midnight.withdraw(id, units, lender, lender);
 
         assertEq(loanToken.balanceOf(lender), units);
     }
@@ -184,12 +187,13 @@ contract AuthorizationTest is BaseTest {
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
         ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        midnight.touchObligation(obligation);
         vm.prank(user);
-        midnight.supplyCollateral(obligation, 0, collateralAmount, user);
+        midnight.supplyCollateral(id, 0, collateralAmount, user);
 
         // User can withdraw their own collateral (no authorization needed)
         vm.prank(user);
-        midnight.withdrawCollateral(obligation, 0, collateralAmount, user, user);
+        midnight.withdrawCollateral(id, 0, collateralAmount, user, user);
 
         assertEq(ERC20(collateralToken).balanceOf(user), collateralAmount);
     }
@@ -203,7 +207,7 @@ contract AuthorizationTest is BaseTest {
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
-        offer.obligation = obligation;
+        offer.id = midnight.touchObligation(obligation);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 
@@ -229,7 +233,7 @@ contract AuthorizationTest is BaseTest {
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
-        offer.obligation = obligation;
+        offer.id = midnight.touchObligation(obligation);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 
@@ -264,13 +268,13 @@ contract AuthorizationTest is BaseTest {
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.repay(obligation, units, borrower, address(0), hex"");
+        midnight.repay(id, units, borrower, address(0), hex"");
 
         vm.prank(borrower);
         midnight.setIsAuthorized(borrower, authorized, true);
 
         vm.prank(authorized);
-        midnight.repay(obligation, units, borrower, address(0), hex"");
+        midnight.repay(id, units, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(id, borrower), 0);
     }
@@ -331,7 +335,7 @@ contract AuthorizationTest is BaseTest {
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
-        offer.obligation = obligation;
+        offer.id = midnight.touchObligation(obligation);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 

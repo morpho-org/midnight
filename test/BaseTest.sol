@@ -127,6 +127,7 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
+        bytes32 id = midnight.touchObligation(obligation);
         uint256 oraclePrice = Oracle(obligation.collateralParams[0].oracle).price();
         uint256 collateral =
             debt.mulDivUp(WAD, obligation.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
@@ -135,7 +136,7 @@ abstract contract BaseTest is Test {
         vm.startPrank(_borrower);
         ERC20(obligation.collateralParams[0].token).approve(address(midnight), 0);
         ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
-        midnight.supplyCollateral(obligation, 0, collateral, _borrower);
+        midnight.supplyCollateral(id, 0, collateral, _borrower);
         vm.stopPrank();
     }
 
@@ -150,12 +151,13 @@ abstract contract BaseTest is Test {
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
+        bytes32 id = midnight.touchObligation(obligation);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         deal(address(loanToken), otherLender, assets);
 
         Offer memory lenderOffer;
-        lenderOffer.obligation = obligation;
+        lenderOffer.id = id;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
@@ -169,13 +171,14 @@ abstract contract BaseTest is Test {
     }
 
     function createBadDebt(Obligation memory obligation) internal {
+        bytes32 id = midnight.touchObligation(obligation);
         (address badBorrower, uint256 badBorrowerPrivateKey) = makeAddrAndKey("badBorrower");
         privateKey[badBorrower] = badBorrowerPrivateKey;
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
         loanToken.approve(address(midnight), type(uint256).max);
         Offer memory badBorrowerOffer;
-        badBorrowerOffer.obligation = obligation;
+        badBorrowerOffer.id = id;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
@@ -192,7 +195,7 @@ abstract contract BaseTest is Test {
         midnight.setIsAuthorized(badBorrower, address(this), true);
 
         deal(obligation.collateralParams[0].token, address(this), 135);
-        midnight.supplyCollateral(obligation, 0, 135, badBorrower);
+        midnight.supplyCollateral(id, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), false);
@@ -202,14 +205,14 @@ abstract contract BaseTest is Test {
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(this), address(0), "");
+        midnight.liquidate(id, 0, 0, 0, badBorrower, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
-        deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, address(0), hex"");
-        assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debtOf(id, badBorrower));
+        midnight.repay(id, midnight.debtOf(id, badBorrower), badBorrower, address(0), hex"");
+        assertEq(midnight.debtOf(id, badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
@@ -309,10 +312,11 @@ abstract contract BaseTest is Test {
     }
 
     function setupObligation(Obligation memory obligation, uint256 units) internal {
+        midnight.touchObligation(obligation);
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
         Offer memory borrowerOffer;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.id = toId(obligation);
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
