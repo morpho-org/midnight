@@ -123,10 +123,10 @@ filtered {
     f -> f.selector != sig:touchObligation(Midnight.Obligation).selector
         && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
-        && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
         && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
     require !Midnight.obligationCreated(id);
     f(e, args);
