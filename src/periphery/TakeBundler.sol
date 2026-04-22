@@ -27,7 +27,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
+        require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
 
         uint256 totalFilledUnits;
@@ -75,7 +75,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
+        require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
 
         uint256 totalFilledSellerAssets;
@@ -123,7 +123,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
+        require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
@@ -178,7 +178,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, MaxReferralFeePctExceeded());
+        require(referralFeePct <= WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);

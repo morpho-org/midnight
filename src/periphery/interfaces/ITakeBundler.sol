@@ -21,7 +21,7 @@ interface ITakeBundler {
     error InsufficientLiquidity();
     error SellerAssetsAboveMax();
     error SellerAssetsBelowMin();
-    error MaxReferralFeePctExceeded();
+    error PctExceeded();
     error Unauthorized();
     error UnitsAboveMax();
     error UnitsBelowMin();
