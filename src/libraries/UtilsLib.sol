@@ -3,7 +3,14 @@
 pragma solidity ^0.8.0;
 
 import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
-import {COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE} from "../interfaces/IEcrecover.sol";
+import {
+    COLLATERAL_PARAMS_TYPE,
+    COLLATERAL_PARAMS_TYPEHASH,
+    OBLIGATION_TYPE,
+    OBLIGATION_TYPEHASH,
+    OFFER_TYPE,
+    OFFER_TYPEHASH
+} from "../interfaces/IEcrecover.sol";
 
 library UtilsLib {
     error CastOverflow();
@@ -81,7 +88,7 @@ library UtilsLib {
     function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                keccak256(COLLATERAL_PARAMS_TYPE),
+                COLLATERAL_PARAMS_TYPEHASH,
                 collateralParams.token,
                 collateralParams.lltv,
                 collateralParams.maxLif,
@@ -99,7 +106,7 @@ library UtilsLib {
 
         return keccak256(
             abi.encode(
-                keccak256(OBLIGATION_TYPE),
+                OBLIGATION_TYPEHASH,
                 obligation.loanToken,
                 collateralParamsArrayHash,
                 obligation.maturity,
@@ -114,7 +121,7 @@ library UtilsLib {
         return keccak256(
             bytes.concat(
                 abi.encode(
-                    keccak256(OFFER_TYPE),
+                    OFFER_TYPEHASH,
                     hashObligation(offer.obligation),
                     offer.buy,
                     offer.maker,

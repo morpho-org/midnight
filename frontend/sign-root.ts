@@ -64,7 +64,7 @@ function defaultOffer(number: string) {
   return {
     obligation: {
       loanToken: "0x" + number.repeat(40),
-      collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: "0"}],
+      collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: ZERO_ADDR}],
       maturity: "0",
       rcfThreshold: "0",
       enterGate: ZERO_ADDR,
@@ -91,8 +91,8 @@ function defaultOffer(number: string) {
 // WARNING: The root should be built by sorting the nodes in ascending order of their hash.
 function buildRoot() {
   return [
+    [defaultOffer("1"), defaultOffer("2")],
     [defaultOffer("3"), defaultOffer("4")],
-    [defaultOffer("2"), defaultOffer("1")],
   ];
 }
 

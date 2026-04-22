@@ -12,8 +12,8 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 // Paste from frontend output.
 address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
 uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x413ed194c43131087aef300de0f05ac48d514007f80a547c7cfad073fa040a69;
-bytes32 constant SIG_S = 0x6d096de715011d0545da120ed8818a40f5f888c2013eff551c319b41f5833f37;
+bytes32 constant SIG_R = 0x5ba4989d3c22a4981ea9e3a1dd4aa77c16b646eaf6fae3393978f3d752efe9b8;
+bytes32 constant SIG_S = 0x340377683b31c78acd43b763af192383b26d09e6a3d73f3784585bda30d11250;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
