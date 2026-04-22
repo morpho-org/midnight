@@ -128,7 +128,7 @@ filtered {
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
-    require !Midnight.obligationCreated(id);
+    require !Midnight.obligationCreated(id), "Assume that the obligation is not created";
     f(e, args);
     assert !Midnight.obligationCreated(id);
 }
