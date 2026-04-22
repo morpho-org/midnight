@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {BaseTest} from "./BaseTest.sol";
 import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
+import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     uint256 internal amountStored;
@@ -35,10 +36,11 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(address(loanToken), amount, address(this), data);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external {
+    function onFlashLoan(address token, uint256 amount, bytes memory data) external returns (bytes32) {
         assertEq(token, address(loanToken), "wrong token");
         assertEq(amount, amountStored, "wrong amount");
         assertEq(data, dataStored, "wrong data");
         if (discardToken) SafeTransferLib.safeTransfer(token, address(0xdead), amount);
+        return CALLBACK_SUCCESS;
     }
 }

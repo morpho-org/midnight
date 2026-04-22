@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -100,7 +100,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(borrower, true);
 
-        vm.expectRevert("buyer gated from increasing credit");
+        vm.expectRevert(IMidnight.BuyerGatedFromIncreasingCredit.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -110,7 +110,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(lender, true);
 
-        vm.expectRevert("seller gated from increasing debt");
+        vm.expectRevert(IMidnight.SellerGatedFromIncreasingDebt.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -239,7 +239,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, hex"");
+        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
 
         assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
     }
@@ -254,7 +254,7 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), borrower, units);
         vm.prank(borrower);
-        midnight.repay(gatedObligation, units, borrower, hex"");
+        midnight.repay(gatedObligation, units, borrower, address(0), hex"");
 
         gate.setWhitelisted(lender, false);
 
@@ -279,8 +279,8 @@ contract GateTest is BaseTest {
 
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
-        if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");
-        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, "");
+        if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
+        midnight.liquidate(gatedObligation, 0, 1, 0, borrower, address(this), address(0), "");
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
@@ -295,8 +295,8 @@ contract GateTest is BaseTest {
         Oracle(gatedObligation.collateralParams[0].oracle).setPrice(0);
 
         vm.prank(liquidator);
-        if (!isWhitelisted) vm.expectRevert("liquidator gated from liquidating");
-        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, "");
+        if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
+        midnight.liquidate(gatedObligation, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     // --- Default (no gate) tests ---

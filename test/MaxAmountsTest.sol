@@ -98,7 +98,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(UtilsLib.CastOverflow.selector);
         take(amount, lender, borrowerOffer);
     }
 
@@ -125,7 +125,7 @@ contract MaxAmountsTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(this), true);
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(UtilsLib.CastOverflow.selector);
         midnight.supplyCollateral(obligation, 0, amount, borrower);
     }
 }

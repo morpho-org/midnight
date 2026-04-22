@@ -6,7 +6,7 @@ import {WAD, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
@@ -73,6 +73,7 @@ contract ContinuousFeeTest is BaseTest {
 
         setupLender(credit, feeRate, ttm);
         uint256 remaining = midnight.pendingFee(id, lender);
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after take");
 
         vm.warp(block.timestamp + elapsed);
         uint256 expectedFee = remaining.mulDivDown(elapsed, ttm);
@@ -95,6 +96,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
+        assertEq(midnight.lastAccrual(id, lender), block.timestamp, "lender lastAccrual after update");
 
         // Fee accumulated in continuousFeeCredit
         if (expectedFee > 0) {
@@ -282,6 +284,7 @@ contract ContinuousFeeTest is BaseTest {
             takeAssets,
             takeAssets,
             exitAmount,
+            otherLender,
             lender,
             keccak256("lender-exit"),
             exitAmount,
@@ -329,7 +332,7 @@ contract ContinuousFeeTest is BaseTest {
 
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, hex"");
+        midnight.repay(obligation, credit, borrower, address(0), hex"");
 
         uint256 pendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(withdrawAmount, creditAfterAccrual) : 0;
@@ -417,7 +420,7 @@ contract ContinuousFeeTest is BaseTest {
         // Repay so withdrawable covers the claim.
         deal(address(loanToken), borrower, credit);
         vm.prank(borrower);
-        midnight.repay(obligation, credit, borrower, hex"");
+        midnight.repay(obligation, credit, borrower, address(0), hex"");
 
         address receiver = makeAddr("receiver");
         uint256 totalUnitsBefore = midnight.totalUnits(id);
@@ -437,7 +440,7 @@ contract ContinuousFeeTest is BaseTest {
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
-        vm.expectRevert("only fee claimer");
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
         midnight.claimContinuousFee(obligation, 0, caller);
     }
 
@@ -484,5 +487,54 @@ contract ContinuousFeeTest is BaseTest {
 
         assertEq(midnight.creditOf(id, lender), newCredit, "view matches credit");
         assertEq(midnight.pendingFee(id, lender), newPendingFee, "view matches pendingFee");
+    }
+
+    function testUpdatePositionReturnsUpdatedValues(
+        uint256 credit,
+        uint256 feeRate,
+        uint256 ttm,
+        uint256 elapsed,
+        bool withBadDebt
+    ) public {
+        credit = bound(credit, 100, MAX_CREDIT);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        ttm = bound(ttm, 10, 360 days);
+        elapsed = bound(elapsed, 1, ttm - 1);
+
+        setupLender(credit, feeRate, ttm);
+
+        if (withBadDebt) createBadDebt(obligation);
+
+        vm.warp(block.timestamp + elapsed);
+
+        (uint128 expectedCredit, uint128 expectedPendingFee, uint128 expectedAccruedFee) =
+            midnight.updatePositionView(obligation, id, lender);
+        uint256 expectedContinuousFeeCredit = midnight.continuousFeeCredit(id) + expectedAccruedFee;
+
+        (uint128 returnedCredit, uint128 returnedPendingFee, uint128 returnedAccruedFee) =
+            midnight.updatePosition(obligation, lender);
+
+        assertEq(returnedCredit, expectedCredit, "returned credit");
+        assertEq(returnedPendingFee, expectedPendingFee, "returned pendingFee");
+        assertEq(returnedAccruedFee, expectedAccruedFee, "returned accruedFee");
+        assertEq(midnight.creditOf(id, lender), returnedCredit, "stored credit");
+        assertEq(midnight.pendingFee(id, lender), returnedPendingFee, "stored pendingFee");
+        assertEq(midnight.continuousFeeCredit(id), expectedContinuousFeeCredit, "continuousFeeCredit");
+    }
+
+    function testUpdatePositionRevertsIfObligationNotCreated() public {
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.updatePosition(obligation, borrower);
+    }
+
+    function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
+        vm.prank(feeClaimer);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.claimContinuousFee(obligation, 0, feeClaimer);
+    }
+
+    function testLastAccrualZeroForFreshPosition() public {
+        setupLender(1e18, 0, 100 days);
+        assertEq(midnight.lastAccrual(id, makeAddr("nobody")), 0, "lastAccrual zero for fresh position");
     }
 }

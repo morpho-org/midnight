@@ -7,6 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {TakeBundler} from "../src/periphery/TakeBundler.sol";
+import {ITakeBundler, Take} from "../src/periphery/interfaces/ITakeBundler.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract BundlerTest is BaseTest {
@@ -22,6 +23,9 @@ contract BundlerTest is BaseTest {
         super.setUp();
 
         takeBundler = new TakeBundler();
+        deal(address(loanToken), address(takeBundler), type(uint256).max);
+        vm.prank(address(takeBundler));
+        loanToken.approve(address(midnight), type(uint256).max);
 
         // Set trading fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
@@ -82,19 +86,23 @@ contract BundlerTest is BaseTest {
     }
 
     function testUnauthorized() public {
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](1);
-        takes[0] = TakeBundler.Take({
-            offer: offers[0], units: 100, sig: sig([offers[0]]), root: root([offers[0]]), proof: proof([offers[0]])
+        offers[0].buy = false;
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
+            offer: offers[0],
+            units: 100,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
         });
 
         vm.prank(address(0xdead));
-        vm.expectRevert("unauthorized");
-        takeBundler.bundleTakeUnits(
-            midnight, 100, borrower, address(0), takes, 0, type(uint256).max, 0, type(uint256).max
-        );
+        vm.expectRevert(ITakeBundler.Unauthorized.selector);
+        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, 0, type(uint256).max);
     }
 
-    function testBundleTakeUnits(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
+    function testSellUnitsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
         units = bound(units, 0, uint256(type(uint128).max) * 3 / 4);
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
@@ -102,18 +110,18 @@ contract BundlerTest is BaseTest {
 
         collateralize(obligation, borrower, units);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -122,9 +130,7 @@ contract BundlerTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            takeBundler.bundleTakeUnits(
-                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
-            );
+            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
@@ -133,37 +139,46 @@ contract BundlerTest is BaseTest {
             assertEq(midnight.debtOf(id, borrower), units, "debt");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
-            takeBundler.bundleTakeUnits(
-                midnight, units, borrower, borrower, takes, 0, type(uint256).max, 0, type(uint256).max
-            );
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
+            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
         }
     }
 
-    function testBundleTakeBuyerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
+    function testBuyBuyerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
         targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
+
+        offers[0].buy = false;
+        offers[0].receiverIfMakerIsSeller = lender;
         offers[0].maxUnits = offerUnits0;
+        offers[1].buy = false;
+        offers[1].receiverIfMakerIsSeller = lender;
         offers[1].maxUnits = offerUnits1;
+
+        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+        deal(address(loanToken), lender, 0);
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         // NB: splitting across offers can require 1 extra unit due to per-leg rounding of buyer assets.
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
 
-        collateralize(obligation, borrower, units);
+        collateralize(obligation, lender, units);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -172,25 +187,27 @@ contract BundlerTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            takeBundler.bundleTakeBuyerAssets(
-                midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
+            takeBundler.buyBuyerAssetsTarget(
+                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
             assertEq(consumed0, fromOffer0, "consumed offer 0");
-            assertEq(consumed0 + consumed1, midnight.debtOf(id, borrower), "total consumed");
-            assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets, "lender balance");
+            assertEq(consumed0 + consumed1, midnight.debtOf(id, lender), "total consumed");
+            assertEq(
+                loanToken.balanceOf(address(takeBundler)), type(uint256).max - targetBuyerAssets, "bundler balance"
+            );
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
-            takeBundler.bundleTakeBuyerAssets(
-                midnight, targetBuyerAssets, borrower, borrower, takes, 0, type(uint256).max
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
+            takeBundler.buyBuyerAssetsTarget(
+                address(midnight), targetBuyerAssets, borrower, takes, 0, type(uint256).max
             );
         }
     }
 
-    function testBundleTakeSellerAssets(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
+    function testSellSellerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
@@ -204,18 +221,18 @@ contract BundlerTest is BaseTest {
         // Extra collateral headroom for the potential extra unit of debt.
         collateralize(obligation, borrower, units + 1);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -230,8 +247,8 @@ contract BundlerTest is BaseTest {
         uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
-            takeBundler.bundleTakeSellerAssets(
-                midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
+            takeBundler.sellSellerAssetsTarget(
+                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -241,32 +258,27 @@ contract BundlerTest is BaseTest {
             assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower balance");
         } else {
             vm.prank(borrower);
-            vm.expectRevert("insufficient liquidity");
-            takeBundler.bundleTakeSellerAssets(
-                midnight, targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
+            vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
+            takeBundler.sellSellerAssetsTarget(
+                address(midnight), targetSellerAssets, borrower, borrower, takes, 0, type(uint256).max
             );
         }
     }
 
     // Average prices.
 
-    function _minTick() internal view returns (uint256) {
-        uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
-        return TickLib.priceToTick(fee);
-    }
-
-    /// @dev Computes the expected totalBuyerAssets for bundleTakeUnits.
-    /// @dev Since buy=true and the obligation starts empty, buyerPrice == tickToPrice(tick).
+    /// @dev Computes the expected totalBuyerAssets for buyUnitsTarget.
+    /// @dev Since buy=false, buyerPrice == tickToPrice(tick) + tradingFee.
     function _expectedBuyerAssets(uint256 targetUnits, uint256 offerUnits0, uint256 tick0, uint256 tick1)
         internal
-        pure
+        view
         returns (uint256)
     {
+        uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         uint256 fromOffer1 = targetUnits - fromOffer0;
-        return
-            fromOffer0.mulDivDown(TickLib.tickToPrice(tick0), WAD)
-                + fromOffer1.mulDivDown(TickLib.tickToPrice(tick1), WAD);
+        return fromOffer0.mulDivUp(TickLib.tickToPrice(tick0) + fee, WAD)
+            + fromOffer1.mulDivUp(TickLib.tickToPrice(tick1) + fee, WAD);
     }
 
     function testAveragePriceTooHigh(
@@ -277,16 +289,22 @@ contract BundlerTest is BaseTest {
         uint256 tick1,
         uint256 maxBuyerAssets
     ) public {
-        uint256 minTick = _minTick();
-        tick0 = bound(tick0, minTick, MAX_TICK);
-        tick1 = bound(tick1, minTick, MAX_TICK);
+        tick0 = bound(tick0, 0, MAX_TICK);
+        tick1 = bound(tick1, 0, MAX_TICK);
         // Ensure buyerAssets > 0 so the max bound actually triggers.
-        uint256 minPrice = UtilsLib.min(TickLib.tickToPrice(tick0), TickLib.tickToPrice(tick1));
-        targetUnits = bound(targetUnits, WAD / minPrice + 1, uint256(type(uint128).max) * 3 / 4);
+        uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 minBuyerPrice = UtilsLib.min(TickLib.tickToPrice(tick0) + fee, TickLib.tickToPrice(tick1) + fee);
+        targetUnits = bound(targetUnits, WAD / minBuyerPrice + 1, uint256(type(uint128).max) * 3 / 4);
+
+        offers[0].buy = false;
+        offers[0].receiverIfMakerIsSeller = lender;
         offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;
+        offers[1].buy = false;
+        offers[1].receiverIfMakerIsSeller = lender;
         offers[1].maxUnits = offerUnits1;
         offers[1].tick = tick1;
+        deal(address(loanToken), lender, 0);
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
@@ -295,20 +313,20 @@ contract BundlerTest is BaseTest {
         vm.assume(expected > 0);
         maxBuyerAssets = bound(maxBuyerAssets, 0, expected - 1);
 
-        collateralize(obligation, borrower, targetUnits);
+        collateralize(obligation, lender, targetUnits);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -316,10 +334,8 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets above max");
-        takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, borrower, takes, 0, maxBuyerAssets, 0, type(uint256).max
-        );
+        vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
+        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, 0, maxBuyerAssets);
     }
 
     function testAveragePriceTooLow(
@@ -330,14 +346,19 @@ contract BundlerTest is BaseTest {
         uint256 tick1,
         uint256 minBuyerAssets
     ) public {
-        uint256 minTick = _minTick();
-        tick0 = bound(tick0, minTick, MAX_TICK);
-        tick1 = bound(tick1, minTick, MAX_TICK);
+        tick0 = bound(tick0, 0, MAX_TICK);
+        tick1 = bound(tick1, 0, MAX_TICK);
         targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
+
+        offers[0].buy = false;
+        offers[0].receiverIfMakerIsSeller = lender;
         offers[0].maxUnits = offerUnits0;
         offers[0].tick = tick0;
+        offers[1].buy = false;
+        offers[1].receiverIfMakerIsSeller = lender;
         offers[1].maxUnits = offerUnits1;
         offers[1].tick = tick1;
+        deal(address(loanToken), lender, 0);
 
         uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
         vm.assume(offerUnits1 >= targetUnits - fromOffer0);
@@ -345,20 +366,20 @@ contract BundlerTest is BaseTest {
         uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
         minBuyerAssets = bound(minBuyerAssets, expected + 1, type(uint256).max);
 
-        collateralize(obligation, borrower, targetUnits);
+        collateralize(obligation, lender, targetUnits);
 
-        TakeBundler.Take[] memory takes = new TakeBundler.Take[](2);
-        takes[0] = TakeBundler.Take({
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            sig: sig([offers[0]]),
+            ratifierData: ratifierData([offers[0]]),
             root: root([offers[0]]),
             proof: proof([offers[0]])
         });
-        takes[1] = TakeBundler.Take({
+        takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            sig: sig([offers[1]]),
+            ratifierData: ratifierData([offers[1]]),
             root: root([offers[1]]),
             proof: proof([offers[1]])
         });
@@ -366,9 +387,7 @@ contract BundlerTest is BaseTest {
         _authorizeBundler();
 
         vm.prank(borrower);
-        vm.expectRevert("buyer assets below min");
-        takeBundler.bundleTakeUnits(
-            midnight, targetUnits, borrower, borrower, takes, minBuyerAssets, type(uint256).max, 0, type(uint256).max
-        );
+        vm.expectRevert(ITakeBundler.BuyerAssetsBelowMin.selector);
+        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, minBuyerAssets, type(uint256).max);
     }
 }
