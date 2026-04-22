@@ -392,9 +392,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        midnight.liquidate(
-            id, 0, midnight.collateral(id, borrower, 0), 0, borrower, address(this), address(0), ""
-        );
+        midnight.liquidate(id, 0, midnight.collateral(id, borrower, 0), 0, borrower, address(this), address(0), "");
 
         assertApproxEqAbs(midnight.debtOf(id, borrower), 0, 1e3, "almost all remaining debt repaid");
         assertApproxEqAbs(
@@ -718,8 +716,7 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 1 liquidation.
         bytes[] memory calls1 = new bytes[](1);
-        calls1[0] =
-            abi.encodeCall(midnight.liquidate, (id, 0, 0, repay, borrower, address(this), address(0), ""));
+        calls1[0] = abi.encodeCall(midnight.liquidate, (id, 0, 0, repay, borrower, address(this), address(0), ""));
         uint256 gasBefore1 = gasleft();
         midnight.multicall(calls1);
         uint256 gas1 = gasBefore1 - gasleft();
@@ -727,10 +724,8 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 2 liquidations.
         bytes[] memory calls2 = new bytes[](2);
-        calls2[0] =
-            abi.encodeCall(midnight.liquidate, (id, 0, 0, repay, borrower, address(this), address(0), ""));
-        calls2[1] =
-            abi.encodeCall(midnight.liquidate, (id, 1, 0, repay, borrower, address(this), address(0), ""));
+        calls2[0] = abi.encodeCall(midnight.liquidate, (id, 0, 0, repay, borrower, address(this), address(0), ""));
+        calls2[1] = abi.encodeCall(midnight.liquidate, (id, 1, 0, repay, borrower, address(this), address(0), ""));
         uint256 gasBefore2 = gasleft();
         midnight.multicall(calls2);
         uint256 gas2 = gasBefore2 - gasleft();
