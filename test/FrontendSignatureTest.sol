@@ -1,40 +1,34 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
+import {console} from "../lib/forge-std/src/console.sol";
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {Offer} from "../src/interfaces/IMidnight.sol";
+import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/interfaces/IEcrecover.sol";
+import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = address(0); // TODO: paste wallet address
-uint8 constant SIG_V = 0; // TODO: paste v
-bytes32 constant SIG_R = bytes32(0); // TODO: paste r
-bytes32 constant SIG_S = bytes32(0); // TODO: paste s
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
+uint8 constant SIG_V = 28;
+bytes32 constant SIG_R = 0x413ed194c43131087aef300de0f05ac48d514007f80a547c7cfad073fa040a69;
+bytes32 constant SIG_S = 0x6d096de715011d0545da120ed8818a40f5f888c2013eff551c319b41f5833f37;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
 
 contract FrontendSignatureTest is Test {
-    Midnight internal midnight;
-
     function setUp() public {
-        midnight = new Midnight();
-
-        EcrecoverRatifier impl = new EcrecoverRatifier(address(midnight));
+        EcrecoverRatifier impl = new EcrecoverRatifier(address(0));
         vm.etch(RATIFIER, address(impl).code);
-
-        vm.prank(ACCOUNT);
-        midnight.setIsAuthorized(ACCOUNT, RATIFIER, true);
     }
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
         offer.obligation.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
-        offer.buy = true;
-        offer.maker = ACCOUNT;
-        offer.expiry = 1 + 3600; // block.timestamp defaults to 1 in forge
+        offer.obligation.collateralParams = collateralParams;
+        offer.expiry = 2 ** 32;
         offer.ratifier = RATIFIER;
     }
 
@@ -66,7 +60,7 @@ contract FrontendSignatureTest is Test {
         return offers;
     }
 
-    function testFrontendSignatureVerification() public {
+    function testFrontendSignatureVerification() public view {
         Offer[4] memory offers;
         offers[0] = defaultOffer(1);
         offers[1] = defaultOffer(2);
@@ -74,6 +68,10 @@ contract FrontendSignatureTest is Test {
         offers[3] = defaultOffer(4);
 
         offers = sortOffers(offers);
+        console.log(offers[0].obligation.loanToken);
+        console.log(offers[1].obligation.loanToken);
+        console.log(offers[2].obligation.loanToken);
+        console.log(offers[3].obligation.loanToken);
 
         bytes32 h0 = UtilsLib.hashOffer(offers[0]);
         bytes32 h1 = UtilsLib.hashOffer(offers[1]);
@@ -83,15 +81,30 @@ contract FrontendSignatureTest is Test {
         bytes32 right = UtilsLib.commutativeHash(h2, h3);
         bytes32 _root = UtilsLib.commutativeHash(left, right);
 
+        // Verify each offer is a leaf of the root.
+        bytes32[] memory proof0 = new bytes32[](2);
+        proof0[0] = h1;
+        proof0[1] = right;
+        assertTrue(UtilsLib.isLeaf(_root, h0, proof0));
+
+        bytes32[] memory proof1 = new bytes32[](2);
+        proof1[0] = h0;
+        proof1[1] = right;
+        assertTrue(UtilsLib.isLeaf(_root, h1, proof1));
+
+        bytes32[] memory proof2 = new bytes32[](2);
+        proof2[0] = h3;
+        proof2[1] = left;
+        assertTrue(UtilsLib.isLeaf(_root, h2, proof2));
+
+        bytes32[] memory proof3 = new bytes32[](2);
+        proof3[0] = h2;
+        proof3[1] = left;
+        assertTrue(UtilsLib.isLeaf(_root, h3, proof3));
+
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT);
-
-        // Proof for offers[0]: sibling hash, then uncle subtree hash.
-        bytes32[] memory proof = new bytes32[](2);
-        proof[0] = h1;
-        proof[1] = right;
-
-        address taker = makeAddr("taker");
-        vm.prank(taker);
-        midnight.take(0, taker, address(0), hex"", taker, offers[0], ratifierData, _root, proof);
+        offers[0].maker = ACCOUNT;
+        bytes32 result = EcrecoverRatifier(RATIFIER).onRatify(offers[0], _root, ratifierData);
+        assertEq(result, CALLBACK_SUCCESS);
     }
 }

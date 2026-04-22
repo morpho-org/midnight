@@ -25,6 +25,20 @@ function buildTypes(height: number) {
       { name: "verifyingContract", type: "address" },
     ],
     Root: [{ name: "root", type: rootFieldType }],
+    CollateralParams: [
+      { name: "token", type: "address" },
+      { name: "lltv", type: "uint256" },
+      { name: "maxLif", type: "uint256" },
+      { name: "oracle", type: "address" },
+    ],
+    Obligation: [
+      { name: "loanToken", type: "address" },
+      { name: "collateralParams", type: "CollateralParams[]" },
+      { name: "maturity", type: "uint256" },
+      { name: "rcfThreshold", type: "uint256" },
+      { name: "enterGate", type: "address" },
+      { name: "liquidatorGate", type: "address" },
+    ],
     Offer: [
       { name: "obligation", type: "Obligation" },
       { name: "buy", type: "bool" },
@@ -43,37 +57,23 @@ function buildTypes(height: number) {
       { name: "maxSellerAssets", type: "uint256" },
       { name: "maxBuyerAssets", type: "uint256" },
     ],
-    Obligation: [
-      { name: "loanToken", type: "address" },
-      { name: "collateralParams", type: "CollateralParams[]" },
-      { name: "maturity", type: "uint256" },
-      { name: "rcfThreshold", type: "uint256" },
-      { name: "enterGate", type: "address" },
-      { name: "liquidatorGate", type: "address" },
-    ],
-    CollateralParams: [
-      { name: "token", type: "address" },
-      { name: "lltv", type: "uint256" },
-      { name: "maxLif", type: "uint256" },
-      { name: "oracle", type: "address" },
-    ],
   };
 }
 
-function defaultOffer(maker: string, number: string) {
+function defaultOffer(number: string) {
   return {
     obligation: {
       loanToken: "0x" + number.repeat(40),
-      collateralParams: [] as unknown[],
+      collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: "0"}],
       maturity: "0",
       rcfThreshold: "0",
       enterGate: ZERO_ADDR,
       liquidatorGate: ZERO_ADDR,
     },
-    buy: true,
-    maker,
+    buy: false,
+    maker: ZERO_ADDR,
     start: "0",
-    expiry: String(Math.floor(Date.now() / 1000) + 3600),
+    expiry: 2**32,
     tick: "0",
     group: ZERO_B32,
     session: ZERO_B32,
@@ -89,10 +89,10 @@ function defaultOffer(maker: string, number: string) {
 }
 
 // WARNING: The root should be built by sorting the nodes in ascending order of their hash.
-function buildRoot(maker: string) {
+function buildRoot() {
   return [
-    [defaultOffer(maker, "1"), defaultOffer(maker, "2")],
-    [defaultOffer(maker, "3"), defaultOffer(maker, "4")],
+    [defaultOffer("3"), defaultOffer("4")],
+    [defaultOffer("2"), defaultOffer("1")],
   ];
 }
 
@@ -112,7 +112,7 @@ async function main() {
   const account = accounts[0].toLowerCase();
   const chainId = Number(await window.ethereum.request({ method: "eth_chainId" }));
 
-  const root = buildRoot(account);
+  const root = buildRoot();
 
   app.innerHTML = `
     <p>Connected: <code>${account}</code> &middot; Chain <code>${chainId}</code></p>
@@ -153,18 +153,10 @@ async function main() {
       const v = parseInt(sig.slice(130, 132), 16);
 
       resultEl.textContent = [
-        "Signature",
-        `  v: ${v}`,
-        `  r: ${r}`,
-        `  s: ${s}`,
-        "",
-        `Height: ${HEIGHT}`,
-        "",
-        "To use with EcrecoverRatifier.onRatify():",
-        `  ratifierData = abi.encode(`,
-        `    Signature({ v: ${v}, r: bytes32(${r}), s: bytes32(${s}) }),`,
-        `    uint256(${HEIGHT})`,
-        `  )`,
+        `address constant ACCOUNT = ${account};`,
+        `uint8 constant SIG_V = ${v};`,
+        `bytes32 constant SIG_R = ${r};`,
+        `bytes32 constant SIG_S = ${s};`,
       ].join("\n");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
