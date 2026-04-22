@@ -79,7 +79,7 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 /// Proves that in `take`, the only addresses whose tokens can be pulled are:
 /// 1. msg.sender (when !offer.buy and buyerCallback == 0),
 /// 2. the buyerCallback that returned CALLBACK_SUCCESS,
-/// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker's offer was ratified).
+/// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker is the buyer with no callback).
 rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require e.msg.sender != currentContract, "only external calls";
 
