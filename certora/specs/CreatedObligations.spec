@@ -96,8 +96,8 @@ rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uin
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
-    Midnight.repay(e, obligation, units, onBehalf, data);
+rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
+    Midnight.repay(e, obligation, units, onBehalf, callback, data);
     assert obligationIsCreated(obligation);
 }
 
@@ -111,8 +111,8 @@ rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation oblig
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert obligationIsCreated(obligation);
 }
 
@@ -123,8 +123,8 @@ strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
 strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.withdrawable(id) == 0;
 
-strong invariant obligationFeesAreEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => noFeesAreSet(id);
+strong invariant obligationTradingFeesAreEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => noTradingFeesAreSet(id);
 
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
@@ -156,7 +156,7 @@ strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address use
 strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
 
-function noFeesAreSet(bytes32 id) returns (bool) {
+function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }

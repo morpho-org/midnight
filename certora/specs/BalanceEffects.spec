@@ -112,14 +112,14 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 /// REPAY ///
 
 /// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
-rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data, bytes32 anyId, address anyUser) {
+rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, onBehalf);
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    repay(e, obligation, units, onBehalf, data);
+    repay(e, obligation, units, onBehalf, callback, data);
 
     assert debtOf(id, onBehalf) == debtBefore - units;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -130,7 +130,7 @@ rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address 
 
 /// Liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
-rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
+rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, borrower);
@@ -139,7 +139,7 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -154,8 +154,8 @@ filtered {
     f -> !f.isView
         && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
-        && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Obligation, address).selector
 } {
     uint256 creditBefore = creditOf(id, user);
@@ -201,14 +201,14 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, 
 
 /// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
 /// and only changes position[id][borrower].collateral[collateralIndex].
-rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, obligation);
 
     uint256 collateralBefore = collateral(id, borrower, collateralIndex);
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    seizedResult, _ = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    seizedResult, _ = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
@@ -222,7 +222,7 @@ filtered {
     f -> !f.isView
         && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
     uint256 collateralBefore = collateral(id, user, colIdx);
     f(e, args);
