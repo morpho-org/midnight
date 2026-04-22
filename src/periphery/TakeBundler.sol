@@ -20,7 +20,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetUnits,
         address taker,
         Take[] calldata takes,
-        uint256 minBuyerAssets,
         uint256 maxBuyerAssets,
         uint256 referralFeePct,
         address referralFeeRecipient
@@ -55,7 +54,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalFilledBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
         require(totalFilledBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
@@ -72,7 +70,6 @@ contract TakeBundler is ITakeBundler {
         address receiver,
         Take[] calldata takes,
         uint256 minSellerAssets,
-        uint256 maxSellerAssets,
         uint256 referralFeePct,
         address referralFeeRecipient
     ) external {
@@ -107,7 +104,6 @@ contract TakeBundler is ITakeBundler {
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
         require(totalFilledSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
-        require(totalFilledSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
 
         uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);

@@ -15,12 +15,10 @@ struct Take {
 interface ITakeBundler {
     /// ERRORS ///
     error BuyerAssetsAboveMax();
-    error BuyerAssetsBelowMin();
     error InconsistentLoanToken();
     error InconsistentObligation();
     error InconsistentSide();
     error InsufficientLiquidity();
-    error SellerAssetsAboveMax();
     error SellerAssetsBelowMin();
     error PctExceeded();
     error Unauthorized();
@@ -29,8 +27,8 @@ interface ITakeBundler {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, uint256 referralFeePct, address referralFeeRecipient) external;
-    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minSellerAssets, uint256 maxSellerAssets, uint256 referralFeePct, address referralFeeRecipient) external;
+    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, uint256 maxBuyerAssets, uint256 referralFeePct, address referralFeeRecipient) external;
+    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minSellerAssets, uint256 referralFeePct, address referralFeeRecipient) external;
     function buyBuyerAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, Take[] calldata takes, uint256 minUnits, uint256 maxUnits, uint256 referralFeePct, address referralFeeRecipient) external;
     function sellSellerAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits, uint256 referralFeePct, address referralFeeRecipient) external;
     // forgefmt: disable-end
