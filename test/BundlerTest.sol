@@ -441,7 +441,7 @@ contract BundlerTest is BaseTest {
         });
 
         vm.prank(borrower);
-        takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, type(uint256).max, supplies);
+        takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, supplies);
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), supplies[i].assets);
@@ -589,10 +589,11 @@ contract BundlerTest is BaseTest {
         uint256 tick1,
         uint256 minSellerAssets
     ) public {
-        tick0 = bound(tick0, 0, MAX_TICK);
-        tick1 = bound(tick1, 0, MAX_TICK);
         // Ensure sellerPrice > 0 so the min bound actually triggers.
         uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 minTick = TickLib.priceToTick(fee + 1);
+        tick0 = bound(tick0, minTick, MAX_TICK);
+        tick1 = bound(tick1, minTick, MAX_TICK);
         uint256 minSellerPrice = UtilsLib.min(TickLib.tickToPrice(tick0) - fee, TickLib.tickToPrice(tick1) - fee);
         targetUnits = bound(targetUnits, WAD / minSellerPrice + 1, uint256(type(uint128).max) * 3 / 4);
 
