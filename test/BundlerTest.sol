@@ -99,7 +99,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
-        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, 0, type(uint256).max);
+        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, type(uint256).max);
     }
 
     function testSellUnitsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
@@ -130,7 +130,7 @@ contract BundlerTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
+            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0);
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
             uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
@@ -140,7 +140,7 @@ contract BundlerTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
-            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, type(uint256).max);
+            takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0);
         }
     }
 
@@ -335,59 +335,6 @@ contract BundlerTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.BuyerAssetsAboveMax.selector);
-        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, 0, maxBuyerAssets);
-    }
-
-    function testAveragePriceTooLow(
-        uint256 offerUnits0,
-        uint256 offerUnits1,
-        uint256 targetUnits,
-        uint256 tick0,
-        uint256 tick1,
-        uint256 minBuyerAssets
-    ) public {
-        tick0 = bound(tick0, 0, MAX_TICK);
-        tick1 = bound(tick1, 0, MAX_TICK);
-        targetUnits = bound(targetUnits, 1, uint256(type(uint128).max) * 3 / 4);
-
-        offers[0].buy = false;
-        offers[0].receiverIfMakerIsSeller = lender;
-        offers[0].maxUnits = offerUnits0;
-        offers[0].tick = tick0;
-        offers[1].buy = false;
-        offers[1].receiverIfMakerIsSeller = lender;
-        offers[1].maxUnits = offerUnits1;
-        offers[1].tick = tick1;
-        deal(address(loanToken), lender, 0);
-
-        uint256 fromOffer0 = UtilsLib.min(targetUnits, offerUnits0);
-        vm.assume(offerUnits1 >= targetUnits - fromOffer0);
-
-        uint256 expected = _expectedBuyerAssets(targetUnits, offerUnits0, tick0, tick1);
-        minBuyerAssets = bound(minBuyerAssets, expected + 1, type(uint256).max);
-
-        collateralize(obligation, lender, targetUnits);
-
-        Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
-
-        _authorizeBundler();
-
-        vm.prank(borrower);
-        vm.expectRevert(ITakeBundler.BuyerAssetsBelowMin.selector);
-        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, minBuyerAssets, type(uint256).max);
+        takeBundler.buyUnitsTarget(address(midnight), targetUnits, borrower, takes, maxBuyerAssets);
     }
 }
