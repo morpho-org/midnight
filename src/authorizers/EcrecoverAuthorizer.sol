@@ -3,13 +3,10 @@
 pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
+import {IEcrecoverAuthorizer} from "./interfaces/IEcrecoverAuthorizer.sol";
 import {Authorization, Signature, AUTHORIZATION_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "../interfaces/IEcrecover.sol";
 
-event SetIsAuthorized(
-    address indexed caller, address indexed authorizer, address indexed authorized, bool isAuthorized, uint256 nonce
-);
-
-contract EcrecoverAuthorizer {
+contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
     address public immutable MIDNIGHT;
     mapping(address => uint256) public nonce;
 
@@ -18,8 +15,8 @@ contract EcrecoverAuthorizer {
     }
 
     function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external {
-        require(block.timestamp <= authorization.deadline, "expired");
-        require(authorization.nonce == nonce[authorization.authorizer]++, "invalid nonce");
+        require(block.timestamp <= authorization.deadline, Expired());
+        require(authorization.nonce == nonce[authorization.authorizer]++, InvalidNonce());
 
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
@@ -29,7 +26,7 @@ contract EcrecoverAuthorizer {
             signer != address(0)
                 && (signer == authorization.authorizer
                     || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer)),
-            "invalid signature"
+            InvalidSignature()
         );
 
         emit SetIsAuthorized(
