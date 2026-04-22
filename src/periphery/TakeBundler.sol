@@ -21,7 +21,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetUnits,
         address taker,
         Take[] calldata takes,
-        uint256 minBuyerAssets,
         uint256 maxBuyerAssets,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
@@ -52,7 +51,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets >= minBuyerAssets, BuyerAssetsBelowMin());
         require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
@@ -77,7 +75,6 @@ contract TakeBundler is ITakeBundler {
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minSellerAssets,
-        uint256 maxSellerAssets,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -118,7 +115,6 @@ contract TakeBundler is ITakeBundler {
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
         require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
-        require(totalSellerAssets <= maxSellerAssets, SellerAssetsAboveMax());
     }
 
     /// @dev See buyUnitsTarget.

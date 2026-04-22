@@ -20,10 +20,8 @@ struct CollateralTransfer {
 interface ITakeBundler {
     /// ERRORS ///
     error BuyerAssetsAboveMax();
-    error BuyerAssetsBelowMin();
     error InconsistentSide();
     error InsufficientLiquidity();
-    error SellerAssetsAboveMax();
     error SellerAssetsBelowMin();
     error Unauthorized();
     error UnitsAboveMax();
@@ -31,8 +29,8 @@ interface ITakeBundler {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, uint256 minBuyerAssets, uint256 maxBuyerAssets, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
-    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minSellerAssets, uint256 maxSellerAssets, CollateralTransfer[] calldata collateralSupplies) external;
+    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, uint256 maxBuyerAssets, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
+    function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minSellerAssets, CollateralTransfer[] calldata collateralSupplies) external;
     function buyBuyerAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, Take[] calldata takes, uint256 minUnits, uint256 maxUnits, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
     function sellSellerAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, uint256 minUnits, uint256 maxUnits, CollateralTransfer[] calldata collateralSupplies) external;
     // forgefmt: disable-end
