@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     // Same offer.tick across all take calls; CONSTANT ensures identical return value.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
-    // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => CVL_toId();
+    // Summarize toId: deterministic hash preserves obligation-to-id relationship without adding assumptions.
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
@@ -16,13 +20,13 @@ methods {
     function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
 
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
-    function touchObligation(Midnight.Obligation memory) internal returns (bytes32) => CVL_toId();
+    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes piecewise interpolation.
     function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
     // Return values are computed before _updatePosition is called; NONDET eliminates its full inlining (the single heaviest internal function).
-    function _updatePosition(Midnight.Obligation memory, bytes32, address) internal => NONDET;
+    function _updatePosition(Midnight.Obligation memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
@@ -48,8 +52,6 @@ methods {
 
 /// GHOSTS ///
 
-persistent ghost bytes32 ghostId;
-
 // ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
 persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
@@ -74,8 +76,8 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 
 /// SUMMARY FUNCTIONS ///
 
-function CVL_toId() returns bytes32 {
-    return ghostId;
+function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
+    return Utils.hashObligation(obligation);
 }
 
 /// Splitting an offer does not punish the maker or favor the taker on asset amounts.
