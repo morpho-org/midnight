@@ -30,11 +30,11 @@ methods {
     function _.havocAll() external => HAVOC_ALL;
 
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => transferCallback();
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => transferCallback();
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
@@ -173,7 +173,7 @@ function isHealthyOrLiquidationLocked(Midnight.Obligation obligation, bytes32 id
     }
 }
 
-// Summary for every callback (token transfer, onLiquidate, onFlashloan, onBuy, onSell)
+// Summary for every non-transfer callback (onLiquidate, onFlashloan, onBuy, onSell, etc.)
 // we check that the user is healthy or locked before the callback, do some external call (to simulate changes by the callback),
 // and then require that the user is still healthy or locked after the callback.
 function genericCallback() {
@@ -194,7 +194,28 @@ function genericCallback() {
     require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after callback";
 }
 
-// Same as the summary above except that it also returns a non-deterministic value.
+// Lighter summary for token transfer callbacks (safeTransfer, safeTransferFrom).
+// Skips the "before" isHealthy check (which genericCallback does) to halve the isHealthy
+// evaluation cost per transfer, avoiding timeouts.  Still models reentrancy via havoc and
+// requires healthiness after the callback. The "before" check for subsequent genericCallback
+// invocations (e.g. onLiquidate) will catch any violation that occurred between callbacks.
+function transferCallback() {
+    address dummy;
+    env e;
+    Midnight.Obligation globalObligation = getGlobalObligation();
+
+    bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
+    bool savedHealthyBefore = healthyOrLockedBeforeCallbacks;
+
+    callback.callHavoc(e, dummy);
+
+    healthyOrLockedBeforeCallbacks = savedHealthyBefore;
+
+    require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
+    require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after callback";
+}
+
+// Same as genericCallback except that it also returns a non-deterministic value.
 function genericCallbackBool() returns (bool) {
     bool result;
     genericCallback();
@@ -222,11 +243,7 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-<<<<<<< jochen/liquidatablePreserved
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address liquidateCallback, bytes data) {
-=======
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
->>>>>>> main
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -244,11 +261,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-<<<<<<< jochen/liquidatablePreserved
     seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, liquidateCallback, data);
-=======
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
->>>>>>> main
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -273,11 +286,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
-<<<<<<< jochen/liquidatablePreserved
 rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address liquidateCallback, bytes data) {
-=======
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
->>>>>>> main
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -290,11 +299,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked before call";
 
-<<<<<<< jochen/liquidatablePreserved
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, liquidateCallback, data);
-=======
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
->>>>>>> main
 
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
     assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after call";
