@@ -101,9 +101,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
-        takeBundler.buyUnitsTarget(
-            address(midnight), 100, borrower, takes, new CollateralTransfer[](0), address(0)
-        );
+        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, new CollateralTransfer[](0), address(0));
     }
 
     function testSellUnitsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
@@ -196,12 +194,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             takeBundler.buyBuyerAssetsTarget(
-                address(midnight),
-                targetBuyerAssets,
-                borrower,
-                takes,
-                new CollateralTransfer[](0),
-                address(0)
+                address(midnight), targetBuyerAssets, borrower, takes, new CollateralTransfer[](0), address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -215,12 +208,7 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.buyBuyerAssetsTarget(
-                address(midnight),
-                targetBuyerAssets,
-                borrower,
-                takes,
-                new CollateralTransfer[](0),
-                address(0)
+                address(midnight), targetBuyerAssets, borrower, takes, new CollateralTransfer[](0), address(0)
             );
         }
     }
@@ -266,12 +254,7 @@ contract BundlerTest is BaseTest {
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
             takeBundler.sellSellerAssetsTarget(
-                address(midnight),
-                targetSellerAssets,
-                borrower,
-                borrower,
-                takes,
-                new CollateralTransfer[](0)
+                address(midnight), targetSellerAssets, borrower, borrower, takes, new CollateralTransfer[](0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -283,12 +266,7 @@ contract BundlerTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert(ITakeBundler.InsufficientLiquidity.selector);
             takeBundler.sellSellerAssetsTarget(
-                address(midnight),
-                targetSellerAssets,
-                borrower,
-                borrower,
-                takes,
-                new CollateralTransfer[](0)
+                address(midnight), targetSellerAssets, borrower, borrower, takes, new CollateralTransfer[](0)
             );
         }
     }
@@ -396,9 +374,7 @@ contract BundlerTest is BaseTest {
         }
 
         vm.prank(borrower);
-        takeBundler.buyBuyerAssetsTarget(
-            address(midnight), targetBuyerAssets, borrower, takes, withdrawals, receiver
-        );
+        takeBundler.buyBuyerAssetsTarget(address(midnight), targetBuyerAssets, borrower, takes, withdrawals, receiver);
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), amounts[i] - amounts[i] / 4);
@@ -474,14 +450,11 @@ contract BundlerTest is BaseTest {
         });
 
         vm.prank(borrower);
-        takeBundler.sellSellerAssetsTarget(
-            address(midnight), targetSellerAssets, borrower, borrower, takes, supplies
-        );
+        takeBundler.sellSellerAssetsTarget(address(midnight), targetSellerAssets, borrower, borrower, takes, supplies);
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), supplies[i].assets);
         }
         assertEq(loanToken.balanceOf(borrower), targetSellerAssets);
     }
-
 }
