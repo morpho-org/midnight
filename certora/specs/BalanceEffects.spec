@@ -130,7 +130,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
 }
 
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
-/// Seller's debt is non-decreasing , and can increase by at most take units.
+/// Seller's debt is non-decreasing, and can increase by at most take units.
 /// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
 rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
