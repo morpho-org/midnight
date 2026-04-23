@@ -19,6 +19,7 @@ contract TakeBundler is ITakeBundler {
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
+        uint256 maxBuyerAssets,
         address taker,
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralWithdrawals,
@@ -26,19 +27,17 @@ contract TakeBundler is ITakeBundler {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
-        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
         address loanToken = takes[0].offer.obligation.loanToken;
         _forceApproveMax(loanToken, midnight);
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
 
         uint256 totalFilledUnits;
+        uint256 totalFilledBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            uint256 units = UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units);
-            uint256 expectedBuyerAssets = TakeAmountsLib.unitsToBuyerAssets(midnight, id, takes[i].offer, units);
-            SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), expectedBuyerAssets);
             try IMidnight(midnight)
                 .take(
-                    units,
+                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
                     taker,
                     address(0),
                     "",
@@ -48,12 +47,11 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256, uint256 filledUnits
+                uint256 filledBuyerAssets, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-            } catch {
-                SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
-            }
+                totalFilledBuyerAssets += filledBuyerAssets;
+            } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
@@ -69,6 +67,8 @@ contract TakeBundler is ITakeBundler {
                     collateralReceiver
                 );
         }
+
+        SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - totalFilledBuyerAssets);
     }
 
     /// @dev See buyUnitsTarget.

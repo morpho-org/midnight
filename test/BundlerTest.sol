@@ -104,7 +104,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
-        takeBundler.buyUnitsTarget(address(midnight), 100, borrower, takes, new CollateralTransfer[](0), address(0));
+        takeBundler.buyUnitsTarget(address(midnight), 100, 0, borrower, takes, new CollateralTransfer[](0), address(0));
     }
 
     function testSellUnitsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 units) public {
@@ -331,8 +331,11 @@ contract BundlerTest is BaseTest {
             withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
         }
 
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 maxBuyerAssets = units.mulDivUp(price, WAD);
+
         vm.prank(borrower);
-        takeBundler.buyUnitsTarget(address(midnight), units, borrower, takes, withdrawals, receiver);
+        takeBundler.buyUnitsTarget(address(midnight), units, maxBuyerAssets, borrower, takes, withdrawals, receiver);
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), amounts[i] - amounts[i] / 4);
