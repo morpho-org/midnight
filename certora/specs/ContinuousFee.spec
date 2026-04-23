@@ -21,10 +21,7 @@ methods {
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
-    // This spec assumes no reentrancy: callbacks do not re-enter Midnight.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    // This spec assumes no reentrancy: callbacks and token transfers are assumed to not re-enter Midnight, since they are summarised as HAVOC_ECF by default.
 }
 
 /// HELPERS ///
