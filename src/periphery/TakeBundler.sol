@@ -29,7 +29,7 @@ contract TakeBundler is ITakeBundler {
 
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
         address loanToken = takes[0].offer.obligation.loanToken;
-        IERC20(loanToken).approve(midnight, type(uint256).max);
+        _forceApproveMax(loanToken, midnight);
 
         uint256 totalFilledUnits;
         uint256 totalBuyerAssets;
@@ -92,7 +92,7 @@ contract TakeBundler is ITakeBundler {
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
-            _safeApprove(token, midnight, collateralSupplies[i].assets);
+            _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
                     obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
@@ -141,7 +141,7 @@ contract TakeBundler is ITakeBundler {
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
         address loanToken = takes[0].offer.obligation.loanToken;
-        IERC20(loanToken).approve(midnight, type(uint256).max);
+        _forceApproveMax(loanToken, midnight);
 
         uint256 totalFilledBuyerAssets;
         uint256 totalUnits;
@@ -211,7 +211,7 @@ contract TakeBundler is ITakeBundler {
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
-            _safeApprove(token, midnight, collateralSupplies[i].assets);
+            _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
                     obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
@@ -254,7 +254,6 @@ contract TakeBundler is ITakeBundler {
         require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
-    /// @dev USDT won't break because the allowance is reset to 0 after supplyCollateral.
     function _safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
         if (!success) {
@@ -263,5 +262,14 @@ contract TakeBundler is ITakeBundler {
             }
         }
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
+    }
+
+    /// @dev Sets the allowance to `type(uint256).max`, skipping the write entirely when the current allowance
+    /// is already at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to
+    /// non-zero allowance changes (e.g. USDT) work.
+    function _forceApproveMax(address token, address spender) internal {
+        if (IERC20(token).allowance(address(this), spender) >= type(uint256).max / 2) return;
+        _safeApprove(token, spender, 0);
+        _safeApprove(token, spender, type(uint256).max);
     }
 }
