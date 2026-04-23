@@ -109,33 +109,38 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
-/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing,
-/// and buyer's credit is non-decreasing relative to its post-update value.
+/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
+/// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
 rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
     address buyer = offer.buy ? offer.maker : taker;
     uint256 buyerDebtBefore = debtOf(id, buyer);
-    uint128 buyerUpdatedCredit;
-    buyerUpdatedCredit, _, _ = updatePositionView(e, offer.obligation, id, buyer);
+    uint128 buyerUpdatedCreditBefore;
+    buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, buyer);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     assert debtOf(id, buyer) <= buyerDebtBefore;
-    assert creditOf(id, buyer) >= buyerUpdatedCredit;
+    assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
+    assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
+    assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
 }
 
-/// The seller side can newly become a borrower, but debt grows by at most units
-/// and only after the seller's credit has been drained to zero.
+/// The seller side can newly become a borrower, but debt grows by at most take units, and only after the seller's credit has been drained to zero.
+/// Seller's credit is non-increasing relative to its post-update value.
 rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
     address seller = offer.buy ? taker : offer.maker;
     uint256 sellerDebtBefore = debtOf(id, seller);
-
+    uint128 sellerUpdatedCreditBefore;
+    sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, seller);
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    assert debtOf(id, seller) >= sellerDebtBefore && debtOf(id, seller) <= sellerDebtBefore + units;
+    assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
+    assert debtOf(id, seller) >= sellerDebtBefore;
+    assert debtOf(id, seller) <= sellerDebtBefore + units;
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
 }
 
