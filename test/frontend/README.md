@@ -1,6 +1,6 @@
 # Usage
 
-Install with `cd frontend && npm install`.
+Install with `cd test/frontend && npm install`.
 Run with `npm run dev`.
 The "Sign Root" button will prompt your wallet.
 Then you will see the offers that would be signed by signing the root.
