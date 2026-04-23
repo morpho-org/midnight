@@ -200,7 +200,7 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callback, bytes data) {
+rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -218,7 +218,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callback, data);
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -241,7 +241,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -254,7 +254,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";
