@@ -109,6 +109,36 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
+/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing,
+/// and buyer's credit is non-decreasing relative to its post-update value.
+rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address buyer = offer.buy ? offer.maker : taker;
+    uint256 buyerDebtBefore = debtOf(id, buyer);
+    uint128 buyerUpdatedCredit;
+    buyerUpdatedCredit, _, _ = updatePositionView(e, offer.obligation, id, buyer);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert debtOf(id, buyer) <= buyerDebtBefore;
+    assert creditOf(id, buyer) >= buyerUpdatedCredit;
+}
+
+/// The seller side can newly become a borrower, but debt grows by at most units
+/// and only after the seller's credit has been drained to zero.
+rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address seller = offer.buy ? taker : offer.maker;
+    uint256 sellerDebtBefore = debtOf(id, seller);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert debtOf(id, seller) >= sellerDebtBefore && debtOf(id, seller) <= sellerDebtBefore + units;
+    assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
+}
+
 /// REPAY ///
 
 /// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
