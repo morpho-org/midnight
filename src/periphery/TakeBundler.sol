@@ -16,6 +16,8 @@ contract TakeBundler is ITakeBundler {
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    /// @dev Taker receives exactly `targetUnits` units. Total loan-token cost is `totalFilledBuyerAssets + fee`, where
+    /// `fee = totalFilledBuyerAssets * pct / (WAD - pct)` (so `pct = fee / (totalFilledBuyerAssets + fee)`).
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -77,6 +79,8 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
+    /// @dev Taker sells exactly `targetUnits` units. Net receipt is `totalFilledSellerAssets - fee`, where
+    /// `fee = totalFilledSellerAssets * pct / WAD` (so `pct = fee / totalFilledSellerAssets`).
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -88,7 +92,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, PctExceeded());
+        require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
@@ -138,6 +142,8 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Takes could have different obligations (with the same loan token).
+    /// @dev Taker spends exactly `targetBuyerAssets` in loan tokens total: `targetBuyerAssets * (WAD - pct) / WAD` goes
+    /// to makers and `targetBuyerAssets * pct / WAD` goes to the referral fee recipient.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
@@ -152,8 +158,11 @@ contract TakeBundler is ITakeBundler {
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
 
+        uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
+        uint256 preFeeTarget = targetBuyerAssets - referralFeeAssets;
+
         uint256 totalFilledBuyerAssets;
-        for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
+        for (uint256 i; i < takes.length && totalFilledBuyerAssets < preFeeTarget; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
@@ -162,7 +171,7 @@ contract TakeBundler is ITakeBundler {
                 .take(
                     UtilsLib.min(
                         TakeAmountsLib.buyerAssetsToUnits(
-                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                            midnight, id, takes[i].offer, preFeeTarget - totalFilledBuyerAssets
                         ),
                         takes[i].units
                     ),
@@ -181,7 +190,7 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+        require(totalFilledBuyerAssets == preFeeTarget, InsufficientLiquidity());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -195,7 +204,6 @@ contract TakeBundler is ITakeBundler {
                 );
         }
 
-        uint256 referralFeeAssets = totalFilledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
@@ -204,6 +212,8 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Takes could have different obligations (with the same loan token).
+    /// @dev Receiver gets exactly `targetSellerAssets` in loan tokens. Makers pay `targetSellerAssets * WAD / (WAD -
+    /// pct)` and the referral fee recipient gets `targetSellerAssets * pct / (WAD - pct)`.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
@@ -215,7 +225,7 @@ contract TakeBundler is ITakeBundler {
         address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
-        require(referralFeePct <= WAD, PctExceeded());
+        require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
 
         Obligation memory obligation = takes[0].offer.obligation;
@@ -229,8 +239,11 @@ contract TakeBundler is ITakeBundler {
                 );
         }
 
+        uint256 referralFeeAssets = targetSellerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
+        uint256 preFeeTarget = targetSellerAssets + referralFeeAssets;
+
         uint256 totalFilledSellerAssets;
-        for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
+        for (uint256 i; i < takes.length && totalFilledSellerAssets < preFeeTarget; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
@@ -239,7 +252,7 @@ contract TakeBundler is ITakeBundler {
                 .take(
                     UtilsLib.min(
                         TakeAmountsLib.sellerAssetsToUnits(
-                            midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                            midnight, id, takes[i].offer, preFeeTarget - totalFilledSellerAssets
                         ),
                         takes[i].units
                     ),
@@ -258,11 +271,10 @@ contract TakeBundler is ITakeBundler {
             } catch {}
         }
 
-        require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+        require(totalFilledSellerAssets == preFeeTarget, InsufficientLiquidity());
 
-        uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
-        SafeTransferLib.safeTransfer(loanToken, receiver, totalFilledSellerAssets - referralFeeAssets);
+        SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
     }
 
     /// @dev USDT won't break because the allowance is reset to 0 after supplyCollateral.
