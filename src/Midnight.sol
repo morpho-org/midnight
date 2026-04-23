@@ -341,8 +341,9 @@ contract Midnight is IMidnight {
             uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
             uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
             uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-            uint128 buyerPendingFeeIncrease =
-                UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+            uint128 buyerPendingFeeIncrease = UtilsLib.toUint128(
+                buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD)
+            );
             uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
                 ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
                 : 0;
@@ -374,8 +375,8 @@ contract Midnight is IMidnight {
                 SellerGatedFromIncreasingDebt()
             );
 
-            address buyerCallback = offer.buy ? offer.callback : takerCallback;
-            address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+            address _buyerCallback = offer.buy ? offer.callback : takerCallback;
+            address _payer = _buyerCallback != address(0) ? _buyerCallback : (offer.buy ? buyer : msg.sender);
 
             emit EventsLib.Take(
                 msg.sender,
@@ -386,7 +387,7 @@ contract Midnight is IMidnight {
                 buyerAssets,
                 sellerAssets,
                 units,
-                payer,
+                _payer,
                 offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller,
                 offer.group,
                 consumed[offer.maker][offer.group],
