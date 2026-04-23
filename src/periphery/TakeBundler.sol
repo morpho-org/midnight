@@ -21,7 +21,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetUnits,
         address taker,
         Take[] calldata takes,
-        uint256 maxBuyerAssets,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
@@ -57,7 +56,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalFilledBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -85,7 +83,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiver,
         Take[] calldata takes,
-        uint256 minSellerAssets,
         CollateralTransfer[] calldata collateralSupplies,
         uint256 referralFeePct,
         address referralFeeRecipient
@@ -131,7 +128,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalFilledSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
 
         uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
@@ -147,8 +143,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetBuyerAssets,
         address taker,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
@@ -159,7 +153,6 @@ contract TakeBundler is ITakeBundler {
         address loanToken = takes[0].offer.obligation.loanToken;
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
@@ -182,16 +175,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                uint256 filledBuyerAssets, uint256, uint256
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalFilledUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalFilledUnits >= minUnits, UnitsBelowMin());
-        require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -220,8 +210,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiver,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         CollateralTransfer[] calldata collateralSupplies,
         uint256 referralFeePct,
         address referralFeeRecipient
@@ -242,7 +230,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         uint256 totalFilledSellerAssets;
-        uint256 totalFilledUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
@@ -265,16 +252,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                uint256, uint256 filledSellerAssets, uint256
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalFilledUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalFilledUnits >= minUnits, UnitsBelowMin());
-        require(totalFilledUnits <= maxUnits, UnitsAboveMax());
 
         uint256 referralFeeAssets = totalFilledSellerAssets.mulDivDown(referralFeePct, WAD);
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
