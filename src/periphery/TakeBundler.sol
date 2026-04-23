@@ -22,7 +22,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetUnits,
         address taker,
         Take[] calldata takes,
-        uint256 maxBuyerAssets,
         uint256 maxMarginalPrice,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
@@ -30,7 +29,6 @@ contract TakeBundler is ITakeBundler {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
         uint256 totalFilledUnits;
-        uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(TickLib.tickToPrice(takes[i].offer.tick) <= maxMarginalPrice, MarginalPriceAboveMax());
@@ -46,15 +44,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                uint256, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalBuyerAssets += filledBuyerAssets;
             } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -77,7 +73,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minSellerAssets,
         uint256 minMarginalPrice,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
@@ -95,7 +90,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         uint256 totalFilledUnits;
-        uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(TickLib.tickToPrice(takes[i].offer.tick) >= minMarginalPrice, MarginalPriceBelowMin());
@@ -111,15 +105,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                uint256, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalSellerAssets += filledSellerAssets;
             } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
     }
 
     /// @dev See buyUnitsTarget.
@@ -128,8 +120,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetBuyerAssets,
         address taker,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         uint256 maxMarginalPrice,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
@@ -139,7 +129,6 @@ contract TakeBundler is ITakeBundler {
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(TickLib.tickToPrice(takes[i].offer.tick) <= maxMarginalPrice, MarginalPriceAboveMax());
@@ -160,16 +149,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                uint256 filledBuyerAssets, uint256, uint256
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -192,8 +178,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         uint256 minMarginalPrice,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
@@ -214,7 +198,6 @@ contract TakeBundler is ITakeBundler {
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(TickLib.tickToPrice(takes[i].offer.tick) >= minMarginalPrice, MarginalPriceBelowMin());
@@ -235,16 +218,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                uint256, uint256 filledSellerAssets, uint256
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
     /// @dev USDT won't break because the allowance is reset to 0 after supplyCollateral.
