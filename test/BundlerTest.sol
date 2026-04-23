@@ -102,7 +102,15 @@ contract BundlerTest is BaseTest {
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
         takeBundler.buyUnitsTarget(
-            address(midnight), 100, borrower, takes, type(uint256).max, new CollateralTransfer[](0), address(0), 0, address(0)
+            address(midnight),
+            100,
+            borrower,
+            takes,
+            type(uint256).max,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0)
         );
     }
 
@@ -463,9 +471,7 @@ contract BundlerTest is BaseTest {
         });
 
         vm.prank(borrower);
-        takeBundler.sellUnitsTarget(
-            address(midnight), units, borrower, borrower, takes, 0, supplies, 0, address(0)
-        );
+        takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, 0, supplies, 0, address(0));
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), supplies[i].assets);
