@@ -16,17 +16,8 @@ methods {
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
-    // zeroFloorSub feeds into timeToMaturity (used by tradingFee, already CONSTANT) and buyerCreditIncrease (affects position state, not return values). NONDET is safe for this property.
-    function UtilsLib.zeroFloorSub(uint256, uint256) internal returns (uint256) => NONDET;
-
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
-
-    // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes piecewise interpolation.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
-
-    // Return values are computed before _updatePosition is called; NONDET eliminates its full inlining (the single heaviest internal function).
-    function _updatePosition(Midnight.Obligation memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
@@ -44,6 +35,7 @@ methods {
     // Callbacks and token transfers: NONDET removes external call complexity.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
@@ -90,9 +82,8 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
 
     // Solver hints: instantiate the sub/super-additivity axioms for the specific A/B/C split.
-    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1;
-
-    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d));
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1, "solver hint: instantiation of ghost_mulDivDown sub-additivity axiom for A/B/C";
+    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)), "solver hint: instantiation of ghost_mulDivUp super-additivity axiom for A/B/C";
 
     storage initState = lastStorage;
 
