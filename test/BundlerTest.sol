@@ -325,7 +325,7 @@ contract BundlerTest is BaseTest {
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralTransfer({obligation: obligation, collateralIndex: i, assets: amounts[i] / 4});
         }
 
         vm.prank(borrower);
@@ -370,7 +370,7 @@ contract BundlerTest is BaseTest {
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralTransfer({obligation: obligation, collateralIndex: i, assets: amounts[i] / 4});
         }
 
         vm.prank(borrower);
@@ -396,7 +396,7 @@ contract BundlerTest is BaseTest {
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(takeBundler), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralTransfer({obligation: obligation, collateralIndex: i, assets: amount});
         }
 
         Take[] memory takes = new Take[](1);
@@ -437,7 +437,7 @@ contract BundlerTest is BaseTest {
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(takeBundler), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralTransfer({obligation: obligation, collateralIndex: i, assets: amount});
         }
 
         Take[] memory takes = new Take[](1);

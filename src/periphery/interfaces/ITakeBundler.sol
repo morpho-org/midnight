@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity >=0.5.0;
 
-import {Offer} from "../../interfaces/IMidnight.sol";
+import {Obligation, Offer} from "../../interfaces/IMidnight.sol";
 
 struct Take {
     uint256 units;
@@ -13,6 +13,7 @@ struct Take {
 }
 
 struct CollateralTransfer {
+    Obligation obligation;
     uint256 collateralIndex;
     uint256 assets;
 }

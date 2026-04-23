@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
+import {IMidnight} from "../interfaces/IMidnight.sol";
 import {IERC20} from "../interfaces/IERC20.sol";
 import {ITakeBundler, Take, CollateralTransfer} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
@@ -49,11 +49,10 @@ contract TakeBundler is ITakeBundler {
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
 
-        Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
             IMidnight(midnight)
                 .withdrawCollateral(
-                    obligation,
+                    collateralWithdrawals[i].obligation,
                     collateralWithdrawals[i].collateralIndex,
                     collateralWithdrawals[i].assets,
                     taker,
@@ -74,14 +73,17 @@ contract TakeBundler is ITakeBundler {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
-        Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
-            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            address token =
+                collateralSupplies[i].obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
-                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
+                    collateralSupplies[i].obligation,
+                    collateralSupplies[i].collateralIndex,
+                    collateralSupplies[i].assets,
+                    taker
                 );
         }
 
@@ -150,11 +152,10 @@ contract TakeBundler is ITakeBundler {
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
 
-        Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
             IMidnight(midnight)
                 .withdrawCollateral(
-                    obligation,
+                    collateralWithdrawals[i].obligation,
                     collateralWithdrawals[i].collateralIndex,
                     collateralWithdrawals[i].assets,
                     taker,
@@ -175,14 +176,17 @@ contract TakeBundler is ITakeBundler {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
 
-        Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
-            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            address token =
+                collateralSupplies[i].obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _safeApprove(token, midnight, collateralSupplies[i].assets);
             IMidnight(midnight)
                 .supplyCollateral(
-                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
+                    collateralSupplies[i].obligation,
+                    collateralSupplies[i].collateralIndex,
+                    collateralSupplies[i].assets,
+                    taker
                 );
         }
 
