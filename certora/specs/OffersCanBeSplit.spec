@@ -19,9 +19,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
     // Deterministic CVL summaries for assembly utility functions (removes inline assembly complexity).
-    function UtilsLib.zeroFloorSub(uint256 x, uint256 y) internal returns (uint256) => CVL_zeroFloorSub(x, y);
     function UtilsLib.min(uint256 x, uint256 y) internal returns (uint256) => CVL_min(x, y);
-    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => NONDET;
 
     // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
@@ -44,12 +42,10 @@ methods {
     // Same offer.tick across all take calls; CONSTANT ensures identical return value.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
-    // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes 7-way piecewise interpolation.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
-
     // Callbacks and token transfers: NONDET removes external call complexity.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
@@ -113,7 +109,8 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
-/// pendingFee and consumed can differ by at most 1 between the two paths due to floor/ceil rounding in mulDivDown/mulDivUp.
+/// credit, debt, and totalUnits match exactly. pendingFee and consumed (in asset-cap mode) can differ by at most 1 due to mulDivDown/mulDivUp rounding.
+/// Proven for synced positions (lossIndex and lastAccrual up-to-date); generalizing is expected to hold but is constrained by prover performance.
 rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
@@ -146,6 +143,8 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
     uint256 consumed1 = consumed(offer.maker, offer.group);
+    uint128 pendingFeeBuyer1 = pendingFee(id, buyer);
+    uint128 pendingFeeSeller1 = pendingFee(id, seller);
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
@@ -157,6 +156,13 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert creditOfSeller1 == creditOf(id, seller), "seller credit must match";
     assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
     assert totalUnits1 == totalUnits(id), "totalUnits must match";
+
     mathint consumedDiff = to_mathint(consumed1) - to_mathint(consumed(offer.maker, offer.group));
-    assert consumedDiff >= -1 && consumedDiff <= 1, "consumed differs by at most 1";
+    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumedDiff == 0, "consumed exact in maxUnits mode";
+    assert offer.maxSellerAssets > 0 || offer.maxBuyerAssets > 0 => consumedDiff >= -1 && consumedDiff <= 1, "consumed differs by at most 1 in asset-cap mode";
+
+    mathint pendingFeeBuyerDiff = to_mathint(pendingFeeBuyer1) - to_mathint(pendingFee(id, buyer));
+    assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1, "buyer pendingFee differs by at most 1";
+    mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(id, seller));
+    assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1, "seller pendingFee differs by at most 1";
 }
