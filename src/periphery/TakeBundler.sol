@@ -21,7 +21,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetUnits,
         address taker,
         Take[] calldata takes,
-        uint256 maxBuyerAssets,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
     ) external {
@@ -32,7 +31,6 @@ contract TakeBundler is ITakeBundler {
         _forceApproveMax(loanToken, midnight);
 
         uint256 totalFilledUnits;
-        uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             uint256 units = UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units);
@@ -50,17 +48,15 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                uint256, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalBuyerAssets += filledBuyerAssets;
             } catch {
                 SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
             }
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalBuyerAssets <= maxBuyerAssets, BuyerAssetsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -83,7 +79,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minSellerAssets,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -100,7 +95,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         uint256 totalFilledUnits;
-        uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -115,15 +109,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                uint256, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalSellerAssets += filledSellerAssets;
             } catch {}
         }
 
         require(totalFilledUnits == targetUnits, InsufficientLiquidity());
-        require(totalSellerAssets >= minSellerAssets, SellerAssetsBelowMin());
     }
 
     /// @dev See buyUnitsTarget.
@@ -132,8 +124,6 @@ contract TakeBundler is ITakeBundler {
         uint256 targetBuyerAssets,
         address taker,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
     ) external {
@@ -144,7 +134,6 @@ contract TakeBundler is ITakeBundler {
         _forceApproveMax(loanToken, midnight);
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             uint256 units = UtilsLib.min(
@@ -167,18 +156,15 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                uint256 filledBuyerAssets, uint256, uint256
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalUnits += filledUnits;
             } catch {
                 SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
             }
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -201,8 +187,6 @@ contract TakeBundler is ITakeBundler {
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -222,7 +206,6 @@ contract TakeBundler is ITakeBundler {
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             try IMidnight(midnight)
@@ -242,16 +225,13 @@ contract TakeBundler is ITakeBundler {
                     takes[i].root,
                     takes[i].proof
                 ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                uint256, uint256 filledSellerAssets, uint256
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalUnits += filledUnits;
             } catch {}
         }
 
         require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
-        require(totalUnits >= minUnits, UnitsBelowMin());
-        require(totalUnits <= maxUnits, UnitsAboveMax());
     }
 
     function _safeApprove(address token, address spender, uint256 value) internal {
