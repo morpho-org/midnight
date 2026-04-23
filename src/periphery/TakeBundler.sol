@@ -132,6 +132,7 @@ contract TakeBundler is ITakeBundler {
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
         address loanToken = takes[0].offer.obligation.loanToken;
         _forceApproveMax(loanToken, midnight);
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), targetBuyerAssets);
 
         uint256 totalFilledBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
@@ -142,8 +143,6 @@ contract TakeBundler is ITakeBundler {
                 ),
                 takes[i].units
             );
-            uint256 expectedBuyerAssets = TakeAmountsLib.unitsToBuyerAssets(midnight, id, takes[i].offer, units);
-            SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), expectedBuyerAssets);
             try IMidnight(midnight)
                 .take(
                     units,
@@ -159,9 +158,7 @@ contract TakeBundler is ITakeBundler {
                 uint256 filledBuyerAssets, uint256, uint256
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-            } catch {
-                SafeTransferLib.safeTransfer(loanToken, msg.sender, expectedBuyerAssets);
-            }
+            } catch {}
         }
 
         require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
