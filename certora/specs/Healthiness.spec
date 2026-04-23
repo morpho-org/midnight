@@ -222,7 +222,11 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
+<<<<<<< jochen/liquidatablePreserved
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address liquidateCallback, bytes data) {
+=======
+rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
+>>>>>>> main
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -240,7 +244,11 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
+<<<<<<< jochen/liquidatablePreserved
     seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, liquidateCallback, data);
+=======
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
+>>>>>>> main
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -265,7 +273,11 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
+<<<<<<< jochen/liquidatablePreserved
 rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address liquidateCallback, bytes data) {
+=======
+rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
+>>>>>>> main
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -278,7 +290,11 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     require isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked before call";
 
+<<<<<<< jochen/liquidatablePreserved
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, liquidateCallback, data);
+=======
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
+>>>>>>> main
 
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
     assert isHealthyOrLiquidationLocked(globalObligation, globalId, globalBorrower), "user is healthy or locked after call";
