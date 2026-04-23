@@ -25,7 +25,7 @@ library EventsLib {
     event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, uint256 badDebt, uint256 latestLossIndex, address payer, address receiver);
     event SetConsumed(address indexed caller, address indexed onBehalf, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed caller, address indexed onBehalf, bytes32 session);
-    event FlashLoan(address indexed caller, address indexed token, uint256 assets, address callback);
+    event FlashLoan(address indexed caller, address[] tokens, uint256[] assets, address indexed callback);
     event SetIsAuthorized(address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized);
     event ClaimContinuousFee(address indexed caller, bytes32 indexed id_, uint256 amount, address indexed receiver);
     event ClaimTradingFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);

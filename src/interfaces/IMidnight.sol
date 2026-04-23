@@ -147,7 +147,7 @@ interface IMidnight {
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function shuffleSession(address onBehalf) external;
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external;
+    function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data) external;
     function touchObligation(Obligation memory obligation) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
