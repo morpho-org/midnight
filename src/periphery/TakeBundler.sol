@@ -7,6 +7,7 @@ import {IERC20} from "../interfaces/IERC20.sol";
 import {ITakeBundler, Take, CollateralTransfer} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
+import {TickLib} from "../libraries/TickLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 contract TakeBundler is ITakeBundler {
@@ -22,6 +23,7 @@ contract TakeBundler is ITakeBundler {
         address taker,
         Take[] calldata takes,
         uint256 maxBuyerAssets,
+        uint256 maxMarginalPrice,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
     ) external {
@@ -31,6 +33,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalBuyerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            require(TickLib.tickToPrice(takes[i].offer.tick) <= maxMarginalPrice, MarginalPriceAboveMax());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -75,6 +78,7 @@ contract TakeBundler is ITakeBundler {
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
         uint256 minSellerAssets,
+        uint256 minMarginalPrice,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -94,6 +98,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
+            require(TickLib.tickToPrice(takes[i].offer.tick) >= minMarginalPrice, MarginalPriceBelowMin());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
@@ -125,6 +130,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minUnits,
         uint256 maxUnits,
+        uint256 maxMarginalPrice,
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver
     ) external {
@@ -136,6 +142,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            require(TickLib.tickToPrice(takes[i].offer.tick) <= maxMarginalPrice, MarginalPriceAboveMax());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -187,6 +194,7 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         uint256 minUnits,
         uint256 maxUnits,
+        uint256 minMarginalPrice,
         CollateralTransfer[] calldata collateralSupplies
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
@@ -209,6 +217,7 @@ contract TakeBundler is ITakeBundler {
         uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
+            require(TickLib.tickToPrice(takes[i].offer.tick) >= minMarginalPrice, MarginalPriceBelowMin());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
