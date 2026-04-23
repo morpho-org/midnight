@@ -18,7 +18,11 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         dataStored = data;
 
         deal(address(loanToken), address(midnight), amount);
-        midnight.flashLoan(address(loanToken), amount, address(this), data);
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(loanToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        midnight.flashLoan(tokens, amounts, address(this), data);
 
         assertEq(loanToken.balanceOf(address(this)), 0, "balanceOf");
         assertEq(loanToken.balanceOf(address(midnight)), amount, "balanceOf");
@@ -32,15 +36,24 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         discardToken = true;
 
         deal(address(loanToken), address(midnight), amount);
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(loanToken);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
         vm.expectRevert(); // exact message depends on the token.
-        midnight.flashLoan(address(loanToken), amount, address(this), data);
+        midnight.flashLoan(tokens, amounts, address(this), data);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external returns (bytes32) {
-        assertEq(token, address(loanToken), "wrong token");
-        assertEq(amount, amountStored, "wrong amount");
+    function onFlashLoan(address[] memory tokens, uint256[] memory amounts, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        assertEq(tokens.length, 1, "wrong tokens length");
+        assertEq(amounts.length, 1, "wrong amounts length");
+        assertEq(tokens[0], address(loanToken), "wrong token");
+        assertEq(amounts[0], amountStored, "wrong amount");
         assertEq(data, dataStored, "wrong data");
-        if (discardToken) SafeTransferLib.safeTransfer(token, address(0xdead), amount);
+        if (discardToken) SafeTransferLib.safeTransfer(tokens[0], address(0xdead), amounts[0]);
         return CALLBACK_SUCCESS;
     }
 }
