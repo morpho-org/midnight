@@ -8,7 +8,7 @@ import {
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
 } from "../src/interfaces/IEcrecover.sol";
-import {IEcrecoverAuthorizer} from "../src/authorizers/interfaces/IEcrecoverAuthorizer.sol";
+import {IEcrecoverAuthorizer} from "../src/periphery/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverAuthorizerTest is BaseTest {
