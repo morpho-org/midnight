@@ -103,7 +103,6 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint256 creditOfSeller1 = creditOf(id, seller);
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
-    uint256 consumed1 = consumed(offer.maker, offer.group);
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
@@ -116,42 +115,3 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
     assert totalUnits1 == totalUnits(id), "totalUnits must match";
 }
-
-/*
-/// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
-/// credit, debt, and totalUnits match exactly. pendingFee and consumed (in asset-cap mode) can differ by at most 1 due to mulDivDown/mulDivUp rounding.
-/// Proven for synced positions (lossIndex and lastAccrual up-to-date); generalizing is expected to hold but is constrained by prover performance.
-rule offersCanBeSplitFeePart(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
-
-    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
-
-    bytes32 id = summaryToId(offer.obligation);
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
-
-    // Explicit require prevents the solver from exploring aliased-storage paths.
-    require buyer != seller, "prover perfomance";
-
-    uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
-    require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
-
-    storage initState = lastStorage;
-
-    // Path 1: take the full amount A.
-    take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    uint128 pendingFeeBuyer1 = pendingFee(id, buyer);
-    uint128 pendingFeeSeller1 = pendingFee(id, seller);
-
-    // Path 2: take B then C from the initial state.
-    take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
-
-    take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    mathint pendingFeeBuyerDiff = to_mathint(pendingFeeBuyer1) - to_mathint(pendingFee(id, buyer));
-    assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1, "buyer pendingFee differs by at most 1";
-    mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(id, seller));
-    assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1, "seller pendingFee differs by at most 1";
-}
-*/
