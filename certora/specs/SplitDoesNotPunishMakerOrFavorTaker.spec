@@ -101,8 +101,9 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     uint256 sellerAssetsC;
     buyerAssetsC, sellerAssetsC, _ = take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    // Maker is buyer: splitting should not make them pay more.
+    // Maker is buyer: splitting saves them at most 1 wei (tight rounding bound).
     assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
+    assert offer.buy => to_mathint(buyerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) + 1;
 
     // Taker is seller: splitting should not make them receive more.
     assert offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) <= to_mathint(sellerAssetsA);
