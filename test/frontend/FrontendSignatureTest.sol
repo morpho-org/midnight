@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "../../lib/forge-std/src/Test.sol";
 import {EcrecoverRatifier} from "../../src/ratifiers/EcrecoverRatifier.sol";
 import {Offer, CollateralParams} from "../../src/interfaces/IMidnight.sol";
-import {Signature} from "../../src/interfaces/IEcrecover.sol";
+import {Signature} from "../../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 

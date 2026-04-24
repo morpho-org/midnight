@@ -2,10 +2,9 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IEcrecoverRatifier} from "./interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IEcrecoverRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH} from "../interfaces/IEcrecover.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 
 contract EcrecoverRatifier is IEcrecoverRatifier {

@@ -10,7 +10,7 @@ import {
     OBLIGATION_TYPEHASH,
     OFFER_TYPE,
     OFFER_TYPEHASH
-} from "../interfaces/IEcrecover.sol";
+} from "./ConstantsLib.sol";
 
 library UtilsLib {
     error CastOverflow();
