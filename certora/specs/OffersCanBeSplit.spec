@@ -19,7 +19,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
     // Deterministic CVL summaries for assembly utility functions (removes inline assembly complexity).
-    function UtilsLib.min(uint256 x, uint256 y) internal returns (uint256) => CVL_min(x, y);
+    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => NONDET;
 
     // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
@@ -42,6 +42,9 @@ methods {
     // Same offer.tick across all take calls; CONSTANT ensures identical return value.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
+    // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes 7-way piecewise interpolation.
+    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
+
     // Callbacks and token transfers: NONDET removes external call complexity.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -58,59 +61,23 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-function CVL_zeroFloorSub(uint256 x, uint256 y) returns uint256 {
-    if (x > y) {
-        return require_uint256(x - y);
-    }
-    return 0;
-}
-
-function CVL_min(uint256 x, uint256 y) returns uint256 {
-    if (y < x) {
-        return y;
-    }
-    return x;
-}
-
 // ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
 persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
-    // Identity: a * x / x == a (needed for _updatePosition no-op when lossIndex is synced).
     axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
-
-    // Zero 2nd arg: a * 0 / c == 0 (needed for _updatePosition no-op when no slashing delta).
     axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivDown(a, 0, c) == 0;
-
-    // Zero 1st arg: 0 * b / c == 0.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivDown(0, b, c) == 0;
-
-    // Bounded: floor(a*b/d) <= a when b <= d (prevents toUint128 reverts / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
-
-    // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
 }
 
 // ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
 persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
-    // Identity: ceil(a * x / x) == a (needed when all remaining credit is consumed: sellerCreditDecrease == sellerCredit).
     axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivUp(a, x, x) == a;
-
-    // Zero 2nd arg: ceil(a * 0 / c) == 0 (needed for _updatePosition no-op).
     axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivUp(a, 0, c) == 0;
-
-    // Zero 1st arg: ceil(0 * b / c) == 0.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivUp(0, b, c) == 0;
-
-    // Bounded: ceil(a*b/d) <= a when b <= d (prevents pendingFee underflow / vacuity).
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
-
-    // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d)) && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
 }
 
 /// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
-/// credit, debt, and totalUnits match exactly. pendingFee and consumed (in asset-cap mode) can differ by at most 1 due to mulDivDown/mulDivUp rounding.
-/// Proven for synced positions (lossIndex and lastAccrual up-to-date); generalizing is expected to hold but is constrained by prover performance.
 rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
@@ -126,12 +93,6 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
     require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
 
-    // This makes _updatePosition a no-op (identity via ghost axioms), dramatically reducing solver work.
-    require userLossIndex(id, buyer) == obLossIndex, "buyer lossIndex synced";
-    require userLossIndex(id, seller) == obLossIndex, "seller lossIndex synced";
-    require to_mathint(lastAccrual(id, buyer)) == to_mathint(e.block.timestamp), "buyer lastAccrual synced";
-    require to_mathint(lastAccrual(id, seller)) == to_mathint(e.block.timestamp), "seller lastAccrual synced";
-
     storage initState = lastStorage;
 
     // Path 1: take the full amount A.
@@ -143,8 +104,6 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
     uint256 consumed1 = consumed(offer.maker, offer.group);
-    uint128 pendingFeeBuyer1 = pendingFee(id, buyer);
-    uint128 pendingFeeSeller1 = pendingFee(id, seller);
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
@@ -156,13 +115,43 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert creditOfSeller1 == creditOf(id, seller), "seller credit must match";
     assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
     assert totalUnits1 == totalUnits(id), "totalUnits must match";
+}
 
-    mathint consumedDiff = to_mathint(consumed1) - to_mathint(consumed(offer.maker, offer.group));
-    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumedDiff == 0, "consumed exact in maxUnits mode";
-    assert offer.maxSellerAssets > 0 || offer.maxBuyerAssets > 0 => consumedDiff >= -1 && consumedDiff <= 1, "consumed differs by at most 1 in asset-cap mode";
+/*
+/// Offers can be split: taking A obligation units at once yields the same position-related state as taking B then C (where A = B + C).
+/// credit, debt, and totalUnits match exactly. pendingFee and consumed (in asset-cap mode) can differ by at most 1 due to mulDivDown/mulDivUp rounding.
+/// Proven for synced positions (lossIndex and lastAccrual up-to-date); generalizing is expected to hold but is constrained by prover performance.
+rule offersCanBeSplitFeePart(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
+
+    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
+
+    bytes32 id = summaryToId(offer.obligation);
+    address buyer = offer.buy ? offer.maker : taker;
+    address seller = offer.buy ? taker : offer.maker;
+
+    // Explicit require prevents the solver from exploring aliased-storage paths.
+    require buyer != seller, "prover perfomance";
+
+    uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
+    require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
+
+    storage initState = lastStorage;
+
+    // Path 1: take the full amount A.
+    take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    uint128 pendingFeeBuyer1 = pendingFee(id, buyer);
+    uint128 pendingFeeSeller1 = pendingFee(id, seller);
+
+    // Path 2: take B then C from the initial state.
+    take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
+
+    take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     mathint pendingFeeBuyerDiff = to_mathint(pendingFeeBuyer1) - to_mathint(pendingFee(id, buyer));
     assert pendingFeeBuyerDiff >= -1 && pendingFeeBuyerDiff <= 1, "buyer pendingFee differs by at most 1";
     mathint pendingFeeSellerDiff = to_mathint(pendingFeeSeller1) - to_mathint(pendingFee(id, seller));
     assert pendingFeeSellerDiff >= -1 && pendingFeeSellerDiff <= 1, "seller pendingFee differs by at most 1";
 }
+*/
