@@ -3,8 +3,9 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./helpers/ERC20.sol";
+import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
+import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     uint256 internal amountStored;
@@ -31,15 +32,15 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         discardToken = true;
 
         deal(address(loanToken), address(midnight), amount);
-        vm.expectRevert("Insufficient balance");
+        vm.expectRevert(); // exact message depends on the token.
         midnight.flashLoan(address(loanToken), amount, address(this), data);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external {
+    function onFlashLoan(address token, uint256 amount, bytes memory data) external returns (bytes32) {
         assertEq(token, address(loanToken), "wrong token");
         assertEq(amount, amountStored, "wrong amount");
         assertEq(data, dataStored, "wrong data");
-        ERC20(token).approve(address(midnight), amount);
-        if (discardToken) assertTrue(ERC20(token).transfer(address(0xdead), amount));
+        if (discardToken) SafeTransferLib.safeTransfer(token, address(0xdead), amount);
+        return CALLBACK_SUCCESS;
     }
 }

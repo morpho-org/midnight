@@ -1,163 +1,231 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
-pragma solidity 0.8.31;
+pragma solidity 0.8.34;
 
-import {Midnight} from "../Midnight.sol";
-import {Offer, Signature} from "../interfaces/IMidnight.sol";
+import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
+import {ITakeBundler, Take, CollateralTransfer} from "./interfaces/ITakeBundler.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
-contract TakeBundler {
+contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
 
-    struct Take {
-        uint256 units;
-        Offer offer;
-        Signature sig;
-        bytes32 root;
-        bytes32[] proof;
-    }
-
-    /// @dev Iterates through orders, filling up to targetUnits units total.
-    /// @dev Assumes offers are all buy or all sell and share the same obligation id.
+    /// @dev Assumes offers are all share the same obligation id.
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    function bundleTakeUnits(
-        Midnight midnight,
+    function buyUnitsTarget(
+        address midnight,
+        uint256 targetUnits,
+        address taker,
+        Take[] calldata takes,
+        CollateralTransfer[] calldata collateralWithdrawals,
+        address collateralReceiver
+    ) external {
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+
+        uint256 totalFilledUnits;
+        for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
+            require(!takes[i].offer.buy, InconsistentSide());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                    taker,
+                    address(0),
+                    "",
+                    address(0),
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256, uint256, uint256 filledUnits
+            ) {
+                totalFilledUnits += filledUnits;
+            } catch {}
+        }
+
+        require(totalFilledUnits == targetUnits, InsufficientLiquidity());
+
+        Obligation memory obligation = takes[0].offer.obligation;
+        for (uint256 i; i < collateralWithdrawals.length; i++) {
+            IMidnight(midnight)
+                .withdrawCollateral(
+                    obligation,
+                    collateralWithdrawals[i].collateralIndex,
+                    collateralWithdrawals[i].assets,
+                    taker,
+                    collateralReceiver
+                );
+        }
+    }
+
+    /// @dev See buyUnitsTarget.
+    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
+    function sellUnitsTarget(
+        address midnight,
         uint256 targetUnits,
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minBuyerAssets,
-        uint256 maxBuyerAssets,
-        uint256 minSellerAssets,
-        uint256 maxSellerAssets
+        CollateralTransfer[] calldata collateralSupplies
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+
+        Obligation memory obligation = takes[0].offer.obligation;
+        for (uint256 i; i < collateralSupplies.length; i++) {
+            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            _safeApprove(token, midnight, collateralSupplies[i].assets);
+            IMidnight(midnight)
+                .supplyCollateral(
+                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
+                );
+        }
 
         uint256 totalFilledUnits;
-        uint256 totalBuyerAssets;
-        uint256 totalSellerAssets;
         for (uint256 i; i < takes.length && totalFilledUnits < targetUnits; i++) {
-            try midnight.take(
-                UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
-                uint256 filledBuyerAssets, uint256 filledSellerAssets, uint256 filledUnits
+            require(takes[i].offer.buy, InconsistentSide());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - totalFilledUnits, takes[i].units),
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256, uint256, uint256 filledUnits
             ) {
                 totalFilledUnits += filledUnits;
-                totalBuyerAssets += filledBuyerAssets;
-                totalSellerAssets += filledSellerAssets;
             } catch {}
         }
 
-        require(totalFilledUnits == targetUnits, "insufficient liquidity");
-        require(totalBuyerAssets >= minBuyerAssets, "buyer assets below min");
-        require(totalBuyerAssets <= maxBuyerAssets, "buyer assets above max");
-        require(totalSellerAssets >= minSellerAssets, "seller assets below min");
-        require(totalSellerAssets <= maxSellerAssets, "seller assets above max");
+        require(totalFilledUnits == targetUnits, InsufficientLiquidity());
     }
 
-    /// @dev Same as bundleTakeUnits but targets buyer assets.
-    /// @dev Not usable if buyerPrice > WAD, because not all buyerAssets are reachable then.
-    /// @dev buyerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
-    /// tradingFee) are not caught by the try/catch and will abort the bundle.
-    /// @dev Requires a non-empty takes array.
-    function bundleTakeBuyerAssets(
-        Midnight midnight,
+    /// @dev See buyUnitsTarget.
+    function buyBuyerAssetsTarget(
+        address midnight,
         uint256 targetBuyerAssets,
         address taker,
-        address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits
+        CollateralTransfer[] calldata collateralWithdrawals,
+        address collateralReceiver
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
-        bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+        // touchObligation to have the correct trading fees.
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledBuyerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledBuyerAssets < targetBuyerAssets; i++) {
-            try midnight.take(
-                UtilsLib.min(
-                    TakeAmountsLib.buyerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+            require(!takes[i].offer.buy, InconsistentSide());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.buyerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetBuyerAssets - totalFilledBuyerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
-                uint256 filledBuyerAssets, uint256, uint256 filledUnits
+                    taker,
+                    address(0),
+                    "",
+                    address(0),
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256 filledBuyerAssets, uint256, uint256
             ) {
                 totalFilledBuyerAssets += filledBuyerAssets;
-                totalUnits += filledUnits;
             } catch {}
         }
 
-        require(totalFilledBuyerAssets == targetBuyerAssets, "insufficient liquidity");
-        require(totalUnits >= minUnits, "units below min");
-        require(totalUnits <= maxUnits, "units above max");
+        require(totalFilledBuyerAssets == targetBuyerAssets, InsufficientLiquidity());
+
+        Obligation memory obligation = takes[0].offer.obligation;
+        for (uint256 i; i < collateralWithdrawals.length; i++) {
+            IMidnight(midnight)
+                .withdrawCollateral(
+                    obligation,
+                    collateralWithdrawals[i].collateralIndex,
+                    collateralWithdrawals[i].assets,
+                    taker,
+                    collateralReceiver
+                );
+        }
     }
 
-    /// @dev Same as bundleTakeUnits but targets seller assets.
-    /// @dev sellerAssetsToUnits is evaluated before midnight.take, so reverts there (e.g. underflow when offerPrice <
-    /// tradingFee) are not caught by the try/catch and will abort the bundle.
-    /// @dev Requires a non-empty takes array.
-    function bundleTakeSellerAssets(
-        Midnight midnight,
+    /// @dev See buyUnitsTarget.
+    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
+    function sellSellerAssetsTarget(
+        address midnight,
         uint256 targetSellerAssets,
         address taker,
         address receiverIfTakerIsSeller,
         Take[] calldata takes,
-        uint256 minUnits,
-        uint256 maxUnits
+        CollateralTransfer[] calldata collateralSupplies
     ) external {
-        require(taker == msg.sender || midnight.isAuthorized(taker, msg.sender), "unauthorized");
-        bytes32 id = midnight.touchObligation(takes[0].offer.obligation); // to have the correct trading fees.
+        require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
+
+        Obligation memory obligation = takes[0].offer.obligation;
+        for (uint256 i; i < collateralSupplies.length; i++) {
+            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            _safeApprove(token, midnight, collateralSupplies[i].assets);
+            IMidnight(midnight)
+                .supplyCollateral(
+                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
+                );
+        }
+
+        // touchObligation to have the correct trading fees.
+        bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         uint256 totalFilledSellerAssets;
-        uint256 totalUnits;
         for (uint256 i; i < takes.length && totalFilledSellerAssets < targetSellerAssets; i++) {
-            try midnight.take(
-                UtilsLib.min(
-                    TakeAmountsLib.sellerAssetsToUnits(
-                        midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+            require(takes[i].offer.buy, InconsistentSide());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(
+                        TakeAmountsLib.sellerAssetsToUnits(
+                            midnight, id, takes[i].offer, targetSellerAssets - totalFilledSellerAssets
+                        ),
+                        takes[i].units
                     ),
-                    takes[i].units
-                ),
-                taker,
-                address(0),
-                "",
-                receiverIfTakerIsSeller,
-                takes[i].offer,
-                takes[i].sig,
-                takes[i].root,
-                takes[i].proof
-            ) returns (
-                uint256, uint256 filledSellerAssets, uint256 filledUnits
+                    taker,
+                    address(0),
+                    "",
+                    receiverIfTakerIsSeller,
+                    takes[i].offer,
+                    takes[i].ratifierData,
+                    takes[i].root,
+                    takes[i].proof
+                ) returns (
+                uint256, uint256 filledSellerAssets, uint256
             ) {
                 totalFilledSellerAssets += filledSellerAssets;
-                totalUnits += filledUnits;
             } catch {}
         }
 
-        require(totalFilledSellerAssets == targetSellerAssets, "insufficient liquidity");
-        require(totalUnits >= minUnits, "units below min");
-        require(totalUnits <= maxUnits, "units above max");
+        require(totalFilledSellerAssets == targetSellerAssets, InsufficientLiquidity());
+    }
+
+    /// @dev USDT won't break because the allowance is reset to 0 after supplyCollateral.
+    function _safeApprove(address token, address spender, uint256 value) internal {
+        (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
+        if (!success) {
+            assembly ("memory-safe") {
+                revert(add(returndata, 0x20), mload(returndata))
+            }
+        }
+        require(returndata.length == 0 || abi.decode(returndata, (bool)));
     }
 }
