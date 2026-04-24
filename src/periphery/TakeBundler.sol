@@ -16,6 +16,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
+    /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens after the buys.
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
