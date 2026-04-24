@@ -16,8 +16,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev Taker receives exactly `targetUnits` units. Total loan-token cost is `totalFilledBuyerAssets + fee`, where
-    /// `fee = totalFilledBuyerAssets * pct / (WAD - pct)` (so `pct = fee / (totalFilledBuyerAssets + fee)`).
+    /// @dev Total loan-token cost is `totalFilledBuyerAssets + totalFilledBuyerAssets * pct / (WAD - pct)`.
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -79,8 +78,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
-    /// @dev Taker sells exactly `targetUnits` units. Net receipt is `totalFilledSellerAssets - fee`, where
-    /// `fee = totalFilledSellerAssets * pct / WAD` (so `pct = fee / totalFilledSellerAssets`).
+    /// @dev Total receipt is `totalFilledSellerAssets - totalFilledSellerAssets * pct / WAD`.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -142,8 +140,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Takes could have different obligations (with the same loan token).
-    /// @dev Taker spends exactly `targetBuyerAssets` in loan tokens total: `targetBuyerAssets * (WAD - pct) / WAD` goes
-    /// to makers and `targetBuyerAssets * pct / WAD` goes to the referral fee recipient.
+    /// @dev Total cost is `targetBuyerAssets`.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
@@ -212,8 +209,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Takes could have different obligations (with the same loan token).
-    /// @dev Receiver gets exactly `targetSellerAssets` in loan tokens. Makers pay `targetSellerAssets * WAD / (WAD -
-    /// pct)` and the referral fee recipient gets `targetSellerAssets * pct / (WAD - pct)`.
+    /// @dev Total receipt is `targetSellerAssets`.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
