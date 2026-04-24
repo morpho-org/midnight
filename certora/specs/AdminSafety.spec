@@ -16,6 +16,7 @@ methods {
     function _.price() external => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+
     // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
