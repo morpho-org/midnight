@@ -12,6 +12,7 @@ methods {
     function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
+    function Midnight.toObligation(bytes32) external returns (Midnight.Obligation memory) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
@@ -114,6 +115,22 @@ rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation oblig
 rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert obligationIsCreated(obligation);
+}
+
+// Obligations can only be created by: touchObligation, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
+rule onlyTouchObligationCreatesObligation(env e, method f, calldataarg args, bytes32 id)
+filtered {
+    f -> f.selector != sig:touchObligation(Midnight.Obligation).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+        && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
+        && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
+} {
+    require !Midnight.obligationCreated(id), "Assume that the obligation is not created";
+    f(e, args);
+    assert !Midnight.obligationCreated(id);
 }
 
 // Show that each obligation state field is empty if the obligation is not created.
