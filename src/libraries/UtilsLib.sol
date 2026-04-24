@@ -102,13 +102,12 @@ library UtilsLib {
         for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
             collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
         }
-        bytes32 collateralParamsArrayHash = keccak256(abi.encodePacked(collateralParamsHashes));
 
         return keccak256(
             abi.encode(
                 OBLIGATION_TYPEHASH,
                 obligation.loanToken,
-                collateralParamsArrayHash,
+                keccak256(abi.encodePacked(collateralParamsHashes)),
                 obligation.maturity,
                 obligation.rcfThreshold,
                 obligation.enterGate,
@@ -119,28 +118,24 @@ library UtilsLib {
 
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
-            bytes.concat(
-                abi.encode(
-                    OFFER_TYPEHASH,
-                    hashObligation(offer.obligation),
-                    offer.buy,
-                    offer.maker,
-                    offer.start,
-                    offer.expiry,
-                    offer.tick
-                ),
-                abi.encode(
-                    offer.group,
-                    offer.session,
-                    offer.callback,
-                    keccak256(offer.callbackData),
-                    offer.receiverIfMakerIsSeller,
-                    offer.ratifier,
-                    offer.reduceOnly,
-                    offer.maxUnits,
-                    offer.maxSellerAssets,
-                    offer.maxBuyerAssets
-                )
+            abi.encode(
+                OFFER_TYPEHASH,
+                hashObligation(offer.obligation),
+                offer.buy,
+                offer.maker,
+                offer.start,
+                offer.expiry,
+                offer.tick,
+                offer.group,
+                offer.session,
+                offer.callback,
+                keccak256(offer.callbackData),
+                offer.receiverIfMakerIsSeller,
+                offer.ratifier,
+                offer.reduceOnly,
+                offer.maxUnits,
+                offer.maxSellerAssets,
+                offer.maxBuyerAssets
             )
         );
     }
