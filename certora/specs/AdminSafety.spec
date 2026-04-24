@@ -16,6 +16,12 @@ methods {
     function _.price() external => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
