@@ -9,10 +9,10 @@ import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
-uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x5ba4989d3c22a4981ea9e3a1dd4aa77c16b646eaf6fae3393978f3d752efe9b8;
-bytes32 constant SIG_S = 0x340377683b31c78acd43b763af192383b26d09e6a3d73f3784585bda30d11250;
+address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+uint8 constant SIG_V = 27;
+bytes32 constant SIG_R = 0x09a648ee294a2ca00ab473404851f03f6e6b884678040da1bd795be8f9773609;
+bytes32 constant SIG_S = 0x47caf1e2a1527357e5ae0091100f7de32b469916c05e163ecf5b46f0f0ab693d;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;

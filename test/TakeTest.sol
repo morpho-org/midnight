@@ -1832,7 +1832,7 @@ contract RatifyCallback is IRatifier {
 
         if (ratifierData.length > 0) {
             (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
-            bytes32 structHash = keccak256(abi.encode(UtilsLib.rootTypeHash(height), root));
+            bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
             recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);

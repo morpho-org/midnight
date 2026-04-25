@@ -293,7 +293,7 @@ abstract contract BaseTest is Test {
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(UtilsLib.rootTypeHash(height), _root));
+        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);

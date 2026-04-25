@@ -16,15 +16,15 @@ const HEIGHT = 2;
 
 /** EIP-712 type definitions matching EcrecoverRatifier's verification logic. */
 function buildTypes(height: number) {
-  let rootFieldType = "Offer";
-  for (let i = 0; i < height; i++) rootFieldType += "[2]";
+  let offerTreeFieldType = "Offer";
+  for (let i = 0; i < height; i++) offerTreeFieldType += "[2]";
 
   return {
     EIP712Domain: [
       { name: "chainId", type: "uint256" },
       { name: "verifyingContract", type: "address" },
     ],
-    Root: [{ name: "root", type: rootFieldType }],
+    OfferTree: [{ name: "offerTree", type: offerTreeFieldType }],
     CollateralParams: [
       { name: "token", type: "address" },
       { name: "lltv", type: "uint256" },
@@ -88,9 +88,9 @@ function defaultOffer(number: string) {
   };
 }
 
-// WARNING: The root should be built by sorting the nodes in ascending order of their hash.
+// WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
 // By luck, the following offers happen to be correctly sorted already.
-function buildRoot() {
+function buildOfferTree() {
   return [
     [defaultOffer("1"), defaultOffer("2")],
     [defaultOffer("3"), defaultOffer("4")],
@@ -113,18 +113,18 @@ async function main() {
   const account = accounts[0].toLowerCase();
   const chainId = Number(await window.ethereum.request({ method: "eth_chainId" }));
 
-  const root = buildRoot();
+  const offerTree = buildOfferTree();
 
   app.innerHTML = `
     <p>Connected: <code>${account}</code> &middot; Chain <code>${chainId}</code></p>
     <p>Ratifier: <code>${RATIFIER}</code> &middot; Height: <code>${HEIGHT}</code></p>
 
     <div class="field">
-      <label for="offer">Root (4 offers as Offer[2][2])</label>
-      <textarea id="offer" spellcheck="false">${JSON.stringify(root, null, 2)}</textarea>
+      <label for="offer">OfferTree (4 offers as Offer[2][2])</label>
+      <textarea id="offer" spellcheck="false">${JSON.stringify(offerTree, null, 2)}</textarea>
     </div>
 
-    <button id="sign">Sign Root</button>
+    <button id="sign">Sign OfferTree</button>
     <pre id="result"></pre>
   `;
 
@@ -139,9 +139,9 @@ async function main() {
 
       const typedData = {
         types: buildTypes(HEIGHT),
-        primaryType: "Root",
+        primaryType: "OfferTree",
         domain: { chainId, verifyingContract: RATIFIER },
-        message: { root: offerData },
+        message: { offerTree: offerData },
       };
 
       const sig = (await window.ethereum!.request({
