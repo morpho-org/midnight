@@ -10,7 +10,7 @@ import {
     OBLIGATION_TYPEHASH,
     OFFER_TYPE,
     OFFER_TYPEHASH
-} from "../interfaces/IEcrecover.sol";
+} from "./ConstantsLib.sol";
 
 library UtilsLib {
     error CastOverflow();
@@ -52,17 +52,13 @@ library UtilsLib {
         return (x * y + (d - 1)) / d;
     }
 
-    function rootTypeHash(uint256 height) internal pure returns (bytes32) {
-        bytes memory brackets = new bytes(3 * height);
+    function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
+        bytes memory typeStr = "OfferTree(Offer";
         for (uint256 i = 0; i < height; i++) {
-            brackets[3 * i] = "[";
-            brackets[3 * i + 1] = "2";
-            brackets[3 * i + 2] = "]";
+            typeStr = bytes.concat(typeStr, "[2]");
         }
-        return
-            keccak256(
-                bytes.concat("Root(Offer", brackets, " root)", COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE)
-            );
+        typeStr = bytes.concat(typeStr, " offerTree)");
+        return keccak256(bytes.concat(typeStr, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
     }
 
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
@@ -102,13 +98,12 @@ library UtilsLib {
         for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
             collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
         }
-        bytes32 collateralParamsArrayHash = keccak256(abi.encodePacked(collateralParamsHashes));
 
         return keccak256(
             abi.encode(
                 OBLIGATION_TYPEHASH,
                 obligation.loanToken,
-                collateralParamsArrayHash,
+                keccak256(abi.encodePacked(collateralParamsHashes)),
                 obligation.maturity,
                 obligation.rcfThreshold,
                 obligation.enterGate,
@@ -117,6 +112,7 @@ library UtilsLib {
         );
     }
 
+    /// @dev Split into two `abi.encode`s to avoid stack-too-deep under via-ir without optimizer.
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
             bytes.concat(
@@ -127,11 +123,11 @@ library UtilsLib {
                     offer.maker,
                     offer.start,
                     offer.expiry,
-                    offer.tick
+                    offer.tick,
+                    offer.group,
+                    offer.session
                 ),
                 abi.encode(
-                    offer.group,
-                    offer.session,
                     offer.callback,
                     keccak256(offer.callbackData),
                     offer.receiverIfMakerIsSeller,
