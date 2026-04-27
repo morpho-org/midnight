@@ -141,6 +141,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Takes could have different obligations (with the same loan token).
     /// @dev Total cost is `targetBuyerAssets`.
+    /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
@@ -210,6 +211,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Takes could have different obligations (with the same loan token).
     /// @dev Total receipt is `targetSellerAssets`.
+    /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
