@@ -271,12 +271,12 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
+        require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
-        require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
@@ -404,9 +404,9 @@ contract Midnight is IMidnight {
 
     /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
@@ -449,9 +449,9 @@ contract Midnight is IMidnight {
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
         external
     {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
@@ -476,9 +476,9 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
         Position storage _position = position[id][onBehalf];
         uint256 newCollateral = _position.collateral[collateralIndex] - assets;
