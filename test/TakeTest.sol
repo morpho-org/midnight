@@ -3,8 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {
+    IEcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -919,7 +922,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig),
+            abi.encode(_sig, uint256(0)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1036,6 +1039,84 @@ contract TakeTest is BaseTest {
             ratifierData([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
             proof([lenderOffer, otherOffer])
+        );
+    }
+
+    // Adding salt to the expiry to test different ordering (see commutativeHash).
+    function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
+        public
+    {
+        units = bound(units, 0, maxAssets);
+        uint256 price = TickLib.tickToPrice(lenderOffer.tick);
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        collateralize(obligation, borrower, units);
+        lenderOffer.maxUnits = units;
+
+        Offer memory offer0 = lenderOffer;
+
+        Offer memory offer1 = lenderOffer;
+        offer1.expiry += bound(saltTimestamp1, 0, type(uint32).max);
+
+        Offer memory offer2 = lenderOffer;
+        offer2.expiry += bound(saltTimestamp2, 0, type(uint32).max);
+
+        Offer memory offer3 = lenderOffer;
+        offer3.expiry += bound(saltTimestamp3, 0, type(uint32).max);
+
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer0,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFirstLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer1,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofSecondLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer2,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofThirdLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer3,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFourthLeaf([offer0, offer1, offer2, offer3])
         );
     }
 
@@ -1750,8 +1831,8 @@ contract RatifyCallback is IRatifier {
         _recordedOffer = offer;
 
         if (ratifierData.length > 0) {
-            Signature memory signature = abi.decode(ratifierData, (Signature));
-            bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
+            bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
             recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);

@@ -2,6 +2,16 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
+import {
+    COLLATERAL_PARAMS_TYPE,
+    COLLATERAL_PARAMS_TYPEHASH,
+    OBLIGATION_TYPE,
+    OBLIGATION_TYPEHASH,
+    OFFER_TYPE,
+    OFFER_TYPEHASH
+} from "./ConstantsLib.sol";
+
 library UtilsLib {
     error CastOverflow();
 
@@ -42,6 +52,15 @@ library UtilsLib {
         return (x * y + (d - 1)) / d;
     }
 
+    function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
+        bytes memory offerTreeType = "OfferTree(Offer";
+        for (uint256 i = 0; i < height; i++) {
+            offerTreeType = bytes.concat(offerTreeType, "[2]");
+        }
+        offerTreeType = bytes.concat(offerTreeType, " offerTree)");
+        return keccak256(bytes.concat(offerTreeType, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
+    }
+
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
     /// @dev Hash sorts the inputs lexicographically.
     function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
@@ -60,6 +79,69 @@ library UtilsLib {
             mstore(0x20, b)
             value := keccak256(0x00, 0x40)
         }
+    }
+
+    /// @dev Computes the EIP-712 hash struct of a CollateralParams.
+    function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                COLLATERAL_PARAMS_TYPEHASH,
+                collateralParams.token,
+                collateralParams.lltv,
+                collateralParams.maxLif,
+                collateralParams.oracle
+            )
+        );
+    }
+
+    /// @dev Computes the EIP-712 hash struct of an Obligation.
+    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
+        bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
+        for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
+            collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
+        }
+
+        return keccak256(
+            abi.encode(
+                OBLIGATION_TYPEHASH,
+                obligation.loanToken,
+                keccak256(abi.encodePacked(collateralParamsHashes)),
+                obligation.maturity,
+                obligation.rcfThreshold,
+                obligation.enterGate,
+                obligation.liquidatorGate
+            )
+        );
+    }
+
+    /// @dev Computes the EIP-712 hash struct of an Offer.
+    /// @dev Split into two `abi.encode`s to avoid stack-too-deep under via-ir without optimizer.
+    function hashOffer(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(
+            bytes.concat(
+                abi.encode(
+                    OFFER_TYPEHASH,
+                    hashObligation(offer.obligation),
+                    offer.buy,
+                    offer.maker,
+                    offer.start,
+                    offer.expiry,
+                    offer.tick,
+                    offer.group,
+                    offer.session
+                ),
+                abi.encode(
+                    offer.callback,
+                    keccak256(offer.callbackData),
+                    offer.receiverIfMakerIsSeller,
+                    offer.ratifier,
+                    offer.reduceOnly,
+                    offer.maxUnits,
+                    offer.maxSellerAssets,
+                    offer.maxBuyerAssets
+                )
+            )
+        );
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {

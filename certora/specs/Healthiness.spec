@@ -2,7 +2,7 @@
 
 import "BitmapSummaries.spec";
 
-using Havoc as callback;
+using Havoc as havocCallback;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -16,6 +16,7 @@ methods {
      * any action on the contract.
      */
     function _.price() external => summaryPrice(calledContract) expect(uint256);
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
@@ -168,7 +169,7 @@ function genericCallback() {
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
 
-    callback.callHavoc(e, dummy);
+    havocCallback.callHavoc(e, dummy);
 
     // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
     healthyBeforeCallback = savedHealthyBefore;
