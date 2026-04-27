@@ -24,8 +24,8 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
+    function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 }
 
 /// HELPERS ///
@@ -40,33 +40,41 @@ definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = ass
 
 definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
+ghost mapping(address => mapping(address => mathint)) tokenBalance;
+
+function cvlSafeTransfer(address token, address receiver, uint256 amount) {
+    cvlSafeTransferFrom(token, currentContract, receiver, amount);
+}
+
+function cvlSafeTransferFrom(address token, address from, address to, uint256 amount) {
+    tokenBalance[token][from] = tokenBalance[token][from] - to_mathint(amount);
+    tokenBalance[token][to] = tokenBalance[token][to] + to_mathint(amount);
+}
+
 /// ROLE SETTER: LIVENESS ///
 
 rule roleSetterCanChangeRoleSetter(env e, address newRoleSetter) {
-    require(e.msg.sender == roleSetter(), "caller is the role setter");
-    require(e.msg.value == 0, "no ETH sent");
+    address roleSetterBefore = roleSetter();
 
     setRoleSetter@withrevert(e, newRoleSetter);
-    assert !lastReverted;
-    assert roleSetter() == newRoleSetter;
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted => roleSetter() == newRoleSetter;
 }
 
 rule roleSetterCanChangeFeeSetter(env e, address newFeeSetter) {
-    require(e.msg.sender == roleSetter(), "caller is the role setter");
-    require(e.msg.value == 0, "no ETH sent");
+    address roleSetterBefore = roleSetter();
 
     setFeeSetter@withrevert(e, newFeeSetter);
-    assert !lastReverted;
-    assert feeSetter() == newFeeSetter;
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted => feeSetter() == newFeeSetter;
 }
 
 rule roleSetterCanChangeFeeClaimer(env e, address newFeeClaimer) {
-    require(e.msg.sender == roleSetter(), "caller is the role setter");
-    require(e.msg.value == 0, "no ETH sent");
+    address roleSetterBefore = roleSetter();
 
     setFeeClaimer@withrevert(e, newFeeClaimer);
-    assert !lastReverted;
-    assert feeClaimer() == newFeeClaimer;
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted => feeClaimer() == newFeeClaimer;
 }
 
 /// ROLE SETTER: ACCESS CONTROL ///
@@ -100,49 +108,45 @@ rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filter
 /// FEE SETTER: LIVENESS ///
 
 rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
-    require(e.msg.sender == feeSetter(), "caller is the fee setter");
-    require(e.msg.value == 0, "no ETH sent");
-    require(index <= 6, "valid fee index");
-    require(newTradingFee <= maxTradingFee(index), "fee within bound");
-    require(newTradingFee % FEE_STEP() == 0, "fee is a multiple of FEE_STEP");
-    require(obligationCreated(id), "obligation exists");
+    address feeSetterBefore = feeSetter();
+    bool validIndex = index <= 6;
+    bool validFee = validIndex ? newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_STEP() == 0 : false;
+    bool obligationExists = obligationCreated(id);
 
     setObligationTradingFee@withrevert(e, id, index, newTradingFee);
-    assert !lastReverted;
-    assert obligationTradingFee(id, index) == newTradingFee;
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && obligationExists;
+    assert !reverted => obligationTradingFee(id, index) == newTradingFee;
 }
 
 rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, uint256 newTradingFee) {
-    require(e.msg.sender == feeSetter(), "caller is the fee setter");
-    require(e.msg.value == 0, "no ETH sent");
-    require(index <= 6, "valid fee index");
-    require(newTradingFee <= maxTradingFee(index), "fee within bound");
-    require(newTradingFee % FEE_STEP() == 0, "fee is a multiple of FEE_STEP");
+    address feeSetterBefore = feeSetter();
+    bool validIndex = index <= 6;
+    bool validFee = validIndex ? newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_STEP() == 0 : false;
 
     setDefaultTradingFee@withrevert(e, loanToken, index, newTradingFee);
-    assert !lastReverted;
-    assert defaultTradingFee(loanToken, index) == newTradingFee;
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee;
+    assert !reverted => defaultTradingFee(loanToken, index) == newTradingFee;
 }
 
 rule feeSetterCanSetObligationContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
-    require(e.msg.sender == feeSetter(), "caller is the fee setter");
-    require(e.msg.value == 0, "no ETH sent");
-    require(newContinuousFee <= MAX_CONTINUOUS_FEE(), "fee within bound");
-    require(obligationCreated(id), "obligation exists");
+    address feeSetterBefore = feeSetter();
+    bool obligationExists = obligationCreated(id);
 
     setObligationContinuousFee@withrevert(e, id, newContinuousFee);
-    assert !lastReverted;
-    assert to_mathint(continuousFee(id)) == to_mathint(newContinuousFee);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && obligationExists;
+    assert !reverted => to_mathint(continuousFee(id)) == to_mathint(newContinuousFee);
 }
 
 rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newContinuousFee) {
-    require(e.msg.sender == feeSetter(), "caller is the fee setter");
-    require(e.msg.value == 0, "no ETH sent");
-    require(newContinuousFee <= MAX_CONTINUOUS_FEE(), "fee within bound");
+    address feeSetterBefore = feeSetter();
 
     setDefaultContinuousFee@withrevert(e, loanToken, newContinuousFee);
-    assert !lastReverted;
-    assert to_mathint(currentContract.defaultContinuousFee[loanToken]) == to_mathint(newContinuousFee);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE();
+    assert !reverted => to_mathint(currentContract.defaultContinuousFee[loanToken]) == to_mathint(newContinuousFee);
 }
 
 /// FEE SETTER: ACCESS CONTROL ///
@@ -171,23 +175,35 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 /// Fee claimer access control is covered in OnlyAuthorizedCanChange.spec.
 
 rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver) {
-    require(e.msg.sender == feeClaimer(), "caller is the fee claimer");
-    require(e.msg.value == 0, "no ETH sent");
-    require(amount <= claimableTradingFee(token), "enough claimable balance");
+    address feeClaimerBefore = feeClaimer();
+    uint256 claimableBefore = claimableTradingFee(token);
+    mathint midnightBalanceBefore = tokenBalance[token][currentContract];
+    mathint receiverBalanceBefore = tokenBalance[token][receiver];
 
     claimTradingFee@withrevert(e, token, amount, receiver);
-    assert !lastReverted;
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= claimableBefore;
+    assert !reverted => claimableTradingFee(token) == claimableBefore - amount;
+    assert !reverted => tokenBalance[token][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : to_mathint(amount));
+    assert !reverted => tokenBalance[token][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : to_mathint(amount));
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
     bytes32 id = toId(e, obligation);
-    require(e.msg.sender == feeClaimer(), "caller is the fee claimer");
-    require(e.msg.value == 0, "no ETH sent");
-    require(obligationCreated(id), "obligation exists");
-    require(amount <= withdrawable(id), "enough withdrawable");
-    require(amount <= totalUnits(id), "enough total units");
-    require(amount <= currentContract.obligationState[id].continuousFeeCredit, "enough continuous fee credit");
+    address feeClaimerBefore = feeClaimer();
+    bool obligationExists = obligationCreated(id);
+    uint256 withdrawableBefore = withdrawable(id);
+    uint256 totalUnitsBefore = totalUnits(id);
+    uint128 continuousFeeCreditBefore = currentContract.obligationState[id].continuousFeeCredit;
+    mathint midnightBalanceBefore = tokenBalance[obligation.loanToken][currentContract];
+    mathint receiverBalanceBefore = tokenBalance[obligation.loanToken][receiver];
 
     claimContinuousFee@withrevert(e, obligation, amount, receiver);
-    assert !lastReverted;
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && obligationExists && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted => withdrawable(id) == withdrawableBefore - amount;
+    assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
+    assert !reverted => to_mathint(currentContract.obligationState[id].continuousFeeCredit) == to_mathint(continuousFeeCreditBefore) - to_mathint(amount);
+    assert !reverted => tokenBalance[obligation.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : to_mathint(amount));
+    assert !reverted => tokenBalance[obligation.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : to_mathint(amount));
 }
