@@ -18,7 +18,7 @@ library UtilsLib {
     /// @dev Returns true if at most one of `x` and `y` is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
         assembly {
-            z := iszero(mul(x, y))
+            z := or(iszero(x), iszero(y))
         }
     }
 
