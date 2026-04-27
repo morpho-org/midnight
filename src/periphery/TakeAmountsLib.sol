@@ -9,32 +9,6 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
-    /// @dev Returns the buyer assets for the given number of units.
-    function unitsToBuyerAssets(address midnight, bytes32 id, Offer memory offer, uint256 units)
-        internal
-        view
-        returns (uint256)
-    {
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 tradingFee =
-            IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
-        return offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-    }
-
-    /// @dev Returns the seller assets for the given number of units.
-    function unitsToSellerAssets(address midnight, bytes32 id, Offer memory offer, uint256 units)
-        internal
-        view
-        returns (uint256)
-    {
-        uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        uint256 tradingFee =
-            IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
-        return offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
-    }
-
     // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.

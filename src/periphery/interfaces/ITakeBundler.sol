@@ -25,7 +25,7 @@ interface ITakeBundler {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function buyUnitsTarget(address midnight, uint256 targetUnits, address taker, Take[] calldata takes, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
+    function buyUnitsTarget(address midnight, uint256 targetUnits, uint256 maxBuyerAssets, address taker, Take[] calldata takes, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
     function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, CollateralTransfer[] calldata collateralSupplies) external;
     function buyBuyerAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, Take[] calldata takes, CollateralTransfer[] calldata collateralWithdrawals, address collateralReceiver) external;
     function sellSellerAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] calldata takes, CollateralTransfer[] calldata collateralSupplies) external;
