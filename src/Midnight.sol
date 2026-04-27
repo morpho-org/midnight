@@ -62,8 +62,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// ROOT
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// @dev If the offers are well-sorted when given to the wallet, the EIP-712 digest will match the root of the tree.
-/// This allows to have clear signing of the tree, credits to Seaport for this mechanism.
+/// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
+/// the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
+/// Seaport for this mechanism.
 ///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
