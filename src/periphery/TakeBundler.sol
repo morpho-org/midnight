@@ -246,7 +246,7 @@ contract TakeBundler is ITakeBundler {
     /// is already at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to
     /// non-zero allowance changes (e.g. USDT) work.
     function _forceApproveMax(address token, address spender) internal {
-        if (IERC20(token).allowance(address(this), spender) >= type(uint256).max / 2) return;
+        if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
         _safeApprove(token, spender, 0);
         _safeApprove(token, spender, type(uint256).max);
     }
