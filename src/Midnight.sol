@@ -468,7 +468,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(collateralToken, msg.sender, address(this), assets);
     }
 
-    /// @dev This function does not call any oracle if all the collateral is withdrawn and the borrower has no debt.
+    /// @dev This function does not call any oracle if the borrower has no debt.
     function withdrawCollateral(
         Obligation memory obligation,
         uint256 collateralIndex,
