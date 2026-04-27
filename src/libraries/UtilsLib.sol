@@ -81,6 +81,7 @@ library UtilsLib {
         }
     }
 
+    /// @dev Computes the EIP-712 hash struct of a CollateralParams.
     function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -93,6 +94,7 @@ library UtilsLib {
         );
     }
 
+    /// @dev Computes the EIP-712 hash struct of an Obligation.
     function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
         bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
         for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
@@ -112,6 +114,7 @@ library UtilsLib {
         );
     }
 
+    /// @dev Computes the EIP-712 hash struct of an Offer.
     /// @dev Split into two `abi.encode`s to avoid stack-too-deep under via-ir without optimizer.
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
