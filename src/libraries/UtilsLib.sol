@@ -53,12 +53,12 @@ library UtilsLib {
     }
 
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
-        bytes memory typeStr = "OfferTree(Offer";
+        bytes memory offerTreeType = "OfferTree(Offer";
         for (uint256 i = 0; i < height; i++) {
-            typeStr = bytes.concat(typeStr, "[2]");
+            offerTreeType = bytes.concat(offerTreeType, "[2]");
         }
-        typeStr = bytes.concat(typeStr, " offerTree)");
-        return keccak256(bytes.concat(typeStr, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
+        offerTreeType = bytes.concat(offerTreeType, " offerTree)");
+        return keccak256(bytes.concat(offerTreeType, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
     }
 
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.

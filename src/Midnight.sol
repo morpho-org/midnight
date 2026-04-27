@@ -60,6 +60,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
 /// @dev Offers should have the current session to be valid.
 ///
+/// ROOT
+/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
+/// @dev If the offers are well-sorted when given to the wallet, the EIP-712 digest will match the root of the tree.
+/// This allows to have clear signing of the tree, credits to Seaport for this mechanism.
+///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
 /// any account that has been authorized.
