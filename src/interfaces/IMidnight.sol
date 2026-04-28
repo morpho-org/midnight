@@ -74,6 +74,7 @@ interface IMidnight {
     error ConsumedUnits();
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
+    error InactiveCollateral();
     error InconsistentInput();
     error WrongBuyCallbackReturnValue();
     error WrongSellCallbackReturnValue();

@@ -70,7 +70,7 @@ contract LiquidationTest is BaseTest {
         setupObligation(obligation, units);
         Oracle(obligation.collateralParams[0].oracle).setPrice(1e36 - 1);
 
-        vm.expectRevert(stdError.indexOOBError);
+        vm.expectRevert(IMidnight.InactiveCollateral.selector);
         midnight.liquidate(obligation, 2, 0, 0, borrower, address(this), address(0), "");
     }
 
@@ -82,14 +82,17 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.collateral(id, borrower, 1), 0);
 
-        vm.expectRevert();
+        vm.expectRevert(IMidnight.InactiveCollateral.selector);
         midnight.liquidate(obligation, 1, 0, 1, borrower, address(this), address(0), "");
 
-        vm.expectRevert();
+        vm.expectRevert(IMidnight.InactiveCollateral.selector);
         midnight.liquidate(obligation, 1, 1, 0, borrower, address(this), address(0), "");
 
-        uint256 collatBefore = midnight.collateral(id, borrower, 0);
+        vm.expectRevert(IMidnight.InactiveCollateral.selector);
         midnight.liquidate(obligation, 1, 0, 0, borrower, address(this), address(0), "");
+
+        uint256 collatBefore = midnight.collateral(id, borrower, 0);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, address(this), address(0), "");
         assertEq(midnight.debtOf(id, borrower), 0);
         assertEq(midnight.collateral(id, borrower, 0), collatBefore);
         assertEq(midnight.collateral(id, borrower, 1), 0);

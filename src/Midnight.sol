@@ -519,6 +519,7 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
+        require(_position.collateral[collateralIndex] > 0, InactiveCollateral());
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
