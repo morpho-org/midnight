@@ -128,20 +128,20 @@ strong invariant defaultContinuousFeeBoundedAll()
 
 strong invariant continuousFeeBounded(bytes32 id)
     currentContract.obligationState[id].continuousFee <= MAX_CONTINUOUS_FEE()
-{
-    preserved with (env e) {
-        requireInvariant defaultContinuousFeeBoundedAll();
+    {
+        preserved with (env e) {
+            requireInvariant defaultContinuousFeeBoundedAll();
+        }
     }
-}
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= creditOf(id, user)
-{
-    preserved with (env e) {
-        requireInvariant continuousFeeBounded(id);
-        requireInvariant defaultContinuousFeeBoundedAll();
+    {
+        preserved with (env e) {
+            requireInvariant continuousFeeBounded(id);
+            requireInvariant defaultContinuousFeeBoundedAll();
+        }
     }
-}
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
