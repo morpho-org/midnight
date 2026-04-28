@@ -4,7 +4,7 @@ pragma solidity 0.8.34;
 
 import {Obligation} from "../interfaces/IMidnight.sol";
 import {Midnight} from "../Midnight.sol";
-import {ICallbacks} from "../interfaces/ICallbacks.sol";
+import {ISellCallback} from "../interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 struct CollateralData {
@@ -12,7 +12,7 @@ struct CollateralData {
     uint256 amount;
 }
 
-contract BorrowerCallback is ICallbacks {
+contract BorrowerCallback is ISellCallback {
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -32,21 +32,5 @@ contract BorrowerCallback is ICallbacks {
                 .supplyCollateral(obligation, collateralData[i].collateralIndex, collateralData[i].amount, seller);
         }
         return CALLBACK_SUCCESS;
-    }
-
-    function onBuy(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        revert("not implemented");
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
-        revert("not implemented");
-    }
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external pure {
-        revert("not implemented");
     }
 }

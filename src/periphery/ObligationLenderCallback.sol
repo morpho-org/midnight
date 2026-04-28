@@ -4,11 +4,11 @@ pragma solidity 0.8.34;
 
 import {Obligation} from "../interfaces/IMidnight.sol";
 import {Midnight} from "../Midnight.sol";
-import {ICallbacks} from "../interfaces/ICallbacks.sol";
+import {IBuyCallback} from "../interfaces/ICallbacks.sol";
 import {IERC20} from "./IERC20.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
-contract ObligationLenderCallback is ICallbacks {
+contract ObligationLenderCallback is IBuyCallback {
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -31,21 +31,5 @@ contract ObligationLenderCallback is ICallbacks {
         Midnight(MIDNIGHT).withdraw(otherObligation, buyerAssets, buyer, address(this));
         IERC20(obligation.loanToken).approve(MIDNIGHT, buyerAssets);
         return CALLBACK_SUCCESS;
-    }
-
-    function onSell(bytes32, Obligation memory, address, uint256, uint256, bytes memory)
-        external
-        pure
-        returns (bytes32)
-    {
-        revert("not implemented");
-    }
-
-    function onLiquidate(bytes32, Obligation memory, uint256, uint256, uint256, address, bytes memory) external pure {
-        revert("not implemented");
-    }
-
-    function onRepay(bytes32, Obligation memory, uint256, address, bytes memory) external pure {
-        revert("not implemented");
     }
 }

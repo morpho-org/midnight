@@ -132,7 +132,7 @@ contract VaultLenderCallbackTest is BaseTest {
             abi.encode(address(vault)),
             address(0),
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
@@ -147,24 +147,6 @@ contract VaultLenderCallbackTest is BaseTest {
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnSellReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        vaultLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnLiquidateReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        vaultLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
-    }
-
-    function testOnRepayReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        vaultLenderCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }
 
@@ -247,7 +229,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         // Borrower repays to create withdrawable funds.
         deal(address(loanToken), borrower, buyerAssets);
         vm.prank(borrower);
-        midnight.repay(obligation2, buyerAssets, borrower, hex"");
+        midnight.repay(obligation2, buyerAssets, borrower, address(0), hex"");
 
         // Authorize callback to withdraw on behalf of lender.
         vm.prank(lender);
@@ -303,7 +285,7 @@ contract ObligationLenderCallbackTest is BaseTest {
             abi.encode(address(uint160(uint256(id2)))),
             address(0),
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
@@ -318,23 +300,5 @@ contract ObligationLenderCallbackTest is BaseTest {
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnSellReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        obligationLenderCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnLiquidateReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        obligationLenderCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
-    }
-
-    function testOnRepayReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        obligationLenderCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }

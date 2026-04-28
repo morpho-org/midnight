@@ -9,6 +9,7 @@ methods {
 
     function _.price() external => NONDET;
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;

@@ -171,7 +171,7 @@ contract BorrowerCallbackTest is BaseTest {
             abi.encode(collateralData),
             borrower,
             lenderOffer,
-            sig([lenderOffer]),
+            ratifierData([lenderOffer]),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -184,23 +184,5 @@ contract BorrowerCallbackTest is BaseTest {
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnBuyReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        borrowerCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
-    }
-
-    function testOnLiquidateReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        borrowerCallback.onLiquidate(bytes32(0), ob, 0, 0, 0, address(0), "");
-    }
-
-    function testOnRepayReverts() public {
-        Obligation memory ob;
-        vm.expectRevert("not implemented");
-        borrowerCallback.onRepay(bytes32(0), ob, 0, address(0), "");
     }
 }
