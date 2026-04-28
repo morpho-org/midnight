@@ -56,11 +56,9 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = to_mathint(creditOf(id, buyer)) - to_mathint(postUpdateCredit);
-    mathint pendingFeeDelta = to_mathint(pendingFee(id, buyer)) - to_mathint(postUpdatePendingFee);
+    mathint creditDelta = creditOf(id, buyer) - postUpdateCredit;
 
-    //assert pendingFeeDelta == (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
-    assert pendingFee(id, buyer) <= postUpdatePendingFee + (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    assert pendingFee(id, buyer) == postUpdatePendingFee + (creditDelta * contFee * timeToMaturity) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(PendingFee * creditDelta / postUpdateCredit).
@@ -84,12 +82,11 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
 
     require creditAfter > 0 || pendingFeeAfter == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
-    mathint creditDelta = to_mathint(postUpdateCredit) - to_mathint(creditAfter);
-    mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFeeAfter);
+    mathint creditDelta = postUpdateCredit - creditAfter;
 
     // When postUpdateCredit == 0: noRemainingContinuousFeeWithoutCredit gives postUpdatePendingFee == 0; credit is non-increasing for a seller, therefore creditAfter == 0;
     // noRemainingContinuousFeeWithoutCredit gives pendingFeeAfter == 0; hence pendingFeeDelta == 0.
-    assert postUpdateCredit == 0 ? pendingFeeDelta == 0 : pendingFeeDelta == (to_mathint(postUpdatePendingFee) * creditDelta + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
+    assert postUpdateCredit == 0 ? postUpdatePendingFee == pendingFeeAfter : postUpdatePendingFee == pendingFeeAfter + (postUpdatePendingFee * creditDelta + postUpdateCredit - 1) / postUpdateCredit;
 }
 
 // When credit decreases via withdraw, pendingFee decreases by ceil(pendingFee * units / postUpdateCredit).
@@ -104,9 +101,8 @@ rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Obligation obli
 
     require id == lastId, "id should be derived from obligation";
 
-    mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFee(id, onBehalf));
-
-    assert postUpdateCredit > 0 => pendingFeeDelta == (to_mathint(postUpdatePendingFee) * to_mathint(units) + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
+    // When postUpdateCredit == 0, pendingFee(id, onBehalf) is unchanged on withdraw.
+    assert postUpdateCredit == 0 ? pendingFee(id, onBehalf) == postUpdatePendingFee : pendingFee(id, onBehalf) == postUpdatePendingFee - (postUpdatePendingFee * units + postUpdateCredit - 1) / postUpdateCredit;
 }
 
 // take() increases continuousFeeCredit by exactly the sum of the accrued fees of the buyer and seller.
