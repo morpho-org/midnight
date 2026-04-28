@@ -6,6 +6,9 @@ using Havoc as callback;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    // Helper used only to force a full storage havoc inside summaries.
+    function _.havocAll() external => HAVOC_ALL;
+
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     // Tracks successful buy callbacks as allowed explicit payers for `take`.
@@ -44,8 +47,8 @@ methods {
     // Proof validation is irrelevant once the offer fields are symbolic inputs.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
-    // Helper used only to force a full storage havoc inside summaries.
-    function _.havocAll() external => HAVOC_ALL;
+    // Offer hashing only gates take(); it does not affect explicit-payer provenance.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 ghost address topLevelCaller;
