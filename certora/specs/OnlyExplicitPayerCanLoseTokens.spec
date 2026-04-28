@@ -10,29 +10,37 @@ methods {
 
     // Tracks successful buy callbacks as allowed explicit payers for `take`.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
+
     // Proves liquidate callbacks only occur on `liquidate` and can then pay the repayment.
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onLiquidateSummary(calledContract) expect(bytes32);
+
     // Proves repay callbacks only occur on `repay` and can then pay the repayment.
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onRepaySummary(calledContract) expect(bytes32);
+
     // Proves flash-loan callbacks only occur on `flashLoan` and can then repay the loan.
     function _.onFlashLoan(address, uint256, bytes) external => onFlashLoanSummary(calledContract) expect(bytes32);
 
     // Checks every token pull against the current explicit-payer allowlist.
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
-    
+
     // Models outbound token sends as arbitrary external effects while preserving prover ghosts.
     function _.transfer(address dest, uint256 value) external => genericExternalCallBool() expect(bool);
+
     // Ratification can affect state but not the already-computed payer allowlist.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => genericExternalCallBytes32() expect(bytes32);
+
     // Sell callbacks happen after `take` token pulls, so they cannot authorize a payer.
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => genericExternalCallBytes32() expect(bytes32);
-    
+
     // Oracle prices are irrelevant to payer provenance.
     function _.price() external => NONDET;
+
     // Arithmetic helpers are abstracted because exact amounts are irrelevant here.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+
     // Arithmetic helpers are abstracted because exact amounts are irrelevant here.
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+
     // Proof validation is irrelevant once the offer fields are symbolic inputs.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
