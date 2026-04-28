@@ -149,4 +149,3 @@ rule setIsAuthorizedIsolation(env e, address onBehalf, address authorized, bool 
     setIsAuthorized(e, onBehalf, authorized, val);
     assert isAuthorized(otherUser, otherAuthorized) == before;
 }
-
