@@ -30,7 +30,7 @@ methods {
 
 /// HELPERS ///
 
-definition FEE_STEP() returns uint256 = 1000000000000;
+definition FEE_STEP() returns uint256 = 10 ^ 12;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -150,7 +150,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 }
 
 /// FEE SETTER: ACCESS CONTROL ///
-/// Trading fee access control is covered in FeeBoundaries.spec.
+/// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
 rule onlyFeeSetterCanChangeObligationContinuousFee(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require obligationCreated(id);
