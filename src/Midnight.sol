@@ -122,6 +122,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
+/// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
