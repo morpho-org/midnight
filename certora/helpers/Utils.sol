@@ -30,6 +30,8 @@ contract Utils {
 
     function callbackSuccess() external pure returns (bytes32) {
         return CALLBACK_SUCCESS;
+    }
+    
     function emptyOffer() external pure returns (Offer memory) {
         Offer memory offer;
         return offer;
