@@ -23,6 +23,10 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
+    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
@@ -41,18 +45,21 @@ function summaryToId(Midnight.Obligation obligation) returns bytes32 {
 
 // Axioms proven in MulDiv.spec (mulDivDownRoundsDown, mulDivDownTightBound).
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b <= max_uint256 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b <= max_uint256 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
 
 // Axioms proven in MulDiv.spec (mulDivUpRoundsUp, mulDivUpTightBound).
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b + d - 1 <= max_uint256 => ghostMulDivUp(a, b, d) * d >= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b + d - 1 <= max_uint256 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
 }
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0) {
+        revert();
+    }
+    if (y != 0 && x > max_uint256 / y) {
         revert();
     }
     return ghostMulDivDown(x, y, d);
@@ -60,6 +67,12 @@ function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0) {
+        revert();
+    }
+    if (y != 0 && x > max_uint256 / y) {
+        revert();
+    }
+    if (require_uint256(x * y) > max_uint256 - (d - 1)) {
         revert();
     }
     return ghostMulDivUp(x, y, d);
