@@ -70,6 +70,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
 /// any account that has been authorized.
 /// @dev In particular, authorized accounts can authorize other accounts on behalf of the user.
+/// @dev When authorizing an account, one should consider:
+/// - The functions that the account can call, and on which contract. At least Midnight's functions should be
+/// considered, but other contracts might re-use Midnight's authorization mapping too (e.g ratifiers).
+/// - The calls that the account can receive. At least Midnight's callbacks should be considered (with
+/// `CALLBACK_SUCCESS` return value).
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
@@ -653,7 +658,7 @@ contract Midnight is IMidnight {
         emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
-    /// @dev Authorized addresses can authorize other addresses to act on their behalf so it should be used carefully.
+    /// @dev See Authorization section above.
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
