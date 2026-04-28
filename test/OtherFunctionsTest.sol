@@ -364,6 +364,16 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.rcfThreshold = 0;
     }
 
+    function testMaturityTooFar() public {
+        Obligation memory longObligation;
+        longObligation.loanToken = address(loanToken);
+        longObligation.maturity = block.timestamp + 100 * 365 days + 1;
+        longObligation.collateralParams = obligation.collateralParams;
+
+        vm.expectRevert(IMidnight.MaturityTooFar.selector);
+        midnight.touchObligation(longObligation);
+    }
+
     function testZeroCollaterals() public {
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);

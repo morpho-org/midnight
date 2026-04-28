@@ -1626,15 +1626,6 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testMaturityTooFar() public {
-        Obligation memory longObligation;
-        longObligation.loanToken = address(loanToken);
-        longObligation.maturity = block.timestamp + 100 * 365 days + 1;
-        longObligation.collateralParams = obligation.collateralParams;
-
-        vm.expectRevert(IMidnight.MaturityTooFar.selector);
-        midnight.touchObligation(longObligation);
-    }
 }
 
 contract InvalidBuyCallback is IBuyCallback {
