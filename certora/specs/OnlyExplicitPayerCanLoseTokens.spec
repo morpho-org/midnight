@@ -95,7 +95,7 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
 
-    assert !badPullSeen, "tokens pulled from someone other than msg.sender, successful buyerCallback, or ratified maker";
+    assert !badPullSeen;
 }
 
 /// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender
@@ -111,5 +111,5 @@ rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filte
 
     f(e, args);
 
-    assert !badPullSeen, "tokens pulled from someone other than msg.sender";
+    assert !badPullSeen;
 }
