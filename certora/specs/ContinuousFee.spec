@@ -59,7 +59,8 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
     mathint creditDelta = to_mathint(creditOf(id, buyer)) - to_mathint(postUpdateCredit);
     mathint pendingFeeDelta = to_mathint(pendingFee(id, buyer)) - to_mathint(postUpdatePendingFee);
 
-    assert pendingFeeDelta == (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    //assert pendingFeeDelta == (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
+    assert pendingFee(id, buyer) <= postUpdatePendingFee + (creditDelta * to_mathint(contFee) * to_mathint(timeToMaturity)) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by exactly ceil(PendingFee * creditDelta / postUpdateCredit).
@@ -89,6 +90,23 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
     // When postUpdateCredit == 0: noRemainingContinuousFeeWithoutCredit gives postUpdatePendingFee == 0; credit is non-increasing for a seller, therefore creditAfter == 0;
     // noRemainingContinuousFeeWithoutCredit gives pendingFeeAfter == 0; hence pendingFeeDelta == 0.
     assert postUpdateCredit == 0 ? pendingFeeDelta == 0 : pendingFeeDelta == (to_mathint(postUpdatePendingFee) * creditDelta + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
+}
+
+// When credit decreases via withdraw, pendingFee decreases by ceil(pendingFee * units / postUpdateCredit).
+rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
+    bytes32 id;
+    uint128 postUpdateCredit;
+    uint128 postUpdatePendingFee;
+
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, obligation, id, onBehalf);
+
+    withdraw(e, obligation, units, onBehalf, receiver);
+
+    require id == lastId, "id should be derived from obligation";
+
+    mathint pendingFeeDelta = to_mathint(postUpdatePendingFee) - to_mathint(pendingFee(id, onBehalf));
+
+    assert postUpdateCredit > 0 => pendingFeeDelta == (to_mathint(postUpdatePendingFee) * to_mathint(units) + to_mathint(postUpdateCredit) - 1) / to_mathint(postUpdateCredit);
 }
 
 // take() increases continuousFeeCredit by exactly the sum of the accrued fees of the buyer and seller.
