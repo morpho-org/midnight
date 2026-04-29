@@ -57,8 +57,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly healthy after a liquidation.
-/// @dev The RCF is deactivated for small collateral amount, essentially to avoid liquidations that are too small
-/// (compared to the gas cost). More precisely, it is deactivated if the liquidation could leave a collateral with a
+/// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are too small
+/// compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral with a
 /// value that would not be enough to repay rcfThreshold units. Which means:
 ///       minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///   <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice)
