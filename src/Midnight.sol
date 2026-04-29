@@ -47,6 +47,24 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// the pending fee of existing lenders is not updated (=> their fee is fixed).
 /// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
 ///
+/// LIQUIDATIONS
+/// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
+/// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
+/// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
+/// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
+/// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
+/// liquidation from putting the borrower back into health. Which means:
+///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
+///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
+/// (rounded up to avoid consecutive max liquidations, so the position could be slightly healthy after a liquidation).
+/// @dev The RCF is deactivated for small collateral amount, essentially to avoid liquidations that are too small
+/// (compared to the gas cost). More precisely, it is deactivated if the liquidation could leave a collateral with a
+/// value that would not be enough to repay rcfThreshold units. Which means:
+///   <=> minNewCollateral * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif < rcfThreshold
+///   <=> (collateral - maxRepaidUnits * lif * ORACLE_PRICE_SCALE / (WAD * liquidatedCollatPrice))
+///         * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif < rcfThreshold
+///   <=> collateral * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif - maxRepaidUnits < rcfThreshold
+///
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
 /// @dev At each lender's next interaction, their credit is slashed proportionally.
@@ -496,14 +514,8 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(collateralToken, receiver, assets);
     }
 
+    /// @dev See LIQUIDATIONS section for more details.
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
-    /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
-    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
-    /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
-    /// @dev Recovery close factor means that debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is
-    /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
-    /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
-    /// TIME_TO_MAX_LIF.
     /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
@@ -584,8 +596,6 @@ contract Midnight is IMidnight {
 
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collateralParams[collateralIndex].lltv;
-                // Rounded up to avoid consecutive max liquidations.
-                // Acknowledged that the position could be slightly healthy after a liquidation.
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
