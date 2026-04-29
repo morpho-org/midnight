@@ -86,13 +86,14 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev In particular, it does not prevent the user from exiting the obligation even when the entry gate is reverting.
 /// @dev The liquidator gate can prevent the user from liquidating borrowers in the obligation (and realizing bad debt).
 ///
-/// TOKEN REQUIREMENTS
+/// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
 /// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`. In
 /// particular, it should not revert because a transfer is no-op.
 /// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
 /// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
 /// - Midnight must send/receive exactly the requested amount on transfers.
+/// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`  when the
