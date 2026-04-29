@@ -13,18 +13,6 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
 
-    // Oracle prices only affect unrelated collateral/liquidation paths in the parametric access-control rules.
-    function _.price() external => NONDET;
-
-    // Exact healthiness math is irrelevant to role and fee-admin state changes.
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Ratifier behavior only gates unrelated `take` executions and is assumed non-reentrant here.
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
-
-    // Code storage details do not affect the role or fee state checked by this spec.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
-
     // Tick pricing is only used in unrelated offer-taking arithmetic.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
@@ -35,10 +23,10 @@ methods {
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
     // Exact rounded-down arithmetic is irrelevant outside the direct fee-claim/accounting checks.
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    //function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Exact rounded-up arithmetic is irrelevant outside the direct fee-claim/accounting checks.
-    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    //function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
