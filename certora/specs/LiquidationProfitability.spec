@@ -8,6 +8,10 @@ methods {
     function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
@@ -24,11 +28,8 @@ methods {
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-
-    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 }
+
 
 /// SUMMARIES ///
 
@@ -42,41 +43,32 @@ persistent ghost summaryPrice(address) returns uint256;
 
 // Axioms proven in MulDiv.spec (mulDivDownTightBound, mulDivDownRoundsDown).
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b <= max_uint256 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b <= max_uint256 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
 }
 
 // Axioms proven in MulDiv.spec (mulDivUpUpperBound, mulDivUpRoundsUp).
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b + d - 1 <= max_uint256 => ghostMulDivUp(a, b, d) * d < a * b + d;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && a * b + d - 1 <= max_uint256 => ghostMulDivUp(a, b, d) * d >= a * b;
-}
-
-function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0) {
-        revert();
-    }
-    if (y != 0 && x > max_uint256 / y) {
-        revert();
-    }
-    return ghostMulDivDown(x, y, d);
-}
-
-function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0) {
-        revert();
-    }
-    if (y != 0 && x > max_uint256 / y) {
-        revert();
-    }
-    if (require_uint256(x * y) > max_uint256 - (d - 1)) {
-        revert();
-    }
-    return ghostMulDivUp(x, y, d);
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d < a * b + d;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
 }
 
 function summaryToId(Midnight.Obligation obligation) returns bytes32 {
     return Utils.hashObligation(obligation);
+}
+
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    return ghostMulDivDown(a, b, d);
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    return ghostMulDivUp(a, b, d);
 }
 
 /// LIF CHARACTERIZATION ///
@@ -116,7 +108,7 @@ rule liquidationLifSeizedAssets(env e, Midnight.Obligation obligation, uint256 c
 
     mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
 
-    // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits).
+    // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits) at the oracle price.
     assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 
     // lif == maxLif when borrower is unhealthy or >= 15 min post-maturity: full liquidation incentive factor applies.
