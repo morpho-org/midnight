@@ -139,7 +139,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// MISC
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
-/// @dev No-ops are allowed.
+/// @dev No-ops are allowed. In particular, Midnight can call the callback of "filled" (consumed=max) offers through a
+/// no-op take.
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
