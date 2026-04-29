@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
@@ -10,18 +12,16 @@ methods {
 
     // Summarize internals irrelevant to continuous fee tracking.
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
-
-    // Over-approximate view functions by summarising to NONDET.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => NONDET;
 
     // summaries over-approximating the behavior of transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
-    // This spec assumes no reentrancy: callbacks and token transfers are assumed to not re-enter Midnight, since they are summarised as HAVOC_ECF by default.
+    // Assume no reentrancy: callbacks and transfers do not re-enter Midnight.
 }
 
 /// HELPERS ///
