@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 
@@ -24,5 +25,10 @@ contract Utils {
 
     function msb(uint128 bitmap) external pure returns (uint256) {
         return UtilsLib.msb(bitmap);
+    }
+
+    function emptyOffer() external pure returns (Offer memory) {
+        Offer memory offer;
+        return offer;
     }
 }

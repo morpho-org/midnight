@@ -29,7 +29,7 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
@@ -220,7 +220,7 @@ abstract contract BaseTest is Test {
     }
 
     function ratifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
+        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier, 0), uint256(0));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -230,32 +230,70 @@ abstract contract BaseTest is Test {
     // assumes the offer is the first one!
     function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](1);
-        _path[0] = keccak256(abi.encode(offers[1]));
+        _path[0] = UtilsLib.hashOffer(offers[1]);
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the first one
+    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[1]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the second one
+    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[0]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the third one
+    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[3]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the fourth one
+    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[2]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
         return _path;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offer));
+        return UtilsLib.hashOffer(offer);
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offers[0]));
+        return UtilsLib.hashOffer(offers[0]);
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
+        return UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+    }
+
+    function root(Offer[4] memory offers) internal pure returns (bytes32) {
+        bytes32 left = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        bytes32 right = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return UtilsLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
     }
 
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract)
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
         internal
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
+        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
@@ -264,12 +302,17 @@ abstract contract BaseTest is Test {
 
     function ratifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0), uint256(0));
     }
 
     function ratifierData(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1), uint256(1));
+    }
+
+    function ratifierData(Offer[4] memory offers) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2), uint256(2));
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {

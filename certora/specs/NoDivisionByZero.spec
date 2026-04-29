@@ -22,6 +22,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
     // Those functions are checked manually to not cause a division by zero.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
