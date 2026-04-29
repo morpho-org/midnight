@@ -1625,7 +1625,6 @@ contract TakeTest is BaseTest {
             proof([borrowerOffer])
         );
     }
-
 }
 
 contract InvalidBuyCallback is IBuyCallback {
