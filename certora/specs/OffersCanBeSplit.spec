@@ -50,9 +50,11 @@ methods {
 
     // Ratifier result is identical across the full and split takes.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => CVL_callbackSuccess() expect(bytes32);
+
     // Token transfers: NONDET removes external call complexity.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
     // Buy/sell callbacks are disabled in the executability rule.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
