@@ -122,12 +122,18 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
+/// @dev `initialChainId` is captured at construction and used in place of `block.chainid` when computing obligation
+/// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
+/// hard-fork there can be some obligation id clashes.
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
+
+    /// IMMUTABLES ///
+
+    uint256 public immutable INITIAL_CHAIN_ID;
 
     /// STORAGE ///
 
@@ -147,6 +153,7 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
+        INITIAL_CHAIN_ID = block.chainid;
         emit EventsLib.Constructor(roleSetter);
     }
 
@@ -703,7 +710,7 @@ contract Midnight is IMidnight {
             _obligationState.tradingFee5 = _defaultTradingFees[5];
             _obligationState.tradingFee6 = _defaultTradingFees[6];
             _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
-            IdLib.storeInCode(obligation);
+            IdLib.storeInCode(obligation, INITIAL_CHAIN_ID);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -788,7 +795,7 @@ contract Midnight is IMidnight {
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {
-        return IdLib.toId(obligation, block.chainid, address(this));
+        return IdLib.toId(obligation, INITIAL_CHAIN_ID, address(this));
     }
 
     /// @dev Reverts if the id is not a valid id of a touched obligation.
