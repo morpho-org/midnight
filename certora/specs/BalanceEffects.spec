@@ -18,6 +18,7 @@ methods {
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -109,17 +110,57 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
+/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
+/// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
+/// Buyer's debt is non-increasing and can decrease by at most take units.
+rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address buyer = offer.buy ? offer.maker : taker;
+    uint256 buyerDebtBefore = debtOf(id, buyer);
+    uint128 buyerUpdatedCreditBefore;
+    buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, buyer);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
+    assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
+    assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
+    assert debtOf(id, buyer) <= buyerDebtBefore;
+    assert debtOf(id, buyer) >= buyerDebtBefore - units;
+}
+
+/// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
+/// Seller's debt is non-decreasing, and can increase by at most take units.
+/// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
+rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address seller = offer.buy ? taker : offer.maker;
+    uint256 sellerDebtBefore = debtOf(id, seller);
+    uint128 sellerUpdatedCreditBefore;
+    sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, seller);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
+    assert debtOf(id, seller) >= sellerDebtBefore;
+    assert debtOf(id, seller) <= sellerDebtBefore + units;
+    assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
+    assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
+}
+
 /// REPAY ///
 
 /// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
-rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data, bytes32 anyId, address anyUser) {
+rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, onBehalf);
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    repay(e, obligation, units, onBehalf, data);
+    repay(e, obligation, units, onBehalf, callback, data);
 
     assert debtOf(id, onBehalf) == debtBefore - units;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -130,7 +171,7 @@ rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address 
 
 /// Liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
-rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser) {
+rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
     uint256 debtBefore = debtOf(id, borrower);
@@ -139,7 +180,7 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -154,8 +195,8 @@ filtered {
     f -> !f.isView
         && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
-        && f.selector != sig:repay(Midnight.Obligation, uint256, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Obligation, address).selector
 } {
     uint256 creditBefore = creditOf(id, user);
@@ -201,14 +242,14 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, 
 
 /// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
 /// and only changes position[id][borrower].collateral[collateralIndex].
-rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, obligation);
 
     uint256 collateralBefore = collateral(id, borrower, collateralIndex);
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    seizedResult, _ = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+    seizedResult, _ = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
@@ -222,7 +263,7 @@ filtered {
     f -> !f.isView
         && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
     uint256 collateralBefore = collateral(id, user, colIdx);
     f(e, args);

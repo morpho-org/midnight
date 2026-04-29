@@ -48,3 +48,14 @@ rule mulDivInverseUpDown(uint256 a, uint256 b, uint256 d) {
 rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv, uint256 WAD) {
     assert lltv * lif <= WAD * WAD => mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif);
 }
+
+rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
+    assert a <= d => mulDivDown(a, b, d) <= b;
+    assert a <= d => mulDivUp(a, b, d) <= b;
+    assert b <= d => mulDivDown(a, b, d) <= a;
+    assert b <= d => mulDivUp(a, b, d) <= a;
+}
+
+rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
+    assert mulDivUp(a, b, d) * d <= a * b + d - 1;
+}
