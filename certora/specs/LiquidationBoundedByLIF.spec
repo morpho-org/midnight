@@ -31,7 +31,6 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;

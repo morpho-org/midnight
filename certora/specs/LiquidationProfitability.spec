@@ -30,7 +30,6 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
-
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;
