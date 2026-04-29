@@ -103,9 +103,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
-/// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
-/// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
-/// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
+/// @dev If a token pulled by Midnight reverts or returns false on `transferFrom` despite balances and approvals being
+/// right, `take`, `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull
+/// that token.
+/// @dev If a token sent by Midnight reverts or returns false on `transfer` despite balances being right, `withdraw`,
 /// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
 /// that token.
 /// @dev If a callback reverts or returns something other than `CALLBACK_SUCCESS`, `take`, `repay`, `liquidate`, and
