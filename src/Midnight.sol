@@ -124,8 +124,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
 /// @dev Note two things about LLTV=WAD:
-/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt (except if liquidations are
-/// gated). In particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
+/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
 ///
