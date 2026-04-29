@@ -147,7 +147,7 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        emit EventsLib.Constructor(roleSetter);
+        emit EventsLib.Constructor(msg.sender);
     }
 
     /// MULTICALL ///
