@@ -45,7 +45,7 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes calldata data) external returns (bytes32) {
+    function onFlashLoan(address token, uint256 amount, address, bytes calldata data) external returns (bytes32) {
         startFlashloan(token, amount);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();

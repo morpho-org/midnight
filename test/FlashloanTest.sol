@@ -36,9 +36,13 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(address(loanToken), amount, address(this), data);
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes memory data) external returns (bytes32) {
+    function onFlashLoan(address token, uint256 amount, address initiator, bytes memory data)
+        external
+        returns (bytes32)
+    {
         assertEq(token, address(loanToken), "wrong token");
         assertEq(amount, amountStored, "wrong amount");
+        assertEq(initiator, address(this), "wrong initiator");
         assertEq(data, dataStored, "wrong data");
         if (discardToken) SafeTransferLib.safeTransfer(token, address(0xdead), amount);
         return CALLBACK_SUCCESS;

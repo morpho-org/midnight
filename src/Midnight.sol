@@ -666,7 +666,7 @@ contract Midnight is IMidnight {
         emit EventsLib.FlashLoan(msg.sender, token, assets, callback);
         SafeTransferLib.safeTransfer(token, callback, assets);
         require(
-            IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(token, assets, msg.sender, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         SafeTransferLib.safeTransferFrom(token, callback, address(this), assets);
