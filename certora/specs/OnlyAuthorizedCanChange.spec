@@ -15,7 +15,7 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
     // Summarize oracle calls.
     function _.price() external => NONDET;
