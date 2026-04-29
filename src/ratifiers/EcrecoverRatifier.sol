@@ -7,6 +7,8 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 
+/// @dev If `block.chainid` changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
+/// no longer valid.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
