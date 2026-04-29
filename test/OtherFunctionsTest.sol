@@ -290,7 +290,7 @@ contract OtherFunctionsTest is BaseTest {
         Obligation memory otherObligation = validObligation(otherObligation);
         bytes32 otherId = midnight.touchObligation(otherObligation);
         Obligation memory otherRoundTrip = midnight.toObligation(otherId);
-        assertEq(keccak256(abi.encode(roundTrip)), keccak256(abi.encode(_obligation)), "stored obligation lost");
+        assertEq(keccak256(abi.encode(otherRoundTrip)), keccak256(abi.encode(otherObligation)), "stored obligation lost");
     }
 
     function testToObligationRevertsIfNotCreated(bytes32 _id) public {
