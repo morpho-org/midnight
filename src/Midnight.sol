@@ -137,6 +137,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
+/// @dev position.creditOf is not up to date. One must use updatePositionView to get the up to date credit.
+/// @dev obligationState.tradingFee0-6 are zero before the obligation is created, and might get updated with the default
+/// fees in touchObligation.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed.
@@ -276,7 +279,8 @@ contract Midnight is IMidnight {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    /// @dev The taker might not get the price they expected if the trading fee was just changed.
+    /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
+    /// to perform atomic price checks.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
