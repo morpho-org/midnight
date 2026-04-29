@@ -122,7 +122,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev `initialChainId` is captured at construction and used in place of `block.chainid` when computing obligation
+/// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
 /// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
 /// hard-fork there can be some obligation id clashes.
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
