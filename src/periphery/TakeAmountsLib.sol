@@ -36,7 +36,7 @@ library TakeAmountsLib {
         uint256 tradingFee =
             IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
-        return
-            offer.buy ? targetSellerAssets.mulDivUp(WAD, sellerPrice) : targetSellerAssets.mulDivDown(WAD, sellerPrice);
+        if (offer.buy) return targetSellerAssets.mulDivUp(WAD, sellerPrice);
+        return targetSellerAssets == 0 ? 0 : (targetSellerAssets - 1).mulDivDown(WAD, sellerPrice) + 1;
     }
 }

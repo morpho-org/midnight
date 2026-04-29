@@ -177,6 +177,47 @@ contract TakeAmountsTest is BaseTest {
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
 
+    // Optimality: returned units is the best valid mapping for the target.
+    // Buyer wants the largest units (more units for the same buyer assets paid).
+    // Seller wants the smallest units (same seller assets received for fewer units provided).
+
+    function testBuyerAssetsToUnitsIsLargest(
+        uint256 targetBuyerAssets,
+        uint256 tick,
+        uint256 tradingFee0,
+        uint256 tradingFee1
+    ) public {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
+        tick = bound(tick, 1, _maxTick(tradingFee));
+
+        offer.tick = tick;
+        uint256 buyerPrice = TickLib.tickToPrice(tick) + tradingFee;
+        uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
+
+        assertEq(units.mulDivUp(buyerPrice, WAD), targetBuyerAssets, "forward not target");
+        assertGt((units + 1).mulDivUp(buyerPrice, WAD), targetBuyerAssets, "not largest units");
+    }
+
+    function testSellerAssetsToUnitsIsSmallest(
+        uint256 targetSellerAssets,
+        uint256 tick,
+        uint256 tradingFee0,
+        uint256 tradingFee1
+    ) public {
+        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
+        tick = bound(tick, 1, _maxTick(tradingFee));
+
+        offer.tick = tick;
+        uint256 sellerPrice = TickLib.tickToPrice(tick);
+        uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
+
+        assertEq(units.mulDivUp(sellerPrice, WAD), targetSellerAssets, "forward not target");
+        assertGt(units, 0, "units zero");
+        assertLt((units - 1).mulDivUp(sellerPrice, WAD), targetSellerAssets, "not smallest units");
+    }
+
     // buyerPrice >= WAD: not all buyerAssets are reachable, but snapped values are.
 
     function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 tradingFee0, uint256 tradingFee1)
