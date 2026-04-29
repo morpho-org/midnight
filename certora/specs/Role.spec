@@ -147,8 +147,8 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 /// FEE SETTER: ACCESS CONTROL ///
 /// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
-rule onlyFeeSetterCanChangeObligationContinuousFee(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    // Per-obligation continuous fees can only be changed for existing obligations.
+/// Once an obligation is created, only the fee setter can modify its continuous fees.
+rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require obligationCreated(id), "obligation must exist";
     uint32 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
