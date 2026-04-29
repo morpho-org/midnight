@@ -258,7 +258,7 @@ contract Midnight is IMidnight {
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev Sell offers with price < trading fee are unfillable.
+    /// @dev Buy offers with price < trading fee are un-fillable.
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
