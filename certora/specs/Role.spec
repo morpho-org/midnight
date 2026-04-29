@@ -13,13 +13,9 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
 
-    // Tick pricing is only used in unrelated offer-taking arithmetic.
+    // Those functions are over-approximated, except for the reverting behavior. This is still sound as they are only used inside `take` but we don't look at the reverting behavior of `take` in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-
-    // Offer hashing only gates unrelated `take` executions; it does not affect role or fee-admin state.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-
-    // Merkle proof validity only gates unrelated `take` executions.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.
