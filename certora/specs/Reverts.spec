@@ -376,9 +376,9 @@ filtered {
 
 /// CALLBACK REVERT PROPAGATION ///
 
-/// If the callback reverts, callback-enabled repay (non-zero callback) reverts.
-rule callbackRevertCausesRepayRevert(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
-    require forceCallbackRevert, "callback reverts";
+/// If the callback reverts or returns something other than CALLBACK_SUCCESS, callback-enabled repay (non-zero callback) reverts.
+rule callbackRevertOrBadReturnCausesRepayRevert(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
+    require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require callback != 0, "callback-enabled repay";
 
     repay@withrevert(e, obligation, units, onBehalf, callback, data);
@@ -386,9 +386,9 @@ rule callbackRevertCausesRepayRevert(env e, Midnight.Obligation obligation, uint
     assert lastReverted;
 }
 
-/// If the callback reverts, callback-enabled liquidate (non-zero callback) reverts.
-rule callbackRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    require forceCallbackRevert, "callback reverts";
+/// If the callback reverts or returns something other than CALLBACK_SUCCESS, callback-enabled liquidate (non-zero callback) reverts.
+rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require callback != 0, "callback-enabled liquidate";
 
     liquidate@withrevert(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
@@ -396,9 +396,9 @@ rule callbackRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, 
     assert lastReverted;
 }
 
-/// If the callback reverts, flashLoan reverts.
-rule callbackRevertCausesFlashLoanRevert(env e, address token, uint256 assets, address callback, bytes data) {
-    require forceCallbackRevert, "callback reverts";
+/// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts.
+rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address token, uint256 assets, address callback, bytes data) {
+    require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
 
     flashLoan@withrevert(e, token, assets, callback, data);
 
