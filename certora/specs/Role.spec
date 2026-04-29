@@ -13,20 +13,11 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
 
-    // Tick pricing is only used in unrelated offer-taking arithmetic.
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-
     // Offer hashing only gates unrelated `take` executions; it does not affect role or fee-admin state.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     // Merkle proof validity only gates unrelated `take` executions.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-
-    // Exact rounded-down arithmetic is irrelevant outside the direct fee-claim/accounting checks.
-    //function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-
-    // Exact rounded-up arithmetic is irrelevant outside the direct fee-claim/accounting checks.
-    //function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
