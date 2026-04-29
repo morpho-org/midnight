@@ -73,8 +73,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When authorizing an account, one should consider:
 /// - The functions that the account can call, and on which contract. At least Midnight's functions should be
 /// considered, but other contracts might re-use Midnight's authorization mapping too (e.g ratifiers).
-/// - The calls that the account can receive. At least Midnight's callbacks should be considered (with
-/// `CALLBACK_SUCCESS` return value).
+/// - Whether the account can return `CALLBACK_SUCCESS` when its `onRatify` function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
