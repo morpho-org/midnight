@@ -13,6 +13,9 @@ methods {
     // Summarize toId: deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
+    // Offer hashing only feeds the Merkle gate; this rule asserts asset arithmetic on successful split paths.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+
     // Merkle proof: irrelevant to asset computation, removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
