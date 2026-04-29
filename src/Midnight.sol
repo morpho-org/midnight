@@ -60,10 +60,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The RCF is deactivated for small collateral amount, essentially to avoid liquidations that are too small
 /// (compared to the gas cost). More precisely, it is deactivated if the liquidation could leave a collateral with a
 /// value that would not be enough to repay rcfThreshold units. Which means:
-///   <=> minNewCollateral * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif < rcfThreshold
-///   <=> (collateral - maxRepaidUnits * lif * ORACLE_PRICE_SCALE / (WAD * liquidatedCollatPrice))
-///         * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif < rcfThreshold
-///   <=> collateral * liquidatedCollatPrice / ORACLE_PRICE_SCALE * WAD / lif - maxRepaidUnits < rcfThreshold
+///       minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
+///   <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice)
+///         * liquidatedCollatPrice / LIF < rcfThreshold
+///   <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
 ///
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
