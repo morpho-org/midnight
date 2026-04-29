@@ -13,6 +13,9 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
 
+    // Tick pricing is only used in unrelated offer-taking arithmetic.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+
     // Offer hashing only gates unrelated `take` executions; it does not affect role or fee-admin state.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
