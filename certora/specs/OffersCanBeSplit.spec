@@ -29,7 +29,7 @@ methods {
 
     // Offer hashing only feeds the Merkle gate; this rule compares position state after successful split paths.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    
+
     // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
