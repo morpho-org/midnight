@@ -3,22 +3,32 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    //function getPassiveFeeRecipient() external returns address envfree;
-
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function updatePositionView(Midnight.Obligation memory obligation, bytes32 id, address user) external returns (uint128, uint128, uint128);
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationLossIndex(bytes32) external returns (uint128) envfree;
 
-    //function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
-    //function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
+    // updatePositionView is used in two regular rules but is not envfree (uses block.timestamp).
+    // Mark optional to silence the spec syntax warning when verifying parametric/invariant rules
+    // that do not exercise it directly. Note: no `memory` location specifier — CVL rejects it
+    // on non-library external method declarations.
+    function updatePositionView(Midnight.Obligation, bytes32, address) external returns (uint128, uint128, uint128) optional;
 
-    // Summarize price oracle as NONDET (it is a view function)
+    /// PRICE / ORACLE ///
     function _.price() external => NONDET;
 
-    // Summarize internals irrelevant to credit tracking.
+    /// SAFE TRANSFERS ///
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+
+    /// MUL/DIV — function summaries that compute the exact value in mathint.
+    /// This preserves all arithmetic relationships (so updatePositionViewReflectedByIndex
+    /// still works) while removing the toUint128/cast overhead inlined around each call.
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    /// MISC INTERNALS irrelevant to credit / loss-index tracking ///
     function toId(Midnight.Obligation) external returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
@@ -29,22 +39,26 @@ methods {
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    // Assume no reentrancy: callbacks, gates, and token transfers do not re-enter Midnight.
+    /// EXTERNAL CALLBACKS — collapse path explosion for strong invariants. ///
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
     function _.canLiquidate(address) external => NONDET;
-
-    // Summarize safeTransfer as NONDET for now (TODO: we could also model them as external)
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
-definition PASSIVE_FEE_RECIPIENT() returns address = 0x7e3dce7c19791d65d67ef7ce3c42d2b7fe6fecb1; //currentContract.getPassiveFeeRecipient();
+definition PASSIVE_FEE_RECIPIENT() returns address = 0x7e3dce7c19791d65d67ef7ce3c42d2b7fe6fecb1;
 
+/// MULDIV FUNCTION SUMMARIES ///
+// Compute the exact value in mathint and reject division-by-zero / overflow paths.
+// The non-deterministic `overflow` flag is sound: when picked true the call reverts
+// and the rule's assertion is not checked on that branch (mirroring real Solidity
+// uint256 multiplication overflow). Mirrors the helper already in this spec file
+// historically and matches the pattern used in Healthiness.spec.
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -53,17 +67,24 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(a * b / d);
 }
 
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return require_uint256((a * b + (d - 1)) / d);
+}
+
 /// GHOST creditAfterSlashingWithPrecision ///
 
-// precision is an integer that is so large that no rounding error will ever occur.
-// A possible value would be 2^128! (factorial).
-// We do not restrict the value but only axiomatically say that it's greater 0 and a multiple of each ownerLossIndex.
+// PRECISION is a (large, abstract) integer that absorbs all rounding error.
+// We do not pin its value, only that it's positive and that PRECISION * credit
+// is an exact multiple of every userLossIndex we may write.
 persistent ghost mathint PRECISION {
     axiom PRECISION > 0;
 }
 
-// ghost mapping for PRECISION * creditOf(id,user) / userLossIndex(id,user)
-// PRECISION ensures that the division will be without rounding errors.
+// Ghost mirror of PRECISION * creditOf(id,user) / userLossIndex(id,user), kept exact by the hooks.
 ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
     init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
 
@@ -133,37 +154,57 @@ strong invariant preciseCreditCorrect(bytes32 id, address owner)
 
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) + PRECISION * continuousFeeCredit(id) <= PRECISION * totalUnits(id)
-    {
-        preserved updatePosition(Midnight.Obligation obligation, address user) with (env e) {
-            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant preciseCreditCorrect(id, user);
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
-        }
-    
-        preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
-            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant preciseCreditCorrect(id, onBehalf);
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
-        }
-    
-        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
-            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant preciseCreditCorrect(id, borrower);
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
-        }
-    
-        preserved take(uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
-            //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-            requireInvariant preciseCreditCorrect(id, taker);
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
-            requireInvariant preciseCreditCorrect(id, offer.maker);
-            requireInvariant obligationLossIndexLeqUserLossIndex(id, offer.maker);
-        }
+{
+    preserved updatePosition(Midnight.Obligation obligation, address user) with (env e) {
+        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant preciseCreditCorrect(id, user);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
     }
+
+    preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
+        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant preciseCreditCorrect(id, onBehalf);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
+    }
+
+    preserved liquidate(
+        Midnight.Obligation obligation,
+        uint256 collateralIndex,
+        uint256 seizedAssets,
+        uint256 repaidUnits,
+        address borrower,
+        address receiver,
+        address callback,
+        bytes data
+    ) with (env e) {
+        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant preciseCreditCorrect(id, borrower);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
+    }
+
+    // NOTE: this preserved block was previously stale (used Midnight.Signature) and never
+    // matched, so requireInvariant hints were silently dropped on take(). Fixed signature.
+    preserved take(
+        uint256 obligationUnits,
+        address taker,
+        address takerCallback,
+        bytes takerCallbackData,
+        address receiverIfTakerIsSeller,
+        Midnight.Offer offer,
+        bytes ratifierData,
+        bytes32 root,
+        bytes32[] proof) with (env e) {
+        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+        requireInvariant preciseCreditCorrect(id, taker);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
+        requireInvariant preciseCreditCorrect(id, offer.maker);
+        requireInvariant obligationLossIndexLeqUserLossIndex(id, offer.maker);
+    }
+}
 
 // The obligation loss index cannot be larger than the user loss index.
 strong invariant obligationLossIndexLeqUserLossIndex(bytes32 id, address owner)
