@@ -5,7 +5,6 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function feeClaimer() external returns (address) envfree;
     function toId(Midnight.Obligation obligation) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
@@ -149,18 +148,4 @@ rule setIsAuthorizedIsolation(env e, address onBehalf, address authorized, bool 
     bool before = isAuthorized(otherUser, otherAuthorized);
     setIsAuthorized(e, onBehalf, authorized, val);
     assert isAuthorized(otherUser, otherAuthorized) == before;
-}
-
-/// FEE CLAIMER RULES ///
-
-/// Only the fee claimer can successfully call claimContinuousFee.
-rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
-    claimContinuousFee(e, obligation, amount, receiver);
-    assert e.msg.sender == feeClaimer();
-}
-
-/// Only the fee claimer can successfully call claimTradingFee.
-rule onlyFeeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver) {
-    claimTradingFee(e, token, amount, receiver);
-    assert e.msg.sender == feeClaimer();
 }
