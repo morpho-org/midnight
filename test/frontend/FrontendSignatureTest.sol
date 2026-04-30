@@ -20,7 +20,7 @@ uint256 constant HEIGHT = 2;
 contract FrontendSignatureTest is Test {
     function setUp() public {
         vm.chainId(1);
-        EcrecoverRatifier impl = new EcrecoverRatifier(address(0));
+        EcrecoverRatifier impl = new EcrecoverRatifier(address(this));
         vm.etch(RATIFIER, address(impl).code);
     }
 
