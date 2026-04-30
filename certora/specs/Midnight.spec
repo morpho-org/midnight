@@ -118,6 +118,15 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
     assert lossIndexAfter >= lossIndexBefore;
 }
 
+rule creditCannotIncreaseWhenLossIndexIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
+    require currentContract.obligationState[id].lossIndex == max_uint128, "assume loss index is maxed";
+    uint256 creditBefore = creditOf(id, user);
+
+    f(e, args);
+
+    assert creditOf(id, user) <= creditBefore;
+}
+
 /// INVARIANTS ///
 
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
