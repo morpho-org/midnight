@@ -15,7 +15,7 @@
 //
 // Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
 // Encoded only on oracle-price paths via boundedPrice + a Sload hook on Position.collateral.
-// In liquidate, the same bound is enforced for the seizedAssets/repaidUnits calldata inputs
+// In liquidate, the same bound is enforced for the seizedAssets/repaidUnits function inputs
 // via the liquidateAmount ghost. Not 100% sound (oracles return unconstrained uint256), but
 // vetted oracles in practice respect this.
 
@@ -29,20 +29,20 @@ methods {
     // Oracle integration assumption: see header.
     function _.price() external => boundedPrice() expect(uint256);
 
-    // Deterministic toId: links calldata obligations to validated state from touchObligation.
+    // Deterministic toId: links call-site obligations to validated state from touchObligation.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // Summarize CREATE2 opcode 
+    // Hash/proof helpers are irrelevant to the multiplication-overflow property.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
 
-    // Sound: tickToPrice = 1e36 / (1e18 + wExp(...)) and wExp(x) >= 0, so result <= WAD.
+    // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
 
     // Proven in ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
     function Midnight.maxLif(uint256 lltv, uint256 cursor) internal returns (uint256) => maxLifSummary(lltv);
 
-    // Hook mulDivDown and mulDivUp to track overflow.
+    // Summarize mulDivDown and mulDivUp to track overflow.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
 }
@@ -56,7 +56,8 @@ persistent ghost bool mulOverflow;
 persistent ghost uint256 latestOraclePrice;
 
 // Set by noMultiplicationOverflowLiquidate to max(seizedAssets, repaidUnits) so boundedPrice
-// can extend the same product bound to liquidate's calldata multiplicands. 0 elsewhere making the extra constraint vacuous.
+// can extend the same product bound to liquidate's function-input multiplicands. 0 elsewhere
+// makes the extra constraint vacuous.
 persistent ghost uint256 liquidateAmount;
 
 /// HOOKS ///
@@ -83,8 +84,8 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-// Assumption : bound is enforced via the collateral Sload hook for storage paths, and via liquidateAmount 
-// for liquidate's calldata multiplicands.
+// Assumption: bound is enforced via the collateral Sload hook for storage paths, and via
+// liquidateAmount for liquidate's function-input multiplicands.
 function boundedPrice() returns uint256 {
     uint256 price;
     latestOraclePrice = price;
@@ -144,9 +145,14 @@ function requireObligationBounds(Midnight.Obligation obligation) {
 
 /// RULES ///
 
-// Exclude maxLif (see header), liquidate (calldata multiplicands need a dedicated bound),
+// Reset oracle-price ghosts so pre-oracle collateral reads are not constrained by stale prices.
+function resetOraclePriceAssumption() {
+    latestOraclePrice = 0;
+    liquidateAmount = 0;
+}
+
+// Exclude maxLif (see header), liquidate (function-input multiplicands need a dedicated bound),
 // and view functions with arbitrary obligation/id pairs (separate rules below).
-// Obligation field bounds for non-view functions come from summaryToId.
 rule noMultiplicationOverflow(method f, env e, calldataarg args)
 filtered {
     f -> f.selector != sig:maxLif(uint256, uint256).selector
@@ -155,7 +161,7 @@ filtered {
         && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
         && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector
 } {
-    require liquidateAmount == 0;
+    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
     f(e, args);
     assert !mulOverflow;
@@ -163,8 +169,10 @@ filtered {
 
 // View functions take id as a separate parameter (not derived from the obligation),
 // so summaryToId bounds don't apply. Explicit obligation bounds are needed.
+// resetOraclePriceAssumption() to prevent hooks from reverting on real cases.
+
 rule noMultiplicationOverflowIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
-    require liquidateAmount == 0;
+    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
     requireObligationBounds(obligation);
     isHealthy(e, obligation, id, borrower);
@@ -172,7 +180,7 @@ rule noMultiplicationOverflowIsHealthy(env e, Midnight.Obligation obligation, by
 }
 
 rule noMultiplicationOverflowIsLiquidatable(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
-    require liquidateAmount == 0;
+    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
     requireObligationBounds(obligation);
     isLiquidatable(e, obligation, id, borrower);
@@ -180,17 +188,18 @@ rule noMultiplicationOverflowIsLiquidatable(env e, Midnight.Obligation obligatio
 }
 
 rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Obligation obligation, bytes32 id, address user) {
-    require liquidateAmount == 0;
+    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
     requireObligationBounds(obligation);
     updatePositionView(e, obligation, id, user);
     assert !mulOverflow;
 }
 
-// liquidate's seizedAssets/repaidUnits are calldata, not storage, so the collateral
-// Sload hook can't constrain them. Set liquidateAmount = max(seizedAssets, repaidUnits)
-// so boundedPrice extends the same (amount * price) bound to these inputs.
+// liquidate's seizedAssets/repaidUnits are function inputs, not storage, so the collateral
+// Sload hook cannot constrain them. Set liquidateAmount to their max so boundedPrice applies
+// the same (amount * price) assumption when liquidate reads the oracle price.
 rule noMultiplicationOverflowLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    resetOraclePriceAssumption();
     liquidateAmount = seizedAssets > repaidUnits ? seizedAssets : repaidUnits;
     require !mulOverflow, "prestate: assume no overflow before liquidate";
     requireObligationBounds(obligation);
