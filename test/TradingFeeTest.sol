@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {Obligation, Offer, Collateral} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
@@ -29,7 +29,7 @@ contract TradingFeeTest is BaseTest {
     bytes32 internal id;
     Offer internal lenderOffer;
     Offer internal borrowerOffer;
-    address internal feeRecipient = makeAddr("feeRecipient");
+    address internal feeClaimer = makeAddr("feeClaimer");
 
     function setUp() public override {
         super.setUp();
@@ -38,25 +38,25 @@ contract TradingFeeTest is BaseTest {
 
         obligation.loanToken = address(loanToken);
         obligation.maturity = block.timestamp + 1 days; // TTM = 1 day (exactly at breakpoint)
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle1)
                 })
             );
-        obligation.collaterals
+        obligation.collateralParams
             .push(
-                Collateral({
+                CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
                     maxLif: maxLif(0.77e18, 0.25e18),
                     oracle: address(oracle2)
                 })
             );
-        obligation.collaterals = sortCollaterals(obligation.collaterals);
+        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
 
         id = toId(obligation);
 
@@ -64,6 +64,7 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.start = block.timestamp;
         lenderOffer.expiry = block.timestamp + 200;
 
@@ -72,11 +73,12 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 10000);
 
-        midnight.setFeeRecipient(feeRecipient);
+        midnight.setFeeClaimer(feeClaimer);
     }
 
     function testBuyUnits(uint256 tradingFee, uint256 sellerTick, uint256 units) public {
@@ -94,10 +96,12 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
     function testSellUnits(uint256 tradingFee, uint256 buyerTick, uint256 units) public {
@@ -114,13 +118,15 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivDown(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, borrower, lenderOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testDefaultFee(uint256 units, uint256 sellerTick, uint256 tradingFee) public {
+    function testDefaultTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee) public {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
@@ -135,26 +141,33 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testSevenDayTtmFee(uint256 units, uint256 sellerTick, uint256 fee1Day, uint256 fee7Days) public {
+    function testSevenDayTtmTradingFee(
+        uint256 units,
+        uint256 sellerTick,
+        uint256 tradingFee1Day,
+        uint256 tradingFee7Days
+    ) public {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee1Day = bound(fee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        fee7Days = bound(fee7Days, fee1Day, midnight.maxTradingFee(2)) / 1e12 * 1e12;
+        tradingFee1Day = bound(tradingFee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee7Days = bound(tradingFee7Days, tradingFee1Day, midnight.maxTradingFee(2)) / 1e12 * 1e12;
 
         obligation.maturity = block.timestamp + 3 days;
 
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
         // Must be set before touchObligation, which snapshots defaultFees at creation time.
-        midnight.setDefaultTradingFee(address(loanToken), 1, fee1Day);
-        midnight.setDefaultTradingFee(address(loanToken), 2, fee7Days);
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee1Day);
+        midnight.setDefaultTradingFee(address(loanToken), 2, tradingFee7Days);
 
         id = midnight.touchObligation(obligation);
         lenderOffer.obligation = obligation;
@@ -169,47 +182,45 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
     }
 
-    function testPostMaturityFee(uint256 units, uint256 sellerTick, uint256 fee0Day, uint256 maturity) public {
-        units = bound(units, 0, MAX_DEBT);
+    function testPostMaturityTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee0Day, uint256 maturity)
+        public
+    {
+        units = bound(units, 1, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee0Day = bound(fee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee0Day = bound(tradingFee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
         maturity = bound(maturity, 0, block.timestamp - 1);
         obligation.maturity = maturity;
         id = toId(obligation);
         lenderOffer.obligation = obligation;
         borrowerOffer.obligation = obligation;
 
-        midnight.setDefaultTradingFee(address(loanToken), 0, fee0Day);
+        midnight.setDefaultTradingFee(address(loanToken), 0, tradingFee0Day);
         borrowerOffer.tick = sellerTick;
 
-        uint256 tradingFee = fee0Day;
-
-        uint256 buyerPrice = sellerPrice + tradingFee;
-        vm.assume(buyerPrice <= WAD);
-        uint256 expectedBuyerAssets = units.mulDivUp(buyerPrice, WAD);
-        uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
-        uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
-
         collateralize(obligation, borrower, MAX_DEBT);
-        take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        take(units, lender, borrowerOffer);
     }
 
-    function testEarlyFee(uint256 units, uint256 sellerTick, uint256 fee360Days, uint256 maturity) public {
+    function testEarlyTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee360Days, uint256 maturity)
+        public
+    {
         units = bound(units, 0, MAX_DEBT);
         sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        fee360Days = bound(fee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        tradingFee360Days = bound(tradingFee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
         maturity = bound(maturity, block.timestamp + 360 days, block.timestamp + 36500 days);
 
         obligation.maturity = maturity;
@@ -217,10 +228,10 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.obligation = obligation;
         borrowerOffer.obligation = obligation;
 
-        midnight.setDefaultTradingFee(address(loanToken), 6, fee360Days);
+        midnight.setDefaultTradingFee(address(loanToken), 6, tradingFee360Days);
         borrowerOffer.tick = sellerTick;
 
-        uint256 tradingFee = fee360Days;
+        uint256 tradingFee = tradingFee360Days;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
@@ -228,9 +239,72 @@ contract TradingFeeTest is BaseTest {
         uint256 expectedSellerAssets = units.mulDivUp(sellerPrice, WAD);
         uint256 expectedFee = expectedBuyerAssets - expectedSellerAssets;
 
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
         collateralize(obligation, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
 
-        assertEq(loanToken.balanceOf(feeRecipient), expectedFee, "fee recipient balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), expectedFee, "claimable trading fee");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, expectedFee, "contract balance increase");
+    }
+
+    function testClaimTradingFee(uint256 tradingFee, uint256 units, uint256 withdrawAmount) public {
+        units = bound(units, 1, MAX_DEBT);
+        tradingFee = bound(tradingFee, 1e12, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(units, lender, borrowerOffer);
+
+        uint256 fee = midnight.claimableTradingFee(address(loanToken));
+        vm.assume(fee > 0);
+        withdrawAmount = bound(withdrawAmount, 1, fee);
+        address receiver = makeAddr("receiver");
+
+        vm.prank(feeClaimer);
+        midnight.claimTradingFee(address(loanToken), withdrawAmount, receiver);
+
+        assertEq(loanToken.balanceOf(receiver), withdrawAmount, "receiver balance");
+        assertEq(midnight.claimableTradingFee(address(loanToken)), fee - withdrawAmount, "remaining fee");
+    }
+
+    function testClaimTradingFeeOnlyFeeClaimer(address caller) public {
+        vm.assume(caller != feeClaimer);
+        vm.prank(caller);
+        vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);
+        midnight.claimTradingFee(address(loanToken), 0, caller);
+    }
+
+    function testClaimTradingFeeExcessReverts() public {
+        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+        borrowerOffer.tick = 0;
+
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(1000, lender, borrowerOffer);
+
+        uint256 fee = midnight.claimableTradingFee(address(loanToken));
+
+        vm.prank(feeClaimer);
+        vm.expectRevert();
+        midnight.claimTradingFee(address(loanToken), fee + 1, feeClaimer);
+    }
+
+    function testTradingFeesAccumulate() public {
+        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+        borrowerOffer.tick = 0;
+        borrowerOffer.group = keccak256("g1");
+
+        uint256 balanceBefore = loanToken.balanceOf(address(midnight));
+        collateralize(obligation, borrower, MAX_DEBT);
+        take(1000, lender, borrowerOffer);
+        uint256 feeAfterFirst = midnight.claimableTradingFee(address(loanToken));
+
+        borrowerOffer.group = keccak256("g2");
+        take(1000, lender, borrowerOffer);
+        uint256 feeAfterSecond = midnight.claimableTradingFee(address(loanToken));
+
+        assertEq(feeAfterSecond, feeAfterFirst * 2, "fees accumulated");
+        assertEq(loanToken.balanceOf(address(midnight)) - balanceBefore, feeAfterSecond, "contract balance increase");
     }
 }

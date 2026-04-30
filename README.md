@@ -1,6 +1,6 @@
-# Morpho Midnight
+# Midnight
 
-Morpho Midnight is a fixed-rate lending protocol based on zero-coupon obligations.
+Midnight is a fixed-rate lending protocol based on zero-coupon obligations.
 
 ## Whitepaper
 

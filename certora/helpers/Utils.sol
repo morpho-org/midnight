@@ -2,10 +2,9 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
-import {IdLib} from "../../src/libraries/IdLib.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {PASSIVE_FEE_RECIPIENT} from "../../src/libraries/ConstantsLib.sol";
 
 contract Utils {
     function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
@@ -28,7 +27,8 @@ contract Utils {
         return UtilsLib.msb(bitmap);
     }
 
-    function passiveFeeRecipient() external pure returns (address) {
-        return PASSIVE_FEE_RECIPIENT;
+    function emptyOffer() external pure returns (Offer memory) {
+        Offer memory offer;
+        return offer;
     }
 }
