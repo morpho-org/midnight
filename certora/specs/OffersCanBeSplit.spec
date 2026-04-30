@@ -14,6 +14,10 @@ methods {
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    // Abstract fee and tick math; this rule only needs deterministic bounded prices across compared take paths.
+    function tradingFee(bytes32, uint256) internal returns (uint256) => boundedTradingFee();
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedOfferPrice();
+
     // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
@@ -42,12 +46,6 @@ methods {
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
 
-    // Same offer.tick across all take calls; CONSTANT ensures identical return value.
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
-
-    // Same obligation and timestamp across all take calls; CONSTANT ensures identical fee and removes 7-way piecewise interpolation.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
-
     // Ratifier result is identical across the full and split takes.
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => CVL_callbackSuccess() expect(bytes32);
 
@@ -70,6 +68,15 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 function CVL_callbackSuccess() returns bytes32 {
     return callbackSuccess();
+}
+
+persistent ghost boundedTradingFee() returns uint256 {
+    axiom boundedTradingFee() <= 5 * 10 ^ 15; // 0.5 % * WAD = 5e15
+}
+
+persistent ghost boundedOfferPrice() returns uint256 {
+    axiom boundedOfferPrice() <= 10 ^ 18; // <= WAD
+    axiom boundedOfferPrice() >= boundedTradingFee(); // so sellerPrice >= 0
 }
 
 // ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
@@ -117,6 +124,19 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
 
+    // Position lossIndex is mirrored from obligationState.lossIndex which take() never writes,
+    // so both paths either keep the original value or set the same canonical value.
+    uint128 buyerLossIndex1 = userLossIndex(id, buyer);
+    uint128 sellerLossIndex1 = userLossIndex(id, seller);
+
+    // lastAccrual is set to block.timestamp by _updatePosition; same env across both paths.
+    uint128 buyerLastAccrual1 = lastAccrual(id, buyer);
+    uint128 sellerLastAccrual1 = lastAccrual(id, seller);
+
+    // continuousFeeCredit accrues per-leg; split-C accrues 0 since lastAccrual was just refreshed,
+    // and split-B uses identical inputs to the full take, so the totals match under the existing ghost summaries.
+    uint128 continuousFeeCredit1 = currentContract.obligationState[id].continuousFeeCredit;
+
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
 
@@ -127,38 +147,9 @@ rule offersCanBeSplit(env e, uint256 obligationUnitsA, uint256 obligationUnitsB,
     assert creditOfSeller1 == creditOf(id, seller), "seller credit must match";
     assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
     assert totalUnits1 == totalUnits(id), "totalUnits must match";
+    assert buyerLossIndex1 == userLossIndex(id, buyer), "buyer lossIndex must match";
+    assert sellerLossIndex1 == userLossIndex(id, seller), "seller lossIndex must match";
+    assert buyerLastAccrual1 == lastAccrual(id, buyer), "buyer lastAccrual must match";
+    assert sellerLastAccrual1 == lastAccrual(id, seller), "seller lastAccrual must match";
+    assert continuousFeeCredit1 == currentContract.obligationState[id].continuousFeeCredit, "continuousFeeCredit must match";
 }
-
-/*
-/// If a full take succeeds, splitting it into B then C also succeeds on the core no-callback/no-gate path.
-/// Asset-capped sell offers are excluded because ceil rounding can make the split consume one extra asset.
-rule fullTakeSuccessImpliesSplitSuccess(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
-
-    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
-
-    bytes32 id = summaryToId(offer.obligation);
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
-
-    require buyer != seller, "prover perfomance";
-    require to_mathint(currentContract.obligationState[id].lossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
-
-    require offer.callback == 0, "maker callback disabled";
-    require takerCallback == 0, "taker callback disabled";
-    require offer.obligation.enterGate == 0, "enter gate disabled";
-    require offer.buy || (offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0), "sell offers must be unit-capped";
-
-    storage initState = lastStorage;
-
-    take@withrevert(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-    require !lastReverted, "full take must succeed";
-
-    take@withrevert(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
-    bool splitBReverted = lastReverted;
-    assert !splitBReverted, "first split take must succeed";
-    require !splitBReverted, "continue from successful first split take";
-
-    take@withrevert(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-    assert !lastReverted, "second split take must succeed";
-}*/
