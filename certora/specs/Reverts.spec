@@ -274,16 +274,15 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Obligation obligation,
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
 /// Note: same short-circuit limitation as oracleZeroCausesIsHealthyReturnFalse
-rule oracleZeroCausesWithdrawCollateralRevert(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(obligation);
     require activatedCollaterals(id, onBehalf) != 0, "borrower has activated collaterals";
 
-    withdrawCollateral@withrevert(e, obligation, collateralIndex, assets, onBehalf, receiver);
-    bool reverted = lastReverted;
+    withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
 
-    assert debtOf(id, onBehalf) > 0 => reverted;
+    assert debtOf(id, onBehalf) == 0;
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
@@ -295,10 +294,9 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker
     address seller = offer.buy ? taker : offer.maker;
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-    bool reverted = lastReverted;
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    assert debtOf(id, seller) > 0 => reverted;
+    assert debtOf(id, seller) == 0;
 }
 
 /// GATE BLOCKING ///
