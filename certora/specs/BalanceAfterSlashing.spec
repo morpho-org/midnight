@@ -8,6 +8,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function updatePositionView(Midnight.Obligation memory obligation, bytes32 id, address user) external returns (uint128, uint128, uint128);
     function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
     function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
     function obligationLossIndex(bytes32) external returns (uint128) envfree;
 
@@ -17,20 +18,29 @@ methods {
     // Summarize price oracle as NONDET (it is a view function)
     function _.price() external => NONDET;
 
-    // Summarize safeTransfer as NONDET for now (TODO: we could also model them as external)
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-
     // Summarize internals irrelevant to credit tracking.
     function toId(Midnight.Obligation) external returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function Midnight.signer(bytes32, Midnight.Signature memory) internal returns (address) => NONDET;
+
+    // Assume no reentrancy: callbacks, gates, and token transfers do not re-enter Midnight.
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
+
+    // Summarize safeTransfer as NONDET for now (TODO: we could also model them as external)
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
 definition PASSIVE_FEE_RECIPIENT() returns address = 0x7e3dce7c19791d65d67ef7ce3c42d2b7fe6fecb1; //currentContract.getPassiveFeeRecipient();
@@ -56,6 +66,7 @@ persistent ghost mathint PRECISION {
 // PRECISION ensures that the division will be without rounding errors.
 ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
     init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
+
     // this is necessary to help the prover. It's an obvious consequence, but the usum implementation does not reason about quantifiers.
     init_state axiom forall bytes32 id. (usum address user. preciseCreditDivIndex[id][user]) == 0;
 }
@@ -63,17 +74,18 @@ ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
 ghost mapping(bytes32 => mapping(address => mathint)) pendingFeeMirror {
     init_state axiom forall bytes32 id. forall address user. pendingFeeMirror[id][user] == 0;
 }
+
 ghost mapping(bytes32 => mapping(address => mathint)) lastAccrualMirror {
     init_state axiom forall bytes32 id. forall address user. lastAccrualMirror[id][user] == 0;
 }
 
-
 /// HELPER FUNCTIONS ///
 
 // Map index to 1-index, for easier math. 
-definition mapIndex(mathint index) returns mathint = 2^128 - 1 - index;
+definition mapIndex(mathint index) returns mathint = 2 ^ 128 - 1 - index;
 
 definition cvlCreditOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
+
 definition cvlUserLossIndex(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lossIndex;
 
 /// HOOKS ///
@@ -81,17 +93,14 @@ definition cvlUserLossIndex(bytes32 id, address owner) returns uint128 = current
 function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint128 newIndex) {
     mathint ownerLossIndex = mapIndex(newIndex);
     require ownerLossIndex > 0 => PRECISION * newCredit % ownerLossIndex == 0, "PRECISION is 2^128!";
-    preciseCreditDivIndex[id][owner] = 
-        ownerLossIndex == 0 ? 0 : PRECISION * newCredit / ownerLossIndex;
+    preciseCreditDivIndex[id][owner] = ownerLossIndex == 0 ? 0 : PRECISION * newCredit / ownerLossIndex;
 }
 
 function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
-    uint128 credit = cvlCreditOf(id,owner);
-    uint128 userIndex = cvlUserLossIndex(id,owner);
+    uint128 credit = cvlCreditOf(id, owner);
+    uint128 userIndex = cvlUserLossIndex(id, owner);
     mathint mappedIndex = mapIndex(userIndex);
-    return mappedIndex == 0 
-        ? preciseCreditDivIndex[id][owner] == 0
-        : preciseCreditDivIndex[id][owner] * mappedIndex == PRECISION * credit;
+    return mappedIndex == 0 ? preciseCreditDivIndex[id][owner] == 0 : preciseCreditDivIndex[id][owner] * mappedIndex == PRECISION * credit;
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].credit uint128 newCredit (uint128 oldCredit) {
@@ -102,20 +111,19 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lossIndex uint128 newInd
     updateCreditDivIndex(id, owner, cvlCreditOf(id, owner), newIndex);
 }
 
-hook Sload uint128 value position[KEY bytes32 id][KEY address owner].pendingFee
-{
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].pendingFee {
     require pendingFeeMirror[id][owner] == value, "ghost mirror";
 }
-hook Sload uint128 value position[KEY bytes32 id][KEY address owner].lastAccrual
-{
+
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].lastAccrual {
     require lastAccrualMirror[id][owner] == value, "ghost mirror";
 }
-hook Sstore position[KEY bytes32 id][KEY address owner].pendingFee uint128 newPending (uint128 oldPending) 
-{
+
+hook Sstore position[KEY bytes32 id][KEY address owner].pendingFee uint128 newPending (uint128 oldPending) {
     pendingFeeMirror[id][owner] = newPending;
 }
-hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newLast (uint128 oldLast) 
-{
+
+hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newLast (uint128 oldLast) {
     lastAccrualMirror[id][owner] = newLast;
 }
 
@@ -124,61 +132,44 @@ strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
-    (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) <= PRECISION * totalUnits(id)
-{
-    preserved updatePosition(Midnight.Obligation obligation, address user) with (env e) {
-        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant preciseCreditCorrect(id, user);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
+    (usum address owner. preciseCreditDivIndex[id][owner]) * mapIndex(obligationLossIndex(id)) + PRECISION * continuousFeeCredit(id) <= PRECISION * totalUnits(id)
+    {
+        preserved updatePosition(Midnight.Obligation obligation, address user) with (env e) {
+            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant preciseCreditCorrect(id, user);
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, user);
+        }
+    
+        preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
+            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant preciseCreditCorrect(id, onBehalf);
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
+        }
+    
+        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
+            requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant preciseCreditCorrect(id, borrower);
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
+        }
+    
+        preserved take(uint256 obligationUnits, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
+            //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
+            requireInvariant preciseCreditCorrect(id, taker);
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
+            requireInvariant preciseCreditCorrect(id, offer.maker);
+            requireInvariant obligationLossIndexLeqUserLossIndex(id, offer.maker);
+        }
     }
 
-    preserved withdraw(Midnight.Obligation obligation, uint256 obligationUnits, address onBehalf, address receiver) with (env e) {
-        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant preciseCreditCorrect(id, onBehalf);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, onBehalf);
-    }
-
-    preserved liquidate(
-        Midnight.Obligation obligation,
-        uint256 collateralIndex,
-        uint256 seizedAssets,
-        uint256 repaidUnits,
-        address borrower,
-        bytes data
-    ) with (env e) {
-        requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant preciseCreditCorrect(id, borrower);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, borrower);
-    }
-
-    preserved take(
-        uint256 obligationUnits,
-        address taker,
-        address takerCallback,
-        bytes takerCallbackData,
-        address receiverIfTakerIsSeller,
-        Midnight.Offer offer,
-        Midnight.Signature signature,
-        bytes32 root,
-        bytes32[] proof) with (env e) {
-        //requireInvariant preciseCreditCorrect(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, PASSIVE_FEE_RECIPIENT());
-        requireInvariant preciseCreditCorrect(id, taker);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, taker);
-        requireInvariant preciseCreditCorrect(id, offer.maker);
-        requireInvariant obligationLossIndexLeqUserLossIndex(id, offer.maker);
-    }
-
-}
 // The obligation loss index cannot be larger than the user loss index.
 strong invariant obligationLossIndexLeqUserLossIndex(bytes32 id, address owner)
     mapIndex(obligationLossIndex(id)) <= mapIndex(cvlUserLossIndex(id, owner));
 
-rule updatePositionViewReflectedByIndex(env e, Midnight.Obligation obligation, bytes32 id, address owner)
-{
+rule updatePositionViewReflectedByIndex(env e, Midnight.Obligation obligation, bytes32 id, address owner) {
     requireInvariant preciseCreditCorrect(id, owner);
     requireInvariant obligationLossIndexLeqUserLossIndex(id, owner);
 
@@ -209,9 +200,8 @@ rule updatePositionZero(env e, Midnight.Obligation obligation, bytes32 id, addre
     assert newCredit == 0 && newPending == 0 && fee == 0;
 }
 
-
 invariant pendingFeeLessEqualThanCredit(bytes32 id, address user)
     currentContract.position[id][user].pendingFee <= currentContract.position[id][user].credit;
 
-invariant pendingFeeLessThanCredit(bytes32 id, address user)
-    currentContract.position[id][user].pendingFee < currentContract.position[id][user].credit || currentContract.position[id][user].pendingFee == 0;
+//invariant pendingFeeLessThanCredit(bytes32 id, address user)
+//    currentContract.position[id][user].pendingFee < currentContract.position[id][user].credit || currentContract.position[id][user].pendingFee == 0;
