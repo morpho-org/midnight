@@ -23,6 +23,7 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -35,7 +36,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
     // Summarize CREATE2 opcode used by IdLib.storeInCode.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
