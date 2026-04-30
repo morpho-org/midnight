@@ -801,8 +801,8 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), 0, "total units");
         uint128 _lossIndex = midnight.lossIndex(id);
         assertEq(_lossIndex, type(uint128).max, "loss index");
+        vm.expectRevert(IMidnight.ObligationLossIndexMaxedOut.selector);
         midnight.updatePosition(obligation, lender);
-        assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
 
         // withdrawCollateral still works
         uint256 collateral = midnight.collateral(id, borrower, 0);
