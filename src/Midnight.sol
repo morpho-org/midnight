@@ -115,10 +115,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - It should not revert on no-op transfers.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`  when the
-/// borrower has debt, and `take` whenever the seller still has debt all revert.
-/// @dev If an activated collateral oracle returns 0 on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, `take` whenever the seller still has debt, and `liquidate` with repaid input all revert.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
+/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
+/// debt, and `take` whenever the seller still has debt might revert.
+/// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
@@ -145,6 +145,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed.
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
+/// @dev The case LLTV=WAD is special, and should be used with care, notably:
+/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
+/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
 ///
 contract Midnight is IMidnight {
@@ -169,7 +173,7 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        emit EventsLib.Constructor(roleSetter);
+        emit EventsLib.Constructor(msg.sender);
     }
 
     /// MULTICALL ///
@@ -281,6 +285,8 @@ contract Midnight is IMidnight {
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
     /// to perform atomic price checks.
+    /// @dev Taking buy offers with price < trading fee will revert.
+    /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
