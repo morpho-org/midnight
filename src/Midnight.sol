@@ -719,10 +719,10 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
-            : 0;
+        uint128 obligationLossIndex = obligationState[id].lossIndex;
+        require(obligationLossIndex < type(uint128).max, ObligationLossIndexMaxedOut());
+        uint256 postSlashCredit =
+            credit.mulDivDown(type(uint128).max - obligationLossIndex, type(uint128).max - _position.lossIndex);
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);

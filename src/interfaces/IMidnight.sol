@@ -90,6 +90,7 @@ interface IMidnight {
     error MultipleNonZero();
     error NoCollateralParams();
     error NotLiquidatable();
+    error ObligationLossIndexMaxedOut();
     error ObligationNotCreated();
     error OfferExpired();
     error OfferNotStarted();
