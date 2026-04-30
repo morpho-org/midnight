@@ -89,8 +89,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 function boundedPrice(address oracle) returns uint256 {
     uint256 price;
     require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collateral (uint128) * price fits in uint256 with mulDivUp rounding headroom";
-    require oracle != liquidatedOracle
-        || to_mathint(liquidateAmount) * price + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "liquidate's seizedAssets/repaidUnits (uint256) * liquidatedCollatPrice fits in uint256 with mulDivUp rounding headroom";
+    require oracle != liquidatedOracle || to_mathint(liquidateAmount) * price + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "liquidate's seizedAssets/repaidUnits (uint256) * liquidatedCollatPrice fits in uint256 with mulDivUp rounding headroom";
     return price;
 }
 
