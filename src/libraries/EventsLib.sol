@@ -7,7 +7,7 @@ import {Obligation} from "../interfaces/IMidnight.sol";
 /// @dev id_ is used to avoid naming conflicts in indexers.
 library EventsLib {
     // forgefmt: disable-start
-    event Constructor(address indexed roleSetter);
+    event Constructor(address indexed roleSetter, uint256 initialChainId);
     event SetRoleSetter(address indexed roleSetter);
     event SetFeeSetter(address indexed feeSetter);
     event SetObligationTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);

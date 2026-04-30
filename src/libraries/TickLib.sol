@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-int256 constant LN_ONE_PLUS_DELTA = 0.024692612590371501e18; // ln(1 + 0.025)
+int256 constant LN_ONE_PLUS_DELTA = 0.024692612590371501e18; // floor(ln(1 + 0.025) * 1e18)
 uint256 constant MAX_TICK = 1046;
 
 library TickLib {
@@ -23,7 +23,7 @@ library TickLib {
             if (x < 0) {
                 return 1e36 / wExp(-x);
             } else {
-                int256 ln2 = 0.693147180559945309e18;
+                int256 ln2 = 0.693147180559945309e18; // floor(ln(2) * 1e18)
                 int256 q = (x + ln2 / 2) / ln2;
                 int256 r = x - q * ln2;
                 int256 secondTerm = r * r / (2 * 1e18);
