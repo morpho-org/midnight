@@ -78,7 +78,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses almost all of its value to bad debt over its lifetime, such that the loss index is
-/// maxed out, then the obligation won't function properly afterwards. Notably, credit would be worthless.
+/// maxed out, then the obligation won't function properly afterwards. Notably, credit positions would be stuck.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
