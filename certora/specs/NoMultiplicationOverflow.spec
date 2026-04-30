@@ -70,6 +70,7 @@ hook Sload uint128 value position[KEY bytes32 id][KEY address user].collateral[I
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 1000000000000000000;
+
 definition ORACLE_PRICE_SCALE() returns uint256 = 1000000000000000000000000000000000000;
 
 // Proven in CreatedObligations.spec (createdObligationsHaveLltvLessThanOrEqualToOne)
