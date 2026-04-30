@@ -338,6 +338,7 @@ abstract contract BaseTest is Test {
     function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
         uint256 len =
             obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+        vm.assume(len > 0);
         CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
