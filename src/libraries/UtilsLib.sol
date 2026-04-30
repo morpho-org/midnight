@@ -178,6 +178,10 @@ library UtilsLib {
         return uint128(bitmap & ~(1 << bit));
     }
 
+    function getBit(uint128 bitmap, uint256 bit) internal pure returns (bool) {
+        return bitmap & (1 << bit) != 0;
+    }
+
     /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
     /// @dev Returns the previous value at the written slot.
     function tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool previous) {

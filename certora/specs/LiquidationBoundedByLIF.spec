@@ -69,43 +69,17 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     return ghostMulDivUp(x, y, d);
 }
 
-/// INVARIANTS ///
-
-/// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
-strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
-
 /// LIF BOUNDARIES ///
 
-/// Liquidation profit is bounded by maxLif (repaidUnits input).
-/// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
-rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+/// Liquidation profit is bounded by maxLif.
+rule liquidationProfitBounded(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, receiver, callback, data);
-
-    mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
-
-    assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
-}
-
-/// Liquidation profit is bounded by maxLif (seizedAssets input)
-rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
-    mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
-    require data.length == 0, "no callback for prover performance";
-    require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchObligation validation and ExactMath.spec)";
-
-    // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec,
-    bytes32 id0 = summaryToId(obligation);
-    requireInvariant nonZeroCollateralsAreActivated(id0, borrower, collateralIndex);
-
-    uint256 seizedResult;
-    uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
 

@@ -547,8 +547,9 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
+        uint128 bitmap = _position.activatedCollaterals;
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
-        require(_position.collateral[collateralIndex] > 0, InactiveCollateral());
+        require(UtilsLib.getBit(bitmap, collateralIndex), InactiveCollateral());
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
@@ -559,7 +560,6 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
-        uint128 bitmap = _position.activatedCollaterals;
         while (bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             CollateralParams memory _collateralParam = obligation.collateralParams[i];

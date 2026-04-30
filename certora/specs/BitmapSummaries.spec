@@ -4,6 +4,7 @@ methods {
     function UtilsLib.setBit(uint128 bitmap, uint256 bit) internal returns (uint128) => summarySetBit(bitmap, bit);
     function UtilsLib.clearBit(uint128 bitmap, uint256 bit) internal returns (uint128) => summaryClearBit(bitmap, bit);
     function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => summaryMsb(bitmap);
+    function UtilsLib.getBit(uint128 bitmap, uint256 bit) internal returns (bool) => summaryGetBit(bitmap, bit);
 }
 
 /// SUMMARIES ///
