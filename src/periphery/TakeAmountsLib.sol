@@ -9,8 +9,9 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
-    /// @dev Returns the largest number of units such that take gives `targetBuyerAssets`.
+    /// @dev Assumes that id and offer.obligation match.
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
+    /// @dev Returns the largest number of units such that take gives `targetBuyerAssets`.
     function buyerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
         view
@@ -26,6 +27,7 @@ library TakeAmountsLib {
             : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
     }
 
+    /// @dev Assumes that id and offer.obligation match.
     /// @dev Returns the smallest number of units such that take gives `targetSellerAssets`.
     function sellerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
         internal
