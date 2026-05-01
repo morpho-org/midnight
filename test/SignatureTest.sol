@@ -32,8 +32,9 @@ contract SignatureTest is BaseTest {
         offer.maker = maker;
 
         vm.prank(maker);
-
         midnight.setIsAuthorized(maker, address(ecrecoverRatifier), true);
+
+        vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.onRatify(offer, root, abi.encode(signature, uint256(0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
@@ -44,6 +45,7 @@ contract SignatureTest is BaseTest {
 
         Signature memory badSig;
 
+        vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
         ecrecoverRatifier.onRatify(offer, root, abi.encode(badSig, uint256(0)));
     }
