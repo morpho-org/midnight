@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Proves that no multiplication overflow occurs in mulDivDown or mulDivUp.
+// Proves that successful calls do not overflow in mulDivDown or mulDivUp.
 //
 // mulDivDown(x, y, d) computes (x * y) / d with Solidity 0.8 checked arithmetic.
 // mulDivUp(x, y, d) computes (x * y + (d - 1)) / d with Solidity 0.8 checked arithmetic.
@@ -14,12 +14,9 @@
 // timestamp range assumption used by this overflow-focused proof.
 //
 // Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
-// Position.collateral[i] is stored as uint128, so boundedPrice requires
-// price * max_uint128 + ORACLE_PRICE_SCALE - 1 <= max_uint256, which is the exact
-// overflow precondition for any (collateral * price) used by the contract.
-// In liquidate, the same bound is also enforced for the seizedAssets/repaidUnits function
-// inputs (uint256) via the liquidateAmount ghost. Not 100% sound (oracles return
-// unconstrained uint256), but vetted oracles in practice respect this.
+// Storage collateral is uint128, so boundedPrice enforces the product bound against max_uint128.
+// Liquidate also applies it to seizedAssets/repaidUnits via liquidateAmount. This is an
+// integration assumption: arbitrary oracle contracts can still return unconstrained uint256 values.
 
 using Utils as Utils;
 
@@ -53,13 +50,12 @@ methods {
 
 persistent ghost bool mulOverflow;
 
-// Set by noMultiplicationOverflowLiquidate to max(seizedAssets, repaidUnits) so boundedPrice can extend the 
-// same product bound to liquidate's function-input multiplicands. 0 elsewhere makes the extra constraint vacuous.
+// Set by noMultiplicationOverflowLiquidate to max(seizedAssets, repaidUnits).
+// 0 elsewhere makes the extra product bound vacuous.
 persistent ghost uint256 liquidateAmount;
 
-// Oracle for collateralIndex in noMultiplicationOverflowLiquidate. boundedPrice gates the
-// liquidateAmount * price bound on this address so the constraint applies only to the price
-// actually multiplied with seizedAssets/repaidUnits, not to other collaterals' oracle reads.
+// Oracle for collateralIndex in noMultiplicationOverflowLiquidate.
+// Gates liquidateAmount * price to the liquidated collateral's oracle.
 persistent ghost address liquidatedOracle;
 
 /// SUMMARIES ///
@@ -78,14 +74,8 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-// Position.collateral[i] is uint128, so price * max_uint128 + ORACLE_PRICE_SCALE - 1 <= max_uint256
-// is the exact overflow precondition for any (collateral * price) read from storage; this
-// applies to every oracle read.
-// The second bound extends the same product bound to liquidate's uint256 function inputs
-// (seizedAssets / repaidUnits), but only for the oracle of collateralIndex (the only price
-// multiplied with those inputs at Midnight.sol:594/:596). Gating on liquidatedOracle prevents
-// this assumption from spuriously constraining other collaterals' oracle reads in the loop
-// at Midnight.sol:548-559. liquidateAmount = 0 elsewhere makes the constraint vacuous.
+// Bound every storage collateral (uint128) * oracle price product.
+// For liquidate's uint256 inputs, apply the same bound only to the liquidated collateral's oracle.
 function boundedPrice(address oracle) returns uint256 {
     uint256 price;
     require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collateral (uint128) * price fits in uint256 with mulDivUp rounding headroom";
@@ -151,8 +141,8 @@ function resetOraclePriceAssumption() {
     liquidatedOracle = 0;
 }
 
-// Exclude maxLif (see header), liquidate (function-input multiplicands need a dedicated bound),
-// and view functions with arbitrary obligation/id pairs (separate rules below).
+// Normal calls intentionally scope this proof to non-reverting executions.
+// Exclude maxLif (see header), liquidate (dedicated input bound), and view functions with arbitrary ids.
 rule noMultiplicationOverflow(method f, env e, calldataarg args)
 filtered {
     f -> f.selector != sig:maxLif(uint256, uint256).selector
