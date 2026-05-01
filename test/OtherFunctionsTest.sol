@@ -130,7 +130,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
-    function testRepayCallback(uint256 units, uint256 repaid) public {
+    function testRepayCallback(uint256 units, uint256 repaid, address caller) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 1, units);
         collateralize(obligation, borrower, units);
@@ -140,9 +140,12 @@ contract OtherFunctionsTest is BaseTest {
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(callback), true);
+        midnight.setIsAuthorized(borrower, caller, true);
+        vm.prank(address(callback));
+        loanToken.approve(address(midnight), repaid);
 
-        callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
+        vm.prank(caller);
+        midnight.repay(obligation, repaid, borrower, address(callback), hex"deadbeef");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(callback.recordedObligationId(), id);

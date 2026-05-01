@@ -12,12 +12,13 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     bytes internal dataStored;
     bool internal discardToken = false;
 
-    function testFlashLoan(uint256 amount, bytes memory data) public {
+    function testFlashLoan(uint256 amount, bytes memory data, address caller) public {
         amount = bound(amount, 1, type(uint256).max);
         amountStored = amount;
         dataStored = data;
 
         deal(address(loanToken), address(midnight), amount);
+        vm.prank(caller);
         midnight.flashLoan(address(loanToken), amount, address(this), data);
 
         assertEq(loanToken.balanceOf(address(this)), 0, "balanceOf");
