@@ -7,6 +7,8 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 
+/// @dev If `block.chainid` changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
+/// no longer valid.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
@@ -15,6 +17,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
     }
 
     function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external view returns (bytes32) {
+        require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
         bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
