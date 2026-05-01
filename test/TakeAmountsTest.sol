@@ -70,6 +70,13 @@ contract TakeAmountsTest is BaseTest {
         return TickLib.tickToPrice(t) > maxPrice ? t - 1 : t;
     }
 
+    /// @dev Returns the lowest tick >= 1 such that tickToPrice(tick) > tradingFee.
+    function _minTick(uint256 tradingFee) internal pure returns (uint256) {
+        if (tradingFee == 0) return 1;
+        uint256 t = TickLib.priceToTick(tradingFee + 1);
+        return t == 0 ? 1 : t;
+    }
+
     /// @dev Creates an initial borrowing position so borrower has debt and lender has units.
     function _createPosition(uint256 positionUnits) internal {
         deal(address(loanToken), lender, type(uint128).max);
@@ -180,42 +187,53 @@ contract TakeAmountsTest is BaseTest {
     // Optimality: returned units is the best valid mapping for the target.
     // Buyer wants the largest units (more units for the same buyer assets paid).
     // Seller wants the smallest units (same seller assets received for fewer units provided).
+    // Forward map rounds down for buy offers and up for sell offers.
 
     function testBuyerAssetsToUnitsIsLargest(
         uint256 targetBuyerAssets,
         uint256 tick,
         uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 tradingFee1,
+        bool buy
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        // Sell offer requires buyerPrice = offerPrice + tradingFee <= WAD; buy offer only requires tick <= MAX_TICK.
+        tick = bound(tick, 1, buy ? MAX_TICK : _maxTick(tradingFee));
 
+        offer.buy = buy;
         offer.tick = tick;
-        uint256 buyerPrice = TickLib.tickToPrice(tick) + tradingFee;
+        uint256 buyerPrice = TickLib.tickToPrice(tick) + (buy ? 0 : tradingFee);
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
 
-        assertEq(units.mulDivUp(buyerPrice, WAD), targetBuyerAssets, "forward not target");
-        assertGt((units + 1).mulDivUp(buyerPrice, WAD), targetBuyerAssets, "not largest units");
+        uint256 forward = buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        uint256 forwardNext = buy ? (units + 1).mulDivDown(buyerPrice, WAD) : (units + 1).mulDivUp(buyerPrice, WAD);
+        assertEq(forward, targetBuyerAssets, "forward not target");
+        assertGt(forwardNext, targetBuyerAssets, "not largest units");
     }
 
     function testSellerAssetsToUnitsIsSmallest(
         uint256 targetSellerAssets,
         uint256 tick,
         uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 tradingFee1,
+        bool buy
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 1, _maxTick(tradingFee));
+        // Buy offer requires sellerPrice = offerPrice - tradingFee > 0; sell offer requires buyerPrice <= WAD.
+        tick = bound(tick, buy ? _minTick(tradingFee) : 1, buy ? MAX_TICK : _maxTick(tradingFee));
 
+        offer.buy = buy;
         offer.tick = tick;
-        uint256 sellerPrice = TickLib.tickToPrice(tick);
+        uint256 sellerPrice = TickLib.tickToPrice(tick) - (buy ? tradingFee : 0);
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
 
-        assertEq(units.mulDivUp(sellerPrice, WAD), targetSellerAssets, "forward not target");
         assertGt(units, 0, "units zero");
-        assertLt((units - 1).mulDivUp(sellerPrice, WAD), targetSellerAssets, "not smallest units");
+        uint256 forward = buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 forwardPrev = buy ? (units - 1).mulDivDown(sellerPrice, WAD) : (units - 1).mulDivUp(sellerPrice, WAD);
+        assertEq(forward, targetSellerAssets, "forward not target");
+        assertLt(forwardPrev, targetSellerAssets, "not smallest units");
     }
 
     // buyerPrice >= WAD: not all buyerAssets are reachable, but snapped values are.
