@@ -4,6 +4,14 @@ pragma solidity ^0.8.0;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
+import {
+    COLLATERAL_PARAMS_TYPE,
+    COLLATERAL_PARAMS_TYPEHASH,
+    OBLIGATION_TYPE,
+    OBLIGATION_TYPEHASH,
+    OFFER_TYPE,
+    OFFER_TYPEHASH
+} from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
     function testFuzzCountBits(uint128 bitmap) public pure {
@@ -157,5 +165,11 @@ contract UtilsLibTest is Test {
         assertApproxEqRel(TickLib.wExp(18 ether), 65659969.137330511139838976 ether, 0.001 ether, "exp(18)");
         assertApproxEqRel(TickLib.wExp(19 ether), 178482300.96318726092869632 ether, 0.001 ether, "exp(19)");
         assertApproxEqRel(TickLib.wExp(20 ether), 485165195.409790277969936384 ether, 0.001 ether, "exp(20)");
+    }
+
+    function testTypehashes() public pure {
+        assertEq(COLLATERAL_PARAMS_TYPEHASH, keccak256(COLLATERAL_PARAMS_TYPE));
+        assertEq(OBLIGATION_TYPEHASH, keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE)));
+        assertEq(OFFER_TYPEHASH, keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE)));
     }
 }
