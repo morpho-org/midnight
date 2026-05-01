@@ -137,9 +137,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
-/// @dev position.creditOf is not up to date. One must use updatePositionView to get the up to date credit.
-/// @dev obligationState.tradingFee0-6 are zero before the obligation is created, and might get updated with the default
-/// fees in touchObligation.
+/// @dev creditOf is not up to date. One must use updatePositionView to get the up to date credit.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed.
