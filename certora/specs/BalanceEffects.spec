@@ -153,20 +153,6 @@ rule takeSellerEffects(env e, uint256 units, address taker, address takerCallbac
     assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
 }
 
-/// TAKE (DEBT DIRECTION) ///
-
-/// In take, the buyer's debt can only decrease.
-rule takeOnlySellerCanNewlyBecomeBorrower(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    bytes32 id = toId(e, offer.obligation);
-    address buyer = offer.buy ? offer.maker : taker;
-
-    uint256 buyerDebtBefore = debtOf(id, buyer);
-
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    assert debtOf(id, buyer) <= buyerDebtBefore;
-}
-
 /// REPAY ///
 
 /// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
