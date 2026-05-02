@@ -33,15 +33,13 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// collaterals simultaneously.
 ///
 /// MULTICOLLATS
-/// @dev An obligation fixes its set of permitted collaterals at creation, each with its own lltv and maxLif.
+/// @dev An obligation has a fixed set of permitted collaterals, each with its own lltv and maxLif.
 /// A borrower's debt is backed jointly by every collateral they have activated: debt capacity is the sum of each
 /// activated collateral's value, weighted by its lltv (`maxDebt = sum_i (collateral_i * price_i * lltv_i)`). A borrower
 /// can therefore back a single debt position with multiple collaterals at once.
 /// @dev Collateral composition remains changeable post-origination. A borrower can `supplyCollateral` and
-/// `withdrawCollateral` at any time, subject only to an instantaneous health check on withdrawal. Lenders therefore
-/// underwrite not just
-/// the collateral mix at origination but the borrower's option to recompose toward the riskiest permitted collateral
-/// at any point before maturity.
+/// `withdrawCollateral` at any time, subject only to an instantaneous health check on withdrawal. In particular, the
+/// borrowers of multicollat obligations can completely change their collateral composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
