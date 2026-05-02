@@ -34,7 +34,7 @@ methods {
     function _.onBuy(bytes32 id, Midnight.Obligation obligation, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
@@ -201,13 +201,13 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
+rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralKey, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
 
-    require globalObligationCollateralLLTV[collateralIndex] * globalObligationCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
+    require globalObligationCollateralLLTV[collateralKey] * globalObligationCollateralMaxLif[collateralKey] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
     require globalObligationCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
@@ -215,26 +215,26 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
 
-    uint256 collateralBefore = collateral(globalId, globalBorrower, collateralIndex);
+    uint256 collateralBefore = collateral(globalId, globalBorrower, collateralKey);
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralKey, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
-    mathint price = summaryPrice(globalObligation.collateralParams[collateralIndex].oracle);
+    mathint price = summaryPrice(globalObligation.collateralParams[collateralKey].oracle);
 
     // require all the axioms that are needed to prove the healthiness after liquidation. These are the same axioms that are proved in the MulDiv.spec
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
     require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
-    require axiomInverseUpDown(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralMaxLif[collateralIndex], globalObligationCollateralLLTV[collateralIndex]), "axiom";
+    require axiomInverseUpDown(repaidUnitsOut, globalObligationCollateralMaxLif[collateralKey], WAD()), "axiom";
+    require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalObligationCollateralMaxLif[collateralKey], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralMaxLif[collateralKey], globalObligationCollateralLLTV[collateralKey]), "axiom";
     require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralKey], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert healthyBeforeCallback, "user is healthy before callbacks";
@@ -242,7 +242,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
+rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -255,7 +255,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
+    liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";

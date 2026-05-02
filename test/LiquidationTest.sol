@@ -64,7 +64,7 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), type(uint256).max);
     }
 
-    function testLiquidateInvalidCollateralIndex() public {
+    function testLiquidateInvalidCollateralKey() public {
         uint256 units = 100e18;
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -74,7 +74,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(obligation, 2, 0, 0, borrower, address(this), address(0), "");
     }
 
-    function testLiquidateInactiveCollateralIndex(uint256 units) public {
+    function testLiquidateInactiveCollateralKey(uint256 units) public {
         units = bound(units, 10, MAX_UNITS);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);

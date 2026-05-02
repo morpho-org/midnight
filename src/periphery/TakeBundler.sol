@@ -68,7 +68,7 @@ contract TakeBundler is ITakeBundler {
             IMidnight(midnight)
                 .withdrawCollateral(
                     obligation,
-                    collateralWithdrawals[i].collateralIndex,
+                    collateralWithdrawals[i].collateralKey,
                     collateralWithdrawals[i].assets,
                     taker,
                     collateralReceiver
@@ -102,13 +102,11 @@ contract TakeBundler is ITakeBundler {
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
-            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            address token = obligation.collateralParams[collateralSupplies[i].collateralKey].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
-                .supplyCollateral(
-                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
-                );
+                .supplyCollateral(obligation, collateralSupplies[i].collateralKey, collateralSupplies[i].assets, taker);
         }
 
         uint256 filledUnits;
@@ -204,7 +202,7 @@ contract TakeBundler is ITakeBundler {
             IMidnight(midnight)
                 .withdrawCollateral(
                     obligation,
-                    collateralWithdrawals[i].collateralIndex,
+                    collateralWithdrawals[i].collateralKey,
                     collateralWithdrawals[i].assets,
                     taker,
                     collateralReceiver
@@ -237,13 +235,11 @@ contract TakeBundler is ITakeBundler {
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
-            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            address token = obligation.collateralParams[collateralSupplies[i].collateralKey].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
-                .supplyCollateral(
-                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
-                );
+                .supplyCollateral(obligation, collateralSupplies[i].collateralKey, collateralSupplies[i].assets, taker);
         }
 
         uint256 referralFeeAssets = targetSellerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);

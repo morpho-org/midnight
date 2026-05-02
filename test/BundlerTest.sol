@@ -528,10 +528,10 @@ contract BundlerTest is BaseTest {
 
     // Collateral transfers.
 
-    function _collateralAmount(uint256 collateralIndex, uint256 debt) internal view returns (uint256) {
-        uint256 oraclePrice = Oracle(obligation.collateralParams[collateralIndex].oracle).price();
+    function _collateralAmount(uint256 collateralKey, uint256 debt) internal view returns (uint256) {
+        uint256 oraclePrice = Oracle(obligation.collateralParams[collateralKey].oracle).price();
         return
-            debt.mulDivUp(WAD, obligation.collateralParams[collateralIndex].lltv)
+            debt.mulDivUp(WAD, obligation.collateralParams[collateralKey].lltv)
                 .mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
     }
 
@@ -578,7 +578,7 @@ contract BundlerTest is BaseTest {
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralTransfer({collateralKey: i, assets: amounts[i] / 4});
         }
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -626,7 +626,7 @@ contract BundlerTest is BaseTest {
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralTransfer({collateralKey: i, assets: amounts[i] / 4});
         }
 
         vm.prank(lender);
@@ -652,7 +652,7 @@ contract BundlerTest is BaseTest {
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(takeBundler), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralTransfer({collateralKey: i, assets: amount});
         }
 
         Take[] memory takes = new Take[](1);
@@ -692,7 +692,7 @@ contract BundlerTest is BaseTest {
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(takeBundler), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralTransfer({collateralKey: i, assets: amount});
         }
 
         Take[] memory takes = new Take[](1);

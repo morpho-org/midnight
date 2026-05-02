@@ -14,7 +14,7 @@ interface ISellCallback {
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Obligation memory obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external returns (bytes32);
+    function onLiquidate(bytes32 id, Obligation memory obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {

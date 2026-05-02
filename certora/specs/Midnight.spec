@@ -86,11 +86,11 @@ rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, addres
     assert claimableTradingFee(offer.obligation.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
-rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
 
-    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     // At most one of the input arguments can be zero.
     assert seizedAssets == 0 || repaidUnits == 0;

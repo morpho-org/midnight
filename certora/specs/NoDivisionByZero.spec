@@ -120,18 +120,18 @@ rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selec
 }
 
 // Show that liquidate does not cause a division by zero, in case the oracle price is non-zero and the collateral is active.
-rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require equalsGlobalObligation(obligation);
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
     require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";
 
-    require obligation.collateralParams[collateralIndex].lltv < WAD() => to_mathint(obligation.collateralParams[collateralIndex].maxLif) * to_mathint(obligation.collateralParams[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
+    require obligation.collateralParams[collateralKey].lltv < WAD() => to_mathint(obligation.collateralParams[collateralKey].maxLif) * to_mathint(obligation.collateralParams[collateralKey].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
 
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
-    require ghostPrice(obligation.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
-    require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
+    require ghostPrice(obligation.collateralParams[collateralKey].oracle) > 0, "Assumption: the collateral price is not zero";
+    require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralKey), "Assumption: liquidated collateral was activated";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert true;
 }

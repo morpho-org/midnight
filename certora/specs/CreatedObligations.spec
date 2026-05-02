@@ -103,18 +103,18 @@ rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint25
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterSupplyCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf) {
-    Midnight.supplyCollateral(e, obligation, collateralIndex, assets, onBehalf);
+rule obligationIsCreatedAfterSupplyCollateral(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf) {
+    Midnight.supplyCollateral(e, obligation, collateralKey, assets, onBehalf);
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
-    Midnight.withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
+rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, address receiver) {
+    Midnight.withdrawCollateral(e, obligation, collateralKey, assets, onBehalf, receiver);
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    Midnight.liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert obligationIsCreated(obligation);
 }
 
@@ -168,8 +168,8 @@ strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address use
 strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => userHasNoLastAccrual(id, user);
 
-strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
-    !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
+strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralKey)
+    !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralKey);
 
 strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
@@ -185,7 +185,7 @@ definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns boo
 
 definition userHasNoLastAccrual(bytes32 id, address user) returns bool = Midnight.lastAccrual(id, user) == 0;
 
-definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
+definition userHasNoCollateral(bytes32 id, address user, uint256 collateralKey) returns bool = collateralKey < 128 => currentContract.position[id][user].collateral[collateralKey] == 0;
 
 definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 

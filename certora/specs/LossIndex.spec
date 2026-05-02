@@ -46,14 +46,14 @@ rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, callda
 }
 
 /// In `liquidate`, the obligation's lossIndex changes if and only if bad debt is realized (totalUnits decreases).
-rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
     uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
     uint256 totalUnitsBefore = totalUnits(id);
 
     require lossIndexBefore < max_uint128, "obligation lossIndex must not be saturated";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     bool lossIndexChanged = currentContract.obligationState[id].lossIndex != lossIndexBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;

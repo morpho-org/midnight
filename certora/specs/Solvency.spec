@@ -28,7 +28,7 @@ methods {
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
+    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
     function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
@@ -70,7 +70,7 @@ ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 // Mapping from obligation id to its loan token.
 ghost mapping(bytes32 => address) loantoken;
 
-// Mapping from obligation id and collateral index to the corresponding collateral token.
+// Mapping from obligation id and collateral key to the corresponding collateral token.
 ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
 ghost hash(address, uint256, uint256, address) returns bytes32;
@@ -82,7 +82,7 @@ function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midni
     // Assume the obligation id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
     require(loantoken[id] == obligation.loanToken), "remember the loan token of the obligation";
-    require(forall uint128 collateralIndex. collateralIndex < obligation.collateralParams.length => collateralToken[id][collateralIndex] == obligation.collateralParams[collateralIndex].token), "remember the collateral tokens of the obligation";
+    require(forall uint128 collateralKey. collateralKey < obligation.collateralParams.length => collateralToken[id][collateralKey] == obligation.collateralParams[collateralKey].token), "remember the collateral tokens of the obligation";
     return id;
 }
 
@@ -113,13 +113,13 @@ ghost mapping(bytes32 => mapping(address => mapping(address => mathint))) collat
 }
 
 // Safe require as obligations limit the number of collateralParams.
-hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] {
-    require value == collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]], "ghost mirror";
+hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralKey] {
+    require value == collateralMirror[id][owner][collateralToken[id][require_uint128(collateralKey)]], "ghost mirror";
 }
 
 // Safe require as obligations limit the number of collateralParams.
-hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
-    collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
+hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralKey] uint128 newCollateral (uint128 oldCollateral) {
+    collateralMirror[id][owner][collateralToken[id][require_uint128(collateralKey)]] = newCollateral;
 }
 
 definition withdrawableSum(address token) returns mathint = usum bytes32 id. withdrawableMirror[id][token];

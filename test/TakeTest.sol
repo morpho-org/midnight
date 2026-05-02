@@ -1680,10 +1680,10 @@ contract BorrowCallback is ISellCallback {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         recordedData = data;
-        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
-        address collateralToken = obligation.collateralParams[collateralIndex].token;
+        (uint256 collateralKey, uint256 amount) = abi.decode(data, (uint256, uint256));
+        address collateralToken = obligation.collateralParams[collateralKey].token;
         ERC20(collateralToken).approve(msg.sender, amount);
-        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, amount, seller);
+        Midnight(msg.sender).supplyCollateral(obligation, collateralKey, amount, seller);
         return CALLBACK_SUCCESS;
     }
 }
@@ -1697,18 +1697,18 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         returns (bytes32)
     {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
-        (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
+        (uint256 collateralKey, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
-        address collateralToken = obligation.collateralParams[collateralIndex].token;
+        address collateralToken = obligation.collateralParams[collateralKey].token;
         ERC20(collateralToken).approve(msg.sender, collateralAmount);
-        Midnight(msg.sender).supplyCollateral(obligation, collateralIndex, collateralAmount, seller);
+        Midnight(msg.sender).supplyCollateral(obligation, collateralKey, collateralAmount, seller);
 
-        Oracle oracle = Oracle(obligation.collateralParams[collateralIndex].oracle);
+        Oracle oracle = Oracle(obligation.collateralParams[collateralKey].oracle);
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
         try Midnight(msg.sender)
-            .liquidate(obligation, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
+            .liquidate(obligation, collateralKey, 0, repaidUnits, seller, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1731,7 +1731,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     bytes32 internal storedRoot;
     bytes32[] internal storedProof;
     uint256 internal innerUnits;
-    uint256 internal storedCollateralIndex;
+    uint256 internal storedCollateralKey;
     uint256 internal storedCollateralAmount;
     uint256 internal storedRepaidUnits;
 
@@ -1741,7 +1741,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         bytes32 _root,
         bytes32[] memory _proof,
         uint256 _innerUnits,
-        uint256 _collateralIndex,
+        uint256 _collateralKey,
         uint256 _collateralAmount,
         uint256 _repaidUnits
     ) external {
@@ -1750,7 +1750,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         storedRoot = _root;
         storedProof = _proof;
         innerUnits = _innerUnits;
-        storedCollateralIndex = _collateralIndex;
+        storedCollateralKey = _collateralKey;
         storedCollateralAmount = _collateralAmount;
         storedRepaidUnits = _repaidUnits;
     }
@@ -1761,7 +1761,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         if (!reentered) {
-            uint256 idx = storedCollateralIndex;
+            uint256 idx = storedCollateralKey;
             address collateralToken = obligation.collateralParams[idx].token;
             ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
             Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);

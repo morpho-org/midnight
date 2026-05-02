@@ -13,7 +13,7 @@ struct Take {
 }
 
 struct CollateralTransfer {
-    uint256 collateralIndex;
+    uint256 collateralKey;
     uint256 assets;
 }
 
