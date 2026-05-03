@@ -811,8 +811,8 @@ contract Midnight is IMidnight {
         return position[id][user].activatedCollaterals;
     }
 
-    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
-        return position[id][user].collateral[index];
+    function collateral(bytes32 id, address user, uint256 collateralKey) external view returns (uint128) {
+        return position[id][user].collateral[collateralKey];
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {

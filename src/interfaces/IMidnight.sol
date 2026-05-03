@@ -160,7 +160,7 @@ interface IMidnight {
     /// OTHER VIEW FUNCTIONS ///
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
     function activatedCollaterals(bytes32 id, address user) external view returns (uint128);
-    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
+    function collateral(bytes32 id, address user, uint256 collateralKey) external view returns (uint128);
     function toId(Obligation memory obligation) external view returns (bytes32);
     function toObligation(bytes32 id) external view returns (Obligation memory);
     function creditOf(bytes32 id, address user) external view returns (uint256);
