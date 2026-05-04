@@ -227,14 +227,14 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Obligation obligation, by
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
-/// Assumption : collateralIndex is the MSB otherwise isLiquidatable -> isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true.
+/// Assumption : collateralIndex is the MSB otherwise take's isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true.
 rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, uint256 collateralIndex) {
     require singleRevertingOracle == offer.obligation.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(offer.obligation);
     address seller = offer.buy ? taker : offer.maker;
 
-    // Without this, isLiquidatable short-circuits to false (without calling isHealthy) because
+    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
@@ -286,7 +286,7 @@ rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Obligation ob
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
-/// Note: same short-circuit limitation — take calls isLiquidatable → isHealthy, which may short-circuit.
+/// Note: same short-circuit limitation — take's liquidatability check calls isHealthy, which may short-circuit.
 rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require forceOracleReturnZero, "all oracles return zero";
 

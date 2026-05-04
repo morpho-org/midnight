@@ -435,7 +435,11 @@ contract Midnight is IMidnight {
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
+        require(
+            position[id][seller].debt == 0
+                || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
+            SellerIsLiquidatable()
+        );
 
         return (buyerAssets, sellerAssets, units);
     }
@@ -881,13 +885,6 @@ contract Midnight is IMidnight {
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
-    }
-
-    /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
-    /// past maturity or not healthy.
-    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
-            && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
