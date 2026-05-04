@@ -897,14 +897,16 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
+        if (debt > 0) {
+            uint128 bitmap = _position.activatedCollaterals;
+            while (bitmap != 0) {
+                uint256 i = UtilsLib.msb(bitmap);
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                bitmap = bitmap.clearBit(i);
+            }
         }
         return maxDebt >= debt;
     }
