@@ -110,6 +110,9 @@ interface IMidnight {
     error UnhealthyBorrower();
 
     // forgefmt: disable-start
+    /// IMMUTABLES ///
+    function INITIAL_CHAIN_ID() external view returns (uint256);
+
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 activatedCollaterals);
     function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossIndex, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);

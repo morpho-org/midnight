@@ -15,7 +15,7 @@ methods {
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
@@ -37,11 +37,13 @@ methods {
 
 /// UPDATE POSITION ///
 
-/// updatePosition sets user's credit to the post-update value,
-/// only changes credit of user at the obligation id, and accrues fee to continuousFeeCredit.
+/// updatePosition can only decrease user's credit (through slashing and fee accrual),
+/// sets it to the post-update value, only changes credit of user at the obligation id,
+/// and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
+    uint256 creditBefore = creditOf(id, user);
     uint128 updatedUserCredit;
     uint128 userFee;
     updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, user);
@@ -56,6 +58,7 @@ rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, 
     assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
     assert creditOf(id, user) == updatedUserCredit;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
+    assert creditOf(id, user) <= creditBefore;
 }
 
 /// WITHDRAW ///

@@ -272,6 +272,33 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(actual, expected, "toId mismatch");
     }
 
+    function testToIdStableAcrossHardfork(
+        Obligation memory _obligation,
+        Obligation memory otherObligation,
+        uint64 newChainId
+    ) public {
+        vm.assume(_obligation.collateralParams.length > 0);
+        vm.assume(newChainId != block.chainid);
+        _obligation = validObligation(_obligation);
+
+        bytes32 idBefore = midnight.touchObligation(_obligation);
+        uint256 capturedChainId = midnight.INITIAL_CHAIN_ID();
+
+        vm.chainId(newChainId);
+
+        assertEq(midnight.INITIAL_CHAIN_ID(), capturedChainId, "INITIAL_CHAIN_ID changed");
+        assertEq(midnight.toId(_obligation), idBefore, "toId changed");
+        Obligation memory roundTrip = midnight.toObligation(idBefore);
+        assertEq(keccak256(abi.encode(roundTrip)), keccak256(abi.encode(_obligation)), "stored obligation lost");
+
+        otherObligation = validObligation(otherObligation);
+        bytes32 otherId = midnight.touchObligation(otherObligation);
+        Obligation memory otherRoundTrip = midnight.toObligation(otherId);
+        assertEq(
+            keccak256(abi.encode(otherRoundTrip)), keccak256(abi.encode(otherObligation)), "stored obligation lost"
+        );
+    }
+
     function testToObligationRevertsIfNotCreated(bytes32 _id) public {
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.toObligation(_id);
