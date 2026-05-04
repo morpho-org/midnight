@@ -213,49 +213,49 @@ filtered {
 
 /// supplyCollateral increases onBehalf's collateral by exactly assets,
 /// and only changes position[id][onBehalf].collateral[collateralKey].
-rule supplyCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule supplyCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyCollateralKey) {
     bytes32 id = toId(e, obligation);
 
     uint256 collateralBefore = collateral(id, onBehalf, collateralKey);
-    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
+    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyCollateralKey);
 
     supplyCollateral(e, obligation, collateralKey, assets, onBehalf);
 
     assert collateral(id, onBehalf, collateralKey) == collateralBefore + assets;
-    assert anyUser != onBehalf || anyId != id || anyIndex != collateralKey => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
+    assert anyUser != onBehalf || anyId != id || anyCollateralKey != collateralKey => collateral(anyId, anyUser, anyCollateralKey) == otherCollateralBefore;
 }
 
 /// WITHDRAW COLLATERAL ///
 
 /// withdrawCollateral decreases onBehalf's collateral by exactly assets,
 /// and only changes position[id][onBehalf].collateral[collateralKey].
-rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyCollateralKey) {
     bytes32 id = toId(e, obligation);
 
     uint256 collateralBefore = collateral(id, onBehalf, collateralKey);
-    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
+    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyCollateralKey);
 
     withdrawCollateral(e, obligation, collateralKey, assets, onBehalf, receiver);
 
     assert collateral(id, onBehalf, collateralKey) == collateralBefore - assets;
-    assert anyUser != onBehalf || anyId != id || anyIndex != collateralKey => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
+    assert anyUser != onBehalf || anyId != id || anyCollateralKey != collateralKey => collateral(anyId, anyUser, anyCollateralKey) == otherCollateralBefore;
 }
 
 /// LIQUIDATE (COLLATERAL) ///
 
 /// liquidate decreases the borrower's collateral at collateralKey by exactly seizedResult,
 /// and only changes position[id][borrower].collateral[collateralKey].
-rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyCollateralKey) {
     bytes32 id = toId(e, obligation);
 
     uint256 collateralBefore = collateral(id, borrower, collateralKey);
-    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
+    uint256 otherCollateralBefore = collateral(anyId, anyUser, anyCollateralKey);
 
     uint256 seizedResult;
     seizedResult, _ = liquidate(e, obligation, collateralKey, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
     assert collateral(id, borrower, collateralKey) == collateralBefore - seizedResult;
-    assert anyUser != borrower || anyId != id || anyIndex != collateralKey => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
+    assert anyUser != borrower || anyId != id || anyCollateralKey != collateralKey => collateral(anyId, anyUser, anyCollateralKey) == otherCollateralBefore;
 }
 
 /// ALL OTHER FUNCTIONS (COLLATERAL) ///

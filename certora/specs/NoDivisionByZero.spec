@@ -75,7 +75,7 @@ ghost ghostPrice(address) returns uint256;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition collateralMatches(Midnight.Obligation obligation, uint256 index) returns bool = (index < globalObligationCollateralLength => obligation.collateralParams[index].oracle == globalObligationCollateralOracle[index] && obligation.collateralParams[index].token == globalObligationCollateralToken[index] && obligation.collateralParams[index].lltv == globalObligationCollateralLLTV[index] && obligation.collateralParams[index].maxLif == globalObligationCollateralMaxLif[index]);
+definition collateralMatches(Midnight.Obligation obligation, uint256 collateralKey) returns bool = (collateralKey < globalObligationCollateralLength => obligation.collateralParams[collateralKey].oracle == globalObligationCollateralOracle[collateralKey] && obligation.collateralParams[collateralKey].token == globalObligationCollateralToken[collateralKey] && obligation.collateralParams[collateralKey].lltv == globalObligationCollateralLLTV[collateralKey] && obligation.collateralParams[collateralKey].maxLif == globalObligationCollateralMaxLif[collateralKey]);
 
 function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
     return obligation.loanToken == globalObligationLoanToken && obligation.collateralParams.length == globalObligationCollateralLength && collateralMatches(obligation, 0) && collateralMatches(obligation, 1) && collateralMatches(obligation, 2) && obligation.maturity == globalObligationMaturity && obligation.rcfThreshold == globalObligationRcfThreshold && obligation.enterGate == globalObligationEnterGate && obligation.liquidatorGate == globalObligationLiquidatorGate;

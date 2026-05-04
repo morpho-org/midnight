@@ -197,7 +197,7 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, ui
 /// Assumption : revertingCollateralKey is the MSB otherwise isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true.
 rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation obligation, uint256 collateralKey, uint256 assets, address onBehalf, address receiver, uint256 revertingCollateralKey) {
     require singleRevertingOracle == obligation.collateralParams[revertingCollateralKey].oracle, "oracle is reverting";
-    require revertingCollateralKey < 128, "clearBit produces a new bitmap whose summaryGetBit is unconstrained for indices >= 128";
+    require revertingCollateralKey < 128, "clearBit produces a new bitmap whose summaryGetBit is unconstrained for keys >= 128";
     require revertingCollateralKey != collateralKey, "withdrawCollateral may clear the bit at collateralKey before calling isHealthy";
 
     bytes32 id = summaryToId(obligation);

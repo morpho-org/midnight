@@ -124,8 +124,8 @@ persistent ghost bytes32 globalId;
 persistent ghost address globalBorrower;
 
 // helper function to check if one of the collateralParams of an obligation matches the global variables.
-// It checks for the length and also returns true if the index is out of bounds. This allows us to require this for every index.
-definition collateralMatches(Midnight.Obligation obligation, uint256 index) returns bool = (index < globalObligationCollateralLength => obligation.collateralParams[index].oracle == globalObligationCollateralOracle[index] && obligation.collateralParams[index].token == globalObligationCollateralToken[index] && obligation.collateralParams[index].lltv == globalObligationCollateralLLTV[index] && obligation.collateralParams[index].maxLif == globalObligationCollateralMaxLif[index]);
+// It checks for the length and also returns true if the key is out of bounds. This allows us to require this for every key.
+definition collateralMatches(Midnight.Obligation obligation, uint256 collateralKey) returns bool = (collateralKey < globalObligationCollateralLength => obligation.collateralParams[collateralKey].oracle == globalObligationCollateralOracle[collateralKey] && obligation.collateralParams[collateralKey].token == globalObligationCollateralToken[collateralKey] && obligation.collateralParams[collateralKey].lltv == globalObligationCollateralLLTV[collateralKey] && obligation.collateralParams[collateralKey].maxLif == globalObligationCollateralMaxLif[collateralKey]);
 
 function equalsGlobalObligation(Midnight.Obligation obligation) returns (bool) {
     return obligation.loanToken == globalObligationLoanToken && obligation.collateralParams.length == globalObligationCollateralLength && collateralMatches(obligation, 0) && collateralMatches(obligation, 1) && collateralMatches(obligation, 2) && obligation.maturity == globalObligationMaturity && obligation.rcfThreshold == globalObligationRcfThreshold && obligation.enterGate == globalObligationEnterGate && obligation.liquidatorGate == globalObligationLiquidatorGate;

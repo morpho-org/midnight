@@ -34,7 +34,7 @@ persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
 
 persistent ghost summaryMulDivUp(uint256, uint256, uint256) returns uint256;
 
-// Check that a collateral bit is set exactly when there is collateral for that index.
+// Check that a collateral bit is set exactly when there is collateral for that key.
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralKey)
     collateralKey < 128 => (collateral(id, user, collateralKey) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralKey));
 

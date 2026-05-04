@@ -1761,10 +1761,10 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     {
         require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
         if (!reentered) {
-            uint256 idx = storedCollateralKey;
-            address collateralToken = obligation.collateralParams[idx].token;
+            uint256 collateralKey = storedCollateralKey;
+            address collateralToken = obligation.collateralParams[collateralKey].token;
             ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
-            Midnight(msg.sender).supplyCollateral(obligation, idx, storedCollateralAmount, seller);
+            Midnight(msg.sender).supplyCollateral(obligation, collateralKey, storedCollateralAmount, seller);
 
             reentered = true;
             Offer memory nestedOffer = storedOffer;
@@ -1772,12 +1772,12 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             Midnight(msg.sender)
                 .take(innerUnits, seller, address(this), "", seller, nestedOffer, storedSig, storedRoot, nestedProof);
 
-            Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
+            Oracle oracle = Oracle(obligation.collateralParams[collateralKey].oracle);
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
             try Midnight(msg.sender)
-                .liquidate(obligation, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
+                .liquidate(obligation, collateralKey, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
