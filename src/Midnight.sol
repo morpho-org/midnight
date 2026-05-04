@@ -34,24 +34,16 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// MULTICOLLATS
 /// @dev An obligation has a fixed set of permitted collaterals, each with its own lltv and maxLif.
-/// A borrower's debt is backed jointly by every collateral they have activated: debt capacity is the sum of each
-/// activated collateral's value, weighted by its lltv (`maxDebt = sum_i (collateral_i * price_i * lltv_i)`). A borrower
-/// can therefore back a single debt position with multiple collaterals at once.
-/// @dev Collateral composition remains changeable post-origination. A borrower can `supplyCollateral` and
-/// `withdrawCollateral` at any time, subject only to an instantaneous health check on withdrawal. In particular, the
-/// borrowers of multicollat obligations can completely change their collateral composition.
+/// A borrower's debt capacity is the sum of each activated collateral's value, weighted by its
+/// lltv (`maxDebt = sum_i (collateral_i * price_i * lltv_i)`).
+/// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
+/// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
+///  change their collateral composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
-/// @dev Collateral slot order is fixed by ascending token address at obligation creation. Sorted index `i` maps to
-/// `obligation.collateralParams[i]` and to bit `i` of `position.activatedCollaterals`. `isHealthy` and `liquidate`
-/// iterate MSB-first (highest-address collateral first).
-/// @dev `isHealthy` short-circuits as soon as `maxDebt >= debt`, but `liquidate` does not. Consequences:
-/// - `isHealthy` can return true without consulting a higher-bit collateral whose oracle reverts.
-/// - Post-maturity, `isLiquidatable` can return true while `liquidate` reverts on a broken oracle, so
-/// `isLiquidatable == true` does not imply `liquidate` succeeds.
-/// - A borrower can unknowingly reduce their effective health buffer by withdrawing a higher-address collateral
-/// that masked a reverting/malfunctioning lower-address collateral in the instantaneous health check.
+/// @dev Liquidator profits, i.e., maxRepaidUnits * (LIF-1) is not a constant across activated collaterals in
+/// RCF-constrained liquidations. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new obligations. Then, the fee setter can override it.
