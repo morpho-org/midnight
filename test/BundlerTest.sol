@@ -246,6 +246,7 @@ contract BundlerTest is BaseTest {
         uint256 firstUnits = 10e18;
         uint256 firstBuyerAssets = firstUnits.mulDivUp(offerPrice, WAD);
         uint256 remainingBuyerAssets = 1000e18;
+        uint256 expectedSecondUnits = remainingBuyerAssets.mulDivDown(WAD, otherBuyerPrice);
         uint256 maxSecondUnits = remainingBuyerAssets.mulDivUp(WAD, offerPrice);
         uint256 targetBuyerAssets = firstBuyerAssets + remainingBuyerAssets;
 
@@ -286,6 +287,8 @@ contract BundlerTest is BaseTest {
         );
 
         assertEq(type(uint256).max - loanToken.balanceOf(lender), targetBuyerAssets, "lender total cost");
+        assertEq(midnight.creditOf(id, lender), firstUnits, "first obligation lender credit");
+        assertEq(midnight.creditOf(otherId, lender), expectedSecondUnits, "second obligation lender credit");
         assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler residual");
     }
 
@@ -407,6 +410,8 @@ contract BundlerTest is BaseTest {
         );
 
         assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower receipt");
+        assertEq(midnight.creditOf(id, lender), firstUnits, "first obligation lender credit");
+        assertEq(midnight.creditOf(otherId, lender), maxSecondUnits, "second obligation lender credit");
         assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler residual");
     }
 
