@@ -133,13 +133,13 @@ function requireObligationBounds(Midnight.Obligation obligation) {
     require obligation.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
 }
 
-/// RULES ///
-
 // Reset oracle-related ghosts so non-liquidate rules don't carry over the extra product bound.
 function resetOraclePriceAssumption() {
     liquidateAmount = 0;
     liquidatedOracle = 0;
 }
+
+/// RULES ///
 
 // Normal calls intentionally scope this proof to non-reverting executions.
 // Exclude maxLif (see header), liquidate (dedicated input bound), and view functions with arbitrary ids.
