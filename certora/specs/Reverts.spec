@@ -193,8 +193,7 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, ui
     assert lastReverted;
 }
 
-/// If an activated collateral oracle reverts on price different than withdrawn collateral,
-/// withdrawCollateral reverts when the borrower has debt.
+/// If an activated collateral oracle reverts on price different than withdrawn collateral, withdrawCollateral reverts when the borrower has debt.
 rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, uint256 revertingCollateralIndex) {
     require singleRevertingOracle == obligation.collateralParams[revertingCollateralIndex].oracle, "oracle is reverting";
     require revertingCollateralIndex < 128, "clearBit produces a new bitmap whose summaryGetBit is unconstrained for indices >= 128";

@@ -20,8 +20,7 @@ contract MidnightWrapper is Midnight {
         uint256 maxDebt;
         if (debt > 0) {
             uint256 len = obligation.collateralParams.length;
-            for (uint256 i = len; i > 0;) {
-                i--;
+            for (uint256 i = len; i > 0; i--) {
                 CollateralParams memory collateralParam = obligation.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
                 maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
