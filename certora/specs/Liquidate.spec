@@ -52,8 +52,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     address user;
     uint256 collateralIndex;
 
-    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser)
-        && (e.block.timestamp > obligation.maturity || !isHealthy(obligation, id, liqUser));
+    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > obligation.maturity || !isHealthy(obligation, id, liqUser));
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
