@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => CVL_toId(obligation);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
@@ -26,15 +29,8 @@ methods {
 
 /// HELPERS ///
 
-// IdLib summary: remember the last id returned by toId.
-
-persistent ghost bytes32 lastId;
-
-function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
-    // non-deterministic id
-    bytes32 id;
-    lastId = id;
-    return id;
+function summaryToId(Midnight.Obligation obligation) returns bytes32 {
+    return Utils.hashObligation(obligation);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -43,15 +39,13 @@ definition WAD() returns uint256 = 10 ^ 18;
 rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     address buyer = offer.buy ? offer.maker : taker;
 
-    bytes32 id;
+    bytes32 id = summaryToId(offer.obligation);
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    require id == lastId, "id should be derived from obligation";
 
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
@@ -65,7 +59,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
 rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     address seller = offer.buy ? taker : offer.maker;
 
-    bytes32 id;
+    bytes32 id = summaryToId(offer.obligation);
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
@@ -74,8 +68,6 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
     require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    require id == lastId, "id should be derived from obligation";
 
     uint256 creditAfter = creditOf(id, seller);
     uint256 pendingFeeAfter = pendingFee(id, seller);
@@ -91,15 +83,13 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
 
 // When credit decreases via withdraw, pendingFee decreases by ceil(pendingFee * units / postUpdateCredit).
 rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
-    bytes32 id;
+    bytes32 id = summaryToId(obligation);
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, obligation, id, onBehalf);
 
     withdraw(e, obligation, units, onBehalf, receiver);
-
-    require id == lastId, "id should be derived from obligation";
 
     // When postUpdateCredit == 0, pendingFee(id, onBehalf) is unchanged on withdraw.
     assert postUpdateCredit == 0 ? pendingFee(id, onBehalf) == postUpdatePendingFee : pendingFee(id, onBehalf) == postUpdatePendingFee - (postUpdatePendingFee * units + postUpdateCredit - 1) / postUpdateCredit;
@@ -110,7 +100,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    bytes32 id;
+    bytes32 id = summaryToId(offer.obligation);
     uint128 buyerAccruedFee;
     uint128 sellerAccruedFee;
 
@@ -120,8 +110,6 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
     uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    require id == lastId, "id should be derived from obligation";
 
     assert continuousFeeCredit(id) == continuousFeeCreditBefore + buyerAccruedFee + sellerAccruedFee;
 }
@@ -140,8 +128,6 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
     postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.obligation, id, user);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
-
-    require id == lastId, "id should be derived from obligation";
 
     uint256 postUpdateCreditAfter;
     uint256 postUpdatePendingFeeAfter;
