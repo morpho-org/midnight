@@ -31,11 +31,11 @@ library IdLib {
     }
 
     /// @dev Stores the data in the code of the contract at the given address.
-    /// @dev Uses the chain id as salt.
-    function storeInCode(Obligation memory obligation) internal returns (address create2Address) {
+    /// @dev Uses the given chain id as salt.
+    function storeInCode(Obligation memory obligation, uint256 chainId) internal returns (address create2Address) {
         bytes memory creationCode = abi.encodePacked(SSTORE2_PREFIX, abi.encode(obligation));
         assembly ("memory-safe") {
-            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainid())
+            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainId)
         }
         require(create2Address != address(0), SStore2DeploymentFailed());
     }

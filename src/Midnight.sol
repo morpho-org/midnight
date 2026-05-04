@@ -115,10 +115,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - It should not revert on no-op transfers.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`  when the
-/// borrower has debt, and `take` whenever the seller still has debt all revert.
-/// @dev If an activated collateral oracle returns 0 on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, `take` whenever the seller still has debt, and `liquidate` with repaid input all revert.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
+/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
+/// debt, and `take` whenever the seller still has debt might revert.
+/// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
@@ -137,16 +137,29 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
+/// @dev creditOf is not up to date. One must use updatePositionView to get the up to date credit.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
-/// @dev No-ops are allowed.
+/// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
+/// offers are "filled" (consumed=max).
 /// @dev NatSpec comments are included only when they bring clarity.
+/// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
+/// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
+/// hard-fork there can be some obligation id clashes.
 /// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
+/// @dev The case LLTV=WAD is special, and should be used with care, notably:
+/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
+/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
+
+    /// IMMUTABLES ///
+
+    uint256 public immutable INITIAL_CHAIN_ID;
 
     /// STORAGE ///
 
@@ -166,7 +179,8 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        emit EventsLib.Constructor(msg.sender);
+        INITIAL_CHAIN_ID = block.chainid;
+        emit EventsLib.Constructor(msg.sender, INITIAL_CHAIN_ID);
     }
 
     /// MULTICALL ///
@@ -276,7 +290,10 @@ contract Midnight is IMidnight {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    /// @dev The taker might not get the price they expected if the trading fee was just changed.
+    /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
+    /// to perform atomic price checks.
+    /// @dev Taking buy offers with price < trading fee will revert.
+    /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
@@ -714,7 +731,7 @@ contract Midnight is IMidnight {
             _obligationState.tradingFee5 = _defaultTradingFees[5];
             _obligationState.tradingFee6 = _defaultTradingFees[6];
             _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
-            IdLib.storeInCode(obligation);
+            IdLib.storeInCode(obligation, INITIAL_CHAIN_ID);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -799,7 +816,7 @@ contract Midnight is IMidnight {
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {
-        return IdLib.toId(obligation, block.chainid, address(this));
+        return IdLib.toId(obligation, INITIAL_CHAIN_ID, address(this));
     }
 
     /// @dev Reverts if the id is not a valid id of a touched obligation.
