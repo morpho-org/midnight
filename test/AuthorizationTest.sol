@@ -199,7 +199,7 @@ contract AuthorizationTest is BaseTest {
         address taker = makeAddr("taker");
 
         Offer memory offer;
-        offer.buy = true;
+        offer.makerIsBuyer = true;
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
@@ -225,7 +225,7 @@ contract AuthorizationTest is BaseTest {
         address operator = makeAddr("operator");
 
         Offer memory offer;
-        offer.buy = true;
+        offer.makerIsBuyer = true;
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;
@@ -327,7 +327,7 @@ contract AuthorizationTest is BaseTest {
         uint256 units = 1000;
 
         Offer memory offer;
-        offer.buy = true;
+        offer.makerIsBuyer = true;
         offer.maker = lender;
         offer.ratifier = address(ecrecoverRatifier);
         offer.maxUnits = units;

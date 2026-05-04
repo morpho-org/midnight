@@ -9,7 +9,7 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
-    /// @dev Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
+    /// @dev Forward mapping rounds buyerAssets down when the maker is the buyer, and up otherwise.
     /// @dev Assumes that id and offer.obligation match.
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.
@@ -21,12 +21,14 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee =
             IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
+        uint256 buyerPrice = offer.makerIsBuyer ? offerPrice : offerPrice + tradingFee;
         require(buyerPrice <= WAD, TickLib.PriceGreaterThanOne());
-        return offer.buy ? targetBuyerAssets.mulDivUp(WAD, buyerPrice) : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
+        return offer.makerIsBuyer
+            ? targetBuyerAssets.mulDivUp(WAD, buyerPrice)
+            : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
     }
 
-    /// @dev Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
+    /// @dev Forward mapping rounds sellerAssets down when the maker is the buyer, and up otherwise.
     /// @dev Assumes that id and offer.obligation match.
     /// @dev Returns the number of units to take to get the target seller assets.
     function sellerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
@@ -37,8 +39,9 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee =
             IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
-        return
-            offer.buy ? targetSellerAssets.mulDivUp(WAD, sellerPrice) : targetSellerAssets.mulDivDown(WAD, sellerPrice);
+        uint256 sellerPrice = offer.makerIsBuyer ? offerPrice - tradingFee : offerPrice;
+        return offer.makerIsBuyer
+            ? targetSellerAssets.mulDivUp(WAD, sellerPrice)
+            : targetSellerAssets.mulDivDown(WAD, sellerPrice);
     }
 }

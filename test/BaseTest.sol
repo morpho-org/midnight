@@ -141,8 +141,8 @@ abstract contract BaseTest is Test {
 
     // hardcodes the right root, signature, proof, and callback (no callback)
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256, uint256) {
-        // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
-        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
+        // receiverIfTakerIsSeller param is for taker (when offer.makerIsBuyer == true)
+        // offer.receiverIfMakerIsSeller is for maker (when offer.makerIsBuyer == false)
         vm.prank(taker);
         return midnight.take(
             units, taker, address(0), hex"", taker, offer, ratifierData([offer]), root([offer]), proof([offer])
@@ -156,7 +156,7 @@ abstract contract BaseTest is Test {
 
         Offer memory lenderOffer;
         lenderOffer.obligation = obligation;
-        lenderOffer.buy = true;
+        lenderOffer.makerIsBuyer = true;
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
@@ -176,7 +176,7 @@ abstract contract BaseTest is Test {
         loanToken.approve(address(midnight), type(uint256).max);
         Offer memory badBorrowerOffer;
         badBorrowerOffer.obligation = obligation;
-        badBorrowerOffer.buy = false;
+        badBorrowerOffer.makerIsBuyer = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
@@ -357,7 +357,7 @@ abstract contract BaseTest is Test {
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;
-        borrowerOffer.buy = false;
+        borrowerOffer.makerIsBuyer = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;

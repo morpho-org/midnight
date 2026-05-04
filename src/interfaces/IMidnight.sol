@@ -20,7 +20,7 @@ struct CollateralParams {
 
 struct Offer {
     Obligation obligation;
-    bool buy;
+    bool makerIsBuyer;
     address maker;
     uint256 start;
     uint256 expiry;

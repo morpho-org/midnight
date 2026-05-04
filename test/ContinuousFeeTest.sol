@@ -56,7 +56,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function _makeBuyOffer(uint256 units, bytes32 group) internal view returns (Offer memory o) {
         o.obligation = obligation;
-        o.buy = true;
+        o.makerIsBuyer = true;
         o.maker = otherLender;
         o.maxUnits = units;
         o.ratifier = address(ecrecoverRatifier);
@@ -185,7 +185,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function _makeBorrowOffer(uint256 credit2) internal view returns (Offer memory borrowOffer) {
         borrowOffer.obligation = obligation;
-        borrowOffer.buy = false;
+        borrowOffer.makerIsBuyer = false;
         borrowOffer.maker = otherBorrower;
         borrowOffer.receiverIfMakerIsSeller = otherBorrower;
         borrowOffer.maxUnits = credit2;

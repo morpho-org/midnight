@@ -41,7 +41,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 // The buyer's pendingFee increases by floor(creditIncrease * continuousFee * timeToMaturity / WAD).
 rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    address buyer = offer.buy ? offer.maker : taker;
+    address buyer = offer.makerIsBuyer ? offer.maker : taker;
 
     bytes32 id;
     uint128 postUpdateCredit;
@@ -63,7 +63,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
 
 // When a seller's credit decreases via a take, their pendingFee decreases by ceil(PendingFee * creditDelta / postUpdateCredit).
 rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    address seller = offer.buy ? taker : offer.maker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
 
     bytes32 id;
     uint128 postUpdateCredit;
@@ -107,8 +107,8 @@ rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Obligation obli
 
 // take() increases continuousFeeCredit by exactly the sum of the accrued fees of the buyer and seller.
 rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
+    address buyer = offer.makerIsBuyer ? offer.maker : taker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
 
     bytes32 id;
     uint128 buyerAccruedFee;
@@ -128,8 +128,8 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
 
 // take should not change the return values of updatePositionView (i.e., post-update credit, pending fee, and accrued fee) of a third party.
 rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, address user) {
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
+    address buyer = offer.makerIsBuyer ? offer.maker : taker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
 
     require user != buyer && user != seller, "user is different from buyer and seller";
 

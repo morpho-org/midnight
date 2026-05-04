@@ -232,7 +232,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     require singleRevertingOracle == offer.obligation.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(offer.obligation);
-    address seller = offer.buy ? taker : offer.maker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
 
     // Without this, isLiquidatable short-circuits to false (without calling isHealthy) because
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
@@ -291,7 +291,7 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(offer.obligation);
-    address seller = offer.buy ? taker : offer.maker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);

@@ -63,7 +63,7 @@ contract MaxAmountsTest is BaseTest {
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;
-        borrowerOffer.buy = false;
+        borrowerOffer.makerIsBuyer = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
@@ -90,7 +90,7 @@ contract MaxAmountsTest is BaseTest {
 
         Offer memory borrowerOffer;
         borrowerOffer.obligation = obligation;
-        borrowerOffer.buy = false;
+        borrowerOffer.makerIsBuyer = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;

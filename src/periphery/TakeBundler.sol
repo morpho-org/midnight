@@ -40,7 +40,7 @@ contract TakeBundler is ITakeBundler {
         uint256 filledUnits;
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
-            require(!takes[i].offer.buy, InconsistentSide());
+            require(!takes[i].offer.makerIsBuyer, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
@@ -114,7 +114,7 @@ contract TakeBundler is ITakeBundler {
         uint256 filledUnits;
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
-            require(takes[i].offer.buy, InconsistentSide());
+            require(takes[i].offer.makerIsBuyer, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
@@ -170,7 +170,7 @@ contract TakeBundler is ITakeBundler {
 
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
-            require(!takes[i].offer.buy, InconsistentSide());
+            require(!takes[i].offer.makerIsBuyer, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
             bytes32 id = IMidnight(midnight).touchObligation(takes[i].offer.obligation);
@@ -251,7 +251,7 @@ contract TakeBundler is ITakeBundler {
 
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
-            require(takes[i].offer.buy, InconsistentSide());
+            require(takes[i].offer.makerIsBuyer, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
             bytes32 id = IMidnight(midnight).touchObligation(takes[i].offer.obligation);

@@ -122,7 +122,7 @@ library UtilsLib {
                 abi.encode(
                     OFFER_TYPEHASH,
                     hashObligation(offer.obligation),
-                    offer.buy,
+                    offer.makerIsBuyer,
                     offer.maker,
                     offer.start,
                     offer.expiry,

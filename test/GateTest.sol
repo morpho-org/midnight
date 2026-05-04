@@ -72,7 +72,7 @@ contract GateTest is BaseTest {
 
         gatedId = toId(gatedObligation);
 
-        lenderOffer.buy = true;
+        lenderOffer.makerIsBuyer = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.obligation = gatedObligation;
@@ -80,7 +80,7 @@ contract GateTest is BaseTest {
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
-        borrowerOffer.buy = false;
+        borrowerOffer.makerIsBuyer = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
@@ -169,7 +169,7 @@ contract GateTest is BaseTest {
         take(units, lender, borrowerOffer);
 
         Offer memory otherBorrowerOffer;
-        otherBorrowerOffer.buy = false;
+        otherBorrowerOffer.makerIsBuyer = false;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
@@ -197,7 +197,7 @@ contract GateTest is BaseTest {
         collateralize(gatedObligation, otherBorrower, units);
 
         Offer memory otherLenderOffer;
-        otherLenderOffer.buy = true;
+        otherLenderOffer.makerIsBuyer = true;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.obligation = gatedObligation;
@@ -212,7 +212,7 @@ contract GateTest is BaseTest {
 
         // Both parties exit
         Offer memory exitOffer;
-        exitOffer.buy = false;
+        exitOffer.makerIsBuyer = false;
         exitOffer.maker = otherLender;
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
@@ -306,7 +306,7 @@ contract GateTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Offer memory ungatedLenderOffer;
-        ungatedLenderOffer.buy = true;
+        ungatedLenderOffer.makerIsBuyer = true;
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.obligation = obligation;

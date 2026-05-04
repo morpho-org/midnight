@@ -41,7 +41,7 @@ function buildTypes(height: number) {
     ],
     Offer: [
       { name: "obligation", type: "Obligation" },
-      { name: "buy", type: "bool" },
+      { name: "makerIsBuyer", type: "bool" },
       { name: "maker", type: "address" },
       { name: "start", type: "uint256" },
       { name: "expiry", type: "uint256" },
@@ -70,7 +70,7 @@ function defaultOffer(number: string) {
       enterGate: ZERO_ADDR,
       liquidatorGate: ZERO_ADDR,
     },
-    buy: false,
+    makerIsBuyer: false,
     maker: ZERO_ADDR,
     start: "0",
     expiry: 2**32,

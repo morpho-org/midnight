@@ -44,7 +44,7 @@ contract TakeAmountsTest is BaseTest {
 
         id = toId(obligation);
 
-        offer.buy = false;
+        offer.makerIsBuyer = false;
         offer.maxUnits = type(uint256).max;
         offer.obligation = obligation;
         offer.ratifier = address(ecrecoverRatifier);
@@ -80,7 +80,7 @@ contract TakeAmountsTest is BaseTest {
         take(positionUnits, lender, offer);
     }
 
-    // All tests use a sell offer (offer.buy = false).
+    // All tests use a sell offer (offer.makerIsBuyer = false).
     // sellerPrice = price, buyerPrice = price + fee.
 
     // buyerIsLender = true: buyer = taker (lender, no debt), seller = maker (borrower).

@@ -58,7 +58,7 @@ contract BundlerTest is BaseTest {
         id = midnight.touchObligation(obligation);
 
         offers.push();
-        offers[0].buy = true;
+        offers[0].makerIsBuyer = true;
         offers[0].maker = lender;
         offers[0].obligation = obligation;
         offers[0].ratifier = address(ecrecoverRatifier);
@@ -66,7 +66,7 @@ contract BundlerTest is BaseTest {
         offers[0].tick = MAX_TICK;
 
         offers.push();
-        offers[1].buy = true;
+        offers[1].makerIsBuyer = true;
         offers[1].maker = lender;
         offers[1].obligation = obligation;
         offers[1].ratifier = address(ecrecoverRatifier);
@@ -90,7 +90,7 @@ contract BundlerTest is BaseTest {
     }
 
     function testUnauthorized() public {
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
 
         Take[] memory takes = new Take[](1);
@@ -156,11 +156,11 @@ contract BundlerTest is BaseTest {
     function testBuyBuyerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetBuyerAssets) public {
         targetBuyerAssets = bound(targetBuyerAssets, 1, uint256(type(uint128).max) / 2);
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].maxUnits = offerUnits0;
-        offers[1].buy = false;
+        offers[1].makerIsBuyer = false;
         offers[1].maker = borrower;
         offers[1].receiverIfMakerIsSeller = borrower;
         offers[1].maxUnits = offerUnits1;
@@ -250,12 +250,12 @@ contract BundlerTest is BaseTest {
         uint256 maxSecondUnits = remainingBuyerAssets.mulDivUp(WAD, offerPrice);
         uint256 targetBuyerAssets = firstBuyerAssets + remainingBuyerAssets;
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].tick = tick;
         offers[0].maxUnits = firstUnits;
-        offers[1].buy = false;
+        offers[1].makerIsBuyer = false;
         offers[1].maker = borrower;
         offers[1].receiverIfMakerIsSeller = borrower;
         offers[1].obligation = otherObligation;
@@ -422,7 +422,7 @@ contract BundlerTest is BaseTest {
         referralFeePct = bound(referralFeePct, 0, WAD - 1);
         address referrer = makeAddr("referrer");
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].maxUnits = type(uint256).max;
@@ -510,7 +510,7 @@ contract BundlerTest is BaseTest {
         referralFeePct = bound(referralFeePct, 0, WAD - 1);
         address referrer = makeAddr("referrer");
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].maxUnits = type(uint256).max;
@@ -611,7 +611,7 @@ contract BundlerTest is BaseTest {
             proof: proof([offers[0]])
         });
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         Take[] memory buyTakes = new Take[](1);
         buyTakes[0] = Take({
             offer: offers[0],
@@ -672,7 +672,7 @@ contract BundlerTest is BaseTest {
         numCollaterals = bound(numCollaterals, 0, 2);
         uint256 units = 100e18;
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].maxUnits = units;
@@ -717,7 +717,7 @@ contract BundlerTest is BaseTest {
         numCollaterals = bound(numCollaterals, 0, 2);
         uint256 units = 100e18;
 
-        offers[0].buy = false;
+        offers[0].makerIsBuyer = false;
         offers[0].maker = borrower;
         offers[0].receiverIfMakerIsSeller = borrower;
         offers[0].maxUnits = units;

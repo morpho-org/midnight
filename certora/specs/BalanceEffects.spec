@@ -105,9 +105,9 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
 
-    mathint makerDelta = offer.buy ? units : -units;
+    mathint makerDelta = offer.makerIsBuyer ? units : -units;
     assert makerNetAfter == makerNetBefore + makerDelta;
-    mathint takerDelta = offer.buy ? -units : units;
+    mathint takerDelta = offer.makerIsBuyer ? -units : units;
     assert takerNetAfter == takerNetBefore + takerDelta;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
@@ -119,7 +119,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
-    address buyer = offer.buy ? offer.maker : taker;
+    address buyer = offer.makerIsBuyer ? offer.maker : taker;
     uint256 buyerDebtBefore = debtOf(id, buyer);
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, buyer);
@@ -139,7 +139,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
 rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
-    address seller = offer.buy ? taker : offer.maker;
+    address seller = offer.makerIsBuyer ? taker : offer.maker;
     uint256 sellerDebtBefore = debtOf(id, seller);
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, seller);

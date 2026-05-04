@@ -28,7 +28,7 @@ contract SetterRatifierTest is BaseTest {
         });
 
         offer.obligation = obligation;
-        offer.buy = true;
+        offer.makerIsBuyer = true;
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);
         offer.maxUnits = type(uint256).max;

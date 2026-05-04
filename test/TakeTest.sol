@@ -59,7 +59,7 @@ contract TakeTest is BaseTest {
 
         id = toId(obligation);
 
-        lenderOffer.buy = true;
+        lenderOffer.makerIsBuyer = true;
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.maxUnits = type(uint256).max;
@@ -67,7 +67,7 @@ contract TakeTest is BaseTest {
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
-        otherLenderOffer.buy = false;
+        otherLenderOffer.makerIsBuyer = false;
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.ratifier = address(ecrecoverRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
@@ -76,7 +76,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
-        borrowerOffer.buy = false;
+        borrowerOffer.makerIsBuyer = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
@@ -85,7 +85,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
-        otherBorrowerOffer.buy = true;
+        otherBorrowerOffer.makerIsBuyer = true;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
@@ -150,7 +150,7 @@ contract TakeTest is BaseTest {
         setupOtherUsers(obligation, otherLenderUnits);
         uint256 actualOtherLenderCredit = midnight.creditOf(id, otherLender);
         deal(address(loanToken), lender, buyerAssets + 1);
-        otherLenderOffer.buy = false;
+        otherLenderOffer.makerIsBuyer = false;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.tick = tick;
         uint256 totalUnitsBefore = midnight.totalUnits(id);
@@ -1523,7 +1523,7 @@ contract TakeTest is BaseTest {
     // - sell offer / unit take input / > 0 trading fee.
     //
     // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by underflow when the trading fee is > 0, and the maker is the buyer.
 
     // fee=0, sell, units
     function testPriceZero_NoTradingFee_sell() public {
@@ -1538,7 +1538,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
 
-    // fee>0, buy, units
+    // fee>0, makerIsBuyer, units
     function testPriceZero_WithTradingFee_buy() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
@@ -1573,7 +1573,7 @@ contract TakeTest is BaseTest {
 
         // address(0) as maker cannot authorize the ratifier
         Offer memory zeroOffer;
-        zeroOffer.buy = true;
+        zeroOffer.makerIsBuyer = true;
         zeroOffer.maker = address(0);
         zeroOffer.ratifier = address(ecrecoverRatifier);
         zeroOffer.maxUnits = units;
@@ -1638,7 +1638,7 @@ contract TakeTest is BaseTest {
         uint256 units = 1e18;
         Offer memory bOffer;
         bOffer.obligation = longObligation;
-        bOffer.buy = false;
+        bOffer.makerIsBuyer = false;
         bOffer.maker = borrower;
         bOffer.receiverIfMakerIsSeller = borrower;
         bOffer.maxUnits = units;

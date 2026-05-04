@@ -293,7 +293,7 @@ contract Midnight is IMidnight {
     /// position at the end.
     /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
     /// to perform atomic price checks.
-    /// @dev Taking buy offers with price < trading fee will revert.
+    /// @dev Taking offers where the maker is the buyer with price < trading fee will revert.
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
     /// buyerPrice <= WAD.
@@ -324,15 +324,16 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
+        (address buyer, address seller) = offer.makerIsBuyer ? (offer.maker, taker) : (taker, offer.maker);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
+        uint256 sellerPrice = offer.makerIsBuyer ? offerPrice - _tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + _tradingFee;
-        uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
-        uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 buyerAssets = offer.makerIsBuyer ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+        uint256 sellerAssets =
+            offer.makerIsBuyer ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed;
         if (offer.maxSellerAssets > 0) {
@@ -374,7 +375,9 @@ contract Midnight is IMidnight {
 
         require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
         if (offer.reduceOnly) {
-            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
+            require(
+                offer.makerIsBuyer ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased()
+            );
         }
 
         require(
@@ -388,17 +391,17 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
-        address buyerCallback = offer.buy ? offer.callback : takerCallback;
-        address sellerCallback = offer.buy ? takerCallback : offer.callback;
-        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
-        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
+        address buyerCallback = offer.makerIsBuyer ? offer.callback : takerCallback;
+        address sellerCallback = offer.makerIsBuyer ? takerCallback : offer.callback;
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.makerIsBuyer ? buyer : msg.sender);
+        address receiver = offer.makerIsBuyer ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         emit EventsLib.Take(
             msg.sender,
             id,
             offer.maker,
             taker,
-            offer.buy,
+            offer.makerIsBuyer,
             buyerAssets,
             sellerAssets,
             units,
@@ -414,7 +417,7 @@ contract Midnight is IMidnight {
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
-            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
+            bytes memory buyerCallbackData = offer.makerIsBuyer ? offer.callbackData : takerCallbackData;
             require(
                 IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
@@ -427,7 +430,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
-            bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
+            bytes memory sellerCallbackData = offer.makerIsBuyer ? takerCallbackData : offer.callbackData;
             require(
                 ISellCallback(sellerCallback)
                         .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)

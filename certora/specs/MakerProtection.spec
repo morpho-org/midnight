@@ -49,8 +49,8 @@ rule makerFavorableRounding(env e, uint256 units, address taker, address takerCa
     uint256 sellerAssets;
     buyerAssets, sellerAssets, _ = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    assert offer.buy => to_mathint(buyerAssets) * WAD() <= to_mathint(units) * to_mathint(offerPrice);
-    assert !offer.buy => to_mathint(sellerAssets) * WAD() >= to_mathint(units) * to_mathint(offerPrice);
+    assert offer.makerIsBuyer => to_mathint(buyerAssets) * WAD() <= to_mathint(units) * to_mathint(offerPrice);
+    assert !offer.makerIsBuyer => to_mathint(sellerAssets) * WAD() >= to_mathint(units) * to_mathint(offerPrice);
 }
 
 // The trading fee cannot be bypassed: the spread between what the buyer pays and what
