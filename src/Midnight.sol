@@ -105,14 +105,14 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev In particular, it does not prevent the user from exiting the obligation even when the entry gate is reverting.
 /// @dev The liquidator gate can prevent the user from liquidating borrowers in the obligation (and realizing bad debt).
 ///
-/// TOKEN REQUIREMENTS
+/// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
-/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`.
+/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`. In
+/// particular, it should not revert because a transfer is no-op.
 /// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
 /// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
 /// - Midnight must send/receive exactly the requested amount on transfers.
-/// - It should not revert on `transfer` and `transferFrom` if balances and approvals are right.
-/// - It should not revert on no-op transfers.
+/// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
@@ -122,9 +122,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
-/// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
-/// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
-/// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
+/// @dev If a token pulled by Midnight reverts or returns false on `transferFrom` despite balances and approvals being
+/// right, `take`, `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull
+/// that token.
+/// @dev If a token sent by Midnight reverts or returns false on `transfer` despite balances being right, `withdraw`,
 /// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
 /// that token.
 /// @dev If a callback reverts or returns something other than `CALLBACK_SUCCESS`, `take`, `repay`, `liquidate`, and
