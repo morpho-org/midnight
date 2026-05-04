@@ -4,7 +4,10 @@ optimizer = true
 optimizer_runs = 100
 bytecode_hash = "none"
 evm_version = "osaka"
-fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
+fs_permissions = [
+    { access = "read", path = "test/ticks_exact.json" },
+    { access = "write", path = "test/gas_report.json" },
+]
 
 [profile.default.fmt]
 wrap_comments = true
