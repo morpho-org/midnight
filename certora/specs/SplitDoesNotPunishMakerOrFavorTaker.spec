@@ -25,7 +25,7 @@ methods {
     // Read-only health check does not affect return values; removes oracle loop.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
-    // End-of-take liquidation check: irrelevant to return values; removes transient storage + oracle call chain.
+    // End-of-take liquidation check: irrelevant to return values on successful paths.
     function isLiquidatable(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
@@ -34,15 +34,6 @@ methods {
     // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
-
-    // Callbacks and token transfers: NONDET removes external call complexity.
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
 }
 
 /// GHOSTS ///
@@ -80,6 +71,8 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 /// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal when split, taker pays more or equal when split.
 rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
+    require obligationUnitsB <= obligationUnitsA, "obligationUnitsB must be no larger than obligationUnitsA";
+    require obligationUnitsC <= obligationUnitsA, "obligationUnitsC must be no larger than obligationUnitsA";
 
     // block.timestamp must fit in uint128 (Midnight.sol casts it).
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
@@ -110,10 +103,13 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
 
     // Taker is seller: splitting should not make them receive more.
     assert offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) <= to_mathint(sellerAssetsA);
+    assert offer.buy => to_mathint(sellerAssetsA) <= to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) + 1;
 
     // Maker is seller: splitting should not make them receive less.
     assert !offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) >= to_mathint(sellerAssetsA);
+    assert !offer.buy => to_mathint(sellerAssetsA) + 1 >= to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC);
 
     // Taker is buyer: splitting should not make them pay less.
     assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) >= to_mathint(buyerAssetsA);
+    assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA) + 1;
 }
