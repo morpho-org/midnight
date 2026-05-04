@@ -137,9 +137,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
+/// @dev creditOf is not up to date. One must use updatePositionView to get the up to date credit.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
-/// @dev No-ops are allowed.
+/// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
+/// offers are "filled" (consumed=max).
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
 /// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
@@ -288,7 +290,8 @@ contract Midnight is IMidnight {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    /// @dev The taker might not get the price they expected if the trading fee was just changed.
+    /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
+    /// to perform atomic price checks.
     /// @dev Taking buy offers with price < trading fee will revert.
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
