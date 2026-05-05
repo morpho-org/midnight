@@ -343,7 +343,7 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Obligation obligation, uint
 
 /// TOKEN TRANSFER REVERT PROPAGATION ///
 
-/// If transferFrom reverts, take, repay, supplyCollateral, liquidate, and flashLoan all revert.
+/// If transferFrom reverts, take, repay, supplyCollateral, and liquidate all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
@@ -364,7 +364,7 @@ rule transferFromRevertPropagationFlashLoan(env e, address[] tokens, uint256[] a
     assert lastReverted;
 }
 
-/// If transfer reverts, withdraw, withdrawCollateral, fee claims, liquidate all revert.
+/// If transfer reverts, withdraw, withdrawCollateral, fee claims, and liquidate all revert.
 rule transferRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
