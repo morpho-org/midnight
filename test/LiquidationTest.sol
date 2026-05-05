@@ -604,7 +604,7 @@ contract LiquidationTest is BaseTest {
 
         // Write debt into Position storage.
         // Layout: slot 0 = credit | pendingFee, slot 1 = lossIndex | lastAccrual,
-        // slot 2 = debt | activatedCollaterals.
+        // slot 2 = debt | collateralBitmap.
         // Debt is in the lower 128 bits of slot 2.
         uint256 mappingSlot = 0;
         bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
@@ -823,9 +823,9 @@ contract LiquidationTest is BaseTest {
     /// @dev Bad debt as computed in liquidate
     function _badDebt() internal view returns (uint256) {
         uint256 badDebt = midnight.debtOf(id, borrower);
-        uint128 bitmap = midnight.activatedCollaterals(id, borrower);
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
+        uint128 collateralBitmap = midnight.collateralBitmap(id, borrower);
+        while (collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(collateralBitmap);
             CollateralParams memory _collateral = obligation.collateralParams[i];
             uint256 price = IOracle(_collateral.oracle).price();
             badDebt = badDebt.zeroFloorSub(
@@ -834,7 +834,7 @@ contract LiquidationTest is BaseTest {
             );
             require(i < 128, "i is too large");
             // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
-            bitmap ^= uint128(1 << i);
+            collateralBitmap ^= uint128(1 << i);
         }
         return badDebt;
     }

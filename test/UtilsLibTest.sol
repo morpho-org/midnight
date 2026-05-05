@@ -14,10 +14,10 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
-    function testFuzzCountBits(uint128 bitmap) public pure {
-        uint256 actual = UtilsLib.countBits(bitmap);
+    function testFuzzCountBits(uint128 collateralBitmap) public pure {
+        uint256 actual = UtilsLib.countBits(collateralBitmap);
         uint256 expected;
-        uint128 temp = bitmap;
+        uint128 temp = collateralBitmap;
         while (temp != 0) {
             temp &= temp - 1;
             expected++;
