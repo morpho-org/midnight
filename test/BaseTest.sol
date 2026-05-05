@@ -348,7 +348,7 @@ abstract contract BaseTest is Test {
         }
         collateralParams = sortCollateralParams(collateralParams);
         obligation.collateralParams = collateralParams;
-        obligation.maturity = obligation.maturity % (block.timestamp + 100 * 365 days);
+        obligation.maturity = bound(obligation.maturity, 0, block.timestamp + 100 * 365 days);
         return obligation;
     }
 
