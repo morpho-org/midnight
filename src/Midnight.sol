@@ -23,6 +23,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
+/// - `maturity <= block.timestamp + 100 years`: the obligation must have a maturity that is not too far in the future.
 /// - `collateralParams.length > 0`: at least one collateral is required.
 /// - `collateralParams.length <= MAX_COLLATERALS` (128): at most 128 collateralParams per obligation.
 /// - Collateral tokens must be non-zero and strictly sorted by address (ascending, no duplicates).
