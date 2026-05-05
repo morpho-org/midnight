@@ -97,7 +97,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses almost all of its value to bad debt over its lifetime, such that the loss index is
-/// maxed out, then the obligation won't function properly afterwards. Notably, credit positions would be stuck.
+/// maxed out, then the obligation won't function properly afterwards. Notably, the take function would revert.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
@@ -313,6 +313,7 @@ contract Midnight is IMidnight {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.lossIndex < type(uint128).max, ObligationLossIndexMaxedOut());
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
@@ -750,10 +751,10 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 obligationLossIndex = obligationState[id].lossIndex;
-        require(obligationLossIndex < type(uint128).max, ObligationLossIndexMaxedOut());
-        uint256 postSlashCredit =
-            credit.mulDivDown(type(uint128).max - obligationLossIndex, type(uint128).max - _position.lossIndex);
+        uint128 _lossIndex = _position.lossIndex;
+        uint256 postSlashCredit = _lossIndex < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
+            : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, obligation.maturity);

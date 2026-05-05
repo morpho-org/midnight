@@ -70,13 +70,11 @@ rule updatePositionSyncsLossIndex(env e, Midnight.Obligation obligation, address
     assert userLossIndex(id, user) == currentContract.obligationState[id].lossIndex;
 }
 
-/// Assuming that the obligation is created, and that the loss index is not maxed out, the updatePosition call does not revert.
+/// Assuming that the obligation is created, the updatePosition call does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
     require obligationCreated(id), "obligation must be created";
-    require currentContract.obligationState[id].lossIndex < max_uint128, "obligation loss index must not be maxed out";
-
     require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
