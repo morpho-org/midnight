@@ -9,6 +9,8 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 library TakeAmountsLib {
     using UtilsLib for uint256;
 
+    error PriceBelowFee();
+
     // Forward: buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD).
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Returns the number of units to take to get the target buyer assets.
@@ -20,7 +22,7 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee =
             IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
-        require(offerPrice >= tradingFee, PriceBelowFee());
+        require(!offer.buy || offerPrice >= tradingFee, PriceBelowFee());
         uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + tradingFee;
         require(buyerPrice <= WAD, TickLib.PriceGreaterThanOne());
         return offer.buy ? targetBuyerAssets.mulDivUp(WAD, buyerPrice) : targetBuyerAssets.mulDivDown(WAD, buyerPrice);
