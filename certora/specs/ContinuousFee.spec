@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => CVL_toId(obligation);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -11,7 +11,7 @@ methods {
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
@@ -30,7 +30,7 @@ methods {
 
 persistent ghost bytes32 lastId;
 
-function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
+function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
     // non-deterministic id
     bytes32 id;
     lastId = id;

@@ -31,17 +31,19 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }
 
 /// UPDATE POSITION ///
 
-/// updatePosition sets user's credit to the post-update value,
-/// only changes credit of user at the obligation id, and accrues fee to continuousFeeCredit.
+/// updatePosition can only decrease user's credit (through slashing and fee accrual),
+/// sets it to the post-update value, only changes credit of user at the obligation id,
+/// and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
+    uint256 creditBefore = creditOf(id, user);
     uint128 updatedUserCredit;
     uint128 userFee;
     updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, user);
@@ -56,6 +58,7 @@ rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, 
     assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
     assert creditOf(id, user) == updatedUserCredit;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
+    assert creditOf(id, user) <= creditBefore;
 }
 
 /// WITHDRAW ///
