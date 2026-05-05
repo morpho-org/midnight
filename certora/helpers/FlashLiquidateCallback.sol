@@ -45,11 +45,18 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address token, uint256 amount, bytes calldata data) external returns (bytes32) {
-        startFlashloan(token, amount);
+    function onFlashLoan(address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
+        external
+        returns (bytes32)
+    {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            startFlashloan(tokens[i], amounts[i]);
+        }
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(token, amount);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            endFlashloan(tokens[i], amounts[i]);
+        }
         return CALLBACK_SUCCESS;
     }
 }
