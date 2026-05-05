@@ -569,9 +569,9 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
-        uint128 collateralBitmap = _position.collateralBitmap;
-        while (collateralBitmap != 0) {
-            uint256 i = UtilsLib.msb(collateralBitmap);
+        uint128 _collateralBitmap = _position.collateralBitmap;
+        while (_collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(_collateralBitmap);
             CollateralParams memory _collateralParam = obligation.collateralParams[i];
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
@@ -580,7 +580,7 @@ contract Midnight is IMidnight {
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
             );
-            collateralBitmap = collateralBitmap.clearBit(i);
+            _collateralBitmap = _collateralBitmap.clearBit(i);
         }
 
         require(
@@ -913,14 +913,14 @@ contract Midnight is IMidnight {
         uint256 debt = _position.debt;
         uint256 maxDebt;
         if (debt > 0) {
-            uint128 collateralBitmap = _position.collateralBitmap;
-            while (collateralBitmap != 0) {
-                uint256 i = UtilsLib.msb(collateralBitmap);
+            uint128 _collateralBitmap = _position.collateralBitmap;
+            while (_collateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = obligation.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
                 maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
-                collateralBitmap = collateralBitmap.clearBit(i);
+                _collateralBitmap = _collateralBitmap.clearBit(i);
             }
         }
         return maxDebt >= debt;
