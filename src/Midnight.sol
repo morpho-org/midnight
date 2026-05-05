@@ -50,7 +50,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// LIQUIDATIONS
 /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
 /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
-/// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
+/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
 /// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
 /// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
@@ -105,14 +105,14 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev In particular, it does not prevent the user from exiting the obligation even when the entry gate is reverting.
 /// @dev The liquidator gate can prevent the user from liquidating borrowers in the obligation (and realizing bad debt).
 ///
-/// TOKEN REQUIREMENTS
+/// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
-/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`.
+/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`. In
+/// particular, it should not revert because a transfer is no-op.
 /// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
 /// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
 /// - Midnight must send/receive exactly the requested amount on transfers.
-/// - It should not revert on `transfer` and `transferFrom` if balances and approvals are right.
-/// - It should not revert on no-op transfers.
+/// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
@@ -122,9 +122,10 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
-/// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
-/// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
-/// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
+/// @dev If a token pulled by Midnight reverts or returns false on `transferFrom` despite balances and approvals being
+/// right, `take`, `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull
+/// that token.
+/// @dev If a token sent by Midnight reverts or returns false on `transfer` despite balances being right, `withdraw`,
 /// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
 /// that token.
 /// @dev If a callback reverts or returns something other than `CALLBACK_SUCCESS`, `take`, `repay`, `liquidate`, and
@@ -146,7 +147,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
 /// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
 /// hard-fork there can be some obligation id clashes.
-/// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
