@@ -62,5 +62,3 @@ rule isHealthyEquivalent(Midnight.Obligation obligation, bytes32 id, address bor
     assert !lastReverted;
     assert isHealthy1 == isHealthy2;
 }
-
-

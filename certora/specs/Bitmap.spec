@@ -68,4 +68,3 @@ rule msbReturnsLargestSetBit(uint128 bitmap) {
     assert bitmap != 0 => getBit(bitmap, msbBit);
     assert bitmap != 0 && getBit(bitmap, otherBit) => otherBit <= msbBit;
 }
-

@@ -16,7 +16,8 @@ persistent ghost summaryGetBit(uint128, uint256) returns bool {
 
 persistent ghost summaryCountBits(uint128) returns mathint {
     // see Bitmap.spec
-    axiom summaryCountBits(0) == 0; 
+    axiom summaryCountBits(0) == 0;
+
     // sanity bounds to be able to require_uint256(summaryCountBits(bitmap))
     axiom forall uint128 b. 0 <= summaryCountBits(b) && summaryCountBits(b) <= 128;
 }
