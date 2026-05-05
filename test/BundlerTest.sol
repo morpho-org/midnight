@@ -227,6 +227,71 @@ contract BundlerTest is BaseTest {
         }
     }
 
+    function testBuyBuyerAssetsTargetUsesEachOfferObligationId() public {
+        uint256 tick = TickLib.priceToTick(0.99e18);
+        uint256 offerPrice = TickLib.tickToPrice(tick);
+
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        Obligation memory otherObligation = obligation;
+        otherObligation.maturity = block.timestamp + 360 days;
+        bytes32 otherId = midnight.touchObligation(otherObligation);
+        uint256 otherTradingFee = midnight.tradingFee(otherId, otherObligation.maturity - block.timestamp);
+        uint256 otherBuyerPrice = offerPrice + otherTradingFee;
+        require(otherTradingFee > 0, "trading fee zero");
+        require(otherBuyerPrice <= WAD, "buyer price greater than one");
+
+        uint256 firstUnits = 10e18;
+        uint256 firstBuyerAssets = firstUnits.mulDivUp(offerPrice, WAD);
+        uint256 remainingBuyerAssets = 1000e18;
+        uint256 expectedSecondUnits = remainingBuyerAssets.mulDivDown(WAD, otherBuyerPrice);
+        uint256 maxSecondUnits = remainingBuyerAssets.mulDivUp(WAD, offerPrice);
+        uint256 targetBuyerAssets = firstBuyerAssets + remainingBuyerAssets;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].tick = tick;
+        offers[0].maxUnits = firstUnits;
+        offers[1].buy = false;
+        offers[1].maker = borrower;
+        offers[1].receiverIfMakerIsSeller = borrower;
+        offers[1].obligation = otherObligation;
+        offers[1].tick = tick;
+        offers[1].maxUnits = maxSecondUnits;
+
+        collateralize(obligation, borrower, firstUnits);
+        collateralize(otherObligation, borrower, maxSecondUnits);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
+            offer: offers[0],
+            units: firstUnits,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = Take({
+            offer: offers[1],
+            units: maxSecondUnits,
+            ratifierData: ratifierData([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        vm.prank(lender);
+        takeBundler.buyBuyerAssetsTarget(
+            address(midnight), targetBuyerAssets, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
+        );
+
+        assertEq(type(uint256).max - loanToken.balanceOf(lender), targetBuyerAssets, "lender total cost");
+        assertEq(midnight.creditOf(id, lender), firstUnits, "first obligation lender credit");
+        assertEq(midnight.creditOf(otherId, lender), expectedSecondUnits, "second obligation lender credit");
+        assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler residual");
+    }
+
     function testSellSellerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
         offers[0].maxUnits = offerUnits0;
@@ -295,6 +360,59 @@ contract BundlerTest is BaseTest {
                 address(0)
             );
         }
+    }
+
+    function testSellSellerAssetsTargetUsesEachOfferObligationId() public {
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        Obligation memory otherObligation = obligation;
+        otherObligation.maturity = block.timestamp + 360 days;
+        bytes32 otherId = midnight.touchObligation(otherObligation);
+        uint256 otherTradingFee = midnight.tradingFee(otherId, otherObligation.maturity - block.timestamp);
+        require(otherTradingFee > 0, "trading fee zero");
+
+        uint256 offerPrice = TickLib.tickToPrice(MAX_TICK);
+        uint256 otherSellerPrice = offerPrice - otherTradingFee;
+        uint256 firstUnits = 10e18;
+        uint256 firstSellerAssets = firstUnits.mulDivDown(offerPrice, WAD);
+        uint256 remainingSellerAssets = 1000e18;
+        uint256 maxSecondUnits = remainingSellerAssets.mulDivUp(WAD, otherSellerPrice);
+        uint256 targetSellerAssets = firstSellerAssets + remainingSellerAssets;
+
+        offers[0].maxUnits = firstUnits;
+        offers[1].obligation = otherObligation;
+        offers[1].maxUnits = maxSecondUnits;
+
+        collateralize(obligation, borrower, firstUnits);
+        collateralize(otherObligation, borrower, maxSecondUnits);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
+            offer: offers[0],
+            units: firstUnits,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = Take({
+            offer: offers[1],
+            units: maxSecondUnits,
+            ratifierData: ratifierData([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        vm.prank(borrower);
+        takeBundler.sellSellerAssetsTarget(
+            address(midnight), targetSellerAssets, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+        );
+
+        assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower receipt");
+        assertEq(midnight.creditOf(id, lender), firstUnits, "first obligation lender credit");
+        assertEq(midnight.creditOf(otherId, lender), maxSecondUnits, "second obligation lender credit");
+        assertEq(loanToken.balanceOf(address(takeBundler)), 0, "bundler residual");
     }
 
     // Referral fee.

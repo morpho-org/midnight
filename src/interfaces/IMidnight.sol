@@ -127,7 +127,7 @@ interface IMidnight {
     function feeClaimer() external view returns (address);
 
     /// MULTICALL ///
-    function multicall(bytes[] calldata calls) external;
+    function multicall(bytes[] memory calls) external;
 
     /// ADMIN FUNCTIONS ///
     function setRoleSetter(address newRoleSetter) external;
@@ -143,14 +143,14 @@ interface IMidnight {
     /// ENTRY-POINTS ///
     function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data) external;
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Obligation calldata obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes calldata data) external returns (uint256, uint256);
+    function liquidate(Obligation memory obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function shuffleSession(address onBehalf) external;
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external;
+    function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
     function touchObligation(Obligation memory obligation) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
