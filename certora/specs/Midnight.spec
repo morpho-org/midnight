@@ -42,6 +42,7 @@ methods {
 /// HELPERS ///
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
