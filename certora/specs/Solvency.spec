@@ -27,7 +27,7 @@ methods {
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onFlashLoan(address token, uint256 amount, bytes data) external => DISPATCHER(true);
+    function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
     function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
