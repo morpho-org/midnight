@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => CVL_toId(obligation);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -30,7 +30,7 @@ methods {
 
 persistent ghost bytes32 lastId;
 
-function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
+function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
     // non-deterministic id
     bytes32 id;
     lastId = id;
