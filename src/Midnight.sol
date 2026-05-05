@@ -87,7 +87,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
-/// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with scoped behavior.
+/// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
+/// scoped behavior.
 /// @dev When authorizing a smart-contract, one should consider:
 /// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
 /// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
