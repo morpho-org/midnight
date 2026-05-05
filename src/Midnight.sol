@@ -128,9 +128,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
-/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, and `take` whenever the seller still has debt might revert.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts.
+/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` and `take` revert when
+/// the user (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
 /// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
 /// greater than type(uint128).max, then `liquidate`, `isHealthy`, `withdrawCollateral` when the borrower has debt, and
@@ -920,14 +920,16 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
+        if (debt > 0) {
+            uint128 bitmap = _position.activatedCollaterals;
+            while (bitmap != 0) {
+                uint256 i = UtilsLib.msb(bitmap);
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                bitmap = bitmap.clearBit(i);
+            }
         }
         return maxDebt >= debt;
     }

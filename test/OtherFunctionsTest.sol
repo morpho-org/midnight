@@ -373,6 +373,52 @@ contract OtherFunctionsTest is BaseTest {
         midnight.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
     }
 
+    function testIsHealthyDoesNotShortCircuitActivatedCollaterals() public {
+        RevertingOracle revertingOracle = new RevertingOracle();
+        CollateralParams[] memory collateralParams = new CollateralParams[](2);
+        uint256 lltv = 0.77e18;
+
+        if (bytes20(address(collateralToken1)) < bytes20(address(collateralToken2))) {
+            collateralParams[0] = CollateralParams({
+                token: address(collateralToken1),
+                lltv: lltv,
+                maxLif: maxLif(lltv, 0.25e18),
+                oracle: address(revertingOracle)
+            });
+            collateralParams[1] = CollateralParams({
+                token: address(collateralToken2), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle2)
+            });
+        } else {
+            collateralParams[0] = CollateralParams({
+                token: address(collateralToken2),
+                lltv: lltv,
+                maxLif: maxLif(lltv, 0.25e18),
+                oracle: address(revertingOracle)
+            });
+            collateralParams[1] = CollateralParams({
+                token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle1)
+            });
+        }
+
+        Obligation memory obligationWithRevertingOracle;
+        obligationWithRevertingOracle.loanToken = address(loanToken);
+        obligationWithRevertingOracle.maturity = block.timestamp + 100;
+        obligationWithRevertingOracle.collateralParams = collateralParams;
+
+        uint256 units = 1e18;
+        uint256 collateral = units.mulDivUp(WAD, lltv);
+        deal(collateralParams[0].token, address(this), collateral);
+        deal(collateralParams[1].token, address(this), collateral);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 1, collateral, borrower);
+        setupObligation(obligationWithRevertingOracle, units);
+
+        revertingOracle.stopOracle();
+
+        vm.expectRevert("Oracle should not be called");
+        midnight.isHealthy(obligationWithRevertingOracle, toId(obligationWithRevertingOracle), borrower);
+    }
+
     // Bitmap tests.
 
     function _createMultiCollateralObligation(uint256 numCollaterals) internal returns (Obligation memory _obligation) {
