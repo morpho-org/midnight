@@ -706,14 +706,21 @@ contract Midnight is IMidnight {
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
-        emit EventsLib.FlashLoan(msg.sender, token, assets, callback);
-        SafeTransferLib.safeTransfer(token, callback, assets);
+    function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
+        external
+    {
+        require(tokens.length == assets.length, InconsistentInput());
+        emit EventsLib.FlashLoan(msg.sender, tokens, assets, callback);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
+        }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
-        SafeTransferLib.safeTransferFrom(token, callback, address(this), assets);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransferFrom(tokens[i], callback, address(this), assets[i]);
+        }
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
