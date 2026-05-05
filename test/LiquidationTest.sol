@@ -205,9 +205,13 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), initialCollateral - seizedAssets, "collateral");
     }
 
-    function testLiquidateCallback(uint256 units, uint256 repaid, uint256 liquidationOraclePrice, bytes memory data)
-        public
-    {
+    function testLiquidateCallback(
+        uint256 units,
+        uint256 repaid,
+        uint256 liquidationOraclePrice,
+        bytes memory data,
+        address caller
+    ) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
@@ -217,6 +221,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
+        vm.prank(caller);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, address(this), address(this), data);
 
         assertEq(recordedRepaidUnits, repaid, "repaid units");
