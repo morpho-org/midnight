@@ -132,6 +132,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
 /// debt, and `take` whenever the seller still has debt might revert.
 /// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
+/// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
+/// greater than type(uint128).max, then `liquidate`, `isHealthy`, `withdrawCollateral` when the borrower has debt, and
+/// `take` whenever the seller still has debt could all revert.
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
