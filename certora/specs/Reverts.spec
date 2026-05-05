@@ -350,7 +350,7 @@ filtered {
         || f.selector == sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
+        || f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector
 } {
     require forceTransferFromRevert, "transferFrom reverts";
     f@withrevert(e, args);
@@ -365,7 +365,7 @@ filtered {
         || f.selector == sig:claimTradingFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
+        || f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector
 } {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);
@@ -395,10 +395,10 @@ rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Obligation o
 }
 
 /// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts.
-rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address token, uint256 assets, address callback, bytes data) {
+rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
 
-    flashLoan@withrevert(e, token, assets, callback, data);
+    flashLoan@withrevert(e, tokens, assets, callback, data);
 
     assert lastReverted;
 }
