@@ -9,9 +9,10 @@ methods {
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    // Over-approximate view functions for prover performance.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.
