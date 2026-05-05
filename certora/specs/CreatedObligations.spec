@@ -150,8 +150,8 @@ strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
 strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => currentContract.obligationState[id].continuousFeeCredit == 0;
 
-strong invariant obligationLossIndexIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossIndex == 0;
+strong invariant obligationLossFactorIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossFactor == 0;
 
 strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0;
@@ -171,8 +171,8 @@ strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 i
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
     !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
-strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
+strong invariant positionLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => currentContract.position[id][user].lossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFees(id);
