@@ -21,7 +21,15 @@ methods {
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
-    // Assume no reentrancy: callbacks and transfers do not re-enter Midnight.
+    // Assume no reentrancy: callbacks, gates and transfers do not re-enter Midnight.
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
 /// HELPERS ///

@@ -140,6 +140,7 @@ interface IMidnight {
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external;
+    function setLimits(address token, uint128 newMaxTotalUnits, uint256 newMaxTakeableAssets, uint256 newMaxCollateralPerUser) external;
     function claimTradingFee(address token, uint256 amount, address receiver) external;
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 

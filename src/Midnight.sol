@@ -209,26 +209,26 @@ contract Midnight is IMidnight {
     /// ADMIN FUNCTIONS ///
 
     function setRoleSetter(address newRoleSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        _onlyRoleSetter();
         roleSetter = newRoleSetter;
         emit EventsLib.SetRoleSetter(newRoleSetter);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        _onlyRoleSetter();
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     function setFeeClaimer(address newFeeClaimer) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        _onlyRoleSetter();
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
         ObligationState storage _obligationState = obligationState[id];
-        require(msg.sender == feeSetter, OnlyFeeSetter());
+        _onlyFeeSetter();
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
         require(newTradingFee % FEE_STEP == 0, FeeNotMultipleOfFeeStep());
@@ -246,7 +246,7 @@ contract Midnight is IMidnight {
     }
 
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
-        require(msg.sender == feeSetter, OnlyFeeSetter());
+        _onlyFeeSetter();
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
         require(newTradingFee % FEE_STEP == 0, FeeNotMultipleOfFeeStep());
@@ -257,7 +257,7 @@ contract Midnight is IMidnight {
 
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         ObligationState storage _obligationState = obligationState[id];
-        require(msg.sender == feeSetter, OnlyFeeSetter());
+        _onlyFeeSetter();
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
         require(_obligationState.created, ObligationNotCreated());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
@@ -266,33 +266,28 @@ contract Midnight is IMidnight {
     }
 
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
-        require(msg.sender == feeSetter, OnlyFeeSetter());
+        _onlyFeeSetter();
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         defaultContinuousFee[loanToken] = uint32(newContinuousFee);
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
-    function setMaxTotalUnits(address token, uint128 newMaxTotalUnits) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+    function setLimits(
+        address token,
+        uint128 newMaxTotalUnits,
+        uint256 newMaxTakeableAssets,
+        uint256 newMaxCollateralPerUser
+    ) external {
+        _onlyRoleSetter();
         maxTotalUnits[token] = newMaxTotalUnits;
-        emit EventsLib.SetMaxTotalUnits(token, newMaxTotalUnits);
-    }
-
-    function setMaxTakeableAssets(address token, uint256 newMaxTakeableAssets) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
         maxTakeableAssets[token] = newMaxTakeableAssets;
-        emit EventsLib.SetMaxTakeableAssets(token, newMaxTakeableAssets);
-    }
-
-    function setMaxCollateralPerUser(address token, uint256 newMaxCollateralPerUser) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
         maxCollateralPerUser[token] = newMaxCollateralPerUser;
-        emit EventsLib.SetMaxCollateralPerUser(token, newMaxCollateralPerUser);
+        emit EventsLib.SetLimits(token, newMaxTotalUnits, newMaxTakeableAssets, newMaxCollateralPerUser);
     }
 
     function claimTradingFee(address token, uint256 amount, address receiver) external {
-        require(msg.sender == feeClaimer, OnlyFeeClaimer());
+        _onlyFeeClaimer();
         claimableTradingFee[token] -= amount;
         emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
         SafeTransferLib.safeTransfer(token, receiver, amount);
@@ -301,7 +296,7 @@ contract Midnight is IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
         bytes32 id = toId(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(msg.sender == feeClaimer, OnlyFeeClaimer());
+        _onlyFeeClaimer();
         require(_obligationState.created, ObligationNotCreated());
 
         _obligationState.continuousFeeCredit -= UtilsLib.toUint128(amount);
@@ -853,6 +848,18 @@ contract Midnight is IMidnight {
 
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
         return position[id][user].credit > 0;
+    }
+
+    function _onlyRoleSetter() internal view {
+        require(msg.sender == roleSetter, OnlyRoleSetter());
+    }
+
+    function _onlyFeeSetter() internal view {
+        require(msg.sender == feeSetter, OnlyFeeSetter());
+    }
+
+    function _onlyFeeClaimer() internal view {
+        require(msg.sender == feeClaimer, OnlyFeeClaimer());
     }
 
     /// OTHER VIEW FUNCTIONS ///
