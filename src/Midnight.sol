@@ -439,14 +439,12 @@ contract Midnight is IMidnight {
                 WrongSellCallbackReturnValue()
             );
         }
-        if (!wasLocked) {
-            UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-            require(
-                position[id][seller].debt == 0
-                    || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
-                SellerIsLiquidatable()
-            );
-        }
+        if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
+        require(
+            position[id][seller].debt == 0 || liquidationLocked(id, seller)
+                || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
+            SellerIsLiquidatable()
+        );
 
         return (buyerAssets, sellerAssets, units);
     }
