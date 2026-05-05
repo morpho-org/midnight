@@ -48,7 +48,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
 ///
 /// LIQUIDATIONS
-/// @dev Accounts are liquidatable only if the liquidation is not locked and they are either unhealthy or the maturity has passed.
+/// @dev Accounts are liquidatable only if the liquidation is not locked and they are either unhealthy or the maturity
+/// has passed.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
 /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
 /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
