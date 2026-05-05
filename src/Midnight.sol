@@ -497,9 +497,9 @@ contract Midnight is IMidnight {
         _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
-            uint128 newBitmap = _position.activatedCollaterals.setBit(collateralIndex);
-            _position.activatedCollaterals = newBitmap;
-            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals());
+            uint128 newBitmap = _position.collateralBitmap.setBit(collateralIndex);
+            _position.collateralBitmap = newBitmap;
+            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyCollateralBitmapBits());
         }
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
@@ -524,7 +524,7 @@ contract Midnight is IMidnight {
         _position.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
 
         if (newCollateral == 0 && assets > 0) {
-            _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
+            _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
         }
 
         require(isHealthy(obligation, id, onBehalf), UnhealthyBorrower());
@@ -551,7 +551,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
-        uint128 bitmap = _position.activatedCollaterals;
+        uint128 bitmap = _position.collateralBitmap;
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
         require(UtilsLib.getBit(bitmap, collateralIndex), InactiveCollateral());
         require(
@@ -632,7 +632,7 @@ contract Midnight is IMidnight {
             uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
             _position.collateral[collateralIndex] = newCollateral;
             if (newCollateral == 0 && seizedAssets > 0) {
-                _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
+                _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
             }
             _obligationState.withdrawable += UtilsLib.toUint128(repaidUnits);
             _position.debt -= UtilsLib.toUint128(repaidUnits);
@@ -809,8 +809,8 @@ contract Midnight is IMidnight {
         return position[id][user].lossIndex;
     }
 
-    function activatedCollaterals(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].activatedCollaterals;
+    function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].collateralBitmap;
     }
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
@@ -899,7 +899,7 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
+        uint128 bitmap = _position.collateralBitmap;
         while (maxDebt < debt && bitmap != 0) {
             uint256 i = UtilsLib.msb(bitmap);
             CollateralParams memory collateralParam = obligation.collateralParams[i];

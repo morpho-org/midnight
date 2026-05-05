@@ -9,7 +9,7 @@ methods {
 
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function activatedCollaterals(bytes32 id, address user) external returns (uint128) envfree;
+    function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -185,7 +185,7 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, ui
     require singleRevertingOracle == obligation.collateralParams[revertingCollateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(obligation);
-    uint128 bitmap = activatedCollaterals(id, borrower);
+    uint128 bitmap = collateralBitmap(id, borrower);
     require summaryGetBit(bitmap, revertingCollateralIndex), "revertingCollateralIndex is activated";
 
     liquidate@withrevert(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
@@ -201,7 +201,7 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation oblig
     require revertingCollateralIndex != collateralIndex, "withdrawCollateral may clear the bit at collateralIndex before calling isHealthy";
 
     bytes32 id = summaryToId(obligation);
-    uint128 bitmap = activatedCollaterals(id, onBehalf);
+    uint128 bitmap = collateralBitmap(id, onBehalf);
     require summaryGetBit(bitmap, revertingCollateralIndex), "revertingCollateralIndex is activated";
     require forall uint256 bit. bit > revertingCollateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "revertingCollateralIndex is the MSB";
 
@@ -216,7 +216,7 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation oblig
 rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
     require singleRevertingOracle == obligation.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
-    uint128 bitmap = activatedCollaterals(id, borrower);
+    uint128 bitmap = collateralBitmap(id, borrower);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
     require forall uint256 bit. bit > collateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "collateralIndex is the MSB";
 
@@ -238,7 +238,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
-    uint128 bitmap = activatedCollaterals(id, seller);
+    uint128 bitmap = collateralBitmap(id, seller);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
     require forall uint256 bit. bit > collateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "collateralIndex is the MSB";
 
@@ -265,7 +265,7 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Obligation obligation,
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(obligation);
-    require activatedCollaterals(id, borrower) != 0, "borrower has activated collaterals";
+    require collateralBitmap(id, borrower) != 0, "borrower has activated collaterals";
 
     bool healthy = isHealthy(e, obligation, id, borrower);
 
@@ -278,7 +278,7 @@ rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Obligation ob
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(obligation);
-    require activatedCollaterals(id, onBehalf) != 0, "borrower has activated collaterals";
+    require collateralBitmap(id, onBehalf) != 0, "borrower has activated collaterals";
 
     withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
 
