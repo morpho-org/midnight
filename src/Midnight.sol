@@ -502,8 +502,7 @@ contract Midnight is IMidnight {
             uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
             _position.collateralBitmap = newCollateralBitmap;
             require(
-                UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER,
-                TooManyCollateralBitmapBits()
+                UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyCollateralBitmapBits()
             );
         }
 
@@ -556,9 +555,9 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
-        uint128 collateralBitmap = _position.collateralBitmap;
+        uint128 borrowerCollateralBitmap = _position.collateralBitmap;
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
-        require(UtilsLib.getBit(collateralBitmap, collateralIndex), InactiveCollateral());
+        require(UtilsLib.getBit(borrowerCollateralBitmap, collateralIndex), InactiveCollateral());
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
@@ -569,8 +568,8 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
-        while (collateralBitmap != 0) {
-            uint256 i = UtilsLib.msb(collateralBitmap);
+        while (borrowerCollateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(borrowerCollateralBitmap);
             CollateralParams memory _collateralParam = obligation.collateralParams[i];
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
@@ -579,7 +578,7 @@ contract Midnight is IMidnight {
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
             );
-            collateralBitmap = collateralBitmap.clearBit(i);
+            borrowerCollateralBitmap = borrowerCollateralBitmap.clearBit(i);
         }
 
         require(
@@ -912,14 +911,14 @@ contract Midnight is IMidnight {
         uint256 debt = _position.debt;
         uint256 maxDebt;
         if (debt > 0) {
-            uint128 collateralBitmap = _position.collateralBitmap;
-            while (collateralBitmap != 0) {
-                uint256 i = UtilsLib.msb(collateralBitmap);
+            uint128 borrowerCollateralBitmap = _position.collateralBitmap;
+            while (borrowerCollateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(borrowerCollateralBitmap);
                 CollateralParams memory collateralParam = obligation.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
                 maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
-                collateralBitmap = collateralBitmap.clearBit(i);
+                borrowerCollateralBitmap = borrowerCollateralBitmap.clearBit(i);
             }
         }
         return maxDebt >= debt;

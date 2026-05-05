@@ -376,7 +376,7 @@ contract OtherFunctionsTest is BaseTest {
         midnight.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
     }
 
-    function testIsHealthyDoesNotShortCircuitActivatedCollaterals() public {
+    function testIsHealthyDoesNotShortCircuitCollateralBitmap() public {
         RevertingOracle revertingOracle = new RevertingOracle();
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         uint256 lltv = 0.77e18;
