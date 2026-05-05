@@ -90,8 +90,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// any account that has been authorized.
 /// @dev When authorizing an account, one should consider:
 /// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
-/// contracts might re-use Midnight's authorization mapping too (e.g ratifiers). In particular, authorized accounts can
-/// authorize other accounts on behalf of the user.
+/// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
+/// authorized accounts can authorize other accounts on behalf of the user.
 /// - Whether the account can return `CALLBACK_SUCCESS` when its `onRatify` function is called.
 /// - For EOAs, the signatures that it can sign.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
