@@ -50,7 +50,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// LIQUIDATIONS
 /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
 /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
-/// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
+/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
 /// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
 /// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
@@ -115,10 +115,13 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
-/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, and `take` whenever the seller still has debt might revert.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts.
+/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` and `take` revert when
+/// the user (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
+/// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
+/// greater than type(uint128).max, then `liquidate`, `isHealthy`, `withdrawCollateral` when the borrower has debt, and
+/// `take` whenever the seller still has debt could all revert.
 /// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
 /// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
 /// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
@@ -147,7 +150,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
 /// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
 /// hard-fork there can be some obligation id clashes.
-/// @dev If `block.chainid` changes (hard fork), all obligation ids change and existing accounting is stranded.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
@@ -497,9 +499,12 @@ contract Midnight is IMidnight {
         _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
-            uint128 newBitmap = _position.collateralBitmap.setBit(collateralIndex);
-            _position.collateralBitmap = newBitmap;
-            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyCollateralBitmapBits());
+            uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
+            _position.collateralBitmap = newCollateralBitmap;
+            require(
+                UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER,
+                TooManyCollateralBitmapBits()
+            );
         }
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
@@ -551,9 +556,9 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
         Position storage _position = position[id][borrower];
-        uint128 bitmap = _position.collateralBitmap;
+        uint128 collateralBitmap = _position.collateralBitmap;
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
-        require(UtilsLib.getBit(bitmap, collateralIndex), InactiveCollateral());
+        require(UtilsLib.getBit(collateralBitmap, collateralIndex), InactiveCollateral());
         require(
             obligation.liquidatorGate == address(0)
                 || ILiquidatorGate(obligation.liquidatorGate).canLiquidate(msg.sender),
@@ -564,8 +569,8 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
+        while (collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(collateralBitmap);
             CollateralParams memory _collateralParam = obligation.collateralParams[i];
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
@@ -574,7 +579,7 @@ contract Midnight is IMidnight {
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
             );
-            bitmap = bitmap.clearBit(i);
+            collateralBitmap = collateralBitmap.clearBit(i);
         }
 
         require(
@@ -692,14 +697,21 @@ contract Midnight is IMidnight {
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
-        emit EventsLib.FlashLoan(msg.sender, token, assets, callback);
-        SafeTransferLib.safeTransfer(token, callback, assets);
+    function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
+        external
+    {
+        require(tokens.length == assets.length, InconsistentInput());
+        emit EventsLib.FlashLoan(msg.sender, tokens, assets, callback);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
+        }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
-        SafeTransferLib.safeTransferFrom(token, callback, address(this), assets);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransferFrom(tokens[i], callback, address(this), assets[i]);
+        }
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
@@ -899,14 +911,16 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.collateralBitmap;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
+        if (debt > 0) {
+            uint128 collateralBitmap = _position.collateralBitmap;
+            while (collateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(collateralBitmap);
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                collateralBitmap = collateralBitmap.clearBit(i);
+            }
         }
         return maxDebt >= debt;
     }
