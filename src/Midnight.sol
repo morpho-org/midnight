@@ -87,8 +87,13 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
-/// any account that has been authorized.
-/// @dev In particular, authorized accounts can authorize other accounts on behalf of the user.
+/// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
+/// scoped behavior.
+/// @dev When authorizing a smart-contract, one should consider:
+/// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
+/// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
+/// authorized accounts can authorize other accounts on behalf of the user.
+/// - Under which conditions the account can return `CALLBACK_SUCCESS` when its `onRatify` function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
@@ -115,9 +120,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts unconditionally.
-/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, and `take` whenever the seller still has debt might revert.
+/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts.
+/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` and `take` revert when
+/// the user (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
 /// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
 /// greater than type(uint128).max, then `liquidate`, `isHealthy`, `withdrawCollateral` when the borrower has debt, and
@@ -686,21 +691,28 @@ contract Midnight is IMidnight {
         emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
-    /// @dev Authorized addresses can authorize other addresses to act on their behalf so it should be used carefully.
+    /// @dev See Authorization section above.
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
-        emit EventsLib.FlashLoan(msg.sender, token, assets, callback);
-        SafeTransferLib.safeTransfer(token, callback, assets);
+    function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
+        external
+    {
+        require(tokens.length == assets.length, InconsistentInput());
+        emit EventsLib.FlashLoan(msg.sender, tokens, assets, callback);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
+        }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(token, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
-        SafeTransferLib.safeTransferFrom(token, callback, address(this), assets);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransferFrom(tokens[i], callback, address(this), assets[i]);
+        }
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
@@ -900,14 +912,16 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
+        if (debt > 0) {
+            uint128 bitmap = _position.activatedCollaterals;
+            while (bitmap != 0) {
+                uint256 i = UtilsLib.msb(bitmap);
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                bitmap = bitmap.clearBit(i);
+            }
         }
         return maxDebt >= debt;
     }

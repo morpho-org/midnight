@@ -37,5 +37,5 @@ interface IEcrecoverAuthorizer {
     function nonce(address authorizer) external view returns (uint256);
 
     /// FUNCTIONS ///
-    function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external;
+    function setIsAuthorized(Authorization memory authorization, Signature memory signature) external;
 }
