@@ -14,7 +14,9 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     bytes internal dataStored;
     bool internal discardToken = false;
 
-    function testFlashLoan(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data, address caller) public {
+    function testFlashLoan(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data, address caller)
+        public
+    {
         amount0 = bound(amount0, 1, type(uint256).max);
         amount1 = bound(amount1, 1, type(uint256).max);
         amount2 = bound(amount2, 1, type(uint256).max);
