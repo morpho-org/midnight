@@ -159,23 +159,23 @@ library UtilsLib {
         }
     }
 
-    /// @dev Assumes `collateralBitmap` is not zero.
-    function msb(uint128 collateralBitmap) internal pure returns (uint256 res) {
+    /// @dev Assumes `bitmap` is not zero.
+    function msb(uint128 bitmap) internal pure returns (uint256 res) {
         assembly {
-            res := sub(255, clz(collateralBitmap))
+            res := sub(255, clz(bitmap))
         }
     }
 
     /// @dev Assumes `bit` is less than 128.
-    function setBit(uint128 collateralBitmap, uint256 bit) internal pure returns (uint128) {
+    function setBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast) as bit < 128
-        return uint128(collateralBitmap | (1 << bit));
+        return uint128(bitmap | (1 << bit));
     }
 
     /// @dev Assumes `bit` is less than 128.
-    function clearBit(uint128 collateralBitmap, uint256 bit) internal pure returns (uint128) {
+    function clearBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast)
-        return uint128(collateralBitmap & ~(1 << bit));
+        return uint128(bitmap & ~(1 << bit));
     }
 
     /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
