@@ -11,6 +11,9 @@ methods {
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivUp(a, b, denominator);
 
+    // Over-approximation of the hashOffer function.
+    function UtilsLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => NONDET;
+
     // IdLib summary: remember the last id returned by toId.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
@@ -42,7 +45,7 @@ ghost summaryPrice(address) returns uint256;
 /// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 /// Also show that liquidate can only be called on liquidatable positions.
-rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, bytes data) {
+rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, address receiver, address callback, bytes data) {
     bytes32 id;
     address user;
     uint256 collateralIndex;
@@ -53,7 +56,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
-    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, data);
+    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, receiver, callback, data);
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);

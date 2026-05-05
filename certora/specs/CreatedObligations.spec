@@ -12,6 +12,7 @@ methods {
     function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
+    function Midnight.toObligation(bytes32) external returns (Midnight.Obligation memory) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
@@ -22,6 +23,7 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -34,7 +36,7 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
     // Summarize CREATE2 opcode used by IdLib.storeInCode.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -96,8 +98,8 @@ rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uin
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) {
-    Midnight.repay(e, obligation, units, onBehalf, data);
+rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
+    Midnight.repay(e, obligation, units, onBehalf, callback, data);
     assert obligationIsCreated(obligation);
 }
 
@@ -111,9 +113,25 @@ rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation oblig
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) {
-    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert obligationIsCreated(obligation);
+}
+
+// Obligations can only be created by: touchObligation, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
+rule onlyTouchObligationCreatesObligation(env e, method f, calldataarg args, bytes32 id)
+filtered {
+    f -> f.selector != sig:touchObligation(Midnight.Obligation).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+        && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
+        && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
+        && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
+        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
+} {
+    require !Midnight.obligationCreated(id), "Assume that the obligation is not created";
+    f(e, args);
+    assert !Midnight.obligationCreated(id);
 }
 
 // Show that each obligation state field is empty if the obligation is not created.
@@ -123,8 +141,8 @@ strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
 strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.withdrawable(id) == 0;
 
-strong invariant obligationFeesAreEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => noFeesAreSet(id);
+strong invariant obligationTradingFeesAreEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => noTradingFeesAreSet(id);
 
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
@@ -156,7 +174,7 @@ strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address use
 strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
 
-function noFeesAreSet(bytes32 id) returns (bool) {
+function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }

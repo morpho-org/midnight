@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
     function testInitialRoleSetter() public view {
@@ -19,7 +19,7 @@ contract SettersTest is BaseTest {
     function testSetRoleSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only role setter");
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setRoleSetter(makeAddr("newRoleSetter"));
     }
 
@@ -31,7 +31,7 @@ contract SettersTest is BaseTest {
     function testSetFeeSetterOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only role setter");
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
@@ -88,19 +88,19 @@ contract SettersTest is BaseTest {
     }
 
     function testSetTradingFeeInvalidIndex(bytes32 id) public {
-        vm.expectRevert("invalid index");
+        vm.expectRevert(IMidnight.InvalidFeeIndex.selector);
         midnight.setObligationTradingFee(id, 7, 0);
     }
 
     function testSetDefaultTradingFeeInvalidIndex(address loanToken) public {
-        vm.expectRevert("invalid index");
+        vm.expectRevert(IMidnight.InvalidFeeIndex.selector);
         midnight.setDefaultTradingFee(loanToken, 7, 0);
     }
 
     function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("trading fee too high");
+        vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
@@ -108,7 +108,7 @@ contract SettersTest is BaseTest {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert("fee should be a multiple of FEE_STEP");
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setObligationTradingFee(id, index, fee);
     }
 
@@ -116,19 +116,25 @@ contract SettersTest is BaseTest {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert("fee should be a multiple of FEE_STEP");
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setDefaultTradingFee(loanToken, index, fee);
     }
 
     function testSetObligationTradingFeeObligationNotCreated(bytes32 id) public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.setObligationTradingFee(id, 0, 0);
+    }
+
+    function testSetObligationContinuousFeeObligationNotCreated(bytes32 id, uint256 fee) public {
+        fee = bound(fee, 0, MAX_CONTINUOUS_FEE);
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        midnight.setObligationContinuousFee(id, fee);
     }
 
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only fee setter");
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
@@ -140,14 +146,14 @@ contract SettersTest is BaseTest {
     function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only role setter");
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
     // Default trading fee tests
 
     function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.tradingFee(bytes32(0), 0);
     }
 
@@ -207,33 +213,33 @@ contract SettersTest is BaseTest {
     function testSetDefaultTradingFeeOnlyFeeSetter(address rdm, address loanToken) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert("only fee setter");
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setDefaultTradingFee(loanToken, 0, 0);
     }
 
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
-        vm.expectRevert("trading fee too high");
+        vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
 
-    function testLinearInterpolation(
-        uint256 fee0,
-        uint256 fee1,
-        uint256 fee2,
-        uint256 fee3,
-        uint256 fee4,
-        uint256 fee5,
-        uint256 fee6
+    function testTradingFeeLinearInterpolation(
+        uint256 tradingFee0,
+        uint256 tradingFee1,
+        uint256 tradingFee2,
+        uint256 tradingFee3,
+        uint256 tradingFee4,
+        uint256 tradingFee5,
+        uint256 tradingFee6
     ) public {
-        fee0 = bound(fee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        fee1 = bound(fee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        fee2 = bound(fee2, 0, midnight.maxTradingFee(2)) / 1e12 * 1e12;
-        fee3 = bound(fee3, 0, midnight.maxTradingFee(3)) / 1e12 * 1e12;
-        fee4 = bound(fee4, 0, midnight.maxTradingFee(4)) / 1e12 * 1e12;
-        fee5 = bound(fee5, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
-        fee6 = bound(fee6, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        tradingFee0 = bound(tradingFee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee1 = bound(tradingFee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee2 = bound(tradingFee2, 0, midnight.maxTradingFee(2)) / 1e12 * 1e12;
+        tradingFee3 = bound(tradingFee3, 0, midnight.maxTradingFee(3)) / 1e12 * 1e12;
+        tradingFee4 = bound(tradingFee4, 0, midnight.maxTradingFee(4)) / 1e12 * 1e12;
+        tradingFee5 = bound(tradingFee5, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
+        tradingFee6 = bound(tradingFee6, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
 
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
@@ -250,38 +256,39 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(obligation);
         midnight.touchObligation(obligation);
 
-        midnight.setObligationTradingFee(id, 0, fee0);
-        midnight.setObligationTradingFee(id, 1, fee1);
-        midnight.setObligationTradingFee(id, 2, fee2);
-        midnight.setObligationTradingFee(id, 3, fee3);
-        midnight.setObligationTradingFee(id, 4, fee4);
-        midnight.setObligationTradingFee(id, 5, fee5);
-        midnight.setObligationTradingFee(id, 6, fee6);
+        midnight.setObligationTradingFee(id, 0, tradingFee0);
+        midnight.setObligationTradingFee(id, 1, tradingFee1);
+        midnight.setObligationTradingFee(id, 2, tradingFee2);
+        midnight.setObligationTradingFee(id, 3, tradingFee3);
+        midnight.setObligationTradingFee(id, 4, tradingFee4);
+        midnight.setObligationTradingFee(id, 5, tradingFee5);
+        midnight.setObligationTradingFee(id, 6, tradingFee6);
 
         // Test exact breakpoints
-        assertEq(midnight.tradingFee(id, 0), fee0, "0 days");
-        assertEq(midnight.tradingFee(id, 1 days), fee1, "1 day");
-        assertEq(midnight.tradingFee(id, 7 days), fee2, "7 days");
-        assertEq(midnight.tradingFee(id, 30 days), fee3, "30 days");
-        assertEq(midnight.tradingFee(id, 90 days), fee4, "90 days");
-        assertEq(midnight.tradingFee(id, 180 days), fee5, "180 days");
-        assertEq(midnight.tradingFee(id, 360 days), fee6, "360 days");
+        assertEq(midnight.tradingFee(id, 0), tradingFee0, "0 days");
+        assertEq(midnight.tradingFee(id, 1 days), tradingFee1, "1 day");
+        assertEq(midnight.tradingFee(id, 7 days), tradingFee2, "7 days");
+        assertEq(midnight.tradingFee(id, 30 days), tradingFee3, "30 days");
+        assertEq(midnight.tradingFee(id, 90 days), tradingFee4, "90 days");
+        assertEq(midnight.tradingFee(id, 180 days), tradingFee5, "180 days");
+        assertEq(midnight.tradingFee(id, 360 days), tradingFee6, "360 days");
 
         // Test interpolation midpoint (0.5 days is between index 0 and 1)
-        uint256 expectedMidpoint = (fee0 * (1 days - 0.5 days) + fee1 * (0.5 days)) / 1 days;
+        uint256 expectedMidpoint = (tradingFee0 * (1 days - 0.5 days) + tradingFee1 * (0.5 days)) / 1 days;
         assertEq(midnight.tradingFee(id, 0.5 days), expectedMidpoint, "Midpoint 0-1d");
 
         // Test interpolation midpoint (4 days is between index 1 and 2)
-        uint256 expectedMid4d = (fee1 * (7 days - 4 days) + fee2 * (4 days - 1 days)) / (7 days - 1 days);
+        uint256 expectedMid4d = (tradingFee1 * (7 days - 4 days) + tradingFee2 * (4 days - 1 days)) / (7 days - 1 days);
         assertEq(midnight.tradingFee(id, 4 days), expectedMid4d, "Midpoint 1-7d");
 
         // Test interpolation midpoint (270 days is between index 5 [180d] and index 6 [360d])
-        uint256 expectedMid270d = (fee5 * (360 days - 270 days) + fee6 * (270 days - 180 days)) / (360 days - 180 days);
+        uint256 expectedMid270d =
+            (tradingFee5 * (360 days - 270 days) + tradingFee6 * (270 days - 180 days)) / (360 days - 180 days);
         assertEq(midnight.tradingFee(id, 270 days), expectedMid270d, "Midpoint 180-360d");
 
         // Test beyond 360 days
-        assertEq(midnight.tradingFee(id, 365 days), fee6, "365 days");
-        assertEq(midnight.tradingFee(id, 1000 days), fee6, "1000 days");
+        assertEq(midnight.tradingFee(id, 365 days), tradingFee6, "365 days");
+        assertEq(midnight.tradingFee(id, 1000 days), tradingFee6, "1000 days");
     }
 
     function testSetContinuousFeeOnlyFeeSetter(address rdm) public {
@@ -303,11 +310,11 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(obligation);
 
         vm.prank(rdm);
-        vm.expectRevert("only fee setter");
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setObligationContinuousFee(id, 100);
 
         vm.prank(rdm);
-        vm.expectRevert("only fee setter");
+        vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
         midnight.setDefaultContinuousFee(address(loanToken), 100);
     }
 
@@ -329,10 +336,10 @@ contract SettersTest is BaseTest {
         midnight.touchObligation(obligation);
         bytes32 id = toId(obligation);
 
-        vm.expectRevert("continuous fee too high");
+        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
         midnight.setObligationContinuousFee(id, fee);
 
-        vm.expectRevert("continuous fee too high");
+        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
         midnight.setDefaultContinuousFee(address(loanToken), fee);
     }
 
