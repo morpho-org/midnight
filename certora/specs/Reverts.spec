@@ -357,7 +357,15 @@ filtered {
     assert lastReverted;
 }
 
-/// If transfer reverts, withdraw, withdrawCollateral, fee claims, liquidate, and flashLoan all revert.
+/// If transferFrom reverts, flashLoan reverts, assuming that the arrays are not empty.
+rule transferFromRevertPropagationFlashLoan(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
+    require forceTransferFromRevert, "transferFrom reverts";
+    require tokens.length > 0, "assume tokens array is not empty";
+    flashLoan@withrevert(e, tokens, assets, callback, data);
+    assert lastReverted;
+}
+
+/// If transfer reverts, withdraw, withdrawCollateral, fee claims, liquidate all revert.
 rule transferRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
@@ -365,10 +373,17 @@ filtered {
         || f.selector == sig:claimTradingFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        || f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector
 } {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);
+    assert lastReverted;
+}
+
+/// If transfer reverts, flashLoan reverts, assuming that the arrays are not empty.
+rule transferRevertPropagationFlashLoan(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
+    require forceTransferRevert, "transfer reverts";
+    require tokens.length > 0, "assume tokens array is not empty";
+    flashLoan@withrevert(e, tokens, assets, callback, data);
     assert lastReverted;
 }
 
@@ -394,9 +409,10 @@ rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Obligation o
     assert lastReverted;
 }
 
-/// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts.
+/// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts, assuming that the arrays are not empty.
 rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
+    require tokens.length > 0, "assume tokens array is not empty";
 
     flashLoan@withrevert(e, tokens, assets, callback, data);
 
