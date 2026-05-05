@@ -672,8 +672,8 @@ contract Midnight is IMidnight {
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
-        require(obligation.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
         if (!obligationState[id].created) {
+            require(obligation.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(obligation.collateralParams.length > 0, NoCollateralParams());
             require(obligation.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
             address previousCollateralToken;

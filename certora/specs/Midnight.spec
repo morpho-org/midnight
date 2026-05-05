@@ -42,6 +42,7 @@ methods {
 /// HELPERS ///
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
@@ -140,6 +141,11 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
         preserved with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
+        }
+        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
+            requireInvariant continuousFeeBounded(id);
+            requireInvariant defaultContinuousFeeBoundedAll();
+            require to_mathint(offer.obligation.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
         }
     }
 
