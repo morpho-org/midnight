@@ -67,7 +67,6 @@ interface IMidnight {
     /// ERRORS ///
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
-    error BuyerPendingFeeExceedsCredit();
     error CollateralParamsNotSorted();
     error CollateralPerUserExceeded();
     error ConsumedBuyerAssets();
@@ -88,6 +87,7 @@ interface IMidnight {
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
+    error MaturityTooFar();
     error MaxTakeableAssetsExceeded();
     error MaxTotalUnitsExceeded();
     error MultipleNonZero();
