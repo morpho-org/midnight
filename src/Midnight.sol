@@ -550,6 +550,8 @@ contract Midnight is IMidnight {
     /// @dev See LIQUIDATIONS section for more details.
     /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
     /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
+    /// @dev Liquidations with both 0 for `seizedAssets` and `repaidUnits` can be done with a collateral that is not
+    /// activated.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
