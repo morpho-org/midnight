@@ -241,7 +241,7 @@ contract Midnight is IMidnight {
         else if (index == 3) _obligationState.tradingFee3 = toStore;
         else if (index == 4) _obligationState.tradingFee4 = toStore;
         else if (index == 5) _obligationState.tradingFee5 = toStore;
-        else _obligationState.tradingFee6 = toStore;
+        else if (index == 6) _obligationState.tradingFee6 = toStore;
         emit EventsLib.SetObligationTradingFee(id, index, newTradingFee);
     }
 
