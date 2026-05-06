@@ -791,9 +791,17 @@ contract MidnightBundlesTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units);
     }
 
-    function testRepay() public {
-        uint256 units = 100e18;
+    function testRepay(uint256 units, uint256 repayUnits, uint256 withdrawAssets) public {
+        units = bound(units, 1, uint256(type(uint128).max) * 3 / 4);
+        repayUnits = bound(repayUnits, 0, units);
+
         offers[0].maxUnits = units;
+
+        // Zero trading fees so the borrower receives exactly `units` loan tokens for the sale,
+        // covering any `repayUnits <= units`.
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
 
         // Borrower sells units to get loan token + accumulate debt and collateral on Midnight.
         Take[] memory sellTakes = new Take[](1);
@@ -811,8 +819,8 @@ contract MidnightBundlesTest is BaseTest {
             address(midnight), units, borrower, borrower, sellTakes, new CollateralTransfer[](0), 0, address(0)
         );
 
-        uint256 repayUnits = units / 2;
-        uint256 withdrawAssets = collateralAmount / 4;
+        uint256 maxWithdrawable = collateralAmount - _collateralAmount(0, units - repayUnits);
+        withdrawAssets = bound(withdrawAssets, 0, maxWithdrawable);
         address collateralReceiver = makeAddr("collateralReceiver");
 
         vm.prank(borrower);
