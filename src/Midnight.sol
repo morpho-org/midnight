@@ -105,8 +105,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
-/// may become extremely imprecise (against the user), potentially leading to a total loss. Additionally, the take
-/// function reverts when the loss factor is maxed out.
+/// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
+/// obligation doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
 /// @dev The entry gate can prevent entry actions (increasing credit or debt) in the obligation.
