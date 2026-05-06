@@ -324,7 +324,7 @@ contract Midnight is IMidnight {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(_obligationState.lossIndex < type(uint128).max, ObligationLossIndexMaxedOut());
+        require(_obligationState.lossFactor < type(uint128).max, ObligationLossFactorMaxedOut());
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
