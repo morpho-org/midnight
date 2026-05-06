@@ -1625,38 +1625,6 @@ contract TakeTest is BaseTest {
             proof([borrowerOffer])
         );
     }
-
-    function testBuyerPendingFeeExceedsCredit() public {
-        // Use a very long maturity so continuousFee * TTM > WAD.
-        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
-
-        Obligation memory longObligation;
-        longObligation.loanToken = address(loanToken);
-        longObligation.maturity = block.timestamp + 200 * 365 days;
-        longObligation.collateralParams = obligation.collateralParams;
-
-        uint256 units = 1e18;
-        Offer memory bOffer;
-        bOffer.obligation = longObligation;
-        bOffer.buy = false;
-        bOffer.maker = borrower;
-        bOffer.receiverIfMakerIsSeller = borrower;
-        bOffer.maxUnits = units;
-        bOffer.ratifier = address(ecrecoverRatifier);
-        bOffer.start = block.timestamp;
-        bOffer.expiry = block.timestamp + 200;
-        bOffer.tick = MAX_TICK;
-
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        collateralize(longObligation, borrower, units);
-
-        vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
-        vm.prank(lender);
-        midnight.take(
-            units, lender, address(0), hex"", lender, bOffer, ratifierData([bOffer]), root([bOffer]), proof([bOffer])
-        );
-    }
 }
 
 contract InvalidBuyCallback is IBuyCallback {
