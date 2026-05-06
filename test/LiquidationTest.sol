@@ -641,8 +641,8 @@ contract LiquidationTest is BaseTest {
         assertTrue(debtAfter == 0 || collateralAfter == 0, "either debt repaid or collateral seized");
     }
 
-    /// @dev Recovery close factor with two collateralParams contributing to maxDebt.
-    /// Drops price of the lower-lltv collateral to make position unhealthy, then liquidates it.
+    /// @dev Recovery close factor with two collateralParams contributing to maxDebt. Drops price of the lower-lltv
+    /// collateral to make position unhealthy, then liquidates it.
     function testRecoveryCloseFactorMultipleCollaterals(uint256 units) public {
         units = bound(units, 100, MAX_UNITS);
 
@@ -833,7 +833,7 @@ contract LiquidationTest is BaseTest {
                     .mulDivUp(WAD, _collateral.maxLif)
             );
             require(i < 128, "i is too large");
-            // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
+            // forge-lint: disable-next-line(unsafe-typecast) as i < 128 is checked above.
             collateralBitmap ^= uint128(1 << i);
         }
         return badDebt;
@@ -874,8 +874,8 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collateralParams[0].lltv, WAD);
     }
 
-    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18).
-    /// Before the fix, this reverted with a division-by-zero in the recovery close factor check.
+    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18). Before the fix, this reverted
+    /// with a division-by-zero in the recovery close factor check.
     function testLiquidatePreMaturityLltvWad(uint256 units) public {
         units = bound(units, 2, MAX_UNITS);
 

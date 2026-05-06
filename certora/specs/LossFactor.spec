@@ -36,7 +36,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-/// The obligation's lossFactor is only modified by `liquidate`.
+/// The obligation's lossFactor is only modified by liquidate.
 rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
 
@@ -45,7 +45,7 @@ rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calld
     assert currentContract.obligationState[id].lossFactor == lossFactorBefore;
 }
 
-/// In `liquidate`, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
+/// In liquidate, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
 rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
     uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
@@ -61,7 +61,7 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 
     assert lossFactorChanged <=> badDebtOccurred;
 }
 
-/// After `updatePosition`, the user's lossFactor is synced to the obligation's lossFactor.
+/// After updatePosition, the user's lossFactor is synced to the obligation's lossFactor.
 rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
@@ -70,7 +70,7 @@ rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, addres
     assert userLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
 }
 
-/// Under valid state, the loss factor slash computation in `updatePosition` does not revert.
+/// Under valid state, the loss factor slash computation in updatePosition does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
@@ -87,9 +87,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     assert !lastReverted, "updatePosition should not revert under valid state";
 }
 
-/// The loss factor arithmetic in `liquidate` does not revert under valid state.
-/// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
-/// Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
+/// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossFactorDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
     bytes32 id = summaryToId(obligation);
 

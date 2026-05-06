@@ -14,10 +14,10 @@ contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
-    /// @dev Total loan-token cost is `filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct)`.
+    /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -81,10 +81,10 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
-    /// @dev Total receipt is `filledSellerAssets - filledSellerAssets * pct / WAD`.
+    /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
@@ -143,10 +143,10 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Takes could have different obligations (with the same loan token).
-    /// @dev Total cost is `targetBuyerAssets`.
+    /// @dev Total cost is targetBuyerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyBuyerAssetsTarget(
         address midnight,
@@ -215,11 +215,11 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Takes could have different obligations (with the same loan token).
-    /// @dev Total receipt is `targetSellerAssets`.
+    /// @dev Total receipt is targetSellerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function sellSellerAssetsTarget(
         address midnight,
@@ -294,9 +294,9 @@ contract TakeBundler is ITakeBundler {
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
     }
 
-    /// @dev Sets the allowance to `type(uint256).max`, skipping the write entirely when the current allowance
-    /// is already at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to
-    /// non-zero allowance changes (e.g. USDT) work.
+    /// @dev Sets the allowance to type(uint256).max, skipping the write entirely when the current allowance is already
+    /// at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to non-zero allowance
+    /// changes (e.g. USDT) work.
     function _forceApproveMax(address token, address spender) internal {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
         _safeApprove(token, spender, 0);
