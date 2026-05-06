@@ -22,14 +22,14 @@ import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
-/// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
-/// - `maturity <= block.timestamp + 100 years`: the obligation must have a maturity that is not too far in the future.
-/// - `collateralParams.length > 0`: at least one collateral is required.
-/// - `collateralParams.length <= MAX_COLLATERALS` (128): at most 128 collateralParams per obligation.
+/// @dev The following constraints are enforced on obligation creation (in touchObligation):
+/// - maturity <= block.timestamp + 100 years: the obligation must have a maturity that is not too far in the future.
+/// - collateralParams.length > 0: at least one collateral is required.
+/// - collateralParams.length <= MAX_COLLATERALS (128): at most 128 collateralParams per obligation.
 /// - Collateral tokens must be non-zero and strictly sorted by address (ascending, no duplicates).
-/// - Each collateral's `lltv` must be one of the allowed tiers (see `isLltvAllowed` in ConstantsLib).
-/// - Each collateral's `maxLif` must equal `maxLif(lltv, LIQUIDATION_CURSOR_LOW)` or
-///   `maxLif(lltv, LIQUIDATION_CURSOR_HIGH)`.
+/// - Each collateral's lltv must be one of the allowed tiers (see isLltvAllowed in ConstantsLib).
+/// - Each collateral's maxLif must equal maxLif(lltv, LIQUIDATION_CURSOR_LOW) or
+///   maxLif(lltv, LIQUIDATION_CURSOR_HIGH).
 /// @dev Additionally, within a single obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10)
 /// collaterals simultaneously.
 ///
@@ -44,9 +44,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
-/// @dev The fee is tracked per lender via `pendingFee` in each position. If the obligation's continuous fee changes,
-/// the pending fee of existing lenders is not updated (=> their fee is fixed).
-/// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
+/// @dev The fee is tracked per lender via pendingFee in each position. If the obligation's continuous fee changes, the
+/// pending fee of existing lenders is not updated (=> their fee is fixed).
+/// @dev Absent bad debt, the face value of a lender's position is credit - pendingFee.
 ///
 /// LIQUIDATIONS
 /// @dev Accounts are liquidatable only if the liquidation is not locked and they are either unhealthy or the maturity
@@ -76,7 +76,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` can be nonzero per offer.
+/// @dev Only one of maxSellerAssets, maxBuyerAssets, or maxUnits can be nonzero per offer.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
@@ -96,7 +96,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
 /// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
 /// authorized accounts can authorize other accounts on behalf of the user.
-/// - Under which conditions the account can return `CALLBACK_SUCCESS` when its `onRatify` function is called.
+/// - Under which conditions the account can return CALLBACK_SUCCESS when its onRatify function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
@@ -115,32 +115,31 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
-/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`. In
-/// particular, it should not revert because a transfer is no-op.
-/// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
-/// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
+/// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular,
+/// it should not revert because a transfer is no-op.
+/// - Midnight's balance of the token should only decrease on transfer and transferFrom.
+/// - It should not re-enter Midnight on transfer nor transferFrom.
 /// - Midnight must send/receive exactly the requested amount on transfers.
 /// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate` reverts.
-/// @dev If an activated collateral oracle reverts on `price`, `isHealthy`, `withdrawCollateral` and `take` revert when
-/// the user (seller for take) has non-zero debt.
-/// @dev If the liquidated collateral oracle returns 0 on `price`, `liquidate` with repaid input reverts.
+/// @dev If an activated collateral oracle reverts on price, liquidate reverts.
+/// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
+/// (seller for take) has non-zero debt.
+/// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
 /// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
-/// greater than type(uint128).max, then `liquidate`, `isHealthy`, `withdrawCollateral` when the borrower has debt, and
-/// `take` whenever the seller still has debt could all revert.
-/// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
-/// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
-/// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
-/// @dev If a token pulled by Midnight reverts or returns false on `transferFrom` despite balances and approvals being
-/// right, `take`, `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull
-/// that token.
-/// @dev If a token sent by Midnight reverts or returns false on `transfer` despite balances being right, `withdraw`,
-/// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
-/// that token.
-/// @dev If a callback reverts or returns something other than `CALLBACK_SUCCESS`, `take`, `repay`, `liquidate`, and
-/// `flashLoan` revert.
+/// greater than type(uint128).max, then liquidate, isHealthy, withdrawCollateral when the borrower has debt, and take
+/// whenever the seller still has debt could all revert.
+/// @dev If enterGate.canIncreaseCredit reverts or returns false, take reverts if the buyer's credit increases.
+/// @dev If enterGate.canIncreaseDebt reverts or returns false, take reverts if the seller's debt increases.
+/// @dev If liquidatorGate reverts or returns false on canLiquidate, liquidate reverts.
+/// @dev If a token pulled by Midnight reverts or returns false on transferFrom despite balances and approvals being
+/// right, take, repay, supplyCollateral, liquidate, and flashLoan repayment revert when they need to pull that token.
+/// @dev If a token sent by Midnight reverts or returns false on transfer despite balances being right, withdraw,
+/// withdrawCollateral, fee claims, the collateral leg of liquidate, and flashLoan revert when they need to send that
+/// token.
+/// @dev If a callback reverts or returns something other than CALLBACK_SUCCESS, take, repay, liquidate, and flashLoan
+/// revert.
 ///
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, and fee claimer.
@@ -155,15 +154,15 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
 /// offers are "filled" (consumed=max).
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev `INITIAL_CHAIN_ID` is captured at construction and used in place of `block.chainid` when computing obligation
-/// ids, so a hard fork that changes `block.chainid` does not strand existing accounting. But as a result, after a
-/// hard-fork there can be some obligation id clashes.
+/// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
+/// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
+/// there can be some obligation id clashes.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
-/// @dev Relies on the `clz` opcode (Osaka), on the `mcopy`, `tload`, and `tstore` opcodes (Cancun), and on the `push0`
-/// opcode (Shanghai).
+/// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
+/// (Shanghai).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
@@ -306,8 +305,8 @@ contract Midnight is IMidnight {
     /// to perform atomic price checks.
     /// @dev Taking buy offers with price < trading fee will revert.
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
-    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
-    /// buyerPrice <= WAD.
+    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
+    /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets, sellerAssets, units.
     function take(
@@ -552,9 +551,9 @@ contract Midnight is IMidnight {
     }
 
     /// @dev See LIQUIDATIONS section for more details.
-    /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
-    /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
-    /// @dev Liquidations with both 0 for `seizedAssets` and `repaidUnits` can be done with a collateral that is not
+    /// @dev At least one of seizedAssets or repaidUnits should be equal to zero.
+    /// @dev Passing both 0 for seizedAssets and repaidUnits allows to realize bad debt with 0 token transferred.
+    /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not
     /// activated.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
