@@ -102,7 +102,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// ROUNDINGS
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
 /// for chains where the gas is cheaper than 1 asset of the loan token.
-/// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
 /// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
 /// afterwards (bad debt can no longer be realized).
@@ -162,7 +162,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
-/// @dev Relies on the `clz` opcode (Osaka) and on the `mcopy`, `tload`, and `tstore` opcodes (Cancun).
+/// @dev Relies on the `clz` opcode (Osaka), on the `mcopy`, `tload`, and `tstore` opcodes (Cancun), and on the `push0`
+/// opcode (Shanghai).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
@@ -603,16 +604,16 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            uint256 oldLossIndex = _obligationState.lossIndex;
-            _obligationState.lossIndex = UtilsLib.toUint128(
+            uint256 oldLossFactor = _obligationState.lossFactor;
+            _obligationState.lossFactor = UtilsLib.toUint128(
                 type(uint128).max
-                    - (type(uint128).max - oldLossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                    - (type(uint128).max - oldLossFactor).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _obligationState.continuousFeeCredit = oldLossIndex < type(uint128).max
+            _obligationState.continuousFeeCredit = oldLossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _obligationState.lossIndex, type(uint128).max - oldLossIndex)
+                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - oldLossFactor)
                 )
                 : 0;
         }
@@ -664,7 +665,7 @@ contract Midnight is IMidnight {
             repaidUnits,
             borrower,
             badDebt,
-            _obligationState.lossIndex,
+            _obligationState.lossFactor,
             payer,
             receiver
         );
@@ -775,9 +776,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
+        uint128 _lossFactor = _position.lossFactor;
+        uint256 postSlashCredit = _lossFactor < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
@@ -813,7 +814,7 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
-        _position.lossIndex = obligationState[id].lossIndex;
+        _position.lossFactor = obligationState[id].lossFactor;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
@@ -829,8 +830,8 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function userLossIndex(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lossIndex;
+    function userLossFactor(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lossFactor;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
@@ -865,8 +866,8 @@ contract Midnight is IMidnight {
         return obligationState[id].totalUnits;
     }
 
-    function lossIndex(bytes32 id) external view returns (uint128) {
-        return obligationState[id].lossIndex;
+    function lossFactor(bytes32 id) external view returns (uint128) {
+        return obligationState[id].lossFactor;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {

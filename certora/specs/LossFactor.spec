@@ -8,7 +8,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function userLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
@@ -36,46 +36,46 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-/// The obligation's lossIndex is only modified by `liquidate`.
-rule onlyLiquidateChangesObligationLossIndex(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+/// The obligation's lossFactor is only modified by `liquidate`.
+rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
+    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
 
     f(e, args);
 
-    assert currentContract.obligationState[id].lossIndex == lossIndexBefore;
+    assert currentContract.obligationState[id].lossFactor == lossFactorBefore;
 }
 
-/// In `liquidate`, the obligation's lossIndex changes if and only if bad debt is realized (totalUnits decreases).
-rule lossIndexChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+/// In `liquidate`, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
+rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
     uint256 totalUnitsBefore = totalUnits(id);
 
-    require lossIndexBefore < max_uint128, "obligation lossIndex must not be saturated";
+    require lossFactorBefore < max_uint128, "obligation lossFactor must not be saturated";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 
-    bool lossIndexChanged = currentContract.obligationState[id].lossIndex != lossIndexBefore;
+    bool lossFactorChanged = currentContract.obligationState[id].lossFactor != lossFactorBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;
 
-    assert lossIndexChanged <=> badDebtOccurred;
+    assert lossFactorChanged <=> badDebtOccurred;
 }
 
-/// After `updatePosition`, the user's lossIndex is synced to the obligation's lossIndex.
-rule updatePositionSyncsLossIndex(env e, Midnight.Obligation obligation, address user) {
+/// After `updatePosition`, the user's lossFactor is synced to the obligation's lossFactor.
+rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
     updatePosition(e, obligation, user);
 
-    assert userLossIndex(id, user) == currentContract.obligationState[id].lossIndex;
+    assert userLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
 }
 
-/// Under valid state, the loss index slash computation in `updatePosition` does not revert.
+/// Under valid state, the loss factor slash computation in `updatePosition` does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
     require obligationCreated(id), "obligation must be created";
-    require userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex, "user lossIndex bounded by obligation lossIndex, already proved in Midnight.spec";
+    require userLossFactor(id, user) <= currentContract.obligationState[id].lossFactor, "user lossFactor bounded by obligation lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require to_mathint(e.block.timestamp) < 2 ^ 128, "reasonable timestamp";
@@ -87,10 +87,10 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     assert !lastReverted, "updatePosition should not revert under valid state";
 }
 
-/// The loss index arithmetic in `liquidate` does not revert under valid state.
+/// The loss factor arithmetic in `liquidate` does not revert under valid state.
 /// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
 /// Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
-rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
+rule liquidateLossFactorDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
     bytes32 id = summaryToId(obligation);
 
     require data.length == 0, "no callback to avoid unrelated external call reverts";
