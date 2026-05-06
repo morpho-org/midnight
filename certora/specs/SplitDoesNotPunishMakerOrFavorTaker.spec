@@ -23,10 +23,8 @@ methods {
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Read-only health check does not affect return values; removes oracle loop.
+    // Also covers the end-of-take seller-liquidatable require, which is inlined and uses isHealthy directly.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // End-of-take liquidation check: irrelevant to return values on successful paths.
-    function isLiquidatable(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
@@ -67,12 +65,10 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 }
 
 /// Splitting an offer does not punish the maker or favor the taker on asset amounts.
-/// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal when split, taker receives less or equal when split.
-/// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal when split, taker pays more or equal when split.
+/// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal (within 1 wei) when split, taker receives less or equal when split.
+/// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal ((within 1 wei) when split, taker pays more or equal when split.
 rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
-    require obligationUnitsB <= obligationUnitsA, "obligationUnitsB must be no larger than obligationUnitsA";
-    require obligationUnitsC <= obligationUnitsA, "obligationUnitsC must be no larger than obligationUnitsA";
 
     // block.timestamp must fit in uint128 (Midnight.sol casts it).
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
