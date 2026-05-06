@@ -103,7 +103,7 @@ interface IMidnight {
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
     error TakerUnauthorized();
-    error TooManyCollateralBitmap();
+    error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
     error TradingFeeTooHigh();
     error Unauthorized();

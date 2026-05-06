@@ -506,7 +506,7 @@ contract Midnight is IMidnight {
         if (oldCollateral == 0 && assets > 0) {
             uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
             _position.collateralBitmap = newCollateralBitmap;
-            require(UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyCollateralBitmap());
+            require(UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals());
         }
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
