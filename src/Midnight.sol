@@ -23,6 +23,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
+/// - `maturity <= block.timestamp + 100 years`: the obligation must have a maturity that is not too far in the future.
 /// - `collateralParams.length > 0`: at least one collateral is required.
 /// - `collateralParams.length <= MAX_COLLATERALS` (128): at most 128 collateralParams per obligation.
 /// - Collateral tokens must be non-zero and strictly sorted by address (ascending, no duplicates).
@@ -381,7 +382,6 @@ contract Midnight is IMidnight {
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
-        require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
         if (offer.reduceOnly) {
             require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
         }
@@ -729,6 +729,7 @@ contract Midnight is IMidnight {
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
         if (!obligationState[id].created) {
+            require(obligation.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(obligation.collateralParams.length > 0, NoCollateralParams());
             require(obligation.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
             address previousCollateralToken;
