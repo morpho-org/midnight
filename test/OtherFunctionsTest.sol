@@ -394,6 +394,17 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.rcfThreshold = 0;
     }
 
+    function testMaturityTooFar(uint256 maturity) public {
+        maturity = bound(maturity, block.timestamp + 100 * 365 days + 1, type(uint256).max);
+        Obligation memory longObligation;
+        longObligation.loanToken = address(loanToken);
+        longObligation.maturity = maturity;
+        longObligation.collateralParams = obligation.collateralParams;
+
+        vm.expectRevert(IMidnight.MaturityTooFar.selector);
+        midnight.touchObligation(longObligation);
+    }
+
     function testZeroCollaterals() public {
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
@@ -646,7 +657,7 @@ contract OtherFunctionsTest is BaseTest {
 
         (
             uint128 totalUnits,
-            uint128 _lossIndex,
+            uint128 _lossFactor,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
             uint16 tradingFee0,
@@ -662,7 +673,7 @@ contract OtherFunctionsTest is BaseTest {
 
         assertTrue(created, "obligation should be created");
         assertEq(totalUnits, 0, "totalUnits");
-        assertEq(_lossIndex, 0, "lossIndex");
+        assertEq(_lossFactor, 0, "lossFactor");
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
