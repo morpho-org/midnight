@@ -59,7 +59,7 @@ filtered {
     assert withdrawableAfter == withdrawableBefore;
 }
 
-/// CLAIMABLE TRADING FEE ///
+// CLAIMABLE TRADING FEE //
 
 rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, address receiver) {
     uint256 before = claimableTradingFee(token);

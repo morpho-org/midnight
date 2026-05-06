@@ -24,7 +24,7 @@ methods {
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 }
 
-/// HELPERS ///
+// HELPERS //
 
 persistent ghost bytes32 liqId;
 
@@ -42,11 +42,11 @@ ghost summaryMulDivUp(uint256, uint256, uint256) returns uint256;
 
 ghost summaryPrice(address) returns uint256;
 
-// RULES ///
+// RULES //
 
-/// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
-/// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
-/// Also show that liquidate can only be called on liquidatable positions.
+// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
+// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
+// Also show that liquidate can only be called on liquidatable positions.
 rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, address receiver, address callback, bytes data) {
     bytes32 id;
     address user;

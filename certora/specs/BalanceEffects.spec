@@ -35,11 +35,11 @@ methods {
     function _.transfer(address, uint256) external => NONDET;
 }
 
-/// UPDATE POSITION ///
+// UPDATE POSITION //
 
-/// updatePosition can only decrease user's credit (through slashing and fee accrual),
-/// sets it to the post-update value, only changes credit of user at the obligation id,
-/// and accrues fee to continuousFeeCredit.
+// updatePosition can only decrease user's credit (through slashing and fee accrual),
+// sets it to the post-update value, only changes credit of user at the obligation id,
+// and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -61,10 +61,10 @@ rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, 
     assert creditOf(id, user) <= creditBefore;
 }
 
-/// WITHDRAW ///
+// WITHDRAW //
 
-/// withdraw decreases onBehalf's post-update credit by exactly units
-/// and only changes credit of onBehalf at the obligation id.
+// withdraw decreases onBehalf's post-update credit by exactly units
+// and only changes credit of onBehalf at the obligation id.
 rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -84,10 +84,10 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, addre
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
 }
 
-/// TAKE ///
+// TAKE //
 
-/// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
-/// and only changes credit of maker and taker and debt of maker and taker at the obligation id.
+// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
+// and only changes credit of maker and taker and debt of maker and taker at the obligation id.
 rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.obligation);
 
@@ -113,9 +113,9 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
 }
 
-/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
-/// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
-/// Buyer's debt is non-increasing and can decrease by at most take units.
+// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
+// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
+// Buyer's debt is non-increasing and can decrease by at most take units.
 rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
@@ -133,9 +133,9 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
     assert debtOf(id, buyer) >= buyerDebtBefore - units;
 }
 
-/// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
-/// Seller's debt is non-decreasing, and can increase by at most take units.
-/// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
+// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
+// Seller's debt is non-decreasing, and can increase by at most take units.
+// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
 rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bytes32 id = toId(e, offer.obligation);
 
@@ -153,9 +153,9 @@ rule takeSellerEffects(env e, uint256 units, address taker, address takerCallbac
     assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
 }
 
-/// REPAY ///
+// REPAY //
 
-/// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
+// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
 rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -170,10 +170,10 @@ rule repayEffects(env e, Midnight.Obligation obligation, uint256 units, address 
     assert anyUser != onBehalf || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
 }
 
-/// LIQUIDATE ///
+// LIQUIDATE //
 
-/// Liquidate decreases the borrower's debt by at least repaidUnits,
-/// and only changes position[id][borrower].debt.
+// Liquidate decreases the borrower's debt by at least repaidUnits,
+// and only changes position[id][borrower].debt.
 rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
@@ -190,9 +190,9 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
     assert anyUser != borrower || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
 }
 
-/// ALL OTHER FUNCTIONS ///
+// ALL OTHER FUNCTIONS //
 
-/// Functions other than take, withdraw, repay, liquidate, updatePosition, and withdrawCollateral do not change any user's credit or debt.
+// Functions other than take, withdraw, repay, liquidate, updatePosition, and withdrawCollateral do not change any user's credit or debt.
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
@@ -209,10 +209,10 @@ filtered {
     assert debtOf(id, user) == debtBefore;
 }
 
-/// SUPPLY COLLATERAL ///
+// SUPPLY COLLATERAL //
 
-/// supplyCollateral increases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+// supplyCollateral increases onBehalf's collateral by exactly assets,
+// and only changes position[id][onBehalf].collateral[collateralIndex].
 rule supplyCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, obligation);
 
@@ -225,10 +225,10 @@ rule supplyCollateralEffects(env e, Midnight.Obligation obligation, uint256 coll
     assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// WITHDRAW COLLATERAL ///
+// WITHDRAW COLLATERAL //
 
-/// withdrawCollateral decreases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+// withdrawCollateral decreases onBehalf's collateral by exactly assets,
+// and only changes position[id][onBehalf].collateral[collateralIndex].
 rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, obligation);
 
@@ -241,10 +241,10 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Obligation obligation, 
     assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// LIQUIDATE (COLLATERAL) ///
+// LIQUIDATE (COLLATERAL) //
 
-/// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
-/// and only changes position[id][borrower].collateral[collateralIndex].
+// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
+// and only changes position[id][borrower].collateral[collateralIndex].
 rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, obligation);
 
@@ -258,9 +258,9 @@ rule liquidateCollateralEffects(env e, Midnight.Obligation obligation, uint256 c
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// ALL OTHER FUNCTIONS (COLLATERAL) ///
+// ALL OTHER FUNCTIONS (COLLATERAL) //
 
-/// Functions other than supplyCollateral, withdrawCollateral, and liquidate do not change any user's collateral.
+// Functions other than supplyCollateral, withdrawCollateral, and liquidate do not change any user's collateral.
 rule collateralUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user, uint256 colIdx)
 filtered {
     f -> !f.isView

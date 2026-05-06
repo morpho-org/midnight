@@ -16,15 +16,15 @@ rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 cursor) {
     assert lltv * maxLif(lltv, cursor) <= WAD() * WAD();
 }
 
-/// @dev maxLif >= WAD. Used in NoDivisionByZero.spec to prove that the nested mulDivDown divisor in maxLif is positive, without assuming it.
-/// Proof: maxLif = WAD^2 / (WAD - cursor*(WAD-lltv)/WAD) and the denominator is less than WAD because the subtractions are checked to not underflow in solidity.
+// @dev maxLif >= WAD. Used in NoDivisionByZero.spec to prove that the nested mulDivDown divisor in maxLif is positive, without assuming it.
+// Proof: maxLif = WAD^2 / (WAD - cursor*(WAD-lltv)/WAD) and the denominator is less than WAD because the subtractions are checked to not underflow in solidity.
 rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
     assert maxLif(lltv, cursor) >= WAD();
 }
 
-/// @dev Strict bound for lltv < WAD: maxLif * lltv <= WAD * (WAD - 1).
-/// Used in NoDivisionByZero.spec (maxLifSummary) to ensure the recovery close factor divisor
-/// WAD - ceil(lif * lltv / WAD) is positive.
+// @dev Strict bound for lltv < WAD: maxLif * lltv <= WAD * (WAD - 1).
+// Used in NoDivisionByZero.spec (maxLifSummary) to ensure the recovery close factor divisor
+// WAD - ceil(lif * lltv / WAD) is positive.
 rule lifTimesLltvStrictBound(uint256 lltv, uint256 cursor) {
     require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
     assert lltv < WAD() => lltv * maxLif(lltv, cursor) <= WAD() * (WAD() - 1);

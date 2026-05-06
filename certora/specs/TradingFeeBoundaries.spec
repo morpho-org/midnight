@@ -14,13 +14,13 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 }
 
-/// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.
+// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.
 definition breakpointTime(uint256 index) returns uint256 = index == 0 ? 0 : index == 1 ? 86400 : index == 2 ? 7 * 86400 : index == 3 ? 30 * 86400 : index == 4 ? 90 * 86400 : index == 5 ? 180 * 86400 : index == 6 ? 360 * 86400 : 0;
 
-/// Lower enclosing breakpoint index for a given time-to-maturity.
+// Lower enclosing breakpoint index for a given time-to-maturity.
 definition lowerIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 5 : ttm >= breakpointTime(4) ? 4 : ttm >= breakpointTime(3) ? 3 : ttm >= breakpointTime(2) ? 2 : ttm >= breakpointTime(1) ? 1 : 0;
 
-/// Upper enclosing breakpoint index for a given time-to-maturity.
+// Upper enclosing breakpoint index for a given time-to-maturity.
 definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 6 : ttm >= breakpointTime(4) ? 5 : ttm >= breakpointTime(3) ? 4 : ttm >= breakpointTime(2) ? 3 : ttm >= breakpointTime(1) ? 2 : 1;
 
 definition FEE_STEP() returns uint256 = 1000000000000;
@@ -31,11 +31,11 @@ definition rawObligationTradingFee(bytes32 id, uint256 index) returns uint16 = i
 
 definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(rawObligationTradingFee(id, index) * FEE_STEP());
 
-/// Default trading fees for any loan token at each index are bounded by its specific maxTradingFee cap.
+// Default trading fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultTradingFeePerIndexBound(address loanToken, uint256 index)
     index <= 6 => defaultTradingFee(loanToken, index) <= maxTradingFee(index);
 
-/// Every obligation's trading fee breakpoints are bounded by the per-index maximum.
+// Every obligation's trading fee breakpoints are bounded by the per-index maximum.
 invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
     index <= 6 => obligationTradingFee(id, index) <= maxTradingFee(index)
     {
@@ -62,7 +62,7 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
         }
     }
 
-/// When an obligation is created, its trading fees are set to the default trading fees of its loan token.
+// When an obligation is created, its trading fees are set to the default trading fees of its loan token.
 rule newObligationTradingFeesMatchDefault(env e, Midnight.Obligation obligation, uint256 index) {
     require index <= 6, "index out of bounds";
     bytes32 id = toId(e, obligation);
@@ -75,7 +75,7 @@ rule newObligationTradingFeesMatchDefault(env e, Midnight.Obligation obligation,
     assert obligationTradingFee(id, index) == expectedTradingFee;
 }
 
-/// Only the fee setter can modify default trading fees (multicall is DELETEd and not checked here).
+// Only the fee setter can modify default trading fees (multicall is DELETEd and not checked here).
 rule onlyFeeSetterCanChangeDefaultTradingFees(method f, env e, address token, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
     uint256 defaultTradingFeeBefore = defaultTradingFee(token, index);
@@ -84,7 +84,7 @@ rule onlyFeeSetterCanChangeDefaultTradingFees(method f, env e, address token, ui
     assert defaultTradingFee(token, index) != defaultTradingFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setDefaultTradingFee(address, uint256, uint256).selector;
 }
 
-/// Once an obligation is created, only the fee setter can modify its trading fees.
+// Once an obligation is created, only the fee setter can modify its trading fees.
 rule onlyFeeSetterCanChangeObligationTradingFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
     require obligationCreated(id), "assume that the obligation is created";
@@ -95,12 +95,12 @@ rule onlyFeeSetterCanChangeObligationTradingFeesPostCreation(method f, env e, by
     assert obligationTradingFee(id, index) != obligationTradingFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setObligationTradingFee(bytes32, uint256, uint256).selector;
 }
 
-/// The trading fee at a breakpoint is equal to the trading fee state variable at that index.
+// The trading fee at a breakpoint is equal to the trading fee state variable at that index.
 rule tradingFeeAtBreakpoint(bytes32 id, uint256 index) {
     assert index <= 6 => tradingFee(id, breakpointTime(index)) == obligationTradingFee(id, index);
 }
 
-/// For any time-to-maturity the trading fee is enclosed between the two adjacent breakpoint values (never overshoots or undershoots).
+// For any time-to-maturity the trading fee is enclosed between the two adjacent breakpoint values (never overshoots or undershoots).
 rule tradingFeeIsBoundedByBreakpointFees(bytes32 id, uint256 timeToMaturity) {
     uint256 tradingFeeLo = obligationTradingFee(id, lowerIndex(timeToMaturity));
     uint256 tradingFeeHi = obligationTradingFee(id, upperIndex(timeToMaturity));

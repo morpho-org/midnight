@@ -28,7 +28,7 @@ methods {
     function UtilsLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
 }
 
-/// Every successful take requires the maker to have authorized the ratifier.
+// Every successful take requires the maker to have authorized the ratifier.
 rule takeRequiresMakerConsent(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     bool makerAuthorizedRatifier = isAuthorized(offer.maker, offer.ratifier);
 
@@ -37,8 +37,8 @@ rule takeRequiresMakerConsent(env e, uint256 units, address taker, address taker
     assert makerAuthorizedRatifier;
 }
 
-/// address(0) can't authorize another account, because it can't call
-/// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
+// address(0) can't authorize another account, because it can't call
+// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
 strong invariant addressZeroCantAuthorize(address authorized)
     !isAuthorized(0, authorized)
     {
@@ -48,7 +48,7 @@ strong invariant addressZeroCantAuthorize(address authorized)
         }
     }
 
-/// No successful take can use address(0) as maker.
+// No successful take can use address(0) as maker.
 rule takeRequiresNonZeroMaker(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     requireInvariant addressZeroCantAuthorize(offer.ratifier);
 

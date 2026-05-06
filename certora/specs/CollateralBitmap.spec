@@ -25,7 +25,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// SUMMARY ///
+// SUMMARY //
 
 persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivZero in MulDiv.spec */

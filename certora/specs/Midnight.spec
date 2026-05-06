@@ -39,7 +39,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
 }
 
-/// HELPERS ///
+// HELPERS //
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -63,9 +63,9 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
-    require x == 0 => r == 0;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    require x == 0 => r == 0, "see mulDivZero in MulDiv.spec";
+    require d > 0 && y <= d => r <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require d > 0 && x <= d && y <= d => x - r <= d - y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
     return r;
 }
 
@@ -120,9 +120,9 @@ rule userLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
     assert lossFactorAfter >= lossFactorBefore;
 }
 
-/// INVARIANTS ///
+// INVARIANTS //
 
-strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
+strong invariant totalUnitsEqualsSumDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
 strong invariant defaultContinuousFeeBoundedAll()
@@ -146,7 +146,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
         preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
-            require to_mathint(offer.obligation.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
+            require to_mathint(offer.obligation.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(), "TTM is bounded by MAX_TTM"; // TODO verify this cleanly
         }
     }
 
@@ -158,6 +158,6 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 strong invariant userLossFactorLeqObligationLossFactor(bytes32 id, address user)
     userLossFactor(id, user) <= currentContract.obligationState[id].lossFactor;
 
-/// A user cannot have both credit and debt.
+// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
     creditOf(id, user) == 0 || debtOf(id, user) == 0;

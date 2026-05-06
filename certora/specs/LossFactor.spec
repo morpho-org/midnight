@@ -30,13 +30,13 @@ methods {
     // External calls are assumed non-reentrant.
 }
 
-/// HELPERS ///
+// HELPERS //
 
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-/// The obligation's lossFactor is only modified by `liquidate`.
+// The obligation's lossFactor is only modified by `liquidate`.
 rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
 
@@ -45,7 +45,7 @@ rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calld
     assert currentContract.obligationState[id].lossFactor == lossFactorBefore;
 }
 
-/// In `liquidate`, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
+// In `liquidate`, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
 rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
     uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
@@ -61,7 +61,7 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 
     assert lossFactorChanged <=> badDebtOccurred;
 }
 
-/// After `updatePosition`, the user's lossFactor is synced to the obligation's lossFactor.
+// After `updatePosition`, the user's lossFactor is synced to the obligation's lossFactor.
 rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
@@ -70,7 +70,7 @@ rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, addres
     assert userLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
 }
 
-/// Under valid state, the loss factor slash computation in `updatePosition` does not revert.
+// Under valid state, the loss factor slash computation in `updatePosition` does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
@@ -87,9 +87,9 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     assert !lastReverted, "updatePosition should not revert under valid state";
 }
 
-/// The loss factor arithmetic in `liquidate` does not revert under valid state.
-/// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
-/// Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
+// The loss factor arithmetic in `liquidate` does not revert under valid state.
+// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
+// Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossFactorDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
     bytes32 id = summaryToId(obligation);
 
@@ -100,7 +100,7 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Obligation obligation, add
     require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";
     require currentContract.position[id][borrower].collateralBitmap == 0, "Assumption: no active collaterals: skip loop and maximize badDebt";
     require currentContract.position[id][borrower].debt > 0, "borrower must have debt to enter badDebt > 0 block";
-    require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable)";
+    require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (see totalUnitsEqualsSumDebtPlusWithdrawable)";
     require e.msg.value == 0, "Midnight is not payable";
 
     address zero = 0;

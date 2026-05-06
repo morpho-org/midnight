@@ -3,7 +3,7 @@ methods {
     function mulDivUp(uint256 a, uint256 b, uint256 d) external returns (uint256) envfree;
 }
 
-/// RULES ///
+// RULES //
 
 /* these proves the axiom used in the other specs */
 

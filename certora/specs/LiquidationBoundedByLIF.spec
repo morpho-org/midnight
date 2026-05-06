@@ -31,7 +31,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// SUMMARIES ///
+// SUMMARIES //
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -69,16 +69,16 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     return ghostMulDivUp(x, y, d);
 }
 
-/// INVARIANTS ///
+// INVARIANTS //
 
-/// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
+// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
     collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
-/// LIF BOUNDARIES ///
+// LIF BOUNDARIES //
 
-/// Liquidation profit is bounded by maxLif (repaidUnits input).
-/// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
+// Liquidation profit is bounded by maxLif (repaidUnits input).
+// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
 rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
@@ -93,7 +93,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Obligation obligat
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
-/// Liquidation profit is bounded by maxLif (seizedAssets input)
+// Liquidation profit is bounded by maxLif (seizedAssets input)
 rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
     mathint maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";

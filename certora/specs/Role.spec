@@ -23,7 +23,7 @@ methods {
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 }
 
-/// HELPERS ///
+// HELPERS //
 
 definition FEE_STEP() returns uint256 = 10 ^ 12;
 
@@ -46,7 +46,7 @@ function cvlSafeTransferFrom(address token, address from, address to, uint256 am
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
 }
 
-/// ROLE SETTER: LIVENESS ///
+// ROLE SETTER: LIVENESS //
 
 rule roleSetterCanChangeRoleSetter(env e, address newRoleSetter) {
     address roleSetterBefore = roleSetter();
@@ -72,7 +72,7 @@ rule roleSetterCanChangeFeeClaimer(env e, address newFeeClaimer) {
     assert !lastReverted => feeClaimer() == newFeeClaimer;
 }
 
-/// ROLE SETTER: ACCESS CONTROL ///
+// ROLE SETTER: ACCESS CONTROL //
 
 rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address roleSetterBefore = roleSetter();
@@ -100,7 +100,7 @@ rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filter
     assert feeClaimer() != feeClaimerBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeClaimer(address).selector;
 }
 
-/// FEE SETTER: LIVENESS ///
+// FEE SETTER: LIVENESS //
 
 rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
@@ -144,10 +144,10 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
     assert !reverted => currentContract.defaultContinuousFee[loanToken] == newContinuousFee;
 }
 
-/// FEE SETTER: ACCESS CONTROL ///
-/// Trading fee access control is covered in TradingFeeBoundaries.spec.
+// FEE SETTER: ACCESS CONTROL //
+// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
-/// Once an obligation is created, only the fee setter can modify its continuous fees.
+// Once an obligation is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require obligationCreated(id), "obligation must exist";
     uint32 continuousFeeBefore = continuousFee(id);
@@ -167,24 +167,24 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
     assert currentContract.defaultContinuousFee[loanToken] != defaultContinuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setDefaultContinuousFee(address, uint256).selector;
 }
 
-/// FEE CLAIMER: ACCESS CONTROL ///
+// FEE CLAIMER: ACCESS CONTROL //
 
-/// Only the fee claimer can successfully call claimTradingFee.
+// Only the fee claimer can successfully call claimTradingFee.
 rule onlyFeeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver) {
     claimTradingFee(e, token, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
-/// Only the fee claimer can successfully call claimContinuousFee.
+// Only the fee claimer can successfully call claimContinuousFee.
 rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
     claimContinuousFee(e, obligation, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
-/// FEE CLAIMER: LIVENESS ///
+// FEE CLAIMER: LIVENESS //
 
 rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
+    require user != currentContract && user != receiver, "user is a third party";
     address feeClaimerBefore = feeClaimer();
     uint256 claimableBefore = claimableTradingFee(token);
     mathint midnightBalanceBefore = tokenBalance[token][currentContract];
@@ -201,7 +201,7 @@ rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address 
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
+    require user != currentContract && user != receiver, "user is a third party";
     bytes32 id = toId(e, obligation);
     address feeClaimerBefore = feeClaimer();
     bool obligationExists = obligationCreated(id);

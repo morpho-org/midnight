@@ -6,10 +6,10 @@ methods {
     function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => summaryMsb(bitmap);
 }
 
-/// SUMMARIES ///
+// SUMMARIES //
 
 persistent ghost summaryGetBit(uint128, uint256) returns bool {
-    // see rule zeroBitmapEmpty in Bitmap.spec
+    // See rule zeroBitmapEmpty in Bitmap.spec.
     axiom forall uint256 bit. !summaryGetBit(0, bit);
 }
 

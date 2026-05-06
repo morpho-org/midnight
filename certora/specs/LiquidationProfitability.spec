@@ -30,7 +30,7 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
-/// SUMMARIES ///
+// SUMMARIES //
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -70,9 +70,9 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return ghostMulDivUp(a, b, d);
 }
 
-/// LIF CHARACTERIZATION ///
+// LIF CHARACTERIZATION //
 
-/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
+// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
 rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     uint256 maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
@@ -93,7 +93,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 co
     assert maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
 }
 
-/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
+// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
 rule liquidationLifSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
     uint256 maxLif = obligation.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";

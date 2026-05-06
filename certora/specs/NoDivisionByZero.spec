@@ -31,7 +31,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
 }
 
-/// GHOSTS ///
+// GHOSTS //
 
 // Reuse part of the setup of Healthiness.spec.
 
@@ -57,19 +57,19 @@ persistent ghost address globalObligationLiquidatorGate;
 
 persistent ghost bytes32 globalId;
 
-/// HOOKS ///
+// HOOKS //
 
 // lossFactor < max: the protocol stops behaving correctly if this happens (documented).
 hook Sload uint128 value obligationState[KEY bytes32 id].lossFactor {
-    require value < max_uint128;
+    require value < max_uint128, "obligation lossFactor is not saturated";
 }
 
 // Follows from userLossFactorLeqObligationLossFactor in Midnight.spec and the hook above.
 hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossFactor {
-    require value < max_uint128;
+    require value < max_uint128, "user lossFactor is not saturated";
 }
 
-/// SUMMARIES ///
+// SUMMARIES //
 
 ghost ghostPrice(address) returns uint256;
 
@@ -110,7 +110,7 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     return result;
 }
 
-/// RULES ///
+// RULES //
 
 // The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
 // The maxLif function is excluded: it is a pure function callable with arbitrary inputs.
@@ -121,7 +121,7 @@ rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selec
 
 // Show that liquidate does not cause a division by zero, in case the oracle price is non-zero and the collateral is active.
 rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    require equalsGlobalObligation(obligation);
+    require equalsGlobalObligation(obligation), "obligation matches the global obligation";
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
     require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";

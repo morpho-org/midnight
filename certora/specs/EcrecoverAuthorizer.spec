@@ -10,9 +10,9 @@ methods {
     function midnight.isAuthorized(address, address) external returns (bool) envfree;
 }
 
-/// EcrecoverAuthorizer increments nonce on success and does not change other nonces.
+// EcrecoverAuthorizer increments nonce on success and does not change other nonces.
 rule effects(env e, EcrecoverAuthorizer.Authorization authorization, EcrecoverAuthorizer.Signature signature, address other) {
-    require other != authorization.authorizer;
+    require other != authorization.authorizer, "other is a different account";
     uint256 nonceBefore = nonce(authorization.authorizer);
     uint256 otherNonceBefore = nonce(other);
 
@@ -22,9 +22,9 @@ rule effects(env e, EcrecoverAuthorizer.Authorization authorization, EcrecoverAu
     assert nonce(other) == otherNonceBefore;
 }
 
-/// Expired deadline, wrong nonce, and nonce reused cause revert.
+// Expired deadline, wrong nonce, and nonce reused cause revert.
 rule requiredConditions(env e1, env e2, EcrecoverAuthorizer.Authorization authorization, EcrecoverAuthorizer.Signature signature, EcrecoverAuthorizer.Authorization otherAuthorization, EcrecoverAuthorizer.Signature otherSignature) {
-    require authorization.authorizer == otherAuthorization.authorizer;
+    require authorization.authorizer == otherAuthorization.authorizer, "same authorizer for both authorizations";
     uint256 nonceBefore = nonce(authorization.authorizer);
 
     setIsAuthorized(e1, authorization, signature);

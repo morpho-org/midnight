@@ -38,7 +38,7 @@ methods {
     function _.transferFrom(address src, address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, src, a, v) expect(bool);
 }
 
-/// HELPERS ///
+// HELPERS //
 
 // ERC20 summaries.
 
@@ -137,7 +137,7 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint128 newWithdrawable
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
-/// INVARIANTS AND RULES ///
+// INVARIANTS AND RULES //
 
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
@@ -156,7 +156,7 @@ strong invariant tokenBalanceCorrect(address token)
         }
     }
 
-// For any token, the flash loans before and after a call is the same.
+// For any token, the flash loans before and after a call are the same.
 // This rule is useful to prove that using persistent ghost for the flashloans mapping is sound.
 rule flashLoansPaidBack(method f, address token) {
     env e;

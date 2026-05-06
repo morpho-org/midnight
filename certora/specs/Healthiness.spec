@@ -38,7 +38,7 @@ methods {
     function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
-/// SUMMARY ///
+// SUMMARY //
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -190,7 +190,7 @@ function genericCallbackBytes32() returns (bytes32) {
     return result;
 }
 
-//// RULES //////
+// RULES //
 
 // The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
 // Since we have a ghost summary for price(), we assume the price will not change during the call.
@@ -200,7 +200,7 @@ function genericCallbackBytes32() returns (bytes32) {
 //  2) the borrower is different from the liquidated user, or the obligation is different.
 // and then we have a final rule for all other functions of the contract.
 
-// Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
+// Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity).
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = false;
 
@@ -225,16 +225,16 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
     mathint price = summaryPrice(globalObligation.collateralParams[collateralIndex].oracle);
 
-    // require all the axioms that are needed to prove the healthiness after liquidation. These are the same axioms that are proved in the MulDiv.spec
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
-    require axiomInverseUpDown(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralMaxLif[collateralIndex], globalObligationCollateralLLTV[collateralIndex]), "axiom";
-    require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "axiom";
+    // require all the axioms that are needed to prove the healthiness after liquidation. These are the same axioms that are proved in MulDiv.spec.
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "see mulDivMonotoneA in MulDiv.spec";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "see mulDivMonotoneA in MulDiv.spec";
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "see mulDivMonotoneB in MulDiv.spec";
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "see mulDivMonotoneD in MulDiv.spec";
+    require axiomInverseUpDown(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), "see mulDivInverseUpDown in MulDiv.spec";
+    require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalObligationCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "see mulDivInverseUpDown in MulDiv.spec";
+    require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralMaxLif[collateralIndex], globalObligationCollateralLLTV[collateralIndex]), "see mulDivLifLLTV in MulDiv.spec";
+    require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "see mulDivAddDownUp in MulDiv.spec";
+    require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalObligationCollateralLLTV[collateralIndex], WAD()), "see mulDivAddDownUp in MulDiv.spec";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert healthyBeforeCallback, "user is healthy before callbacks";
@@ -269,7 +269,7 @@ rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector !
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyBeforeCallback = true;
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "see mulDivMonotoneA in MulDiv.spec";
 
     require globalObligationCollateralLength <= 3, "too many collateralParams for the spec to handle";
 

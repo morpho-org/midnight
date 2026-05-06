@@ -66,7 +66,7 @@ strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation o
 strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
     obligationIsCreated(obligation) => i < j => j < obligation.collateralParams.length => obligation.collateralParams[i].token < obligation.collateralParams[j].token;
 
-// Show that a created obligation do not have address(0) collateralParams.
+// Show that a created obligation does not have address(0) collateralParams.
 strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
     obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].token != 0;
 

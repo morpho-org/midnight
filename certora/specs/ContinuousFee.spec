@@ -24,7 +24,7 @@ methods {
     // Assume no reentrancy: callbacks and transfers do not re-enter Midnight.
 }
 
-/// HELPERS ///
+// HELPERS //
 
 // IdLib summary: remember the last id returned by toId.
 
@@ -63,7 +63,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
     assert pendingFee(id, buyer) == postUpdatePendingFee + (creditDelta * contFee * timeToMaturity) / WAD();
 }
 
-// When a seller's credit decreases via a take, their pendingFee decreases by ceil(PendingFee * creditDelta / postUpdateCredit).
+// When a seller's credit decreases via a take, their pendingFee decreases by ceil(pendingFee * creditDelta / postUpdateCredit).
 rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     address seller = offer.buy ? taker : offer.maker;
 

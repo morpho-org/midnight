@@ -68,7 +68,7 @@ rule tradingFeeIsNotBypassed(env e, uint256 units, address taker, address takerC
     assert to_mathint(buyerAssets) - to_mathint(sellerAssets) <= (to_mathint(units) * to_mathint(fee) + WAD() - 1) / WAD();
 }
 
-// taking zero units must produce zero assets on both sides.
+// Taking zero units must produce zero assets on both sides.
 rule zeroUnitsTakeResultsInZeroAssets(env e, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     uint256 buyerAssets;
     uint256 sellerAssets;

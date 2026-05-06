@@ -7,7 +7,7 @@ methods {
     function msb(uint128 bitmap) external returns (uint256) envfree;
 }
 
-/// RULES ///
+// RULES //
 
 rule zeroBitmapEmpty(uint256 bit) {
     bool isBitSet = getBit(0, bit);
