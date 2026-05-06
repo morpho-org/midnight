@@ -205,9 +205,13 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), initialCollateral - seizedAssets, "collateral");
     }
 
-    function testLiquidateCallback(uint256 units, uint256 repaid, uint256 liquidationOraclePrice, bytes memory data)
-        public
-    {
+    function testLiquidateCallback(
+        uint256 units,
+        uint256 repaid,
+        uint256 liquidationOraclePrice,
+        bytes memory data,
+        address caller
+    ) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
@@ -217,6 +221,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
+        vm.prank(caller);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, address(this), address(this), data);
 
         assertEq(recordedRepaidUnits, repaid, "repaid units");
@@ -599,7 +604,7 @@ contract LiquidationTest is BaseTest {
 
         // Write debt into Position storage.
         // Layout: slot 0 = credit | pendingFee, slot 1 = lossIndex | lastAccrual,
-        // slot 2 = debt | activatedCollaterals.
+        // slot 2 = debt | collateralBitmap.
         // Debt is in the lower 128 bits of slot 2.
         uint256 mappingSlot = 0;
         bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
@@ -818,9 +823,9 @@ contract LiquidationTest is BaseTest {
     /// @dev Bad debt as computed in liquidate
     function _badDebt() internal view returns (uint256) {
         uint256 badDebt = midnight.debtOf(id, borrower);
-        uint128 bitmap = midnight.activatedCollaterals(id, borrower);
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
+        uint128 collateralBitmap = midnight.collateralBitmap(id, borrower);
+        while (collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(collateralBitmap);
             CollateralParams memory _collateral = obligation.collateralParams[i];
             uint256 price = IOracle(_collateral.oracle).price();
             badDebt = badDebt.zeroFloorSub(
@@ -829,7 +834,7 @@ contract LiquidationTest is BaseTest {
             );
             require(i < 128, "i is too large");
             // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
-            bitmap ^= uint128(1 << i);
+            collateralBitmap ^= uint128(1 << i);
         }
         return badDebt;
     }
@@ -898,32 +903,10 @@ contract LiquidationTest is BaseTest {
         assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
     }
 
-    function testIsLiquidatableNoDebt() public {
+    function testLiquidateNoDebtReverts() public {
         midnight.touchObligation(obligation);
-        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "no debt not liquidatable");
-    }
-
-    function testIsLiquidatableHealthyPreMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "healthy pre-maturity not liquidatable");
-    }
-
-    function testIsLiquidatablePostMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        vm.warp(obligation.maturity + 1);
-        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "post-maturity with debt is liquidatable");
-    }
-
-    function testIsLiquidatableUnhealthyPreMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
-        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "unhealthy pre-maturity is liquidatable");
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     function onLiquidate(
