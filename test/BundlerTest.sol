@@ -207,7 +207,7 @@ contract BundlerTest is BaseTest {
             takeBundler.buyBuyerAssetsTarget(
                 address(midnight),
                 targetBuyerAssets,
-                type(uint256).max,
+                2e36,
                 lender,
                 takes,
                 new CollateralTransfer[](0),
@@ -227,7 +227,7 @@ contract BundlerTest is BaseTest {
             takeBundler.buyBuyerAssetsTarget(
                 address(midnight),
                 targetBuyerAssets,
-                type(uint256).max,
+                2e36,
                 lender,
                 takes,
                 new CollateralTransfer[](0),
@@ -503,7 +503,7 @@ contract BundlerTest is BaseTest {
             address(midnight),
             units,
             type(uint256).max,
-            type(uint256).max,
+            WAD * WAD,
             lender,
             takes,
             new CollateralTransfer[](0),
@@ -601,7 +601,7 @@ contract BundlerTest is BaseTest {
         takeBundler.buyBuyerAssetsTarget(
             address(midnight),
             targetBuyerAssets,
-            type(uint256).max,
+            WAD * WAD,
             lender,
             takes,
             new CollateralTransfer[](0),
@@ -787,7 +787,7 @@ contract BundlerTest is BaseTest {
             address(midnight),
             units,
             maxBuyerAssets,
-            type(uint256).max,
+            WAD * WAD,
             lender,
             takes,
             withdrawals,
@@ -838,7 +838,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(lender);
         takeBundler.buyBuyerAssetsTarget(
-            address(midnight), targetBuyerAssets, type(uint256).max, lender, takes, withdrawals, receiver, 0, address(0)
+            address(midnight), targetBuyerAssets, WAD * WAD, lender, takes, withdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {

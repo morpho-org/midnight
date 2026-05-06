@@ -18,6 +18,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The maxAvgBuyerAssetsPerUnit parameter is the maximum assets to pay to get 1 unit, scaled by 1e18.
+    /// @dev Pass 2e36 for maxAvgBuyerAssetsPerUnit to disable the average price check.
     /// @dev Total loan-token cost is `filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct)`.
     function buyUnitsTarget(
         address midnight,
@@ -159,6 +160,7 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is `targetBuyerAssets`.
     /// @dev The maxAvgBuyerAssetsPerUnit parameter is the maximum assets to pay to get 1 unit, scaled by 1e18.
+    /// @dev Pass 2e36 for maxAvgBuyerAssetsPerUnit to disable the average price check.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyBuyerAssetsTarget(
         address midnight,
