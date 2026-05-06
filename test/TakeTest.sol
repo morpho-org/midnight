@@ -1526,7 +1526,7 @@ contract TakeTest is BaseTest {
     // - by underflow when the trading fee is > 0, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZero_NoTradingFee_sell() public {
+    function testPriceZeroNoTradingFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1539,7 +1539,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZero_WithTradingFee_buy() public {
+    function testPriceZeroWithTradingFeeBuy() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 units = 1e18;
@@ -1551,7 +1551,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZero_WithTradingFee_sell() public {
+    function testPriceZeroWithTradingFeeSell() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
