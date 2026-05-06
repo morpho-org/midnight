@@ -48,7 +48,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
 ///
 /// LIQUIDATIONS
-/// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
+/// @dev Accounts are liquidatable only if the liquidation is not locked and they are either unhealthy or the maturity
+/// has passed.
+/// @dev Liquidations can revert for other reasons, see LIVENESS.
 /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
 /// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
@@ -443,7 +445,11 @@ contract Midnight is IMidnight {
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
+        require(
+            position[id][seller].debt == 0 || liquidationLocked(id, seller)
+                || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
+            SellerIsLiquidatable()
+        );
 
         return (buyerAssets, sellerAssets, units);
     }
@@ -896,13 +902,6 @@ contract Midnight is IMidnight {
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
-    }
-
-    /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
-    /// past maturity or not healthy.
-    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
-            && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
     }
 
     /// @dev This function should be called with the id corresponding to the obligation.
