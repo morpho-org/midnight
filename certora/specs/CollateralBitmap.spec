@@ -38,7 +38,7 @@ persistent ghost summaryMulDivUp(uint256, uint256, uint256) returns uint256;
 
 // Check that a collateral bit is set exactly when there is collateral for that index.
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
 // Check that the number of activated collaterals never exceeds MAX_COLLATERALS_PER_BORROWER.
 // This bounds the while-loop iterations in isHealthy() and liquidate().
