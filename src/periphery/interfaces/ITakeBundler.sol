@@ -19,7 +19,6 @@ struct CollateralTransfer {
 
 interface ITakeBundler {
     /// ERRORS ///
-    error InconsistentLoanToken();
     error InconsistentObligation();
     error InconsistentSide();
     error OutOfOffers();
