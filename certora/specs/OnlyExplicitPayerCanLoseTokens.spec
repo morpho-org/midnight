@@ -13,19 +13,21 @@ methods {
 
     // Callbacks can modify the whole state arbitrarily, and can only modify the ghost variables to allow
     // themselves as payer. Callbacks are checked to only be called by their corresponding function,
-    // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onBuySummary(calledContract) expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onLiquidateSummary(calledContract) expect(bytes32);
-    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onRepaySummary(calledContract) expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => onFlashLoanSummary(calledContract) expect(bytes32);
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => genericExternalCallBytes32() expect(bytes32);
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => genericExternalCallBytes32() expect(bytes32);
+    // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer, so we
+    // model them with a plain HAVOC_ALL.
+    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, allowBuyCallbackAsPayer) expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, allowLiquidateCallback) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onCallBackSummary(calledContract, allowRepayCallbackAsPayer) expect(bytes32);
+    function _.onFlashLoan(address[], uint256[], bytes) external => onCallBackSummary(calledContract, allowFlashLoanCallbackAsPayer) expect(bytes32);
 
     // Checks every token pull against the current explicit-payer allowlist.
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
 
-    // Models outbound token sends as arbitrary external effects while preserving prover ghosts.
-    function _.transfer(address dest, uint256 value) external => genericExternalCallBool() expect(bool);
+    function _.onRatify(Midnight.Offer, bytes32, bytes) external => HAVOC_ALL;
+    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => HAVOC_ALL;
+
+    // Models outbound token sends as arbitrary external effects.
+    function _.transfer(address dest, uint256 value) external => HAVOC_ALL;
 
     // Oracle prices are irrelevant to payer provenance.
     function _.price() external => NONDET;
@@ -37,98 +39,40 @@ methods {
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
-ghost address topLevelCaller;
+persistent ghost address topLevelCaller;
 
-ghost bool topLevelCallerAllowed;
+persistent ghost bool topLevelCallerAllowed;
 
-ghost address allowedCallbackPayer;
+persistent ghost address allowedCallbackPayer;
 
-ghost bool allowedCallbackPayerActive;
+persistent ghost bool allowedCallbackPayerActive;
 
-ghost bool allowBuyCallbackAsPayer;
+persistent ghost bool allowBuyCallbackAsPayer;
 
-ghost bool allowLiquidateCallback;
+persistent ghost bool allowLiquidateCallback;
 
-ghost bool allowRepayCallbackAsPayer;
+persistent ghost bool allowRepayCallbackAsPayer;
 
-ghost bool allowFlashLoanCallbackAsPayer;
+persistent ghost bool allowFlashLoanCallbackAsPayer;
 
 /// Tracks the maker address from a validated offer.
-ghost address allowedMaker;
+persistent ghost address allowedMaker;
 
-ghost bool allowedMakerActive;
+persistent ghost bool allowedMakerActive;
 
-ghost bool badPullSeen;
+persistent ghost bool badPullSeen;
 
-function havocPreservingGhosts() {
-    address savedTopLevelCaller = topLevelCaller;
-    bool savedTopLevelCallerAllowed = topLevelCallerAllowed;
-    address savedAllowedCallbackPayer = allowedCallbackPayer;
-    bool savedAllowedCallbackPayerActive = allowedCallbackPayerActive;
-    bool savedAllowBuyCallbackAsPayer = allowBuyCallbackAsPayer;
-    bool savedallowLiquidateCallback = allowLiquidateCallback;
-    bool savedAllowRepayCallbackAsPayer = allowRepayCallbackAsPayer;
-    bool savedAllowFlashLoanCallbackAsPayer = allowFlashLoanCallbackAsPayer;
-    address savedAllowedMaker = allowedMaker;
-    bool savedAllowedMakerActive = allowedMakerActive;
-    bool savedBadPullSeen = badPullSeen;
-
+function triggerHavocAll() {
     address dummy;
     env e;
     callback.callHavoc(e, dummy);
-
-    topLevelCaller = savedTopLevelCaller;
-    topLevelCallerAllowed = savedTopLevelCallerAllowed;
-    allowedCallbackPayer = savedAllowedCallbackPayer;
-    allowedCallbackPayerActive = savedAllowedCallbackPayerActive;
-    allowBuyCallbackAsPayer = savedAllowBuyCallbackAsPayer;
-    allowLiquidateCallback = savedallowLiquidateCallback;
-    allowRepayCallbackAsPayer = savedAllowRepayCallbackAsPayer;
-    allowFlashLoanCallbackAsPayer = savedAllowFlashLoanCallbackAsPayer;
-    allowedMaker = savedAllowedMaker;
-    allowedMakerActive = savedAllowedMakerActive;
-    badPullSeen = savedBadPullSeen;
 }
 
-function genericExternalCallBytes32() returns (bytes32) {
-    bytes32 result;
-    havocPreservingGhosts();
-    return result;
-}
-
-function genericExternalCallBool() returns (bool) {
-    bool success;
-    havocPreservingGhosts();
-    if (!success) {
-        revert();
-    }
-    return true;
-}
-
-function onBuySummary(address callbackAddress) returns (bytes32) {
-    assert allowBuyCallbackAsPayer;
-    return onCallBackSummary(callbackAddress);
-}
-
-function onLiquidateSummary(address callbackAddress) returns (bytes32) {
-    assert allowLiquidateCallback;
-    return onCallBackSummary(callbackAddress);
-}
-
-function onRepaySummary(address callbackAddress) returns (bytes32) {
-    assert allowRepayCallbackAsPayer;
-    return onCallBackSummary(callbackAddress);
-}
-
-function onFlashLoanSummary(address callbackAddress) returns (bytes32) {
-    assert allowFlashLoanCallbackAsPayer;
-    return onCallBackSummary(callbackAddress);
-}
-
-function onCallBackSummary(address callbackAddress) returns (bytes32) {
+function onCallBackSummary(address callbackAddress, bool allowedAsPayer) returns (bytes32) {
+    assert allowedAsPayer;
     require callbackAddress != 0, "address(0) has no code and cannot return CALLBACK_SUCCESS";
     bytes32 result;
-    havocPreservingGhosts();
+    triggerHavocAll();
     allowedCallbackPayer = callbackAddress;
     allowedCallbackPayerActive = result == Utils.callbackSuccess();
     return result;
@@ -140,19 +84,19 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
         revert();
     }
 
-    havocPreservingGhosts();  
-   
-    if (topLevelCallerAllowed && src == topLevelCaller) {  
-        return true;  
-    }  
-    if (allowedCallbackPayerActive && src == allowedCallbackPayer) {  
-        return true;  
-    }  
-    if (allowedMakerActive && src == allowedMaker) {  
-        return true;  
-    }  
+    triggerHavocAll();
 
-    badPullSeen = true;  
+    if (topLevelCallerAllowed && src == topLevelCaller) {
+        return true;
+    }
+    if (allowedCallbackPayerActive && src == allowedCallbackPayer) {
+        return true;
+    }
+    if (allowedMakerActive && src == allowedMaker) {
+        return true;
+    }
+
+    badPullSeen = true;
     return true;
 }
 
