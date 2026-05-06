@@ -8,8 +8,6 @@ struct Take {
     uint256 units;
     Offer offer;
     bytes ratifierData;
-    bytes32 root;
-    bytes32[] proof;
 }
 
 struct CollateralTransfer {

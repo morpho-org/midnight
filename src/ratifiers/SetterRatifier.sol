@@ -5,6 +5,7 @@ pragma solidity 0.8.34;
 import {ISetterRatifier} from "./interfaces/ISetterRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
+import {UtilsLib} from "../libraries/UtilsLib.sol";
 
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
@@ -21,9 +22,11 @@ contract SetterRatifier is ISetterRatifier {
         emit SetIsRatified(maker, root, newIsRatified);
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
+    function onRatify(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
+        (bytes32 root, bytes32[] memory proof) = abi.decode(ratifierData, (bytes32, bytes32[]));
         require(isRatified[offer.maker][root], NotRatified());
+        require(UtilsLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
         return CALLBACK_SUCCESS;
     }
 }

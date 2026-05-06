@@ -82,12 +82,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
 /// @dev Offers should have the current session to be valid.
 ///
-/// ROOT
-/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
-/// the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
-/// Seaport for this mechanism.
-///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
 /// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
@@ -317,9 +311,7 @@ contract Midnight is IMidnight {
         bytes memory takerCallbackData,
         address receiverIfTakerIsSeller,
         Offer memory offer,
-        bytes memory ratifierData,
-        bytes32 root,
-        bytes32[] memory proof
+        bytes memory ratifierData
     ) external returns (uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
@@ -330,10 +322,9 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
-        require(UtilsLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
         require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
+        require(IRatifier(offer.ratifier).onRatify(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 

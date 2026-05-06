@@ -50,9 +50,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     address(0),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
@@ -124,9 +122,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     address(this),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
@@ -186,9 +182,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     address(0),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256 resBuyerAssets, uint256, uint256
             ) {
@@ -266,9 +260,7 @@ contract TakeBundler is ITakeBundler {
                     "",
                     address(this),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256, uint256 resSellerAssets, uint256
             ) {
