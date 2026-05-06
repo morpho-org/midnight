@@ -482,7 +482,6 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     // pre-maturity unhealthy (so lif = maxLif), valid RCF math.
     require collatBefore > 0;
     require e.block.timestamp < obligation.maturity;
-    require seizedAssets > 0 || repaidUnits > 0;
 
     // No badDebt: debt covered by raw collateral value (pre-lif scaling).
     require debtBefore <= CVL_mulDivUp(CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
@@ -506,4 +505,83 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     require to_mathint(debtAfter)   == to_mathint(debtBefore)  - to_mathint(actualRepaid);
 
     assert isHealthyNoBitmap(obligation, id, borrower);
+}
+
+// ============================================================================
+// Minimal reproducer rules — diagnose whether the storage write→read link
+// across `liquidate` is preserved by the SMT. NO RCF math, no health check,
+// no obligation pinning beyond length=1. If these CEX, the prover is failing
+// to propagate the slot-write inside liquidate to the slot-read after.
+// ============================================================================
+
+// Tests: in seizedAssets > 0 path, collat[0] decrements by exactly the
+// returned actualSeized value, and debt decrements by actualRepaid.
+// Requires no badDebt — otherwise contract decrements debt by an extra
+// `badDebt` amount that's NOT returned in the liquidate tuple.
+rule storageLinkSeizedPath(env e, Midnight.Obligation obligation, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
+    require obligation.collateralParams.length == 1;
+
+    uint256 lltv = obligation.collateralParams[0].lltv;
+    uint256 maxLif = obligation.collateralParams[0].maxLif;
+    require maxLif >= WAD();
+    uint256 price = CVL_price(obligation.collateralParams[0].oracle);
+
+    bytes32 id;
+    uint256 collatBefore = collateral(id, borrower, 0);
+    uint256 debtBefore = debtOf(id, borrower);
+
+    require collatBefore > 0;
+    require debtBefore > 0;
+    require seizedAssets > 0;
+
+    // No badDebt: contract's badDebt branch decrements debt by an amount not
+    // captured in the liquidate return tuple.
+    require debtBefore <= CVL_mulDivUp(CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+
+    uint256 actualSeized;
+    uint256 actualRepaid;
+    actualSeized, actualRepaid = liquidate(e, obligation, 0, seizedAssets, 0, borrower, receiver, callback, data);
+    require id == lastId;
+
+    uint256 collatAfter = collateral(id, borrower, 0);
+    uint256 debtAfter = debtOf(id, borrower);
+
+    assert to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized),
+        "collat decrement mismatch";
+    assert to_mathint(debtAfter) == to_mathint(debtBefore) - to_mathint(actualRepaid),
+        "debt decrement mismatch";
+}
+
+// Tests: in repaidUnits > 0 path. Same property as above for the other branch.
+// Same no-badDebt precondition.
+rule storageLinkRepaidPath(env e, Midnight.Obligation obligation, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    require obligation.collateralParams.length == 1;
+
+    uint256 lltv = obligation.collateralParams[0].lltv;
+    uint256 maxLif = obligation.collateralParams[0].maxLif;
+    require maxLif >= WAD();
+    uint256 price = CVL_price(obligation.collateralParams[0].oracle);
+
+    bytes32 id;
+    uint256 collatBefore = collateral(id, borrower, 0);
+    uint256 debtBefore = debtOf(id, borrower);
+
+    require collatBefore > 0;
+    require debtBefore > 0;
+    require repaidUnits > 0;
+
+    require debtBefore <= CVL_mulDivUp(CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+
+    uint256 actualSeized;
+    uint256 actualRepaid;
+    actualSeized, actualRepaid = liquidate(e, obligation, 0, 0, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
+
+    uint256 collatAfter = collateral(id, borrower, 0);
+    uint256 debtAfter = debtOf(id, borrower);
+
+    assert to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized),
+        "collat decrement mismatch";
+    assert to_mathint(debtAfter) == to_mathint(debtBefore) - to_mathint(actualRepaid),
+        "debt decrement mismatch";
 }
