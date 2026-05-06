@@ -158,11 +158,7 @@ interface IMidnight {
     function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
-<<<<<<< HEAD
-    function userLossIndex(bytes32 id, address user) external view returns (uint128);
-=======
     function userLossFactor(bytes32 id, address user) external view returns (uint128);
->>>>>>> origin/main
     function collateralBitmap(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Obligation memory obligation) external view returns (bytes32);
