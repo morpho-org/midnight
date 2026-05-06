@@ -31,8 +31,9 @@ methods {
     // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
-    // End-of-take liquidation check is deterministic across compared paths.
-    function isLiquidatable(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
+    // End-of-take seller-liquidatable require is inlined and uses isHealthy; CONSTANT keeps it
+    // deterministic across the compared paths.
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
