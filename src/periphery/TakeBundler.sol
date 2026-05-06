@@ -173,7 +173,7 @@ contract TakeBundler is ITakeBundler {
             require(!takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
-            bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+            bytes32 id = IMidnight(midnight).touchObligation(takes[i].offer.obligation);
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -254,7 +254,7 @@ contract TakeBundler is ITakeBundler {
             require(takes[i].offer.buy, InconsistentSide());
             require(takes[i].offer.obligation.loanToken == loanToken, InconsistentLoanToken());
             // touchObligation to have the correct trading fees.
-            bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+            bytes32 id = IMidnight(midnight).touchObligation(takes[i].offer.obligation);
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(

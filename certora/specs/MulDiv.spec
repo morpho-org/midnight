@@ -56,6 +56,22 @@ rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
     assert b <= d => mulDivUp(a, b, d) <= a;
 }
 
+rule mulDivDownRoundsDown(uint256 a, uint256 b, uint256 d) {
+    assert mulDivDown(a, b, d) * d <= a * b;
+}
+
+rule mulDivDownTightBound(uint256 a, uint256 b, uint256 d) {
+    assert (mulDivDown(a, b, d) + 1) * d > a * b;
+}
+
+rule mulDivUpRoundsUp(uint256 a, uint256 b, uint256 d) {
+    assert mulDivUp(a, b, d) * d >= a * b;
+}
+
+rule mulDivUpTightBound(uint256 a, uint256 b, uint256 d) {
+    assert mulDivUp(a, b, d) > 0 => (mulDivUp(a, b, d) - 1) * d < a * b;
+}
+
 rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) * d <= a * b + d - 1;
 }

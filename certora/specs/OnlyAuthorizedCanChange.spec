@@ -14,7 +14,7 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
     // Summarize oracle calls.
     function _.price() external => NONDET;
@@ -39,7 +39,7 @@ methods {
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onRatify(Midnight.Offer offer, bytes32, bytes) external => CVL_onRatify(offer) expect(bytes32);
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
