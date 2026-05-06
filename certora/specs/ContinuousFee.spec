@@ -49,6 +49,8 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
 
+    require pendingFee(id, buyer) <= creditOf(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
+
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
     require id == lastId, "id should be derived from obligation";
