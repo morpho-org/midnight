@@ -59,9 +59,9 @@ persistent ghost bytes32 globalId;
 
 /// HOOKS ///
 
-// Follows from userLossIndexLeqObligationLossIndex in Midnight.spec.
-hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossIndex {
-    require value <= currentContract.obligationState[id].lossIndex;
+// Follows from userLossFactorLeqObligationLossFactor in Midnight.spec.
+hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossFactor {
+    require value <= currentContract.obligationState[id].lossFactor;
 }
 
 /// SUMMARIES ///
