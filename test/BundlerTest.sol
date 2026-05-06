@@ -260,7 +260,15 @@ contract BundlerTest is BaseTest {
         vm.prank(lender);
         vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
         takeBundler.buyUnitsTarget(
-            address(midnight), 2, type(uint256).max, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
+            address(midnight),
+            2,
+            type(uint256).max,
+            lender,
+            takes,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0)
         );
     }
 
