@@ -20,6 +20,9 @@ persistent ghost summaryCountBits(uint128) returns mathint {
 
     // sanity bounds to be able to require_uint256(summaryCountBits(bitmap))
     axiom forall uint128 b. 0 <= summaryCountBits(b) && summaryCountBits(b) <= 128;
+
+    // consistency: any set bit implies a positive count
+    axiom forall uint128 b. forall uint256 bit. summaryGetBit(b, bit) => summaryCountBits(b) >= 1;
 }
 
 function summaryCountBitsWrapper(uint128 bitmap) returns uint256 {
@@ -31,6 +34,7 @@ function summarySetBit(uint128 bitmap, uint256 bit) returns (uint128) {
     assert bit < 128;
     require summaryGetBit(result, bit), "see Bitmap.spec";
     require forall uint256 otherBit. otherBit != bit && otherBit < 128 => summaryGetBit(result, otherBit) == summaryGetBit(bitmap, otherBit), "see Bitmap.spec";
+    require summaryCountBits(result) == summaryCountBits(bitmap) + (summaryGetBit(bitmap, bit) ? 0 : 1), "see Bitmap.spec";
     return result;
 }
 
