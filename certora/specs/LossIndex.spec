@@ -89,7 +89,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
 
 /// The loss index arithmetic in `liquidate` does not revert under valid state.
 /// Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path.
-/// Uses activatedCollaterals=0 to skip the collateral loop, ensuring badDebt == position.debt.
+/// Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, address borrower, bytes data) {
     bytes32 id = summaryToId(obligation);
 
@@ -98,7 +98,7 @@ rule liquidateLossIndexDoesNotRevert(env e, Midnight.Obligation obligation, addr
     require obligation.liquidatorGate == 0, "Assumption:no liquidator gate";
     require obligation.collateralParams.length > 0, "obligation has at least one collateral (enforced by touchObligation)";
     require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";
-    require currentContract.position[id][borrower].activatedCollaterals == 0, "Assumption: no active collaterals: skip loop and maximize badDebt";
+    require currentContract.position[id][borrower].collateralBitmap == 0, "Assumption: no active collaterals: skip loop and maximize badDebt";
     require currentContract.position[id][borrower].debt > 0, "borrower must have debt to enter badDebt > 0 block";
     require currentContract.position[id][borrower].debt <= currentContract.obligationState[id].totalUnits, "position debt bounded by totalUnits (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable)";
     require e.msg.value == 0, "Midnight is not payable";
