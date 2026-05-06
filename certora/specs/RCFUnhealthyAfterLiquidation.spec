@@ -38,49 +38,14 @@ methods {
     function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 }
 
-// Global-obligation pinning: rules fix the obligation under test by requiring
-// equalsGlobalObligation(obligation), then bind id := globalId directly.
-// summaryToId enforces determinism (same obligation → globalId) and injectivity
-// (different obligation → not globalId), removing the need for a `lastId == id`
-// require after the liquidate call.
-persistent ghost address globalObligationLoanToken;
-persistent ghost uint256 globalObligationCollateralLength;
-persistent ghost mapping(uint256 => address) globalObligationCollateralOracle;
-persistent ghost mapping(uint256 => address) globalObligationCollateralToken;
-persistent ghost mapping(uint256 => uint256) globalObligationCollateralLLTV;
-persistent ghost mapping(uint256 => uint256) globalObligationCollateralMaxLif;
-persistent ghost uint256 globalObligationMaturity;
-persistent ghost uint256 globalObligationRcfThreshold;
-persistent ghost address globalObligationEnterGate;
-persistent ghost address globalObligationLiquidatorGate;
-persistent ghost bytes32 globalId;
-
-definition collateralMatches(Midnight.Obligation obligation, uint256 index) returns bool =
-    (index < globalObligationCollateralLength =>
-        obligation.collateralParams[index].oracle == globalObligationCollateralOracle[index] &&
-        obligation.collateralParams[index].token == globalObligationCollateralToken[index] &&
-        obligation.collateralParams[index].lltv == globalObligationCollateralLLTV[index] &&
-        obligation.collateralParams[index].maxLif == globalObligationCollateralMaxLif[index]);
-
-function equalsGlobalObligation(Midnight.Obligation obligation) returns bool {
-    return obligation.loanToken == globalObligationLoanToken &&
-        obligation.collateralParams.length == globalObligationCollateralLength &&
-        collateralMatches(obligation, 0) &&
-        collateralMatches(obligation, 1) &&
-        collateralMatches(obligation, 2) &&
-        obligation.maturity == globalObligationMaturity &&
-        obligation.rcfThreshold == globalObligationRcfThreshold &&
-        obligation.enterGate == globalObligationEnterGate &&
-        obligation.liquidatorGate == globalObligationLiquidatorGate;
-}
+// Last-id pattern: CVL_toId stashes the returned id into lastId ghost.
+// Each rule binds `bytes32 id;` and requires `id == lastId` after the
+// liquidate call to tie the spec's id reads to the contract's internal id.
+persistent ghost bytes32 lastId;
 
 function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
     bytes32 id;
-    if (equalsGlobalObligation(obligation) && midnight == currentContract) {
-        require id == globalId, "toId() is deterministic";
-    } else {
-        require id != globalId, "toId() is injective";
-    }
+    lastId = id;
     return id;
 }
 
@@ -106,8 +71,6 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
 
     uint256 lltv = obligation.collateralParams[0].lltv;
@@ -118,7 +81,7 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -132,6 +95,7 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -162,8 +126,6 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
 
 rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
 
     uint256 lltv = obligation.collateralParams[0].lltv;
@@ -174,7 +136,7 @@ rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation oblig
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -188,6 +150,7 @@ rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation oblig
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -225,8 +188,6 @@ rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation oblig
 //   Total surplus ≤ 1 + floor(floor(price / OPS) * lltv / WAD).
 rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
     uint256 seizedAssets = 0;
 
@@ -238,7 +199,7 @@ rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, u
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -259,6 +220,7 @@ rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, u
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
 
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
@@ -304,8 +266,6 @@ rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, u
 //   Total surplus ≤ 2.
 rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
     uint256 repaidUnits = 0;
 
@@ -317,7 +277,7 @@ rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, u
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -338,6 +298,7 @@ rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, u
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
 
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
@@ -359,8 +320,6 @@ rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, u
 // assume badDebt is zero
 rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
 
     uint256 lltv = obligation.collateralParams[0].lltv;
@@ -371,7 +330,7 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -385,6 +344,7 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -434,8 +394,6 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
 // nested mapping `position[id][user].collateral[i]`.
 rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
     uint256 collateralIndex = 0;
 
     uint256 lltv = obligation.collateralParams[0].lltv;
@@ -446,7 +404,7 @@ rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, ui
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -474,6 +432,7 @@ rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, ui
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
     require actualRepaid == _maxRepaid;            // RCF cap hit
 
@@ -507,8 +466,6 @@ rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, ui
 // write→read link loss across liquidate seen in earlier CEXes.
 rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
-    require equalsGlobalObligation(obligation);
-    require globalObligationCollateralLength == 1;
 
     uint256 lltv = obligation.collateralParams[0].lltv;
     uint256 maxLif = obligation.collateralParams[0].maxLif;
@@ -517,7 +474,7 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     require lifTimesLltv < WAD();
 
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
-    bytes32 id = globalId;
+    bytes32 id;
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -538,6 +495,7 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, 0, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    require id == lastId;
 
     require actualRepaid == _maxRepaid;
 
