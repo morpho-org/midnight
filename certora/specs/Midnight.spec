@@ -43,6 +43,8 @@ methods {
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
+definition MAX_TTM() returns mathint = 100 * 365 * 86400;
+
 function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
@@ -123,8 +125,30 @@ rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
+strong invariant defaultContinuousFeeBoundedAll()
+    forall address token. currentContract.defaultContinuousFee[token] <= MAX_CONTINUOUS_FEE();
+
+strong invariant continuousFeeBounded(bytes32 id)
+    currentContract.obligationState[id].continuousFee <= MAX_CONTINUOUS_FEE()
+    {
+        preserved with (env e) {
+            requireInvariant defaultContinuousFeeBoundedAll();
+        }
+    }
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user);
+    pendingFee(id, user) <= creditOf(id, user)
+    {
+        preserved with (env e) {
+            requireInvariant continuousFeeBounded(id);
+            requireInvariant defaultContinuousFeeBoundedAll();
+        }
+        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
+            requireInvariant continuousFeeBounded(id);
+            requireInvariant defaultContinuousFeeBoundedAll();
+            require to_mathint(offer.obligation.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
+        }
+    }
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
