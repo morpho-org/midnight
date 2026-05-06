@@ -35,7 +35,7 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
@@ -194,7 +194,6 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Obligation obligation, ui
 }
 
 /// If an activated collateral oracle reverts on price different than withdrawn collateral, withdrawCollateral reverts when the borrower has debt.
-/// Assumption : revertingCollateralIndex is the MSB otherwise isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true.
 rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, uint256 revertingCollateralIndex) {
     require singleRevertingOracle == obligation.collateralParams[revertingCollateralIndex].oracle, "oracle is reverting";
     require revertingCollateralIndex < 128, "clearBit produces a new bitmap whose summaryGetBit is unconstrained for indices >= 128";
@@ -203,7 +202,6 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation oblig
     bytes32 id = summaryToId(obligation);
     uint128 bitmap = activatedCollaterals(id, onBehalf);
     require summaryGetBit(bitmap, revertingCollateralIndex), "revertingCollateralIndex is activated";
-    require forall uint256 bit. bit > revertingCollateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "revertingCollateralIndex is the MSB";
 
     withdrawCollateral@withrevert(e, obligation, collateralIndex, assets, onBehalf, receiver);
     bool reverted = lastReverted;
@@ -212,13 +210,11 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Obligation oblig
 }
 
 /// If an activated collateral oracle reverts on price, isHealthy reverts when the borrower has debt.
-/// Assumption : collateralIndex is the MSB otherwise isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true..
 rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Obligation obligation, bytes32 id, address borrower, uint256 collateralIndex) {
     require singleRevertingOracle == obligation.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     uint128 bitmap = activatedCollaterals(id, borrower);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
-    require forall uint256 bit. bit > collateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "collateralIndex is the MSB";
 
     isHealthy@withrevert(e, obligation, id, borrower);
     bool reverted = lastReverted;
@@ -227,20 +223,18 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Obligation obligation, by
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
-/// Assumption : collateralIndex is the MSB otherwise isLiquidatable -> isHealthy short-circuit could find a CEX where first collateral is enough to have maxDebt >= debt and return true.
 rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, uint256 collateralIndex) {
     require singleRevertingOracle == offer.obligation.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(offer.obligation);
     address seller = offer.buy ? taker : offer.maker;
 
-    // Without this, isLiquidatable short-circuits to false (without calling isHealthy) because
+    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
     uint128 bitmap = activatedCollaterals(id, seller);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
-    require forall uint256 bit. bit > collateralIndex && bit < 128 => !summaryGetBit(bitmap, bit), "collateralIndex is the MSB";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
@@ -260,7 +254,6 @@ rule oracleZeroCausesLiquidateWithRepaidRevert(env e, Midnight.Obligation obliga
 }
 
 /// If all oracles return 0 and the borrower has debt, isHealthy returns false.
-/// Note: this forces ALL oracles to return 0 because isHealthy has a short-circuit (while maxDebt < debt).
 rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Obligation obligation, address borrower) {
     require forceOracleReturnZero, "all oracles return zero";
 
@@ -273,7 +266,6 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Obligation obligation,
 }
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
-/// Note: same short-circuit limitation as oracleZeroCausesIsHealthyReturnFalse
 rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     require forceOracleReturnZero, "all oracles return zero";
 
@@ -286,7 +278,6 @@ rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Obligation ob
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
-/// Note: same short-circuit limitation — take calls isLiquidatable → isHealthy, which may short-circuit.
 rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require forceOracleReturnZero, "all oracles return zero";
 
@@ -343,21 +334,28 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Obligation obligation, uint
 
 /// TOKEN TRANSFER REVERT PROPAGATION ///
 
-/// If transferFrom reverts, take, repay, supplyCollateral, liquidate, and flashLoan all revert.
+/// If transferFrom reverts, take, repay, supplyCollateral, and liquidate all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
         || f.selector == sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
 } {
     require forceTransferFromRevert, "transferFrom reverts";
     f@withrevert(e, args);
     assert lastReverted;
 }
 
-/// If transfer reverts, withdraw, withdrawCollateral, fee claims, liquidate, and flashLoan all revert.
+/// If transferFrom reverts, flashLoan reverts, assuming that the arrays are not empty.
+rule transferFromRevertPropagationFlashLoan(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
+    require forceTransferFromRevert, "transferFrom reverts";
+    require tokens.length > 0, "assume tokens array is not empty";
+    flashLoan@withrevert(e, tokens, assets, callback, data);
+    assert lastReverted;
+}
+
+/// If transfer reverts, withdraw, withdrawCollateral, fee claims, and liquidate all revert.
 rule transferRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
@@ -365,10 +363,17 @@ filtered {
         || f.selector == sig:claimTradingFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        || f.selector == sig:flashLoan(address, uint256, address, bytes).selector
 } {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);
+    assert lastReverted;
+}
+
+/// If transfer reverts, flashLoan reverts, assuming that the arrays are not empty.
+rule transferRevertPropagationFlashLoan(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
+    require forceTransferRevert, "transfer reverts";
+    require tokens.length > 0, "assume tokens array is not empty";
+    flashLoan@withrevert(e, tokens, assets, callback, data);
     assert lastReverted;
 }
 
@@ -394,11 +399,12 @@ rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Obligation o
     assert lastReverted;
 }
 
-/// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts.
-rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address token, uint256 assets, address callback, bytes data) {
+/// If the callback reverts or returns something other than CALLBACK_SUCCESS, flashLoan reverts, assuming that the arrays are not empty.
+rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
+    require tokens.length > 0, "assume tokens array is not empty";
 
-    flashLoan@withrevert(e, token, assets, callback, data);
+    flashLoan@withrevert(e, tokens, assets, callback, data);
 
     assert lastReverted;
 }

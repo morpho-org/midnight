@@ -205,9 +205,13 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), initialCollateral - seizedAssets, "collateral");
     }
 
-    function testLiquidateCallback(uint256 units, uint256 repaid, uint256 liquidationOraclePrice, bytes memory data)
-        public
-    {
+    function testLiquidateCallback(
+        uint256 units,
+        uint256 repaid,
+        uint256 liquidationOraclePrice,
+        bytes memory data,
+        address caller
+    ) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
@@ -217,6 +221,7 @@ contract LiquidationTest is BaseTest {
         Oracle(obligation.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(obligation.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
+        vm.prank(caller);
         midnight.liquidate(obligation, 0, 0, repaid, borrower, address(this), address(this), data);
 
         assertEq(recordedRepaidUnits, repaid, "repaid units");
@@ -898,32 +903,10 @@ contract LiquidationTest is BaseTest {
         assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
     }
 
-    function testIsLiquidatableNoDebt() public {
+    function testLiquidateNoDebtReverts() public {
         midnight.touchObligation(obligation);
-        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "no debt not liquidatable");
-    }
-
-    function testIsLiquidatableHealthyPreMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        assertFalse(midnight.isLiquidatable(obligation, id, borrower), "healthy pre-maturity not liquidatable");
-    }
-
-    function testIsLiquidatablePostMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        vm.warp(obligation.maturity + 1);
-        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "post-maturity with debt is liquidatable");
-    }
-
-    function testIsLiquidatableUnhealthyPreMaturityView(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
-        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
-        assertTrue(midnight.isLiquidatable(obligation, id, borrower), "unhealthy pre-maturity is liquidatable");
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        midnight.liquidate(obligation, 0, 0, 0, borrower, address(this), address(0), "");
     }
 
     function onLiquidate(
