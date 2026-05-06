@@ -56,7 +56,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.onRatify(offer, _root, "");
+        bytes32 result = setterRatifier.onRatify(offer, abi.encode(_root, new bytes32[](0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -73,7 +73,9 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(0, borrower, address(0), hex"", borrower, offer, emptySig, _root, proof([offer]));
+        midnight.take(
+            0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, proof([offer]))
+        );
     }
 
     function testOnRatifyNotMidnight() public {
@@ -84,7 +86,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRatified(lender, _root, true);
 
         vm.expectRevert(ISetterRatifier.NotMidnight.selector);
-        setterRatifier.onRatify(offer, _root, "");
+        setterRatifier.onRatify(offer, abi.encode(_root, new bytes32[](0)));
     }
 
     function testSetIsRatifiedUnauthorizedOnBehalf() public {

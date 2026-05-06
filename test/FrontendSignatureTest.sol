@@ -10,9 +10,9 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0x09a648ee294a2ca00ab473404851f03f6e6b884678040da1bd795be8f9773609;
-bytes32 constant SIG_S = 0x47caf1e2a1527357e5ae0091100f7de32b469916c05e163ecf5b46f0f0ab693d;
+uint8 constant SIG_V = 28;
+bytes32 constant SIG_R = 0xb9b9bbc9871e19caccd05beff7c335263e6fc81ea4b29d4ab65c260cf6b977ae;
+bytes32 constant SIG_S = 0x335181240405f44f94ff143bc841ce19120907dad81d5cbb489ff9292ce7c478;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
@@ -30,6 +30,7 @@ contract FrontendSignatureTest is Test {
         offer.obligation.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
         offer.ratifier = RATIFIER;
+        offer.maker = ACCOUNT;
     }
 
     function testFrontendSignatureVerification() public view {
@@ -67,10 +68,8 @@ contract FrontendSignatureTest is Test {
         proof3[1] = left;
         assertTrue(UtilsLib.isLeaf(_root, h3, proof3));
 
-        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT);
-        // Trick to pass the maker to the ratifier, without having the offers depend on the maker.
-        offers[0].maker = ACCOUNT;
-        bytes32 result = EcrecoverRatifier(RATIFIER).onRatify(offers[0], _root, ratifierData);
+        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, proof0);
+        bytes32 result = EcrecoverRatifier(RATIFIER).onRatify(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 }

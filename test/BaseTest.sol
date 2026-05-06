@@ -144,9 +144,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(
-            units, taker, address(0), hex"", taker, offer, ratifierData([offer]), root([offer]), proof([offer])
-        );
+        return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -219,8 +217,10 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function ratifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier, 0), uint256(0));
+    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
+        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -300,19 +300,41 @@ abstract contract BaseTest is Test {
         return _signature;
     }
 
-    function ratifierData(Offer[1] memory offers) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0), uint256(0));
+    function _encodeMerkleRatifierData(Signature memory _sig, uint256 _height, bytes32 _root, bytes32[] memory _proof)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encode(_sig, _height, _root, _proof);
     }
 
-    function ratifierData(Offer[2] memory offers) internal view returns (bytes memory) {
+    function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1), uint256(1));
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
+        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
     }
 
-    function ratifierData(Offer[4] memory offers) internal view returns (bytes memory) {
+    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2), uint256(2));
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1);
+        return _encodeMerkleRatifierData(_sig, 1, _root, _proof);
+    }
+
+    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2);
+        return _encodeMerkleRatifierData(_sig, 2, _root, _proof);
+    }
+
+    /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
+    /// the signed root or the proof is intentionally inconsistent with the offer.
+    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
+        internal
+        view
+        returns (bytes memory)
+    {
+        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
+        return _encodeMerkleRatifierData(_sig, _height, _root, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -356,7 +378,18 @@ abstract contract BaseTest is Test {
     function setupObligation(Obligation memory obligation, uint256 units) internal {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
-        Offer memory borrowerOffer;
+        Offer memory borrowerOffer = _setupObligationOffer(obligation, units);
+        bytes memory rd = merkleRatifierData([borrowerOffer]);
+
+        vm.prank(lender);
+        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
+    }
+
+    function _setupObligationOffer(Obligation memory obligation, uint256 units)
+        private
+        view
+        returns (Offer memory borrowerOffer)
+    {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
@@ -366,19 +399,6 @@ abstract contract BaseTest is Test {
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;
-
-        vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            address(0),
-            hex"",
-            borrower,
-            borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

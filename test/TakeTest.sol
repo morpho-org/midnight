@@ -896,7 +896,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidRoot(bytes32 invalidRoot) public {
         vm.assume(invalidRoot != root([lenderOffer]));
-        vm.expectRevert(IMidnight.InvalidProof.selector);
+        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -905,9 +905,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            invalidRoot,
-            new bytes32[](0)
+            merkleRatifierData(lenderOffer, invalidRoot, new bytes32[](0), 0)
         );
     }
 
@@ -922,9 +920,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, uint256(0)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            abi.encode(_sig, uint256(0), root([lenderOffer]), new bytes32[](0))
         );
     }
 
@@ -948,9 +944,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey))
         );
         assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
         assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
@@ -978,9 +972,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey))
         );
         assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
         assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
@@ -988,7 +980,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
-        vm.expectRevert(IMidnight.InvalidProof.selector);
+        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -997,16 +989,14 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            _path
+            merkleRatifierData(lenderOffer, root([lenderOffer]), _path, 0)
         );
     }
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
         vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
-        vm.expectRevert(IMidnight.InvalidProof.selector);
+        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
             100,
@@ -1015,9 +1005,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            _path
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _path, 1)
         );
     }
 
@@ -1036,9 +1024,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            proof([lenderOffer, otherOffer])
+            merkleRatifierData([lenderOffer, otherOffer], proof([lenderOffer, otherOffer]))
         );
     }
 
@@ -1072,9 +1058,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer0,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofFirstLeaf([offer0, offer1, offer2, offer3])
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofFirstLeaf([offer0, offer1, offer2, offer3]))
         );
 
         vm.revertToState(snapshot);
@@ -1086,9 +1070,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer1,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofSecondLeaf([offer0, offer1, offer2, offer3])
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofSecondLeaf([offer0, offer1, offer2, offer3]))
         );
 
         vm.revertToState(snapshot);
@@ -1100,9 +1082,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer2,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofThirdLeaf([offer0, offer1, offer2, offer3])
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofThirdLeaf([offer0, offer1, offer2, offer3]))
         );
 
         vm.revertToState(snapshot);
@@ -1114,18 +1094,14 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer3,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofFourthLeaf([offer0, offer1, offer2, offer3])
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofFourthLeaf([offer0, offer1, offer2, offer3]))
         );
     }
 
     function testTakeNotRatified() public {
         vm.expectRevert();
         vm.prank(borrower);
-        midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
-        );
+        midnight.take(100, borrower, address(0), hex"", borrower, lenderOffer, emptySig);
     }
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
@@ -1144,9 +1120,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
     }
 
@@ -1160,9 +1134,7 @@ contract TakeTest is BaseTest {
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
         vm.prank(sender);
-        midnight.take(
-            0, sender, address(0), hex"", sender, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, emptySig);
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
@@ -1185,9 +1157,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
         );
     }
 
@@ -1217,9 +1187,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
         );
     }
 
@@ -1244,9 +1212,7 @@ contract TakeTest is BaseTest {
             hex"",
             sender,
             lenderOffer,
-            ratifierData([lenderOffer], vm.addr(signerPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer], vm.addr(signerPrivateKey))
         );
     }
 
@@ -1264,9 +1230,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
     }
 
@@ -1281,9 +1245,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
     }
 
@@ -1302,9 +1264,7 @@ contract TakeTest is BaseTest {
             hex"",
             taker,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
     }
 
@@ -1354,9 +1314,7 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral),
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
         assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
@@ -1386,9 +1344,7 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral, repaidUnits),
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
 
         assertFalse(callback.liquidateSucceeded());
@@ -1417,16 +1373,7 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(callback), true);
 
-        callback.prepare(
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer]),
-            units,
-            0,
-            2 * collateral,
-            repaidUnits
-        );
+        callback.prepare(lenderOffer, merkleRatifierData([lenderOffer]), units, 0, 2 * collateral, repaidUnits);
 
         vm.prank(borrower);
         midnight.take(
@@ -1436,9 +1383,7 @@ contract TakeTest is BaseTest {
             "",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
 
         assertTrue(callback.reentered());
@@ -1467,9 +1412,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
     }
 
@@ -1509,9 +1452,7 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets),
             address(0),
             borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
+            merkleRatifierData([borrowerOffer])
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
@@ -1588,17 +1529,7 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.RatifierUnauthorized.selector);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            zeroOffer,
-            abi.encode(badSig),
-            root(zeroOffer),
-            new bytes32[](0)
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, zeroOffer, abi.encode(badSig));
     }
 
     function testBuyBuyerCallbackRevertsOnInvalidReturn(uint256 units) public {
@@ -1620,9 +1551,7 @@ contract TakeTest is BaseTest {
             hex"",
             address(0),
             borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
+            merkleRatifierData([borrowerOffer])
         );
     }
 }
@@ -1696,8 +1625,6 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
 
     Offer internal storedOffer;
     bytes internal storedSig;
-    bytes32 internal storedRoot;
-    bytes32[] internal storedProof;
     uint256 internal innerUnits;
     uint256 internal storedCollateralIndex;
     uint256 internal storedCollateralAmount;
@@ -1706,8 +1633,6 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     function prepare(
         Offer memory _offer,
         bytes memory _sig,
-        bytes32 _root,
-        bytes32[] memory _proof,
         uint256 _innerUnits,
         uint256 _collateralIndex,
         uint256 _collateralAmount,
@@ -1715,8 +1640,6 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     ) external {
         storedOffer = _offer;
         storedSig = _sig;
-        storedRoot = _root;
-        storedProof = _proof;
         innerUnits = _innerUnits;
         storedCollateralIndex = _collateralIndex;
         storedCollateralAmount = _collateralAmount;
@@ -1736,9 +1659,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
 
             reentered = true;
             Offer memory nestedOffer = storedOffer;
-            bytes32[] memory nestedProof = storedProof;
-            Midnight(msg.sender)
-                .take(innerUnits, seller, address(this), "", seller, nestedOffer, storedSig, storedRoot, nestedProof);
+            Midnight(msg.sender).take(innerUnits, seller, address(this), "", seller, nestedOffer, storedSig);
 
             Oracle oracle = Oracle(obligation.collateralParams[idx].oracle);
             uint256 healthyPrice = oracle.price();
@@ -1795,11 +1716,12 @@ contract RatifyCallback is IRatifier {
         return _recordedOffer;
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external returns (bytes32) {
+    function onRatify(Offer memory offer, bytes memory ratifierData) external returns (bytes32) {
         _recordedOffer = offer;
 
         if (ratifierData.length > 0) {
-            (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
+            (Signature memory signature, uint256 height, bytes32 root,) =
+                abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[]));
             bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));

@@ -97,9 +97,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 100,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(address(0xdead));
@@ -121,16 +119,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         if (offerUnits1 >= units - fromOffer0) {
@@ -181,16 +175,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         if (offerUnits1 >= units - fromOffer0) {
@@ -245,16 +235,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         vm.prank(lender);
@@ -284,16 +270,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         vm.prank(borrower);
@@ -325,16 +307,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         vm.prank(lender);
@@ -362,16 +340,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         // Mirror the bundler's exact fill logic to derive units needed from offer1.
@@ -426,16 +400,12 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
         takes[1] = Take({
             offer: offers[1],
             units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
+            ratifierData: merkleRatifierData([offers[1]])
         });
 
         vm.prank(borrower);
@@ -471,9 +441,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(lender);
@@ -519,9 +487,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(borrower);
@@ -561,9 +527,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(lender);
@@ -609,9 +573,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(borrower);
@@ -636,9 +598,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         offers[0].buy = false;
@@ -646,9 +606,7 @@ contract BundlerTest is BaseTest {
         buyTakes[0] = Take({
             offer: offers[0],
             units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.startPrank(lender);
@@ -718,9 +676,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         address receiver = makeAddr("collateralReceiver");
@@ -766,9 +722,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         address receiver = makeAddr("collateralReceiver");
@@ -807,9 +761,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(borrower);
@@ -847,9 +799,7 @@ contract BundlerTest is BaseTest {
         takes[0] = Take({
             offer: offers[0],
             units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
+            ratifierData: merkleRatifierData([offers[0]])
         });
 
         vm.prank(borrower);
