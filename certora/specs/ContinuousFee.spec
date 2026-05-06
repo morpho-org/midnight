@@ -39,8 +39,6 @@ function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition pendingFeeBoundedByCredit(bytes32 id, address user) returns bool = pendingFee(id, user) <= creditOf(id, user);
-
 // The buyer's pendingFee increases by floor(creditIncrease * continuousFee * timeToMaturity / WAD).
 rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     address buyer = offer.buy ? offer.maker : taker;
@@ -51,8 +49,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
 
-    require pendingFeeBoundedByCredit(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
-    require postUpdatePendingFee <= postUpdateCredit, "updatePositionView keeps pendingFee bounded by credit";
+    require pendingFee(id, buyer) <= creditOf(id, buyer),"See pendingContinuousFeeBoundedByCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
