@@ -17,9 +17,9 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
         with:
-          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
+          version: v1.7.0
 
       - name: Check formatting
         run: forge fmt src test script certora --check
@@ -32,9 +32,9 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
         with:
-          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
+          version: v1.7.0
 
       - name: Run forge lint
         run: forge lint src test script certora --deny notes
@@ -47,9 +47,9 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
         with:
-          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
+          version: v1.7.0
 
       - name: Run forge build
         run: forge build --force --sizes
@@ -76,9 +76,9 @@ jobs:
         with:
           submodules: recursive
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
         with:
-          version: nightly-1e342ef7d296a674ea248e95ed12c152f7e00ee6
+          version: v1.7.0
       - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings
         env:
