@@ -39,7 +39,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// lltv (`maxDebt = sum_i (collateral_i * price_i * lltv_i)`).
 /// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
 /// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
-///  change their collateral composition.
+/// change their collateral composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
