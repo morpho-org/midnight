@@ -467,6 +467,157 @@ contract BundlerTest is BaseTest {
         );
     }
 
+    // Average price.
+
+    function testBuyUnitsTargetAveragePriceExceeded() public {
+        uint256 units = 100e18;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = units;
+
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
+            offer: offers[0],
+            units: units,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+
+        vm.prank(lender);
+        vm.expectRevert(ITakeBundler.AveragePriceExceeded.selector);
+        takeBundler.buyUnitsTarget(
+            address(midnight),
+            units,
+            units.mulDivUp(price, WAD),
+            price - 1,
+            lender,
+            takes,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0)
+        );
+    }
+
+    function testSellUnitsTargetAveragePriceTooLow() public {
+        uint256 units = 100e18;
+        offers[0].maxUnits = units;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 sellerPrice = price - _tradingFee;
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
+            offer: offers[0],
+            units: units,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+
+        vm.prank(borrower);
+        vm.expectRevert(ITakeBundler.AveragePriceTooLow.selector);
+        takeBundler.sellUnitsTarget(
+            address(midnight),
+            units,
+            sellerPrice + 1,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
+        );
+    }
+
+    function testBuyBuyerAssetsTargetAveragePriceExceeded() public {
+        uint256 units = 100e18;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = units;
+
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 targetBuyerAssets = units.mulDivUp(price, WAD);
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
+            offer: offers[0],
+            units: units,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+
+        vm.prank(lender);
+        vm.expectRevert(ITakeBundler.AveragePriceExceeded.selector);
+        takeBundler.buyBuyerAssetsTarget(
+            address(midnight),
+            targetBuyerAssets,
+            price - 1,
+            lender,
+            takes,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0)
+        );
+    }
+
+    function testSellSellerAssetsTargetAveragePriceTooLow() public {
+        uint256 units = 100e18;
+        offers[0].maxUnits = units;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 targetSellerAssets = units.mulDivDown(sellerPrice, WAD);
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({
+            offer: offers[0],
+            units: units,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+
+        vm.prank(borrower);
+        vm.expectRevert(ITakeBundler.AveragePriceTooLow.selector);
+        takeBundler.sellSellerAssetsTarget(
+            address(midnight),
+            targetSellerAssets,
+            sellerPrice + 1,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
+        );
+    }
+
     // Referral fee.
 
     function testBuyUnitsTargetWithReferralFee(uint256 units, uint256 referralFeePct) public {
@@ -784,16 +935,7 @@ contract BundlerTest is BaseTest {
 
         vm.prank(lender);
         takeBundler.buyUnitsTarget(
-            address(midnight),
-            units,
-            maxBuyerAssets,
-            WAD * WAD,
-            lender,
-            takes,
-            withdrawals,
-            receiver,
-            0,
-            address(0)
+            address(midnight), units, maxBuyerAssets, WAD * WAD, lender, takes, withdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
