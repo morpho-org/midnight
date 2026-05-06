@@ -12,8 +12,8 @@ uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
 uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
-uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("midnight.liquidationLocked"));
-bytes32 constant CALLBACK_SUCCESS = keccak256("MIDNIGHT CALLBACK SUCCESS");
+uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
+bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 /// @dev keccak256(COLLATERAL_PARAMS_TYPE)

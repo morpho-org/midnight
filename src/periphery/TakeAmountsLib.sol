@@ -22,6 +22,7 @@ library TakeAmountsLib {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 tradingFee =
             IMidnight(midnight).tradingFee(id, UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp));
+        // Mirrors Midnight's computation to revert if offerPrice < tradingFee in case of a buy offer.
         uint256 sellerPrice = offer.buy ? offerPrice - tradingFee : offerPrice;
         uint256 buyerPrice = sellerPrice + tradingFee;
         require(buyerPrice <= WAD, TickLib.PriceGreaterThanOne());
