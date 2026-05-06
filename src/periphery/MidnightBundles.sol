@@ -4,13 +4,13 @@ pragma solidity 0.8.34;
 
 import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
 import {IERC20} from "../interfaces/IERC20.sol";
-import {ITakeBundler, Take, CollateralTransfer} from "./interfaces/ITakeBundler.sol";
+import {IMidnightBundles, Take, CollateralTransfer} from "./interfaces/IMidnightBundles.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
-contract TakeBundler is ITakeBundler {
+contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
@@ -282,6 +282,36 @@ contract TakeBundler is ITakeBundler {
 
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
+    }
+
+    /// @dev The onBehalf must have authorized this bundler and the msg.sender (if different from onBehalf) on Midnight.
+    /// @dev The msg.sender must have approved the bundler to transfer `units` of the obligation's loan token.
+    function repay(
+        address midnight,
+        Obligation calldata obligation,
+        uint256 units,
+        address onBehalf,
+        CollateralTransfer[] calldata collateralWithdrawals,
+        address collateralReceiver
+    ) external {
+        require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
+
+        address loanToken = obligation.loanToken;
+        _forceApproveMax(loanToken, midnight);
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), units);
+
+        IMidnight(midnight).repay(obligation, units, onBehalf, address(0), "");
+
+        for (uint256 i; i < collateralWithdrawals.length; i++) {
+            IMidnight(midnight)
+                .withdrawCollateral(
+                    obligation,
+                    collateralWithdrawals[i].collateralIndex,
+                    collateralWithdrawals[i].assets,
+                    onBehalf,
+                    collateralReceiver
+                );
+        }
     }
 
     function _safeApprove(address token, address spender, uint256 value) internal {

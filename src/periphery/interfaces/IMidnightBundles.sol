@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity >=0.5.0;
 
-import {Offer} from "../../interfaces/IMidnight.sol";
+import {Offer, Obligation} from "../../interfaces/IMidnight.sol";
 
 struct Take {
     uint256 units;
@@ -17,7 +17,7 @@ struct CollateralTransfer {
     uint256 assets;
 }
 
-interface ITakeBundler {
+interface IMidnightBundles {
     /// ERRORS ///
     error InconsistentLoanToken();
     error InconsistentObligation();
@@ -32,5 +32,6 @@ interface ITakeBundler {
     function sellUnitsTarget(address midnight, uint256 targetUnits, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient) external;
     function buyBuyerAssetsTarget(address midnight, uint256 targetBuyerAssets, address taker, Take[] memory takes, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient) external;
     function sellSellerAssetsTarget(address midnight, uint256 targetSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient) external;
+    function repay(address midnight, Obligation memory obligation, uint256 units, address onBehalf, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver) external;
     // forgefmt: disable-end
 }
