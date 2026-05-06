@@ -48,11 +48,9 @@ jobs:
           [ -s compare/old.tsv ] || { echo "old manifest is empty"; exit 1; }
       - name: Run Forge tests
         run: forge test
-      - name: Install Foundry (latest nightly)
+      - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
-        with:
-          version: nightly
-      - name: Build with Foundry (latest nightly)
+      - name: Build with Foundry
         run: forge build --force --out out-new --cache-path cache-new
       - name: Export bytecode manifest (new)
         run: |

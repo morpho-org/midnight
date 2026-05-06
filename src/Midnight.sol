@@ -161,7 +161,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
-/// @dev Relies on the clz opcode (Osaka) and on the mcopy, tload, and tstore opcodes (Cancun).
+/// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
+/// (Shanghai).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
