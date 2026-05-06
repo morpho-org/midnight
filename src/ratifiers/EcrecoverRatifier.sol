@@ -6,6 +6,7 @@ import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "./interface
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {MerkleLib} from "../libraries/MerkleLib.sol";
 
 /// @dev If `block.chainid` changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.
@@ -23,8 +24,8 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, uint256 height, bytes32 root, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[]));
-        require(UtilsLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
-        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
+        require(MerkleLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
+        bytes32 structHash = keccak256(abi.encode(MerkleLib.offerTreeTypeHash(height), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);

@@ -10,6 +10,7 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {MerkleLib} from "../src/libraries/MerkleLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -238,7 +239,7 @@ abstract contract BaseTest is Test {
     function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = UtilsLib.hashOffer(offers[1]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
         return _path;
     }
 
@@ -246,7 +247,7 @@ abstract contract BaseTest is Test {
     function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = UtilsLib.hashOffer(offers[0]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
         return _path;
     }
 
@@ -254,7 +255,7 @@ abstract contract BaseTest is Test {
     function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = UtilsLib.hashOffer(offers[3]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
         return _path;
     }
 
@@ -262,7 +263,7 @@ abstract contract BaseTest is Test {
     function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = UtilsLib.hashOffer(offers[2]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
         return _path;
     }
 
@@ -275,13 +276,13 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
     }
 
     function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
-        bytes32 right = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
-        return UtilsLib.commutativeHash(left, right);
+        bytes32 left = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        bytes32 right = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return MerkleLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -293,7 +294,7 @@ abstract contract BaseTest is Test {
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), _root));
+        bytes32 structHash = keccak256(abi.encode(MerkleLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);

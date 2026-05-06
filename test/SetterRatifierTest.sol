@@ -73,9 +73,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(
-            0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, proof([offer]))
-        );
+        midnight.take(0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, proof([offer])));
     }
 
     function testOnRatifyNotMidnight() public {

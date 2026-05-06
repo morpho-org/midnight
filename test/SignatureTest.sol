@@ -37,8 +37,7 @@ contract SignatureTest is BaseTest {
         midnight.setIsAuthorized(maker, address(ecrecoverRatifier), true);
 
         vm.prank(address(midnight));
-        bytes32 result =
-            ecrecoverRatifier.onRatify(offer, abi.encode(signature, uint256(0), root, new bytes32[](0)));
+        bytes32 result = ecrecoverRatifier.onRatify(offer, abi.encode(signature, uint256(0), root, new bytes32[](0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
 

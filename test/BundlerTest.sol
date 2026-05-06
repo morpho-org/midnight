@@ -94,11 +94,7 @@ contract BundlerTest is BaseTest {
         offers[0].maker = borrower;
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 100,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(address(0xdead));
         vm.expectRevert(ITakeBundler.Unauthorized.selector);
@@ -116,16 +112,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
@@ -172,16 +160,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(lender);
@@ -232,16 +212,8 @@ contract BundlerTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(lender);
         vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
@@ -267,16 +239,8 @@ contract BundlerTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
@@ -304,16 +268,8 @@ contract BundlerTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(lender);
         vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
@@ -337,16 +293,8 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units + 1);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         // Mirror the bundler's exact fill logic to derive units needed from offer1.
         // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
@@ -397,16 +345,8 @@ contract BundlerTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
@@ -438,11 +378,7 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         takeBundler.buyUnitsTarget(
@@ -484,11 +420,7 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         takeBundler.sellUnitsTarget(
@@ -524,11 +456,7 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         takeBundler.buyBuyerAssetsTarget(
@@ -570,11 +498,7 @@ contract BundlerTest is BaseTest {
         collateralize(obligation, borrower, units + 1);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         takeBundler.sellSellerAssetsTarget(
@@ -595,19 +519,11 @@ contract BundlerTest is BaseTest {
 
     function testPctExceeded() public {
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
 
         offers[0].buy = false;
         Take[] memory buyTakes = new Take[](1);
-        buyTakes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        buyTakes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.startPrank(lender);
         vm.expectRevert(ITakeBundler.PctExceeded.selector);
@@ -673,11 +589,7 @@ contract BundlerTest is BaseTest {
         uint256[] memory amounts = _supplyTakerCollateral(lender, numCollaterals, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
@@ -719,11 +631,7 @@ contract BundlerTest is BaseTest {
         uint256 targetBuyerAssets = units.mulDivUp(price, WAD);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
@@ -758,11 +666,7 @@ contract BundlerTest is BaseTest {
         }
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         takeBundler.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, supplies, 0, address(0));
@@ -796,11 +700,7 @@ contract BundlerTest is BaseTest {
         }
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: merkleRatifierData([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         takeBundler.sellSellerAssetsTarget(

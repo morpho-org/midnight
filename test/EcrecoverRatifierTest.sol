@@ -67,10 +67,7 @@ contract EcrecoverRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = UtilsLib.hashOffer(offer);
         bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}),
-            uint256(0),
-            _root,
-            new bytes32[](0)
+            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), uint256(0), _root, new bytes32[](0)
         );
 
         vm.prank(address(midnight));
