@@ -36,7 +36,7 @@ uint256 constant LLTV_6 = 0.965e18;
 uint256 constant LLTV_7 = 0.98e18;
 uint256 constant LLTV_8 = 1e18;
 
-/// @dev Returns true if `lltv` is one of the allowed LLTV tiers.
+/// @dev Returns true if lltv is one of the allowed LLTV tiers.
 function isLltvAllowed(uint256 lltv) pure returns (bool) {
     return lltv == LLTV_0 || lltv == LLTV_1 || lltv == LLTV_2 || lltv == LLTV_3 || lltv == LLTV_4 || lltv == LLTV_5 || lltv == LLTV_6 || lltv == LLTV_7 || lltv == LLTV_8;
 }
