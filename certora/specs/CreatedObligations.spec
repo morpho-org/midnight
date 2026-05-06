@@ -159,8 +159,8 @@ strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
 strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => Midnight.debtOf(id, user) == 0;
 
-strong invariant obligationActivatedCollateralsAreEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => userHasNoActivatedCollaterals(id, user);
+strong invariant obligationCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasEmptyCollateralBitmap(id, user);
 
 strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => userHasNoRemainingContinuousFee(id, user);
@@ -179,7 +179,7 @@ function noTradingFeesAreSet(bytes32 id) returns (bool) {
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
-definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.position[id][user].activatedCollaterals == 0;
+definition userHasEmptyCollateralBitmap(bytes32 id, address user) returns bool = currentContract.position[id][user].collateralBitmap == 0;
 
 definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = Midnight.pendingFee(id, user) == 0;
 

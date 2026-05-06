@@ -59,7 +59,7 @@ struct Position {
     uint128 lossIndex;
     uint128 lastAccrual;
     uint128 debt;
-    uint128 activatedCollaterals;
+    uint128 collateralBitmap;
     uint128[128] collateral;
 }
 
@@ -114,7 +114,7 @@ interface IMidnight {
     function INITIAL_CHAIN_ID() external view returns (uint256);
 
     /// STORAGE GETTERS ///
-    function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 activatedCollaterals);
+    function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossIndex, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
     function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossIndex, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
@@ -159,7 +159,7 @@ interface IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
     function userLossIndex(bytes32 id, address user) external view returns (uint128);
-    function activatedCollaterals(bytes32 id, address user) external view returns (uint128);
+    function collateralBitmap(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Obligation memory obligation) external view returns (bytes32);
     function toObligation(bytes32 id) external view returns (Obligation memory);
