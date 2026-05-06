@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {Obligation} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
+import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 contract Utils {
     function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
@@ -30,5 +31,9 @@ contract Utils {
     function emptyOffer() external pure returns (Offer memory) {
         Offer memory offer;
         return offer;
+    }
+
+    function callbackSuccess() external pure returns (bytes32) {
+        return CALLBACK_SUCCESS;
     }
 }

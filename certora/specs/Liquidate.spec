@@ -20,6 +20,8 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
+    function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 }
 
 /// HELPERS ///
@@ -50,7 +52,7 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obl
     address user;
     uint256 collateralIndex;
 
-    bool wasLiquidatable = isLiquidatable(e, obligation, id, liqUser);
+    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > obligation.maturity || !isHealthy(obligation, id, liqUser));
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);

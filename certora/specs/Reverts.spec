@@ -12,6 +12,7 @@ methods {
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     // Oracle: routed through CVL function to allow ghost flags to force specific behaviors (revert, return zero) per rule.
     // calledContract is used to target a single oracle address for per-oracle revert control (used by oracle revert/zero rules).
@@ -157,7 +158,7 @@ function CVL_callbackBytes32() returns bytes32 {
     }
     if (forceCallbackBadReturn) {
         bytes32 bad;
-        require bad != to_bytes32(0xee60b2e8d46b15beabf6792dae952096e6cb7b86b90ca90f7c00aa15c812ff1a), "not CALLBACK_SUCCESS";
+        require bad != Utils.callbackSuccess(), "not CALLBACK_SUCCESS";
         return bad;
     }
     bytes32 result;
@@ -229,7 +230,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     bytes32 id = summaryToId(offer.obligation);
     address seller = offer.buy ? taker : offer.maker;
 
-    // Without this, isLiquidatable short-circuits to false (without calling isHealthy) because
+    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
