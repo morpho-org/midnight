@@ -147,7 +147,6 @@ rule noMultiplicationOverflow(method f, env e, calldataarg args)
 filtered {
     f -> f.selector != sig:maxLif(uint256, uint256).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        && f.selector != sig:isLiquidatable(Midnight.Obligation, bytes32, address).selector
         && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
         && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector
 } {
@@ -165,14 +164,6 @@ rule noMultiplicationOverflowIsHealthy(env e, Midnight.Obligation obligation, by
     require !mulOverflow, "prestate: no overflow before call";
     requireObligationBounds(obligation);
     isHealthy(e, obligation, id, borrower);
-    assert !mulOverflow;
-}
-
-rule noMultiplicationOverflowIsLiquidatable(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
-    resetOraclePriceAssumption();
-    require !mulOverflow, "prestate: no overflow before call";
-    requireObligationBounds(obligation);
-    isLiquidatable(e, obligation, id, borrower);
     assert !mulOverflow;
 }
 
