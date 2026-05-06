@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import {Test} from "../../lib/forge-std/src/Test.sol";
-import {EcrecoverRatifier} from "../../src/ratifiers/EcrecoverRatifier.sol";
-import {Offer, CollateralParams} from "../../src/interfaces/IMidnight.sol";
-import {Signature} from "../../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
-import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
-import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
+import {Test} from "../lib/forge-std/src/Test.sol";
+import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;

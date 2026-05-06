@@ -130,7 +130,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
-    function testRepayCallback(uint256 units, uint256 repaid) public {
+    function testRepayCallback(uint256 units, uint256 repaid, address caller) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 1, units);
         collateralize(obligation, borrower, units);
@@ -140,9 +140,12 @@ contract OtherFunctionsTest is BaseTest {
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(callback), true);
+        midnight.setIsAuthorized(borrower, caller, true);
+        vm.prank(address(callback));
+        loanToken.approve(address(midnight), repaid);
 
-        callback.repay(midnight, obligation, repaid, borrower, hex"deadbeef");
+        vm.prank(caller);
+        midnight.repay(obligation, repaid, borrower, address(callback), hex"deadbeef");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
         assertEq(callback.recordedObligationId(), id);
@@ -371,6 +374,52 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.prank(borrower);
         midnight.withdrawCollateral(obligationWithRevertingOracle, 0, collateral, borrower, borrower);
+    }
+
+    function testIsHealthyDoesNotShortCircuitActivatedCollaterals() public {
+        RevertingOracle revertingOracle = new RevertingOracle();
+        CollateralParams[] memory collateralParams = new CollateralParams[](2);
+        uint256 lltv = 0.77e18;
+
+        if (bytes20(address(collateralToken1)) < bytes20(address(collateralToken2))) {
+            collateralParams[0] = CollateralParams({
+                token: address(collateralToken1),
+                lltv: lltv,
+                maxLif: maxLif(lltv, 0.25e18),
+                oracle: address(revertingOracle)
+            });
+            collateralParams[1] = CollateralParams({
+                token: address(collateralToken2), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle2)
+            });
+        } else {
+            collateralParams[0] = CollateralParams({
+                token: address(collateralToken2),
+                lltv: lltv,
+                maxLif: maxLif(lltv, 0.25e18),
+                oracle: address(revertingOracle)
+            });
+            collateralParams[1] = CollateralParams({
+                token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle1)
+            });
+        }
+
+        Obligation memory obligationWithRevertingOracle;
+        obligationWithRevertingOracle.loanToken = address(loanToken);
+        obligationWithRevertingOracle.maturity = block.timestamp + 100;
+        obligationWithRevertingOracle.collateralParams = collateralParams;
+
+        uint256 units = 1e18;
+        uint256 collateral = units.mulDivUp(WAD, lltv);
+        deal(collateralParams[0].token, address(this), collateral);
+        deal(collateralParams[1].token, address(this), collateral);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 0, collateral, borrower);
+        midnight.supplyCollateral(obligationWithRevertingOracle, 1, collateral, borrower);
+        setupObligation(obligationWithRevertingOracle, units);
+
+        revertingOracle.stopOracle();
+
+        vm.expectRevert("Oracle should not be called");
+        midnight.isHealthy(obligationWithRevertingOracle, toId(obligationWithRevertingOracle), borrower);
     }
 
     // Bitmap tests.

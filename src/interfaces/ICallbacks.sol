@@ -22,6 +22,6 @@ interface IRepayCallback {
 }
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address token, uint256 assets, bytes memory data) external returns (bytes32);
+    function onFlashLoan(address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
 }
 // forgefmt: disable-end
