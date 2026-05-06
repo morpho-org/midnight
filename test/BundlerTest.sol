@@ -227,6 +227,74 @@ contract BundlerTest is BaseTest {
         }
     }
 
+    function testBuyUnitsTargetInconsistentObligation() public {
+        Obligation memory otherObligation = obligation;
+        otherObligation.maturity = block.timestamp + 360 days;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = 1;
+        offers[1].buy = false;
+        offers[1].maker = borrower;
+        offers[1].receiverIfMakerIsSeller = borrower;
+        offers[1].obligation = otherObligation;
+        offers[1].maxUnits = 1;
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
+            offer: offers[0],
+            units: 1,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = Take({
+            offer: offers[1],
+            units: 1,
+            ratifierData: ratifierData([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        vm.prank(lender);
+        vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
+        takeBundler.buyUnitsTarget(
+            address(midnight), 2, type(uint256).max, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
+        );
+    }
+
+    function testSellUnitsTargetInconsistentObligation() public {
+        Obligation memory otherObligation = obligation;
+        otherObligation.maturity = block.timestamp + 360 days;
+
+        offers[0].maxUnits = 1;
+        offers[1].obligation = otherObligation;
+        offers[1].maxUnits = 1;
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({
+            offer: offers[0],
+            units: 1,
+            ratifierData: ratifierData([offers[0]]),
+            root: root([offers[0]]),
+            proof: proof([offers[0]])
+        });
+        takes[1] = Take({
+            offer: offers[1],
+            units: 1,
+            ratifierData: ratifierData([offers[1]]),
+            root: root([offers[1]]),
+            proof: proof([offers[1]])
+        });
+
+        vm.prank(borrower);
+        vm.expectRevert(ITakeBundler.InconsistentObligation.selector);
+        takeBundler.sellUnitsTarget(
+            address(midnight), 2, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+        );
+    }
+
     function testBuyBuyerAssetsTargetInconsistentObligation() public {
         for (uint256 i; i <= 6; i++) {
             midnight.setObligationTradingFee(id, i, 0);
