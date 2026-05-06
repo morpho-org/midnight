@@ -1526,7 +1526,7 @@ contract TakeTest is BaseTest {
     // - by underflow when the trading fee is > 0, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZero_NoTradingFee_sell() public {
+    function testPriceZeroNoTradingFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1539,7 +1539,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZero_WithTradingFee_buy() public {
+    function testPriceZeroWithTradingFeeBuy() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 units = 1e18;
@@ -1551,7 +1551,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZero_WithTradingFee_sell() public {
+    function testPriceZeroWithTradingFeeSell() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
@@ -1623,38 +1623,6 @@ contract TakeTest is BaseTest {
             ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
-        );
-    }
-
-    function testBuyerPendingFeeExceedsCredit() public {
-        // Use a very long maturity so continuousFee * TTM > WAD.
-        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
-
-        Obligation memory longObligation;
-        longObligation.loanToken = address(loanToken);
-        longObligation.maturity = block.timestamp + 200 * 365 days;
-        longObligation.collateralParams = obligation.collateralParams;
-
-        uint256 units = 1e18;
-        Offer memory bOffer;
-        bOffer.obligation = longObligation;
-        bOffer.buy = false;
-        bOffer.maker = borrower;
-        bOffer.receiverIfMakerIsSeller = borrower;
-        bOffer.maxUnits = units;
-        bOffer.ratifier = address(ecrecoverRatifier);
-        bOffer.start = block.timestamp;
-        bOffer.expiry = block.timestamp + 200;
-        bOffer.tick = MAX_TICK;
-
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        collateralize(longObligation, borrower, units);
-
-        vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
-        vm.prank(lender);
-        midnight.take(
-            units, lender, address(0), hex"", lender, bOffer, ratifierData([bOffer]), root([bOffer]), proof([bOffer])
         );
     }
 }

@@ -18,13 +18,15 @@ contract MidnightWrapper is Midnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint256 len = obligation.collateralParams.length;
-        for (uint256 i = len; i > 0 && maxDebt < debt;) {
-            i--;
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
+        if (debt > 0) {
+            uint256 len = obligation.collateralParams.length;
+            for (uint256 i = len; i > 0;) {
+                i--;
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+            }
         }
         return maxDebt >= debt;
     }
