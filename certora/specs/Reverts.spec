@@ -229,7 +229,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     bytes32 id = summaryToId(offer.obligation);
     address seller = offer.buy ? taker : offer.maker;
 
-    // Without this, isLiquidatable short-circuits to false (without calling isHealthy) because
+    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because
     // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
