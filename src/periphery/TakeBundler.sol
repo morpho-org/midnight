@@ -14,7 +14,8 @@ contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev Total loan-token cost is `filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct)`.
@@ -81,7 +82,8 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is `filledSellerAssets - filledSellerAssets * pct / WAD`.
@@ -143,7 +145,8 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Takes could have different obligations (with the same loan token).
     /// @dev Total cost is `targetBuyerAssets`.
@@ -215,7 +218,8 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Skips every reason why `take` can revert (including ones that are not asynchrony related).
+    /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Takes could have different obligations (with the same loan token).
