@@ -101,9 +101,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
-/// @dev If an obligation loses almost all of its value to bad debt over its lifetime, such that the loss index is
-/// maxed out, then the obligation won't function properly afterwards. Notably, the take function would revert.
-///
+/// @dev If an obligation loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
+/// may become so imprecise that extreme/total losses may be wrongly reported. In those cases the obligation doesn't
+/// function properly, and notably the take function reverts when the loss index is maxed out.
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
 /// @dev The entry gate can prevent entry actions (increasing credit or debt) in the obligation.
