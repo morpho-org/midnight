@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 import {Obligation} from "../interfaces/IMidnight.sol";
 
 library IdLib {
+    error SStore2DeploymentFailed();
+
     /// @dev Used as a prefix to some data, to give a creation code that deploys the data as runtime bytecode.
     /// @dev Explanation of the prefix:
     /// hex       opcode          stack              comments
@@ -29,12 +31,12 @@ library IdLib {
     }
 
     /// @dev Stores the data in the code of the contract at the given address.
-    /// @dev Uses the chain id as salt.
-    function storeInCode(Obligation memory obligation) internal returns (address create2Address) {
+    /// @dev Uses the given chain id as salt.
+    function storeInCode(Obligation memory obligation, uint256 chainId) internal returns (address create2Address) {
         bytes memory creationCode = abi.encodePacked(SSTORE2_PREFIX, abi.encode(obligation));
         assembly ("memory-safe") {
-            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainid())
+            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainId)
         }
-        require(create2Address != address(0), "Failed to create SStore2 contract");
+        require(create2Address != address(0), SStore2DeploymentFailed());
     }
 }

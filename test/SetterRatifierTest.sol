@@ -4,7 +4,9 @@ pragma solidity ^0.8.0;
 
 import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.sol";
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
+import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
@@ -45,7 +47,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testOnRatifyAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = keccak256(abi.encode(offer));
+        bytes32 _root = UtilsLib.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, true);
@@ -53,13 +55,14 @@ contract SetterRatifierTest is BaseTest {
         vm.prank(borrower);
         setterRatifier.setIsRatified(lender, _root, true);
 
+        vm.prank(address(midnight));
         bytes32 result = setterRatifier.onRatify(offer, _root, "");
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = keccak256(abi.encode(offer));
+        bytes32 _root = UtilsLib.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, address(setterRatifier), true);
@@ -73,11 +76,22 @@ contract SetterRatifierTest is BaseTest {
         midnight.take(0, borrower, address(0), hex"", borrower, offer, emptySig, _root, proof([offer]));
     }
 
+    function testOnRatifyNotMidnight() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = UtilsLib.hashOffer(offer);
+
+        vm.prank(lender);
+        setterRatifier.setIsRatified(lender, _root, true);
+
+        vm.expectRevert(ISetterRatifier.NotMidnight.selector);
+        setterRatifier.onRatify(offer, _root, "");
+    }
+
     function testSetIsRatifiedUnauthorizedOnBehalf() public {
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ISetterRatifier.Unauthorized.selector);
         setterRatifier.setIsRatified(lender, _root, true);
     }
 }

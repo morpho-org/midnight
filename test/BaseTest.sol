@@ -29,9 +29,9 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {EcrecoverAuthorizer} from "../src/authorizers/EcrecoverAuthorizer.sol";
+import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
@@ -144,7 +144,9 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer]));
+        return midnight.take(
+            units, taker, address(0), hex"", taker, offer, ratifierData([offer]), root([offer]), proof([offer])
+        );
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -200,13 +202,13 @@ abstract contract BaseTest is Test {
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
+        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, hex"");
+        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, address(0), hex"");
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
@@ -217,8 +219,8 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function sig(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
+    function ratifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier, 0), uint256(0));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -228,46 +230,89 @@ abstract contract BaseTest is Test {
     // assumes the offer is the first one!
     function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](1);
-        _path[0] = keccak256(abi.encode(offers[1]));
+        _path[0] = UtilsLib.hashOffer(offers[1]);
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the first one
+    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[1]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the second one
+    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[0]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the third one
+    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[3]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the fourth one
+    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = UtilsLib.hashOffer(offers[2]);
+        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
         return _path;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offer));
+        return UtilsLib.hashOffer(offer);
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offers[0]));
+        return UtilsLib.hashOffer(offers[0]);
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
+        return UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+    }
+
+    function root(Offer[4] memory offers) internal pure returns (bytes32) {
+        bytes32 left = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        bytes32 right = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        return UtilsLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
     }
 
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract)
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
         internal
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
+        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
         return _signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (bytes memory) {
+    function ratifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0), uint256(0));
     }
 
-    function sig(Offer[2] memory offers) internal view returns (bytes memory) {
+    function ratifierData(Offer[2] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1), uint256(1));
+    }
+
+    function ratifierData(Offer[4] memory offers) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2), uint256(2));
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -290,9 +335,10 @@ abstract contract BaseTest is Test {
     }
 
     /// @dev Returns an obligation with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
-    function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
+    function validObligation(Obligation memory obligation) internal view returns (Obligation memory) {
         uint256 len =
             obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+        vm.assume(len > 0);
         CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
@@ -303,6 +349,7 @@ abstract contract BaseTest is Test {
         }
         collateralParams = sortCollateralParams(collateralParams);
         obligation.collateralParams = collateralParams;
+        obligation.maturity = bound(obligation.maturity, 0, block.timestamp + 100 * 365 days);
         return obligation;
     }
 
@@ -328,7 +375,7 @@ abstract contract BaseTest is Test {
             hex"",
             borrower,
             borrowerOffer,
-            sig([borrowerOffer]),
+            ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
         );
