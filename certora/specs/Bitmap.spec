@@ -59,6 +59,17 @@ rule clearBitClearsBit(uint128 bitmap, uint256 bit) {
     assert countAfter == countBefore - (wasSet ? 1 : 0), "clearBit decrements count when bit was set";
 }
 
+rule countBitsAtMost128(uint128 bitmap) {
+    uint256 count = countBits(bitmap);
+    assert count <= 128;
+}
+
+rule countBitsPositiveWhenBitSet(uint128 bitmap, uint256 bit) {
+    require getBit(bitmap, bit), "bit is set";
+    uint256 count = countBits(bitmap);
+    assert count > 0;
+}
+
 rule msbReturnsLargestSetBit(uint128 bitmap) {
     uint256 msbBit = msb(bitmap);
     uint256 otherBit;
