@@ -6,7 +6,7 @@ import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "./interface
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./HashLib.sol";
-import {MerkleLib} from "../libraries/MerkleLib.sol";
+import {MerkleLib} from "./MerkleLib.sol";
 
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.

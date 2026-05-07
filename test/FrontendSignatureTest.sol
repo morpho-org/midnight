@@ -7,7 +7,7 @@ import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
-import {MerkleLib} from "../src/libraries/MerkleLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;

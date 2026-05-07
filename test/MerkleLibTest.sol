@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {MerkleLib} from "../src/libraries/MerkleLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {
     COLLATERAL_PARAMS_TYPE,
     COLLATERAL_PARAMS_TYPEHASH,

@@ -11,7 +11,7 @@ import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
-import {MerkleLib} from "../src/libraries/MerkleLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
