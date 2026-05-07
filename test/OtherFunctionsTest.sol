@@ -668,7 +668,8 @@ contract OtherFunctionsTest is BaseTest {
             uint16 tradingFee5,
             uint16 tradingFee6,
             uint32 _continuousFee,
-            bool created
+            bool created,
+            uint128 _claimableTradingFee
         ) = midnight.obligationState(_id);
 
         assertTrue(created, "obligation should be created");
@@ -676,6 +677,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_lossFactor, 0, "lossFactor");
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
+        assertEq(_claimableTradingFee, 0, "claimableTradingFee");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
         assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
         assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
@@ -693,7 +695,7 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, bool created) = midnight.obligationState(id);
+        (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, bool created,) = midnight.obligationState(id);
 
         assertTrue(created, "should be created");
         assertEq(totalUnits, units, "totalUnits after trade");

@@ -8,7 +8,7 @@ methods {
     function feeClaimer() external returns (address) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
+    function claimableTradingFee(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
@@ -170,8 +170,8 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 /// FEE CLAIMER: ACCESS CONTROL ///
 
 /// Only the fee claimer can successfully call claimTradingFee.
-rule onlyFeeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver) {
-    claimTradingFee(e, token, amount, receiver);
+rule onlyFeeClaimerCanClaimTradingFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
+    claimTradingFee(e, obligation, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
@@ -183,21 +183,23 @@ rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, 
 
 /// FEE CLAIMER: LIVENESS ///
 
-rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver, address user) {
+rule feeClaimerCanClaimTradingFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver, address user) {
     require user != currentContract && user != receiver;
+    bytes32 id = toId(e, obligation);
     address feeClaimerBefore = feeClaimer();
-    uint256 claimableBefore = claimableTradingFee(token);
-    mathint midnightBalanceBefore = tokenBalance[token][currentContract];
-    mathint receiverBalanceBefore = tokenBalance[token][receiver];
-    mathint userBalanceBefore = tokenBalance[token][user];
+    bool obligationExists = obligationCreated(id);
+    uint256 claimableBefore = claimableTradingFee(id);
+    mathint midnightBalanceBefore = tokenBalance[obligation.loanToken][currentContract];
+    mathint receiverBalanceBefore = tokenBalance[obligation.loanToken][receiver];
+    mathint userBalanceBefore = tokenBalance[obligation.loanToken][user];
 
-    claimTradingFee@withrevert(e, token, amount, receiver);
+    claimTradingFee@withrevert(e, obligation, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= claimableBefore;
-    assert !reverted => claimableTradingFee(token) == claimableBefore - amount;
-    assert !reverted => tokenBalance[token][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[token][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[token][user] == userBalanceBefore;
+    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && obligationExists && amount <= claimableBefore;
+    assert !reverted => claimableTradingFee(id) == claimableBefore - amount;
+    assert !reverted => tokenBalance[obligation.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
+    assert !reverted => tokenBalance[obligation.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
+    assert !reverted => tokenBalance[obligation.loanToken][user] == userBalanceBefore;
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver, address user) {

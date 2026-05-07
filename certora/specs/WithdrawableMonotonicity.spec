@@ -4,7 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
+    function claimableTradingFee(bytes32 id) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
 
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
@@ -61,14 +61,15 @@ filtered {
 
 /// CLAIMABLE TRADING FEE ///
 
-rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, address receiver) {
-    uint256 before = claimableTradingFee(token);
-    claimTradingFee(e, token, amount, receiver);
-    assert claimableTradingFee(token) == before - amount;
+rule claimDecreasesClaimableTradingFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
+    bytes32 id = toId(e, obligation);
+    uint256 before = claimableTradingFee(id);
+    claimTradingFee(e, obligation, amount, receiver);
+    assert claimableTradingFee(id) == before - amount;
 }
 
-rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
-    uint256 before = claimableTradingFee(token);
+rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, bytes32 id) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector && f.selector != sig:claimTradingFee(Midnight.Obligation, uint256, address).selector } {
+    uint256 before = claimableTradingFee(id);
     f(e, args);
-    assert claimableTradingFee(token) == before;
+    assert claimableTradingFee(id) == before;
 }

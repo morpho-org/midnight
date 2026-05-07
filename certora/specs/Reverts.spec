@@ -361,7 +361,7 @@ rule transferRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:withdraw(Midnight.Obligation, uint256, address, address).selector
         || f.selector == sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
-        || f.selector == sig:claimTradingFee(address, uint256, address).selector
+        || f.selector == sig:claimTradingFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Obligation, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {

@@ -192,7 +192,6 @@ contract Midnight is IMidnight {
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
     mapping(address loanToken => uint32) public defaultContinuousFee;
-    mapping(address token => uint256) public claimableTradingFee;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -285,11 +284,17 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
-    function claimTradingFee(address token, uint256 amount, address receiver) external {
+    function claimTradingFee(Obligation memory obligation, uint256 amount, address receiver) external {
+        bytes32 id = toId(obligation);
+        ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        claimableTradingFee[token] -= amount;
-        emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
-        SafeTransferLib.safeTransfer(token, receiver, amount);
+        require(_obligationState.created, ObligationNotCreated());
+
+        _obligationState.claimableTradingFee -= UtilsLib.toUint128(amount);
+
+        emit EventsLib.ClaimTradingFee(msg.sender, id, amount, receiver);
+
+        SafeTransferLib.safeTransfer(obligation.loanToken, receiver, amount);
     }
 
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
@@ -444,7 +449,7 @@ contract Midnight is IMidnight {
         }
 
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
+        _obligationState.claimableTradingFee += UtilsLib.toUint128(buyerAssets - sellerAssets);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -907,6 +912,10 @@ contract Midnight is IMidnight {
 
     function continuousFeeCredit(bytes32 id) external view returns (uint256) {
         return obligationState[id].continuousFeeCredit;
+    }
+
+    function claimableTradingFee(bytes32 id) external view returns (uint256) {
+        return obligationState[id].claimableTradingFee;
     }
 
     function pendingFee(bytes32 id, address user) external view returns (uint128) {

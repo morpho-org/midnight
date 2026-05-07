@@ -3,8 +3,6 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function claimableTradingFee(address token) external returns (uint256) envfree;
-
     function _.price() external => NONDET;
 
     // Summarize mulDivUp and mulDivDown by ghost functions. This is for performance of the prover.
@@ -137,12 +135,27 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint128 newWithdrawable
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
+definition claimableTradingFeeSum(address token) returns mathint = usum bytes32 id. claimableTradingFeeMirror[id][token];
+
+ghost mapping(bytes32 => mapping(address => mathint)) claimableTradingFeeMirror {
+    init_state axiom (forall bytes32 id. forall address token. claimableTradingFeeMirror[id][token] == 0);
+    init_state axiom (forall address token. claimableTradingFeeSum(token) == 0);
+}
+
+hook Sload uint128 value obligationState[KEY bytes32 id].claimableTradingFee {
+    require value == claimableTradingFeeMirror[id][loantoken[id]], "ghost mirror";
+}
+
+hook Sstore obligationState[KEY bytes32 id].claimableTradingFee uint128 newClaimableTradingFee (uint128 oldClaimableTradingFee) {
+    claimableTradingFeeMirror[id][loantoken[id]] = newClaimableTradingFee;
+}
+
 /// INVARIANTS AND RULES ///
 
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
+    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFeeSum(token) - flashloans[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";

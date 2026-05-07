@@ -28,6 +28,6 @@ library EventsLib {
     event FlashLoan(address indexed caller, address[] tokens, uint256[] assets, address indexed callback);
     event SetIsAuthorized(address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized);
     event ClaimContinuousFee(address indexed caller, bytes32 indexed id_, uint256 amount, address indexed receiver);
-    event ClaimTradingFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);
+    event ClaimTradingFee(address indexed caller, bytes32 indexed id_, uint256 amount, address indexed receiver);
     // forgefmt: disable-end
 }

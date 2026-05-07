@@ -51,6 +51,7 @@ struct ObligationState {
     uint16 tradingFee6;
     uint32 continuousFee;
     bool created;
+    uint128 claimableTradingFee;
 }
 
 struct Position {
@@ -116,13 +117,12 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created, uint128 claimableTradingFee);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
     function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
-    function claimableTradingFee(address token) external view returns (uint256);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
@@ -138,7 +138,7 @@ interface IMidnight {
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external;
-    function claimTradingFee(address token, uint256 amount, address receiver) external;
+    function claimTradingFee(Obligation memory obligation, uint256 amount, address receiver) external;
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
@@ -173,6 +173,7 @@ interface IMidnight {
     function tradingFees(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
     function continuousFeeCredit(bytes32 id) external view returns (uint256);
+    function claimableTradingFee(bytes32 id) external view returns (uint256);
     function pendingFee(bytes32 id, address user) external view returns (uint128);
     function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
