@@ -158,7 +158,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
-/// @dev Credit, pending fee, and loss factor are not up to date. Use updatePositionView to get the up-to-date values.
+/// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
 /// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
