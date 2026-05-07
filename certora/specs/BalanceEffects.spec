@@ -18,8 +18,6 @@ methods {
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
@@ -28,7 +26,7 @@ methods {
     // body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
+    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
@@ -88,7 +86,7 @@ rule withdrawEffects(env e, Midnight.Obligation obligation, uint256 units, addre
 
 /// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
 /// and only changes credit of maker and taker and debt of maker and taker at the obligation id.
-rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.obligation);
 
     uint128 makerCreditBefore;
@@ -100,7 +98,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
@@ -116,7 +114,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 /// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
 /// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
 /// Buyer's debt is non-increasing and can decrease by at most take units.
-rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     bytes32 id = toId(e, offer.obligation);
 
     address buyer = offer.buy ? offer.maker : taker;
@@ -124,7 +122,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, buyer);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
     assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
     assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
@@ -136,7 +134,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
 /// Seller's debt is non-decreasing, and can increase by at most take units.
 /// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
-rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     bytes32 id = toId(e, offer.obligation);
 
     address seller = offer.buy ? taker : offer.maker;
@@ -144,7 +142,7 @@ rule takeSellerEffects(env e, uint256 units, address taker, address takerCallbac
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, seller);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
     assert debtOf(id, seller) >= sellerDebtBefore;
@@ -196,7 +194,7 @@ rule liquidateEffects(env e, Midnight.Obligation obligation, uint256 collateralI
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
