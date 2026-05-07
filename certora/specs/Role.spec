@@ -15,6 +15,7 @@ methods {
 
     // Those functions are over-approximated, except for the reverting behavior. This is still sound as they are only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    
     // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
