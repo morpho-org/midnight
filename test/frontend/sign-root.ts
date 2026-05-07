@@ -89,11 +89,13 @@ function defaultOffer(number: string, maker: string) {
 }
 
 // WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
-// By luck, the following offers happen to be correctly sorted already.
+// For the default Anvil account, leaf pairs (1,2) and (3,4) sort correctly, but the
+// (1,2) subtree hash is greater than the (3,4) subtree hash, so the subtrees are
+// swapped here. Any change to the maker may require re-sorting.
 function buildOfferTree(maker: string) {
   return [
-    [defaultOffer("1", maker), defaultOffer("2", maker)],
     [defaultOffer("3", maker), defaultOffer("4", maker)],
+    [defaultOffer("1", maker), defaultOffer("2", maker)],
   ];
 }
 
