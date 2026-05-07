@@ -292,9 +292,8 @@ contract TakeBundler is ITakeBundler {
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
     }
 
-    /// @dev Sets the allowance to type(uint256).max, skipping the write entirely when the current allowance is already
-    /// at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to non-zero allowance
-    /// changes (e.g. USDT) work.
+    /// @dev Skips the approval entirely when the current allowance is already 2^95.
+    /// @dev Resets to 0 before re-approving to support USDT like tokens.
     function _forceApproveMax(address token, address spender) internal {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
         _safeApprove(token, spender, 0);
