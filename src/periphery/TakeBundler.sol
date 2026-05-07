@@ -17,14 +17,12 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
-    /// @dev The maxAvgBuyerAssetsPerUnit parameter is the maximum assets to pay to get 1 unit, scaled by 1e18.
-    /// @dev Pass 2e36 for maxAvgBuyerAssetsPerUnit to disable the average price check.
+    /// @dev The msg.sender will pay at most maxBuyerAssets.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
     function buyUnitsTarget(
         address midnight,
         uint256 targetUnits,
         uint256 maxBuyerAssets,
-        uint256 maxAvgBuyerAssetsPerUnit,
         address taker,
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralWithdrawals,
@@ -79,10 +77,6 @@ contract TakeBundler is ITakeBundler {
         }
 
         uint256 referralFeeAssets = filledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
-        require(
-            filledBuyerAssets + referralFeeAssets <= targetUnits.mulDivDown(maxAvgBuyerAssetsPerUnit, WAD),
-            AveragePriceExceeded()
-        );
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - filledBuyerAssets - referralFeeAssets);
     }
@@ -91,12 +85,12 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
-    /// @dev The minAvgSellerAssetsPerUnit parameter is the minimum assets to receive for 1 unit, scaled by 1e18.
+    /// @dev The receiver will receive at least minSellerAssets.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
     function sellUnitsTarget(
         address midnight,
         uint256 targetUnits,
-        uint256 minAvgSellerAssetsPerUnit,
+        uint256 minSellerAssets,
         address taker,
         address receiver,
         Take[] calldata takes,
@@ -147,10 +141,7 @@ contract TakeBundler is ITakeBundler {
         require(filledUnits == targetUnits, OutOfOffers());
 
         uint256 referralFeeAssets = filledSellerAssets.mulDivDown(referralFeePct, WAD);
-        require(
-            filledSellerAssets - referralFeeAssets >= targetUnits.mulDivUp(minAvgSellerAssetsPerUnit, WAD),
-            AveragePriceTooLow()
-        );
+        require(filledSellerAssets - referralFeeAssets >= minSellerAssets, SellerAssetsTooLow());
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, filledSellerAssets - referralFeeAssets);
     }
@@ -159,13 +150,12 @@ contract TakeBundler is ITakeBundler {
     /// @dev The bundler skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
-    /// @dev The maxAvgBuyerAssetsPerUnit parameter is the maximum assets to pay to get 1 unit, scaled by 1e18.
-    /// @dev Pass 2e36 for maxAvgBuyerAssetsPerUnit to disable the average price check.
+    /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyBuyerAssetsTarget(
         address midnight,
         uint256 targetBuyerAssets,
-        uint256 maxAvgBuyerAssetsPerUnit,
+        uint256 minUnits,
         address taker,
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralWithdrawals,
@@ -215,7 +205,7 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(filledBuyerAssets == targetFilledBuyerAssets, OutOfOffers());
-        require(targetBuyerAssets <= filledUnits.mulDivDown(maxAvgBuyerAssetsPerUnit, WAD), AveragePriceExceeded());
+        require(filledUnits >= minUnits, UnitsTooLow());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -237,12 +227,12 @@ contract TakeBundler is ITakeBundler {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
-    /// @dev The minAvgSellerAssetsPerUnit parameter is the minimum assets to receive for 1 unit, scaled by 1e18.
+    /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function sellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
-        uint256 minAvgSellerAssetsPerUnit,
+        uint256 maxUnits,
         address taker,
         address receiver,
         Take[] calldata takes,
@@ -300,7 +290,7 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(filledSellerAssets == targetFilledSellerAssets, OutOfOffers());
-        require(targetSellerAssets >= filledUnits.mulDivUp(minAvgSellerAssetsPerUnit, WAD), AveragePriceTooLow());
+        require(filledUnits <= maxUnits, UnitsTooHigh());
 
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
