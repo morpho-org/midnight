@@ -10,10 +10,10 @@ import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
 uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0xb9b9bbc9871e19caccd05beff7c335263e6fc81ea4b29d4ab65c260cf6b977ae;
-bytes32 constant SIG_S = 0x335181240405f44f94ff143bc841ce19120907dad81d5cbb489ff9292ce7c478;
+bytes32 constant SIG_R = 0x201a68090d982e5e166937f7fd652ccbdcb0c9c71ab72ea7f12ec7fdf5b8e07e;
+bytes32 constant SIG_S = 0x38c48036a2c1b2257e9532ef90b366deec4fa2e79af395f61b69ff9d1afe7658;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
@@ -31,7 +31,6 @@ contract FrontendSignatureTest is Test {
         offer.obligation.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
         offer.ratifier = RATIFIER;
-        offer.maker = ACCOUNT;
     }
 
     function testFrontendSignatureVerification() public view {
@@ -72,5 +71,10 @@ contract FrontendSignatureTest is Test {
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).onRatify(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
+    }
+
+    // Trick to ensure onRatify checks that the signer is the maker, without having the offers depend on the maker.
+    function isAuthorized(address, address signer) external pure returns (bool) {
+        return signer == ACCOUNT;
     }
 }
