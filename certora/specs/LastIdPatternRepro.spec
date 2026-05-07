@@ -2,15 +2,6 @@
 
 // Minimal reproducer: under the lastId ghost-binding pattern the storage
 // write→read link across liquidate is lost.
-//
-// Setup: toId summary returns nondet bytes32, side-effects ghost lastId.
-// Rule binds `bytes32 id;` (free), reads collateral[id, borrower, 0] before
-// the call, then `require id == lastId` after, then reads again. The post
-// read uses the resolved id; the pre read uses a symbolic id that the SMT
-// can resolve to a different position. Assertion violated.
-//
-// Foundry test/RcfReproTest.sol confirms storage decrement matches
-// returned actualSeized at byte-identical state — so CEX is a CVL artefact.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -45,9 +36,7 @@ function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
     return id;
 }
 
-// Expected CEX. Contract decrements collateral[collateralIndex] by exactly
-// the returned actualSeized in the seizedAssets-input path, regardless of
-// badDebt. lastId binding lets SMT decouple pre/post storage reads.
+
 rule storageDecouples_lastId(
     env e, Midnight.Obligation obligation, uint256 seizedAssets,
     address borrower, address receiver, address callback, bytes data
