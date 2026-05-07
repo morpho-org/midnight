@@ -7,7 +7,7 @@ methods {
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function userLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -15,9 +15,10 @@ methods {
     function _.price() external => NONDET;
 
     // Summarize internals irrelevant to credit and debt tracking.
-    function IdLib.storeInCode(Midnight.Obligation memory) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -30,17 +31,19 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address, uint256, bytes) external => NONDET;
+    function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }
 
 /// UPDATE POSITION ///
 
-/// updatePosition sets user's credit to the post-update value,
-/// only changes credit of user at the obligation id, and accrues fee to continuousFeeCredit.
+/// updatePosition can only decrease user's credit (through slashing and fee accrual),
+/// sets it to the post-update value, only changes credit of user at the obligation id,
+/// and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, obligation);
 
+    uint256 creditBefore = creditOf(id, user);
     uint128 updatedUserCredit;
     uint128 userFee;
     updatedUserCredit, _, userFee = updatePositionView(e, obligation, id, user);
@@ -55,6 +58,7 @@ rule updatePositionEffects(env e, Midnight.Obligation obligation, address user, 
     assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
     assert creditOf(id, user) == updatedUserCredit;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
+    assert creditOf(id, user) <= creditBefore;
 }
 
 /// WITHDRAW ///
@@ -107,6 +111,46 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     assert takerNetAfter == takerNetBefore + takerDelta;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
+}
+
+/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
+/// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
+/// Buyer's debt is non-increasing and can decrease by at most take units.
+rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address buyer = offer.buy ? offer.maker : taker;
+    uint256 buyerDebtBefore = debtOf(id, buyer);
+    uint128 buyerUpdatedCreditBefore;
+    buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, buyer);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
+    assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
+    assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
+    assert debtOf(id, buyer) <= buyerDebtBefore;
+    assert debtOf(id, buyer) >= buyerDebtBefore - units;
+}
+
+/// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
+/// Seller's debt is non-decreasing, and can increase by at most take units.
+/// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
+rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+    bytes32 id = toId(e, offer.obligation);
+
+    address seller = offer.buy ? taker : offer.maker;
+    uint256 sellerDebtBefore = debtOf(id, seller);
+    uint128 sellerUpdatedCreditBefore;
+    sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.obligation, id, seller);
+
+    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
+    assert debtOf(id, seller) >= sellerDebtBefore;
+    assert debtOf(id, seller) <= sellerDebtBefore + units;
+    assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
+    assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
 }
 
 /// REPAY ///

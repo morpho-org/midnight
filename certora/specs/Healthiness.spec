@@ -2,7 +2,7 @@
 
 import "BitmapSummaries.spec";
 
-using Havoc as callback;
+using Havoc as havocCallback;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -16,6 +16,7 @@ methods {
      * any action on the contract.
      */
     function _.price() external => summaryPrice(calledContract) expect(uint256);
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
@@ -34,7 +35,7 @@ methods {
     function _.onSell(bytes32 id, Midnight.Obligation obligation, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address token, uint256 amount, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///
@@ -168,7 +169,7 @@ function genericCallback() {
     // check that isHealthy holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool savedHealthyBefore = healthyBeforeCallback && callIsHealthy(globalObligation, globalId, globalBorrower);
 
-    callback.callHavoc(e, dummy);
+    havocCallback.callHavoc(e, dummy);
 
     // the callback havocs the global variable healthyBeforeCallback, so we restore the variable using the saved value in the local variable.
     healthyBeforeCallback = savedHealthyBefore;
@@ -200,7 +201,7 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callback, bytes data) {
+rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -218,7 +219,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callback, data);
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalObligation, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -241,7 +242,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or obligation differs.
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data) {
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -254,7 +255,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Obligation obligation, ui
 
     require callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy before call";
 
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callbackAddr, data);
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalObligation, globalId, globalBorrower), "user is healthy after call";

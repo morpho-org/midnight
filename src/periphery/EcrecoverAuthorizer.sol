@@ -3,9 +3,16 @@
 pragma solidity 0.8.34;
 
 import {IMidnight} from "../interfaces/IMidnight.sol";
-import {IEcrecoverAuthorizer} from "./interfaces/IEcrecoverAuthorizer.sol";
-import {Authorization, Signature, AUTHORIZATION_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "../interfaces/IEcrecover.sol";
+import {
+    IEcrecoverAuthorizer,
+    Authorization,
+    Signature,
+    AUTHORIZATION_TYPEHASH,
+    EIP712_DOMAIN_TYPEHASH
+} from "./interfaces/IEcrecoverAuthorizer.sol";
 
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed authorizations
+/// are no longer valid.
 contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
     address public immutable MIDNIGHT;
     mapping(address => uint256) public nonce;
