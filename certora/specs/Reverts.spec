@@ -46,7 +46,7 @@ methods {
     // Bitmap operations (msb, clearBit, setBit) are provided by BitmapSummaries.spec.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // The function `toObligation` is not used by the protocol.
+    // The function toObligation is not used by the protocol.
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
