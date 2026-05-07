@@ -12,7 +12,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function userLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -112,12 +112,12 @@ rule obligationLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, cal
     assert lossFactorAfter >= lossFactorBefore;
 }
 
-rule userLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossFactorLeqObligationLossFactor(id, user);
-    uint128 lossFactorBefore = userLossFactor(id, user);
+rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant lastLossFactorLeqObligationLossFactor(id, user);
+    uint128 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lossFactorAfter = userLossFactor(id, user);
-    assert lossFactorAfter >= lossFactorBefore;
+    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    assert lastLossFactorAfter >= lastLossFactorBefore;
 }
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
@@ -166,8 +166,8 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
-strong invariant userLossFactorLeqObligationLossFactor(bytes32 id, address user)
-    userLossFactor(id, user) <= currentContract.obligationState[id].lossFactor;
+strong invariant lastLossFactorLeqObligationLossFactor(bytes32 id, address user)
+    lastLossFactor(id, user) <= currentContract.obligationState[id].lossFactor;
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
