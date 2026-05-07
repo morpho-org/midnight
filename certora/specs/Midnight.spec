@@ -12,7 +12,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -105,19 +105,30 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
-rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+rule obligationLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
     f(e, args);
-    uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter >= lossIndexBefore;
+    uint128 lossFactorAfter = currentContract.obligationState[id].lossFactor;
+    assert lossFactorAfter >= lossFactorBefore;
 }
 
-rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
-    uint128 lossIndexBefore = userLossIndex(id, user);
+rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant lastLossFactorLeqObligationLossFactor(id, user);
+    uint128 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter >= lossIndexBefore;
+    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    assert lastLossFactorAfter >= lastLossFactorBefore;
+}
+
+rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
+    require currentContract.obligationState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    uint256 creditBefore = creditOf(id, user);
+    uint256 debtBefore = debtOf(id, user);
+
+    f(e, args);
+
+    assert creditOf(id, user) <= creditBefore;
+    assert debtOf(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -155,8 +166,8 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
-strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+strong invariant lastLossFactorLeqObligationLossFactor(bytes32 id, address user)
+    lastLossFactor(id, user) <= currentContract.obligationState[id].lossFactor;
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
