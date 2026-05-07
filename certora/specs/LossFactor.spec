@@ -19,7 +19,6 @@ methods {
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
-    // Required: without these, PTA fails on Midnight.take() and cascades into storage-splitting failure for the whole Midnight contract, breaking storage-path compilation for every rule below (even those that never call take).
     // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;

@@ -13,7 +13,7 @@ methods {
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function maxTradingFee(uint256 index) external returns (uint256) envfree;
 
-    // Those functions are over-approximated, except for the reverting behavior. This is still sound as they are only used inside take but we don't look at the reverting behavior of take in this file.
+    // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     // Assumption: token transfers do not revert and do not re-enter Midnight.

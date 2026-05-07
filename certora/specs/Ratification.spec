@@ -5,12 +5,14 @@ methods {
 
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
-    function _.price() external => NONDET;
     function _.onRatify(Midnight.Offer, bytes) external => DISPATCHER(true);
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
+    function MerkleLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function MerkleLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     // Summaries for internals irrelevant to ratification properties.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -47,6 +49,6 @@ strong invariant addressZeroCantAuthorize(address authorized)
 rule takeRequiresNonZeroMaker(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
     requireInvariant addressZeroCantAuthorize(offer.ratifier);
 
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
-    assert !lastReverted => offer.maker != 0;
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    assert offer.maker != 0;
 }
