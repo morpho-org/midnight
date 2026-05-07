@@ -12,7 +12,7 @@ methods {
     function _.transfer(address, uint256) external => NONDET;
     function MerkleLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function MerkleLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+    function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     // Summaries for internals irrelevant to ratification properties.
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
