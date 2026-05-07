@@ -51,7 +51,7 @@ contract TakeAmountsTest is BaseTest {
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 
-        createBadDebt(obligation); // to create non trivial lossIndex.
+        createBadDebt(obligation); // to create non trivial lossFactor.
     }
 
     function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {

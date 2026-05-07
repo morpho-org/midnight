@@ -3,8 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {
+    IEcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -919,7 +922,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig),
+            abi.encode(_sig, uint256(0)),
             root([lenderOffer]),
             proof([lenderOffer])
         );
@@ -1036,6 +1039,84 @@ contract TakeTest is BaseTest {
             ratifierData([lenderOffer, otherOffer]),
             root([lenderOffer, otherOffer]),
             proof([lenderOffer, otherOffer])
+        );
+    }
+
+    // Adding salt to the expiry to test different ordering (see commutativeHash).
+    function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
+        public
+    {
+        units = bound(units, 0, maxAssets);
+        uint256 price = TickLib.tickToPrice(lenderOffer.tick);
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+        collateralize(obligation, borrower, units);
+        lenderOffer.maxUnits = units;
+
+        Offer memory offer0 = lenderOffer;
+
+        Offer memory offer1 = lenderOffer;
+        offer1.expiry += bound(saltTimestamp1, 0, type(uint32).max);
+
+        Offer memory offer2 = lenderOffer;
+        offer2.expiry += bound(saltTimestamp2, 0, type(uint32).max);
+
+        Offer memory offer3 = lenderOffer;
+        offer3.expiry += bound(saltTimestamp3, 0, type(uint32).max);
+
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer0,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFirstLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer1,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofSecondLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer2,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofThirdLeaf([offer0, offer1, offer2, offer3])
+        );
+
+        vm.revertToState(snapshot);
+        vm.prank(borrower);
+        midnight.take(
+            units,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            offer3,
+            ratifierData([offer0, offer1, offer2, offer3]),
+            root([offer0, offer1, offer2, offer3]),
+            proofFourthLeaf([offer0, offer1, offer2, offer3])
         );
     }
 
@@ -1316,7 +1397,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
-    // Show the effect of the wasLocked variable in `take`.
+    // Show the effect of the wasLocked variable in take.
     // The variable is not necessary but makes the behavior easy to describe.
     // With wasLocked, a nested take does not restore liquidatability.
     function testSellNestedTakeLiquidateRevertsWhileLiquidationLocked() public {
@@ -1377,7 +1458,7 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
-        vm.expectRevert(IMidnight.InvalidSellCallback.selector);
+        vm.expectRevert(IMidnight.WrongSellCallbackReturnValue.selector);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1445,7 +1526,7 @@ contract TakeTest is BaseTest {
     // - by underflow when the trading fee is > offerPrice, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZero_NoTradingFee_sell() public {
+    function testPriceZeroNoTradingFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1461,7 +1542,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZero_WithTradingFee_buy() public {
+    function testPriceZeroWithTradingFeeBuy() public {
         midnight.touchObligation(obligation);
         uint256 price = TickLib.tickToPrice(0);
         midnight.setObligationTradingFee(id, 1, price + 1e12);
@@ -1474,7 +1555,7 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZero_WithTradingFee_sell() public {
+    function testPriceZeroWithTradingFeeSell() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
@@ -1536,7 +1617,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.InvalidBuyCallback.selector);
+        vm.expectRevert(IMidnight.WrongBuyCallbackReturnValue.selector);
         vm.prank(lender);
         midnight.take(
             units,
@@ -1548,38 +1629,6 @@ contract TakeTest is BaseTest {
             ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
-        );
-    }
-
-    function testBuyerPendingFeeExceedsCredit() public {
-        // Use a very long maturity so continuousFee * TTM > WAD.
-        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
-
-        Obligation memory longObligation;
-        longObligation.loanToken = address(loanToken);
-        longObligation.maturity = block.timestamp + 200 * 365 days;
-        longObligation.collateralParams = obligation.collateralParams;
-
-        uint256 units = 1e18;
-        Offer memory bOffer;
-        bOffer.obligation = longObligation;
-        bOffer.buy = false;
-        bOffer.maker = borrower;
-        bOffer.receiverIfMakerIsSeller = borrower;
-        bOffer.maxUnits = units;
-        bOffer.ratifier = address(ecrecoverRatifier);
-        bOffer.start = block.timestamp;
-        bOffer.expiry = block.timestamp + 200;
-        bOffer.tick = MAX_TICK;
-
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        collateralize(longObligation, borrower, units);
-
-        vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
-        vm.prank(lender);
-        midnight.take(
-            units, lender, address(0), hex"", lender, bOffer, ratifierData([bOffer]), root([bOffer]), proof([bOffer])
         );
     }
 }
@@ -1632,7 +1681,8 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
         ERC20(obligation.loanToken).approve(msg.sender, repaidUnits);
-        try Midnight(msg.sender).liquidate(obligation, collateralIndex, 0, repaidUnits, seller, "") returns (
+        try Midnight(msg.sender)
+            .liquidate(obligation, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1700,7 +1750,8 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
             ERC20(obligation.loanToken).approve(msg.sender, storedRepaidUnits);
-            try Midnight(msg.sender).liquidate(obligation, idx, 0, storedRepaidUnits, seller, "") returns (
+            try Midnight(msg.sender)
+                .liquidate(obligation, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
@@ -1754,8 +1805,8 @@ contract RatifyCallback is IRatifier {
         _recordedOffer = offer;
 
         if (ratifierData.length > 0) {
-            Signature memory signature = abi.decode(ratifierData, (Signature));
-            bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, root));
+            (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
+            bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
             bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
             bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
             recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);

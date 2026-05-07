@@ -12,7 +12,7 @@ library TickLib {
     error PriceGreaterThanOne();
     error TickOutOfRange();
 
-    /// @dev Returns `x` / `d` rounded to the nearest integer with ties rounded down, without checking for overflow.
+    /// @dev Returns x / d rounded to the nearest integer with ties rounded down, without checking for overflow.
     function divHalfDownUnchecked(uint256 x, uint256 d) internal pure returns (uint256) {
         unchecked {
             return (x + (d - 1) / 2) / d;
@@ -24,7 +24,7 @@ library TickLib {
             if (x < 0) {
                 return 1e36 / wExp(-x);
             } else {
-                int256 ln2 = 0.693147180559945309e18;
+                int256 ln2 = 0.693147180559945309e18; // floor(ln(2) * 1e18)
                 int256 q = (x + ln2 / 2) / ln2;
                 int256 r = x - q * ln2;
                 int256 secondTerm = r * r / (2 * 1e18);

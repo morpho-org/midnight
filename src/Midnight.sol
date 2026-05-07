@@ -22,15 +22,26 @@ import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// OBLIGATIONS
-/// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
-/// - `collateralParams.length > 0`: at least one collateral is required.
-/// - `collateralParams.length <= MAX_COLLATERALS` (128): at most 128 collateralParams per obligation.
+/// @dev The following constraints are enforced on obligation creation (in touchObligation):
+/// - maturity <= block.timestamp + 100 years: the obligation must have a maturity that is not too far in the future.
+/// - collateralParams.length > 0: at least one collateral is required.
+/// - collateralParams.length <= MAX_COLLATERALS (128): at most 128 collateralParams per obligation.
 /// - Collateral tokens must be non-zero and strictly sorted by address (ascending, no duplicates).
-/// - Each collateral's `lltv` must be one of the allowed tiers (see `isLltvAllowed` in ConstantsLib).
-/// - Each collateral's `maxLif` must equal `maxLif(lltv, LIQUIDATION_CURSOR_LOW)` or
-///   `maxLif(lltv, LIQUIDATION_CURSOR_HIGH)`.
+/// - Each collateral's lltv must be one of the allowed tiers (see isLltvAllowed in ConstantsLib).
+/// - Each collateral's maxLif must equal maxLif(lltv, LIQUIDATION_CURSOR_LOW) or
+///   maxLif(lltv, LIQUIDATION_CURSOR_HIGH).
 /// @dev Additionally, within a single obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10)
 /// collaterals simultaneously.
+///
+/// MULTICOLLATS
+/// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
+/// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
+/// change their collateral composition.
+/// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
+/// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
+/// activate such a collateral post-incident to block their own liquidation.
+/// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
+/// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new obligations. Then, the fee setter can override it.
@@ -43,9 +54,30 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
-/// @dev The fee is tracked per lender via `pendingFee` in each position. If the obligation's continuous fee changes,
-/// the pending fee of existing lenders is not updated (=> their fee is fixed).
-/// @dev Absent bad debt, the face value of a lender's position is `credit - pendingFee`.
+/// @dev The fee is tracked per lender via pendingFee in each position. If the obligation's continuous fee changes, the
+/// pending fee of existing lenders is not updated (=> their fee is fixed).
+/// @dev Absent bad debt, the face value of a lender's position is credit - pendingFee.
+///
+/// LIQUIDATIONS
+/// @dev Accounts are liquidatable only if the liquidation is not locked and they are either unhealthy or the maturity
+/// has passed.
+/// @dev Liquidations can revert for other reasons, see LIVENESS.
+/// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
+/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
+/// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
+/// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
+/// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
+///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
+///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
+/// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
+/// healthy after a liquidation.
+/// @dev The RCF is deactivated after the maturity.
+/// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
+/// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
+/// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
+///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
+///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
+///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
 ///
 /// SLASHING
 /// @dev When some bad debt is realized, it is socialized among lenders in the obligation.
@@ -54,56 +86,70 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` can be nonzero per offer.
+/// @dev Only one of maxSellerAssets, maxBuyerAssets, or maxUnits can be nonzero per offer.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
 /// @dev Offers should have the current session to be valid.
 ///
+/// ROOT
+/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
+/// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
+/// the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
+/// Seaport for this mechanism.
+///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
-/// any account that has been authorized.
-/// @dev In particular, authorized accounts can authorize other accounts on behalf of the user.
+/// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
+/// scoped behavior.
+/// @dev When authorizing a smart-contract, one should consider:
+/// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
+/// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
+/// authorized accounts can authorize other accounts on behalf of the user.
+/// - Under which conditions the account can return CALLBACK_SUCCESS when its onRatify function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
 /// for chains where the gas is cheaper than 1 asset of the loan token.
-/// @dev lossIndex is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev slash rounds the credit down, so lenders lose a bit at each interaction.
-/// @dev If an obligation loses more than 99%+ of its value to bad debt over its lifetime, it won't function properly
-/// afterwards (bad debt can no longer be realized).
-///
+/// @dev If an obligation loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
+/// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
+/// obligation doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
 /// @dev The entry gate can prevent entry actions (increasing credit or debt) in the obligation.
 /// @dev In particular, it does not prevent the user from exiting the obligation even when the entry gate is reverting.
 /// @dev The liquidator gate can prevent the user from liquidating borrowers in the obligation (and realizing bad debt).
 ///
-/// TOKEN REQUIREMENTS
+/// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
-/// - It should be ERC-20 compliant, except that it can omit return values on `transfer` and `transferFrom`.
-/// - Midnight's balance of the token should only decrease on `transfer` and `transferFrom`.
-/// - It should not re-enter Midnight on `transfer` nor `transferFrom`.
+/// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular,
+/// it should not revert because a transfer is no-op.
+/// - Midnight's balance of the token should only decrease on transfer and transferFrom.
+/// - It should not re-enter Midnight on transfer nor transferFrom.
 /// - Midnight must send/receive exactly the requested amount on transfers.
-/// - It should not revert on `transfer` and `transferFrom` if balances and approvals are right.
-/// - It should not revert on no-op transfers.
+/// @dev See LIVENESS for liveness guarantees.
 ///
 /// LIVENESS
-/// @dev If an activated collateral oracle reverts on `price`, `liquidate`, `isHealthy`, `withdrawCollateral`  when the
-/// borrower has debt, and `take` whenever the seller still has debt all revert.
-/// @dev If an activated collateral oracle returns 0 on `price`, `isHealthy`, `withdrawCollateral` when the borrower has
-/// debt, `take` whenever the seller still has debt, and `liquidate` with repaid input all revert.
-/// @dev If `enterGate.canIncreaseCredit` reverts or returns false, `take` reverts if the buyer's credit increases.
-/// @dev If `enterGate.canIncreaseDebt` reverts or returns false, `take` reverts if the seller's debt increases.
-/// @dev If `liquidatorGate` reverts or returns false on `canLiquidate`, `liquidate` reverts.
-/// @dev If a token pulled by Midnight reverts on `transferFrom` despite balances and approvals being right, `take`,
-/// `repay`, `supplyCollateral`, `liquidate`, and `flashLoan` repayment revert when they need to pull that token.
-/// @dev If a token sent by Midnight reverts on `transfer` despite balances being right, `withdraw`,
-/// `withdrawCollateral`, fee claims, the collateral leg of `liquidate`, and `flashLoan` revert when they need to send
-/// that token.
-/// @dev If a callback reverts, or if a buy/sell callback returns something other than `CALLBACK_SUCCESS`,
-/// callback-enabled `take`, `repay`, `liquidate`, and `flashLoan` revert.
+/// @dev If an activated collateral oracle reverts on price, liquidate reverts.
+/// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
+/// (seller for take) has non-zero debt.
+/// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
+/// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
+/// greater than type(uint128).max, then liquidate, isHealthy, withdrawCollateral when the borrower has debt, and take
+/// whenever the seller still has debt could all revert.
+/// @dev If enterGate.canIncreaseCredit reverts or returns false, take reverts if the buyer's credit increases.
+/// @dev If enterGate.canIncreaseDebt reverts or returns false, take reverts if the seller's debt increases.
+/// @dev If liquidatorGate reverts or returns false on canLiquidate, liquidate reverts.
+/// @dev If a token pulled by Midnight reverts or returns false on transferFrom despite balances and approvals being
+/// right, take, repay, supplyCollateral, liquidate, and flashLoan repayment revert when they need to pull that token.
+/// @dev If a token sent by Midnight reverts or returns false on transfer despite balances being right, withdraw,
+/// withdrawCollateral, fee claims, the collateral leg of liquidate, and flashLoan revert when they need to send that
+/// token.
+/// @dev If a callback reverts or returns something other than CALLBACK_SUCCESS, take, repay, liquidate, and flashLoan
+/// revert.
 ///
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, and fee claimer.
@@ -112,14 +158,30 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
+/// @dev creditOf, pendingFee, and lossFactor are not up to date. One must use updatePositionView to get the up to date
+/// values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
-/// @dev No-ops are allowed.
+/// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
+/// offers are "filled" (consumed=max).
 /// @dev NatSpec comments are included only when they bring clarity.
+/// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
+/// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
+/// there can be some obligation id clashes.
+/// @dev The case LLTV=WAD is special, and should be used with care, notably:
+/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
+/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
+/// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
+/// (Shanghai).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
+
+    /// IMMUTABLES ///
+
+    uint256 public immutable INITIAL_CHAIN_ID;
 
     /// STORAGE ///
 
@@ -140,7 +202,8 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        emit EventsLib.Constructor(roleSetter);
+        INITIAL_CHAIN_ID = block.chainid;
+        emit EventsLib.Constructor(msg.sender, INITIAL_CHAIN_ID);
     }
 
     /// MULTICALL ///
@@ -268,9 +331,12 @@ contract Midnight is IMidnight {
     /// @dev Same function used to buy and sell.
     /// @dev If one wants to match two offers without taking a position, they can batch take them and not have a
     /// position at the end.
-    /// @dev The taker might not get the price they expected if the trading fee was just changed.
-    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
-    /// buyerPrice <= WAD.
+    /// @dev The taker might not get the price they expected if the trading fee was just changed. A bundler can be used
+    /// to perform atomic price checks.
+    /// @dev Taking buy offers with price < trading fee will revert.
+    /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
+    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
+    /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets, sellerAssets, units.
     function take(
@@ -284,47 +350,22 @@ contract Midnight is IMidnight {
         bytes32 root,
         bytes32[] memory proof
     ) external returns (uint256, uint256, uint256) {
+        require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
+        require(_obligationState.lossFactor < type(uint128).max, ObligationLossFactorMaxedOut());
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
-        require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
-        require(UtilsLib.isLeaf(root, keccak256(abi.encode(offer)), proof), InvalidProof());
+        require(UtilsLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
         require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        (
-            address buyer,
-            address buyerCallback,
-            bytes memory buyerCallbackData,
-            address seller,
-            address sellerCallback,
-            bytes memory sellerCallbackData,
-            address receiver
-        ) = offer.buy
-            ? (
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                taker,
-                takerCallback,
-                takerCallbackData,
-                receiverIfTakerIsSeller
-            )
-            : (
-                taker,
-                takerCallback,
-                takerCallbackData,
-                offer.maker,
-                offer.callback,
-                offer.callbackData,
-                offer.receiverIfMakerIsSeller
-            );
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         require(offer.tick % _obligationState.spacing == 0, "tick not accessible at obligation level");
 
@@ -374,7 +415,6 @@ contract Midnight is IMidnight {
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
 
-        require(buyerPos.pendingFee <= buyerPos.credit, BuyerPendingFeeExceedsCredit());
         if (offer.reduceOnly) {
             require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
         }
@@ -390,6 +430,11 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
+        address buyerCallback = offer.buy ? offer.callback : takerCallback;
+        address sellerCallback = offer.buy ? takerCallback : offer.callback;
+        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+        address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
+
         emit EventsLib.Take(
             msg.sender,
             id,
@@ -399,6 +444,7 @@ contract Midnight is IMidnight {
             buyerAssets,
             sellerAssets,
             units,
+            payer,
             receiver,
             offer.group,
             newConsumed,
@@ -410,37 +456,42 @@ contract Midnight is IMidnight {
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
         if (buyerCallback != address(0)) {
+            bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
                 IBuyCallback(buyerCallback).onBuy(id, offer.obligation, buyer, buyerAssets, units, buyerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidBuyCallback()
+                WrongBuyCallbackReturnValue()
             );
         }
 
-        address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
         claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
+            bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
                 ISellCallback(sellerCallback)
                         .onSell(id, offer.obligation, seller, sellerAssets, units, sellerCallbackData)
                     == CALLBACK_SUCCESS,
-                InvalidSellCallback()
+                WrongSellCallbackReturnValue()
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(!isLiquidatable(offer.obligation, id, seller), SellerIsLiquidatable());
+        require(
+            position[id][seller].debt == 0 || liquidationLocked(id, seller)
+                || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
+            SellerIsLiquidatable()
+        );
 
         return (buyerAssets, sellerAssets, units);
     }
 
     /// @dev Will revert if there are no withdrawable funds.
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         _updatePosition(obligation, id, onBehalf);
 
         Position storage _position = position[id][onBehalf];
@@ -458,38 +509,45 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, bytes calldata data) external {
+    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
+        external
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
 
         position[id][onBehalf].debt -= UtilsLib.toUint128(units);
         obligationState[id].withdrawable += UtilsLib.toUint128(units);
 
-        emit EventsLib.Repay(msg.sender, id, units, onBehalf);
+        address payer = callback != address(0) ? callback : msg.sender;
+        emit EventsLib.Repay(msg.sender, id, units, onBehalf, payer);
 
-        if (data.length > 0) {
-            IRepayCallback(msg.sender).onRepay(id, obligation, units, onBehalf, data);
+        if (callback != address(0)) {
+            require(
+                IRepayCallback(callback).onRepay(id, obligation, units, onBehalf, data) == CALLBACK_SUCCESS,
+                WrongRepayCallbackReturnValue()
+            );
         }
-
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), units);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), units);
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
         external
     {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
         _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
-            uint128 newBitmap = _position.activatedCollaterals.setBit(collateralIndex);
-            _position.activatedCollaterals = newBitmap;
-            require(UtilsLib.countBits(newBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals());
+            uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
+            _position.collateralBitmap = newCollateralBitmap;
+            require(
+                UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
+            );
         }
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
@@ -497,7 +555,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransferFrom(collateralToken, msg.sender, address(this), assets);
     }
 
-    /// @dev This function does not call any oracle if all the collateral is withdrawn and the borrower has no debt.
+    /// @dev This function does not call any oracle if the borrower has no debt.
     function withdrawCollateral(
         Obligation memory obligation,
         uint256 collateralIndex,
@@ -505,16 +563,16 @@ contract Midnight is IMidnight {
         address onBehalf,
         address receiver
     ) external {
+        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         address collateralToken = obligation.collateralParams[collateralIndex].token;
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
 
         Position storage _position = position[id][onBehalf];
         uint256 newCollateral = _position.collateral[collateralIndex] - assets;
         _position.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
 
         if (newCollateral == 0 && assets > 0) {
-            _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
+            _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
         }
 
         require(isHealthy(obligation, id, onBehalf), UnhealthyBorrower());
@@ -524,15 +582,11 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(collateralToken, receiver, assets);
     }
 
-    /// @dev At least one of `seizedAssets` or `repaidUnits` should be equal to zero.
-    /// @dev Accounts with nonzero debt are liquidatable if they are unhealthy or if the maturity has passed.
-    /// @dev Before maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
-    /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
-    /// @dev Recovery close factor means that debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV, which is
-    /// equivalent to repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
-    /// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif(lltv) at maturity +
-    /// TIME_TO_MAX_LIF.
-    /// @dev Passing both 0 for `seizedAssets` and `repaidUnits` allows to realize bad debt with 0 token transferred.
+    /// @dev See LIQUIDATIONS section for more details.
+    /// @dev At least one of seizedAssets or repaidUnits should be equal to zero.
+    /// @dev Passing both 0 for seizedAssets and repaidUnits allows to realize bad debt with 0 token transferred.
+    /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not
+    /// activated.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Obligation calldata obligation,
@@ -540,6 +594,8 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        address receiver,
+        address callback,
         bytes calldata data
     ) external returns (uint256, uint256) {
         bytes32 id = touchObligation(obligation);
@@ -556,9 +612,9 @@ contract Midnight is IMidnight {
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
+        uint128 _collateralBitmap = _position.collateralBitmap;
+        while (_collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(_collateralBitmap);
             CollateralParams memory _collateralParam = obligation.collateralParams[i];
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
@@ -567,7 +623,7 @@ contract Midnight is IMidnight {
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
             );
-            bitmap = bitmap.clearBit(i);
+            _collateralBitmap = _collateralBitmap.clearBit(i);
         }
 
         require(
@@ -580,16 +636,16 @@ contract Midnight is IMidnight {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
             uint256 oldTotalUnits = _obligationState.totalUnits;
-            uint256 oldLossIndex = _obligationState.lossIndex;
-            _obligationState.lossIndex = UtilsLib.toUint128(
+            uint256 oldLossFactor = _obligationState.lossFactor;
+            _obligationState.lossFactor = UtilsLib.toUint128(
                 type(uint128).max
-                    - (type(uint128).max - oldLossIndex).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                    - (type(uint128).max - oldLossFactor).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _obligationState.continuousFeeCredit = oldLossIndex < type(uint128).max
+            _obligationState.continuousFeeCredit = oldLossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _obligationState.lossIndex, type(uint128).max - oldLossIndex)
+                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - oldLossFactor)
                 )
                 : 0;
         }
@@ -610,8 +666,6 @@ contract Midnight is IMidnight {
 
             if (block.timestamp <= obligation.maturity) {
                 uint256 lltv = obligation.collateralParams[collateralIndex].lltv;
-                // Rounded up to avoid consecutive max liquidations.
-                // Acknowledged that the position could be slightly healthy after a liquidation.
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
@@ -627,11 +681,13 @@ contract Midnight is IMidnight {
             uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
             _position.collateral[collateralIndex] = newCollateral;
             if (newCollateral == 0 && seizedAssets > 0) {
-                _position.activatedCollaterals = _position.activatedCollaterals.clearBit(collateralIndex);
+                _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
             }
             _obligationState.withdrawable += UtilsLib.toUint128(repaidUnits);
             _position.debt -= UtilsLib.toUint128(repaidUnits);
         }
+
+        address payer = callback != address(0) ? callback : msg.sender;
 
         emit EventsLib.Liquidate(
             msg.sender,
@@ -641,17 +697,23 @@ contract Midnight is IMidnight {
             repaidUnits,
             borrower,
             badDebt,
-            _obligationState.lossIndex
+            _obligationState.lossFactor,
+            payer,
+            receiver
         );
 
-        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, msg.sender, seizedAssets);
+        SafeTransferLib.safeTransfer(obligation.collateralParams[collateralIndex].token, receiver, seizedAssets);
 
-        if (data.length > 0) {
-            ILiquidateCallback(msg.sender)
-                .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data);
+        if (callback != address(0)) {
+            require(
+                ILiquidateCallback(callback)
+                    .onLiquidate(id, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, data)
+                == CALLBACK_SUCCESS,
+                WrongLiquidateCallbackReturnValue()
+            );
         }
 
-        SafeTransferLib.safeTransferFrom(obligation.loanToken, msg.sender, address(this), repaidUnits);
+        SafeTransferLib.safeTransferFrom(obligation.loanToken, payer, address(this), repaidUnits);
 
         return (seizedAssets, repaidUnits);
     }
@@ -672,24 +734,35 @@ contract Midnight is IMidnight {
         emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
-    /// @dev Authorized addresses can authorize other addresses to act on their behalf so it should be used carefully.
+    /// @dev See Authorization section above.
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
     }
 
-    function flashLoan(address token, uint256 assets, address callback, bytes calldata data) external {
-        emit EventsLib.FlashLoan(msg.sender, token, assets);
-        SafeTransferLib.safeTransfer(token, msg.sender, assets);
-        IFlashLoanCallback(callback).onFlashLoan(token, assets, data);
-        SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), assets);
+    function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
+        external
+    {
+        require(tokens.length == assets.length, InconsistentInput());
+        emit EventsLib.FlashLoan(msg.sender, tokens, assets, callback);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
+        }
+        require(
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
+            WrongFlashLoanCallbackReturnValue()
+        );
+        for (uint256 i = 0; i < tokens.length; i++) {
+            SafeTransferLib.safeTransferFrom(tokens[i], callback, address(this), assets[i]);
+        }
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
         if (!obligationState[id].created) {
+            require(obligation.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(obligation.collateralParams.length > 0, NoCollateralParams());
             require(obligation.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
             address previousCollateralToken;
@@ -719,7 +792,7 @@ contract Midnight is IMidnight {
             _obligationState.tradingFee5 = _defaultTradingFees[5];
             _obligationState.tradingFee6 = _defaultTradingFees[6];
             _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
-            IdLib.storeInCode(obligation);
+            IdLib.storeInCode(obligation, INITIAL_CHAIN_ID);
 
             emit EventsLib.ObligationCreated(id, obligation);
         }
@@ -737,9 +810,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lossIndex = _position.lossIndex;
-        uint256 postSlashCredit = _lossIndex < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossIndex, type(uint128).max - _lossIndex)
+        uint128 _lossFactor = _position.lossFactor;
+        uint256 postSlashCredit = _lossFactor < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
@@ -775,7 +848,7 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
-        _position.lossIndex = obligationState[id].lossIndex;
+        _position.lossFactor = obligationState[id].lossFactor;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
@@ -791,12 +864,12 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function userLossIndex(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lossIndex;
+    function userLossFactor(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lossFactor;
     }
 
-    function activatedCollaterals(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].activatedCollaterals;
+    function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].collateralBitmap;
     }
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
@@ -804,7 +877,7 @@ contract Midnight is IMidnight {
     }
 
     function toId(Obligation memory obligation) public view returns (bytes32) {
-        return IdLib.toId(obligation, block.chainid, address(this));
+        return IdLib.toId(obligation, INITIAL_CHAIN_ID, address(this));
     }
 
     /// @dev Reverts if the id is not a valid id of a touched obligation.
@@ -827,8 +900,8 @@ contract Midnight is IMidnight {
         return obligationState[id].totalUnits;
     }
 
-    function lossIndex(bytes32 id) external view returns (uint128) {
-        return obligationState[id].lossIndex;
+    function lossFactor(bytes32 id) external view returns (uint128) {
+        return obligationState[id].lossFactor;
     }
 
     function obligationCreated(bytes32 id) external view returns (bool) {
@@ -875,13 +948,6 @@ contract Midnight is IMidnight {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
     }
 
-    /// @dev A borrower is liquidatable if they have debt, liquidation is not transiently locked, and they are
-    /// past maturity or not healthy.
-    function isLiquidatable(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
-        return position[id][borrower].debt > 0 && !liquidationLocked(id, borrower)
-            && (block.timestamp > obligation.maturity || !isHealthy(obligation, id, borrower));
-    }
-
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
@@ -889,14 +955,16 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;
-        uint128 bitmap = _position.activatedCollaterals;
-        while (maxDebt < debt && bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
-            CollateralParams memory collateralParam = obligation.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                .mulDivDown(collateralParam.lltv, WAD);
-            bitmap = bitmap.clearBit(i);
+        if (debt > 0) {
+            uint128 _collateralBitmap = _position.collateralBitmap;
+            while (_collateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(_collateralBitmap);
+                CollateralParams memory collateralParam = obligation.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                _collateralBitmap = _collateralBitmap.clearBit(i);
+            }
         }
         return maxDebt >= debt;
     }

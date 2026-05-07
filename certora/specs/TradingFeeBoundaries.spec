@@ -10,6 +10,7 @@ methods {
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 }
 
@@ -44,7 +45,7 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
         preserved withdraw(Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
-        preserved repay(Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) with (env e) {
+        preserved repay(Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
         preserved supplyCollateral(Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf) with (env e) {
@@ -53,7 +54,7 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
         preserved withdrawCollateral(Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
-        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) with (env e) {
+        preserved liquidate(Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
         }
         preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
