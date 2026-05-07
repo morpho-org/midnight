@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
-// https://github.com/Uniswap/permit2/tree/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219/src/libraries
+// From https://github.com/Uniswap/permit2/tree/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219/src/libraries
 pragma solidity ^0.8.17;
-
-/// @dev Linearized test vendor copy of the parts of Uniswap Permit2 needed by the bundler tests.
 
 interface IEIP712 {
     function DOMAIN_SEPARATOR() external view returns (bytes32);
