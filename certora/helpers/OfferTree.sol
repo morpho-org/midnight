@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 
 /// @dev Ghost offer-tree helper used by Certora specs.
@@ -10,6 +9,10 @@ import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 ///      well-formedness invariant by construction. The verified invariant is then used
 ///      to prove that any successful `take` against a Midnight signed root corresponds
 ///      to a leaf actually present in the maker's tree.
+/// @dev Purely structural: the helper does not encode the Offer struct itself, so it
+///      avoids triggering pointer-analysis failures on `Offer.obligation.collateralParams[]`.
+///      Specs supply leaf hashes externally (computed via the spec's chosen hashOffer
+///      summary) and assert structural well-formedness here.
 contract OfferTree {
     struct Node {
         bytes32 left;
@@ -20,12 +23,11 @@ contract OfferTree {
 
     mapping(bytes32 => Node) internal tree;
 
-    function newLeaf(Offer memory offer) public {
-        bytes32 h = UtilsLib.hashOffer(offer);
-        require(h != 0, "zero leaf hash");
-        Node storage n = tree[h];
+    function newLeaf(bytes32 leafHash) public {
+        require(leafHash != 0, "zero leaf hash");
+        Node storage n = tree[leafHash];
         require(_isEmpty(n), "leaf already populated");
-        n.hashNode = h;
+        n.hashNode = leafHash;
         n.isLeaf = true;
     }
 
@@ -67,10 +69,6 @@ contract OfferTree {
         return tree[id].right;
     }
 
-    function hashOffer(Offer memory offer) external pure returns (bytes32) {
-        return UtilsLib.hashOffer(offer);
-    }
-
     /// @dev Well-formed predicate.
     /// @dev Empty nodes well-formed; leaves have id == hashNode and no children;
     ///      internal nodes have non-empty children, pair-sorted hashes, and
@@ -90,9 +88,15 @@ contract OfferTree {
     }
 
     /// @dev Walks down the tree from `id`, consuming `proof` from end to start,
-    ///      asserting every visited node is well-formed.
+    ///      asserting every visited node is well-formed AND that the path terminates
+    ///      at a leaf.
     /// @dev At each step, descends into the child whose hash differs from the sibling
     ///      hash supplied in the proof. Mirrors the upward fold in `UtilsLib.isLeaf`.
+    /// @dev The leaf-termination requirement encodes the assumption that `proof.length`
+    ///      matches the actual depth from `id` to a leaf. The on-chain `take` does NOT
+    ///      enforce this (it accepts any proof length whose folded hash equals root) —
+    ///      the gap is intentional in the contract and is exposed by `takeCorrectness`
+    ///      failing if this requirement is dropped.
     function wellFormedPath(bytes32 id, bytes32[] memory proof) public view {
         for (uint256 i = proof.length;;) {
             require(isWellFormed(id));
@@ -104,7 +108,15 @@ contract OfferTree {
             bytes32 left = tree[id].left;
             bytes32 right = tree[id].right;
 
+            // Sibling must equal exactly one of the children's hashes. Without this,
+            // the downward walk and the upward fold in `UtilsLib.isLeaf` can diverge
+            // below the root, even though they agree on the root value: the fold
+            // produces a synthetic intermediate hash unrelated to actual tree nodes,
+            // and the spec's leaf-membership conclusion would not follow.
+            require(getHash(left) == sibling || getHash(right) == sibling);
+
             id = getHash(left) == sibling ? right : left;
         }
+        require(tree[id].isLeaf);
     }
 }

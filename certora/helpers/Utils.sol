@@ -12,6 +12,10 @@ contract Utils {
         return keccak256(abi.encode(obligation));
     }
 
+    function hashOffer(Offer memory offer) external pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
+    }
+
     function getBit(uint128 bitmap, uint256 bit) external pure returns (bool) {
         return bitmap & (1 << bit) != 0;
     }
