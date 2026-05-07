@@ -969,7 +969,15 @@ contract BundlerTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert(ITakeBundler.SellerAssetsTooLow.selector);
         takeBundler.sellUnitsTarget(
-            address(midnight), units, minSellerAssets, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+            address(midnight),
+            units,
+            minSellerAssets,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
         );
     }
 
