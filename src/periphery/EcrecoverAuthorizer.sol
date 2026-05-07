@@ -21,7 +21,7 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         MIDNIGHT = _midnight;
     }
 
-    function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external {
+    function setIsAuthorized(Authorization calldata authorization, Signature calldata signature) external {
         require(block.timestamp <= authorization.deadline, Expired());
         require(authorization.nonce == nonce[authorization.authorizer]++, InvalidNonce());
 

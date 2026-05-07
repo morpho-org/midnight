@@ -292,7 +292,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(token, receiver, amount);
     }
 
-    function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external {
+    function claimContinuousFee(Obligation calldata obligation, uint256 amount, address receiver) external {
         bytes32 id = toId(obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
@@ -324,12 +324,12 @@ contract Midnight is IMidnight {
         uint256 units,
         address taker,
         address takerCallback,
-        bytes memory takerCallbackData,
+        bytes calldata takerCallbackData,
         address receiverIfTakerIsSeller,
-        Offer memory offer,
-        bytes memory ratifierData,
+        Offer calldata offer,
+        bytes calldata ratifierData,
         bytes32 root,
-        bytes32[] memory proof
+        bytes32[] calldata proof
     ) external returns (uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
@@ -467,7 +467,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Will revert if there are no withdrawable funds.
-    function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external {
+    function withdraw(Obligation calldata obligation, uint256 units, address onBehalf, address receiver) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -488,7 +488,7 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
+    function repay(Obligation calldata obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
         external
     {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
@@ -510,7 +510,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev This function checks authorization to prevent activated collateral poisoning.
-    function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
+    function supplyCollateral(Obligation calldata obligation, uint256 collateralIndex, uint256 assets, address onBehalf)
         external
     {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
@@ -536,7 +536,7 @@ contract Midnight is IMidnight {
 
     /// @dev This function does not call any oracle if the borrower has no debt.
     function withdrawCollateral(
-        Obligation memory obligation,
+        Obligation calldata obligation,
         uint256 collateralIndex,
         uint256 assets,
         address onBehalf,
@@ -737,7 +737,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
-    function touchObligation(Obligation memory obligation) public returns (bytes32) {
+    function touchObligation(Obligation calldata obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
         if (!obligationState[id].created) {
             require(obligation.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
@@ -779,7 +779,7 @@ contract Midnight is IMidnight {
 
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
-    function updatePositionView(Obligation memory obligation, bytes32 id, address user)
+    function updatePositionView(Obligation calldata obligation, bytes32 id, address user)
         public
         view
         returns (uint128, uint128, uint128)
@@ -804,7 +804,7 @@ contract Midnight is IMidnight {
 
     /// @dev Slashes the position and accrues the continuous fee.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
-    function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128) {
+    function updatePosition(Obligation calldata obligation, address user) external returns (uint128, uint128, uint128) {
         bytes32 id = toId(obligation);
         require(obligationState[id].created, ObligationNotCreated());
         return _updatePosition(obligation, id, user);
@@ -813,7 +813,7 @@ contract Midnight is IMidnight {
     /// @dev Expects the obligation to be touched.
     /// @dev Expects the id to correspond to the obligation's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
-    function _updatePosition(Obligation memory obligation, bytes32 id, address user)
+    function _updatePosition(Obligation calldata obligation, bytes32 id, address user)
         internal
         returns (uint128, uint128, uint128)
     {
@@ -852,7 +852,7 @@ contract Midnight is IMidnight {
         return position[id][user].collateral[index];
     }
 
-    function toId(Obligation memory obligation) public view returns (bytes32) {
+    function toId(Obligation calldata obligation) public view returns (bytes32) {
         return IdLib.toId(obligation, INITIAL_CHAIN_ID, address(this));
     }
 
@@ -923,7 +923,7 @@ contract Midnight is IMidnight {
     /// @dev This function should be called with the id corresponding to the obligation.
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the obligation's id.
-    function isHealthy(Obligation memory obligation, bytes32 id, address borrower) public view returns (bool) {
+    function isHealthy(Obligation calldata obligation, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
         uint256 maxDebt;

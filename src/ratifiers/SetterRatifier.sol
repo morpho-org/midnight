@@ -21,7 +21,7 @@ contract SetterRatifier is ISetterRatifier {
         emit SetIsRatified(maker, root, newIsRatified);
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory) external view returns (bytes32) {
+    function onRatify(Offer calldata offer, bytes32 root, bytes calldata) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         require(isRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
