@@ -171,7 +171,7 @@ strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 i
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
     !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
-strong invariant positionLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {

@@ -114,10 +114,10 @@ rule obligationLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, cal
 
 rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant lastLossFactorLeqObligationLossFactor(id, user);
-    uint128 lossFactorBefore = lastLossFactor(id, user);
+    uint128 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lossFactorAfter = lastLossFactor(id, user);
-    assert lossFactorAfter >= lossFactorBefore;
+    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    assert lastLossFactorAfter >= lastLossFactorBefore;
 }
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
