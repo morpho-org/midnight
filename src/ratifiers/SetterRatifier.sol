@@ -32,8 +32,8 @@ contract SetterRatifier is ISetterRatifier {
     function onRatify(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, bytes32[] memory proof) = abi.decode(ratifierData, (bytes32, bytes32[]));
-        require(isRatified[offer.maker][root], NotRatified());
         require(MerkleLib.isLeaf(root, HashLib.hashOffer(offer), proof), InvalidProof());
+require(isRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
     }
 }
