@@ -6,7 +6,7 @@ import {COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE} from "./ConstantsLi
 
 /// @dev Helpers for verifying signed Merkle trees of offers.
 library MerkleLib {
-    /// @dev Returns the EIP-712 typehash of `OfferTree(Offer[2]...[2] offerTree)` with `height` levels.
+    /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         bytes memory offerTreeType = "OfferTree(Offer";
         for (uint256 i = 0; i < height; i++) {
@@ -26,7 +26,7 @@ library MerkleLib {
         return currentHash == root;
     }
 
-    /// @dev Returns the keccak256 hash of the sorted concatenation of `a` and `b`.
+    /// @dev Returns the keccak256 hash of the sorted concatenation of a and b.
     function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
         if (a > b) (a, b) = (b, a);
         assembly ("memory-safe") {

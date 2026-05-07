@@ -8,7 +8,7 @@ import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {MerkleLib} from "../libraries/MerkleLib.sol";
 
-/// @dev If `block.chainid` changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.
 /// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers.
 /// To that end, it expects the ratifier data to contain the signature, the height of the offer in the tree,
