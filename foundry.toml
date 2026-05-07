@@ -1,10 +1,14 @@
 [profile.default]
 via_ir = true
 optimizer = true
-optimizer_runs = 300
+optimizer_runs = 100000
 bytecode_hash = "none"
 evm_version = "osaka"
 fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
+
+[profile.default.optimizer_details.yulDetails]
+stackAllocation = true
+optimizerSteps = "dhfoDgvulfnTUtnIf[xa[r]EscLMcCTUtTOntnfDIulLculVcul[j]TpeuljmulIxa[rul]xa[r]cLgvifCTUca[r]LSsTFOtfDnca[r]Iulc]jmul[jul]VcTOcul"
 
 [profile.default.fmt]
 wrap_comments = true
