@@ -120,6 +120,17 @@ rule userLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
     assert lossFactorAfter >= lossFactorBefore;
 }
 
+rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
+    require currentContract.obligationState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    uint256 creditBefore = creditOf(id, user);
+    uint256 debtBefore = debtOf(id, user);
+
+    f(e, args);
+
+    assert creditOf(id, user) <= creditBefore;
+    assert debtOf(id, user) <= debtBefore;
+}
+
 /// INVARIANTS ///
 
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
