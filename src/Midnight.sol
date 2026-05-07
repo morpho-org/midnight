@@ -40,7 +40,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
-/// @dev Liquidator profit (i.e., maxRepayable * (LIF-1)) is not constant across activated collaterals. Hence,
+/// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated collaterals. Hence,
 /// liquidators may have a preference order over collaterals when liquidating.
 ///
 /// TRADING FEES
