@@ -10,6 +10,7 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {MerkleLib} from "../src/libraries/MerkleLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -231,57 +232,57 @@ abstract contract BaseTest is Test {
     // assumes the offer is the first one!
     function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](1);
-        _path[0] = UtilsLib.hashOffer(offers[1]);
+        _path[0] = HashLib.hashOffer(offers[1]);
         return _path;
     }
 
     // 4 leaves, assumes the offer is the first one
     function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[1]);
-        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[0] = HashLib.hashOffer(offers[1]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the second one
     function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[0]);
-        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[0] = HashLib.hashOffer(offers[0]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the third one
     function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[3]);
-        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[0] = HashLib.hashOffer(offers[3]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the fourth one
     function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[2]);
-        _path[1] = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[0] = HashLib.hashOffer(offers[2]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _path;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
-        return UtilsLib.hashOffer(offer);
+        return HashLib.hashOffer(offer);
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.hashOffer(offers[0]);
+        return HashLib.hashOffer(offers[0]);
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        return MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
     }
 
     function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
-        bytes32 right = MerkleLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        bytes32 left = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        bytes32 right = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return MerkleLib.commutativeHash(left, right);
     }
 

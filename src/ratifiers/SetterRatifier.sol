@@ -5,7 +5,7 @@ pragma solidity 0.8.34;
 import {ISetterRatifier} from "./interfaces/ISetterRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {HashLib} from "./HashLib.sol";
 import {MerkleLib} from "../libraries/MerkleLib.sol";
 
 /// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
@@ -30,7 +30,7 @@ contract SetterRatifier is ISetterRatifier {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, bytes32[] memory proof) = abi.decode(ratifierData, (bytes32, bytes32[]));
         require(isRatified[offer.maker][root], NotRatified());
-        require(MerkleLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
+        require(MerkleLib.isLeaf(root, HashLib.hashOffer(offer), proof), InvalidProof());
         return CALLBACK_SUCCESS;
     }
 }
