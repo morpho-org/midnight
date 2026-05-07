@@ -18,7 +18,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
-    function buyQuantityAndWithdrawCollateral(
+    function unitsTargetBuyAndWithdrawCollateral(
         address midnight,
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -85,7 +85,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
-    function supplyCollateralAndSellQuantity(
+    function supplyCollateralAndUnitsTargetSell(
         address midnight,
         uint256 targetUnits,
         address taker,
@@ -149,7 +149,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function buyNotionalAndWithdrawCollateral(
+    function assetsTargetBuyAndWithdrawCollateral(
         address midnight,
         uint256 targetBuyerAssets,
         address taker,
@@ -221,7 +221,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function supplyCollateralAndSellNotional(
+    function supplyCollateralAndAssetsTargetSell(
         address midnight,
         uint256 targetSellerAssets,
         address taker,
