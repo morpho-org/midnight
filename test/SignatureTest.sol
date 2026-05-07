@@ -9,7 +9,7 @@ import {
     Signature,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
-import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract SignatureTest is BaseTest {
@@ -29,7 +29,7 @@ contract SignatureTest is BaseTest {
 
         Offer memory offer;
         offer.maker = maker;
-        bytes32 root = UtilsLib.hashOffer(offer);
+        bytes32 root = HashLib.hashOffer(offer);
 
         Signature memory signature = signature(root, privateKey, address(ecrecoverRatifier), 0);
 
@@ -44,7 +44,7 @@ contract SignatureTest is BaseTest {
     function testOnRatifyInvalidSignature() public {
         Offer memory offer;
         offer.maker = borrower;
-        bytes32 root = UtilsLib.hashOffer(offer);
+        bytes32 root = HashLib.hashOffer(offer);
 
         Signature memory badSig;
 

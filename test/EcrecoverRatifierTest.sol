@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
@@ -22,7 +22,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyMakerSigns() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(address(midnight));
@@ -32,7 +32,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyAuthorizedSigns() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
 
         vm.prank(lender);
 
@@ -46,7 +46,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyNotMidnight() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.expectRevert(IEcrecoverRatifier.NotMidnight.selector);
@@ -55,7 +55,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyUnauthorizedSigner() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
@@ -65,7 +65,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = abi.encode(
             Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), uint256(0), _root, new bytes32[](0)
         );
@@ -87,7 +87,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
     function testOnRatifyRevokeAuthorizationInvalidates() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashOffer(offer);
 
         vm.prank(lender);
 

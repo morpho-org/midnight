@@ -11,7 +11,8 @@ import {
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MerkleLib} from "../src/libraries/MerkleLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
@@ -996,7 +997,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
-        vm.assume(_path[0] != UtilsLib.hashOffer(otherOffer));
+        vm.assume(_path[0] != HashLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(

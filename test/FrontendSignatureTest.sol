@@ -6,8 +6,8 @@ import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MerkleLib} from "../src/libraries/MerkleLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
@@ -41,10 +41,10 @@ contract FrontendSignatureTest is Test {
         offers[2] = defaultOffer(3);
         offers[3] = defaultOffer(4);
 
-        bytes32 h0 = UtilsLib.hashOffer(offers[0]);
-        bytes32 h1 = UtilsLib.hashOffer(offers[1]);
-        bytes32 h2 = UtilsLib.hashOffer(offers[2]);
-        bytes32 h3 = UtilsLib.hashOffer(offers[3]);
+        bytes32 h0 = HashLib.hashOffer(offers[0]);
+        bytes32 h1 = HashLib.hashOffer(offers[1]);
+        bytes32 h2 = HashLib.hashOffer(offers[2]);
+        bytes32 h3 = HashLib.hashOffer(offers[3]);
         bytes32 left = MerkleLib.commutativeHash(h0, h1);
         bytes32 right = MerkleLib.commutativeHash(h2, h3);
         bytes32 _root = MerkleLib.commutativeHash(left, right);

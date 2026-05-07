@@ -60,7 +60,7 @@ function buildTypes(height: number) {
   };
 }
 
-function defaultOffer(number: string) {
+function defaultOffer(number: string, maker: string) {
   return {
     obligation: {
       loanToken: "0x" + number.repeat(40),
@@ -71,7 +71,7 @@ function defaultOffer(number: string) {
       liquidatorGate: ZERO_ADDR,
     },
     buy: false,
-    maker: ZERO_ADDR,
+    maker,
     start: "0",
     expiry: 2**32,
     tick: "0",
@@ -89,11 +89,13 @@ function defaultOffer(number: string) {
 }
 
 // WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
-// By luck, the following offers happen to be correctly sorted already.
-function buildOfferTree() {
+// For the default Anvil account, leaf pairs (1,2) and (3,4) sort correctly, but the
+// (1,2) subtree hash is greater than the (3,4) subtree hash, so the subtrees are
+// swapped here. Any change to the maker may require re-sorting.
+function buildOfferTree(maker: string) {
   return [
-    [defaultOffer("1"), defaultOffer("2")],
-    [defaultOffer("3"), defaultOffer("4")],
+    [defaultOffer("3", maker), defaultOffer("4", maker)],
+    [defaultOffer("1", maker), defaultOffer("2", maker)],
   ];
 }
 
@@ -113,7 +115,7 @@ async function main() {
   const account = accounts[0].toLowerCase();
   const chainId = Number(await window.ethereum.request({ method: "eth_chainId" }));
 
-  const offerTree = buildOfferTree();
+  const offerTree = buildOfferTree(account);
 
   app.innerHTML = `
     <p>Connected: <code>${account}</code> &middot; Chain <code>${chainId}</code></p>
