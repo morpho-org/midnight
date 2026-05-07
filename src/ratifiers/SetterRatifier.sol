@@ -33,7 +33,7 @@ contract SetterRatifier is ISetterRatifier {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, bytes32[] memory proof) = abi.decode(ratifierData, (bytes32, bytes32[]));
         require(MerkleLib.isLeaf(root, HashLib.hashOffer(offer), proof), InvalidProof());
-require(isRatified[offer.maker][root], NotRatified());
+        require(isRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
     }
 }
