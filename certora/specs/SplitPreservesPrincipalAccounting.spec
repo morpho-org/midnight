@@ -31,8 +31,7 @@ methods {
     // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
 
-    // End-of-take seller-liquidatable require is inlined and uses isHealthy; CONSTANT keeps it
-    // deterministic across the compared paths.
+    // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
@@ -72,8 +71,8 @@ rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    // Explicit require prevents the solver from exploring aliased-storage paths.
-    require buyer != seller, "prover performance";
+    // Redundant with the SelfTake() revert; kept as a solver hint to break storage aliasing.
+    require buyer != seller;
 
     uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
     require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
@@ -89,7 +88,7 @@ rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
 
-    // Position lossIndex is mirrored from obligationState.lossIndex which take() never writes.
+    // take() never writes obligationState.lossIndex; _updatePosition mirrors it into position.lossIndex.
     uint128 buyerLossIndex1 = userLossIndex(id, buyer);
     uint128 sellerLossIndex1 = userLossIndex(id, seller);
 
@@ -99,6 +98,11 @@ rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 
 
     // _updatePosition accrues before the principal move; the split-C accrual sees the same timestamp.
     uint128 continuousFeeCredit1 = currentContract.obligationState[id].continuousFeeCredit;
+
+    // Regression guards: take() never writes obligationState.withdrawable or position.activatedCollaterals.
+    uint128 withdrawable1 = currentContract.obligationState[id].withdrawable;
+    uint128 buyerActivated1 = currentContract.position[id][buyer].activatedCollaterals;
+    uint128 sellerActivated1 = currentContract.position[id][seller].activatedCollaterals;
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
@@ -115,4 +119,7 @@ rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 
     assert buyerLastAccrual1 == lastAccrual(id, buyer), "buyer lastAccrual must match";
     assert sellerLastAccrual1 == lastAccrual(id, seller), "seller lastAccrual must match";
     assert continuousFeeCredit1 == currentContract.obligationState[id].continuousFeeCredit, "continuousFeeCredit must match";
+    assert withdrawable1 == currentContract.obligationState[id].withdrawable, "withdrawable must match";
+    assert buyerActivated1 == currentContract.position[id][buyer].activatedCollaterals, "buyer activatedCollaterals must match";
+    assert sellerActivated1 == currentContract.position[id][seller].activatedCollaterals, "seller activatedCollaterals must match";
 }

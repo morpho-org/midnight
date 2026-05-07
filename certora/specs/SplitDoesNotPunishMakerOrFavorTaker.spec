@@ -22,9 +22,8 @@ methods {
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
-    // Read-only health check does not affect return values; removes oracle loop.
-    // Also covers the end-of-take seller-liquidatable require, which is inlined and uses isHealthy directly.
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
@@ -73,16 +72,18 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     // block.timestamp must fit in uint128 (Midnight.sol casts it).
     require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
 
-    // Solver hints: instantiate the sub/super-additivity axioms for the specific A/B/C split.
-    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) >= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivDown(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivDown(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivDown(obligationUnitsC, b, d)) + 1, "solver hint: instantiation of ghost_mulDivDown sub-additivity axiom for A/B/C";
-    require forall uint256 b. forall uint256 d. d != 0 => to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) <= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)) && to_mathint(ghost_mulDivUp(obligationUnitsA, b, d)) + 1 >= to_mathint(ghost_mulDivUp(obligationUnitsB, b, d)) + to_mathint(ghost_mulDivUp(obligationUnitsC, b, d)), "solver hint: instantiation of ghost_mulDivUp super-additivity axiom for A/B/C";
-
     storage initState = lastStorage;
 
     // Path 1: take the full amount A.
     uint256 buyerAssetsA;
     uint256 sellerAssetsA;
     buyerAssetsA, sellerAssetsA, _ = take(e, obligationUnitsA, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    // Maker's offer cap consumed after path 1.
+    uint256 consumedAfterA = currentContract.consumed[offer.maker][offer.group];
+
+    // Protocol fee accrued in storage after path 1: incremented by buyerAssets - sellerAssets per take.
+    uint256 claimableAfterA = currentContract.claimableTradingFee[offer.obligation.loanToken];
 
     // Path 2: take B then C from the initial state.
     uint256 buyerAssetsB;
@@ -92,6 +93,12 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     uint256 buyerAssetsC;
     uint256 sellerAssetsC;
     buyerAssetsC, sellerAssetsC, _ = take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
+
+    // Maker's offer cap consumed after path 2.
+    uint256 consumedAfterBC = currentContract.consumed[offer.maker][offer.group];
+
+    // Protocol fee accrued in storage after path 2.
+    uint256 claimableAfterBC = currentContract.claimableTradingFee[offer.obligation.loanToken];
 
     // Maker is buyer: splitting saves them at most 1 wei (tight rounding bound).
     assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
@@ -108,4 +115,19 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     // Taker is buyer: splitting should not make them pay less.
     assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) >= to_mathint(buyerAssetsA);
     assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA) + 1;
+
+    // Protocol trading fee delta (buyerAssets - sellerAssets) drifts by at most 1 wei across splits.
+    // Derivable from the bounds above: in each rounding mode, buyer- and seller-side deviations are
+    // co-directional, so the delta tightens to ±1 rather than ±2.
+    assert to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) + 1;
+    assert to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) <= to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) + 1;
+
+    // Maker's offer cap consumption drifts by at most 1 wei across splits, regardless of mode
+    // (maxUnits: exact; maxSellerAssets/maxBuyerAssets: bounded by the asset deviation).
+    assert to_mathint(consumedAfterA) <= to_mathint(consumedAfterBC) + 1;
+    assert to_mathint(consumedAfterBC) <= to_mathint(consumedAfterA) + 1;
+
+    // Protocol fee storage drift matches the delta drift: claimableTradingFee += buyerAssets - sellerAssets per take.
+    assert to_mathint(claimableAfterA) <= to_mathint(claimableAfterBC) + 1;
+    assert to_mathint(claimableAfterBC) <= to_mathint(claimableAfterA) + 1;
 }
