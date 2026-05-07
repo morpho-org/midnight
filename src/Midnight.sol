@@ -786,9 +786,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lossFactor = _position.lossFactor;
-        uint256 postSlashCredit = _lossFactor < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lossFactor)
+        uint128 _lastLossFactor = _position.lastLossFactor;
+        uint256 postSlashCredit = _lastLossFactor < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lastLossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
@@ -824,7 +824,7 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
-        _position.lossFactor = obligationState[id].lossFactor;
+        _position.lastLossFactor = obligationState[id].lossFactor;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
@@ -840,8 +840,8 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function userLossFactor(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lossFactor;
+    function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lastLossFactor;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
