@@ -14,7 +14,7 @@ persistent ghost summaryGetBit(uint128, uint256) returns bool {
     axiom forall uint256 bit. !summaryGetBit(0, bit);
 }
 
-persistent ghost summaryCountBits(uint128) returns mathint {
+persistent ghost summaryCountBits(uint128) returns uint256 {
     // see Bitmap.spec
     axiom summaryCountBits(0) == 0;
 
