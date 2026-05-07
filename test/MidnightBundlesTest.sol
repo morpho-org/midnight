@@ -104,7 +104,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(address(0xdead));
         vm.expectRevert(IMidnightBundles.Unauthorized.selector);
-        midnightBundles.buyUnitsTarget(
+        midnightBundles.buyQuantityAndWithdrawCollateral(
             address(midnight), 100, 0, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
         );
     }
@@ -135,7 +135,7 @@ contract MidnightBundlesTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
-            midnightBundles.sellUnitsTarget(
+            midnightBundles.supplyCollateralAndSellQuantity(
                 address(midnight), units, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
             );
 
@@ -147,7 +147,7 @@ contract MidnightBundlesTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(IMidnightBundles.OutOfOffers.selector);
-            midnightBundles.sellUnitsTarget(
+            midnightBundles.supplyCollateralAndSellQuantity(
                 address(midnight), units, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
             );
         }
@@ -195,7 +195,7 @@ contract MidnightBundlesTest is BaseTest {
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(lender);
-            midnightBundles.buyBuyerAssetsTarget(
+            midnightBundles.buyNotionalAndWithdrawCollateral(
                 address(midnight),
                 targetBuyerAssets,
                 lender,
@@ -214,7 +214,7 @@ contract MidnightBundlesTest is BaseTest {
         } else {
             vm.prank(lender);
             vm.expectRevert(IMidnightBundles.OutOfOffers.selector);
-            midnightBundles.buyBuyerAssetsTarget(
+            midnightBundles.buyNotionalAndWithdrawCollateral(
                 address(midnight),
                 targetBuyerAssets,
                 lender,
@@ -259,7 +259,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.buyUnitsTarget(
+        midnightBundles.buyQuantityAndWithdrawCollateral(
             address(midnight),
             2,
             type(uint256).max,
@@ -298,7 +298,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.sellUnitsTarget(
+        midnightBundles.supplyCollateralAndSellQuantity(
             address(midnight), 2, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
         );
     }
@@ -339,7 +339,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.buyBuyerAssetsTarget(
+        midnightBundles.buyNotionalAndWithdrawCollateral(
             address(midnight), 1000, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
         );
     }
@@ -382,7 +382,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
-            midnightBundles.sellSellerAssetsTarget(
+            midnightBundles.supplyCollateralAndSellNotional(
                 address(midnight),
                 targetSellerAssets,
                 borrower,
@@ -401,7 +401,7 @@ contract MidnightBundlesTest is BaseTest {
         } else {
             vm.prank(borrower);
             vm.expectRevert(IMidnightBundles.OutOfOffers.selector);
-            midnightBundles.sellSellerAssetsTarget(
+            midnightBundles.supplyCollateralAndSellNotional(
                 address(midnight),
                 targetSellerAssets,
                 borrower,
@@ -440,7 +440,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.sellSellerAssetsTarget(
+        midnightBundles.supplyCollateralAndSellNotional(
             address(midnight), 1000, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
         );
     }
@@ -477,7 +477,7 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(lender);
-        midnightBundles.buyUnitsTarget(
+        midnightBundles.buyQuantityAndWithdrawCollateral(
             address(midnight),
             units,
             type(uint256).max,
@@ -525,7 +525,7 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(borrower);
-        midnightBundles.sellUnitsTarget(
+        midnightBundles.supplyCollateralAndSellQuantity(
             address(midnight), units, borrower, receiver, takes, new CollateralTransfer[](0), referralFeePct, referrer
         );
 
@@ -567,7 +567,7 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(lender);
-        midnightBundles.buyBuyerAssetsTarget(
+        midnightBundles.buyNotionalAndWithdrawCollateral(
             address(midnight),
             targetBuyerAssets,
             lender,
@@ -615,7 +615,7 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(borrower);
-        midnightBundles.sellSellerAssetsTarget(
+        midnightBundles.supplyCollateralAndSellNotional(
             address(midnight),
             targetSellerAssets,
             borrower,
@@ -653,22 +653,22 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.startPrank(lender);
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
-        midnightBundles.buyUnitsTarget(
+        midnightBundles.buyQuantityAndWithdrawCollateral(
             address(midnight), 1, 0, lender, buyTakes, new CollateralTransfer[](0), address(0), WAD, address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
-        midnightBundles.buyBuyerAssetsTarget(
+        midnightBundles.buyNotionalAndWithdrawCollateral(
             address(midnight), 1, lender, buyTakes, new CollateralTransfer[](0), address(0), WAD, address(0)
         );
         vm.stopPrank();
 
         vm.startPrank(borrower);
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
-        midnightBundles.sellUnitsTarget(
+        midnightBundles.supplyCollateralAndSellQuantity(
             address(midnight), 1, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
-        midnightBundles.sellSellerAssetsTarget(
+        midnightBundles.supplyCollateralAndSellNotional(
             address(midnight), 1, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
         );
         vm.stopPrank();
@@ -733,7 +733,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 maxBuyerAssets = units.mulDivUp(price, WAD);
 
         vm.prank(lender);
-        midnightBundles.buyUnitsTarget(
+        midnightBundles.buyQuantityAndWithdrawCollateral(
             address(midnight), units, maxBuyerAssets, lender, takes, withdrawals, receiver, 0, address(0)
         );
 
@@ -778,7 +778,7 @@ contract MidnightBundlesTest is BaseTest {
         }
 
         vm.prank(lender);
-        midnightBundles.buyBuyerAssetsTarget(
+        midnightBundles.buyNotionalAndWithdrawCollateral(
             address(midnight), targetBuyerAssets, lender, takes, withdrawals, receiver, 0, address(0)
         );
 
@@ -813,7 +813,9 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(borrower);
-        midnightBundles.sellUnitsTarget(address(midnight), units, borrower, borrower, takes, supplies, 0, address(0));
+        midnightBundles.supplyCollateralAndSellQuantity(
+            address(midnight), units, borrower, borrower, takes, supplies, 0, address(0)
+        );
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), supplies[i].assets);
@@ -845,7 +847,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
         uint256 collateralAmount = midnight.collateral(id, borrower, 0);
         vm.prank(borrower);
-        midnightBundles.sellUnitsTarget(
+        midnightBundles.supplyCollateralAndSellQuantity(
             address(midnight), units, borrower, borrower, sellTakes, new CollateralTransfer[](0), 0, address(0)
         );
 
@@ -862,7 +864,9 @@ contract MidnightBundlesTest is BaseTest {
         uint256 borrowerLoanBalanceBefore = loanToken.balanceOf(borrower);
 
         vm.prank(borrower);
-        midnightBundles.repay(address(midnight), obligation, repayUnits, borrower, withdrawals, collateralReceiver);
+        midnightBundles.repayAndWithdrawCollateral(
+            address(midnight), obligation, repayUnits, borrower, withdrawals, collateralReceiver
+        );
 
         assertEq(midnight.debtOf(id, borrower), units - repayUnits, "debt");
         assertEq(midnight.collateral(id, borrower, 0), collateralAmount - withdrawAssets, "remaining collateral");
@@ -907,7 +911,7 @@ contract MidnightBundlesTest is BaseTest {
         });
 
         vm.prank(borrower);
-        midnightBundles.sellSellerAssetsTarget(
+        midnightBundles.supplyCollateralAndSellNotional(
             address(midnight), targetSellerAssets, borrower, borrower, takes, supplies, 0, address(0)
         );
 
