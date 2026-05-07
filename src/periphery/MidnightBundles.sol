@@ -18,7 +18,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
-    function buyUnitsTargetAndWithdrawCollateral(
+    function buyQuantityAndWithdrawCollateral(
         address midnight,
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -85,7 +85,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
-    function supplyCollateralAndSellUnitsTarget(
+    function supplyCollateralAndSellQuantity(
         address midnight,
         uint256 targetUnits,
         address taker,
@@ -97,17 +97,18 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
-        Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
-            address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
+            address token = takes[0].offer.obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
-                    obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
+                    takes[0].offer.obligation,
+                    collateralSupplies[i].collateralIndex,
+                    collateralSupplies[i].assets,
+                    taker
                 );
         }
 
@@ -138,6 +139,7 @@ contract MidnightBundles is IMidnightBundles {
         require(filledUnits == targetUnits, OutOfOffers());
 
         uint256 referralFeeAssets = filledSellerAssets.mulDivDown(referralFeePct, WAD);
+        address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, filledSellerAssets - referralFeeAssets);
     }
@@ -147,7 +149,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function buyBuyerAssetsTargetAndWithdrawCollateral(
+    function buyNotionalAndWithdrawCollateral(
         address midnight,
         uint256 targetBuyerAssets,
         address taker,
@@ -219,7 +221,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function supplyCollateralAndSellSellerAssetsTarget(
+    function supplyCollateralAndSellNotional(
         address midnight,
         uint256 targetSellerAssets,
         address taker,
@@ -231,7 +233,6 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
@@ -278,6 +279,7 @@ contract MidnightBundles is IMidnightBundles {
 
         require(filledSellerAssets == targetFilledSellerAssets, OutOfOffers());
 
+        address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
     }
