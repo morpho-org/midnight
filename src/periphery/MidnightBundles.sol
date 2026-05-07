@@ -282,8 +282,8 @@ contract MidnightBundles is IMidnightBundles {
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
     }
 
-    /// @dev The onBehalf must have authorized this bundler and the msg.sender (if different from onBehalf) on Midnight.
-    /// @dev The msg.sender must have approved the bundler to transfer `units` of the obligation's loan token.
+    /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on Midnight.
+    /// @dev The msg.sender must have approved the contract to transfer `units` of the obligation's loan token.
     function repay(
         address midnight,
         Obligation calldata obligation,
