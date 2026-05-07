@@ -26,12 +26,7 @@ methods {
     function _.onRatify(Midnight.Offer, bytes32, bytes) external => HAVOC_ALL;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => HAVOC_ALL;
 
-    // Models outbound token sends as arbitrary external effects.
-    function _.transfer(address dest, uint256 value) external => HAVOC_ALL;
-
-    // Oracle prices are irrelevant to payer provenance.
-    function _.price() external => NONDET;
-
+    function _._() external => HAVOC_ALL ALL;
     // Over-approximation for view functions: we are not looking at reverts and they cannot call callbacks.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -51,9 +46,9 @@ persistent ghost bool allowBuyCallbackAsPayer;
 
 persistent ghost bool allowLiquidateCallback;
 
-persistent ghost bool allowRepayCallbackAsPayer;
+persistent ghost bool allowRepayCallback;
 
-persistent ghost bool allowFlashLoanCallbackAsPayer;
+persistent ghost bool allowFlashLoanCallback;
 
 /// Tracks the maker address from a validated offer.
 persistent ghost address allowedMaker;
@@ -68,8 +63,8 @@ function triggerHavocAll() {
     callback.callHavoc(e, dummy);
 }
 
-function onCallBackSummary(address callbackAddress, bool allowedAsPayer) returns (bytes32) {
-    assert allowedAsPayer;
+function onCallBackSummary(address callbackAddress, bool allowedCallback) returns (bytes32) {
+    assert allowedCallback;
     require callbackAddress != 0, "address(0) has no code and cannot return CALLBACK_SUCCESS";
     bytes32 result;
     triggerHavocAll();
