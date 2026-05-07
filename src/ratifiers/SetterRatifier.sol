@@ -9,8 +9,7 @@ import {HashLib} from "./HashLib.sol";
 import {MerkleLib} from "./MerkleLib.sol";
 
 /// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
-/// To that end, it expects the ratifier data to contain the root of the tree and the proof of the offer in the
-/// tree.
+/// To that end, it expects the ratifier data to contain the root of the tree and the proof of the offer in the tree.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
