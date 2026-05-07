@@ -34,9 +34,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// collaterals simultaneously.
 ///
 /// MULTICOLLATS
-/// @dev An obligation has a fixed set of permitted collaterals, each with its own lltv and maxLif.
-/// A borrower's debt capacity is the sum of each activated collateral's value, weighted by its
-/// lltv (`maxDebt = sum_i (collateral_i * price_i * lltv_i)`).
 /// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
 /// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
 /// change their collateral composition.
