@@ -996,7 +996,7 @@ contract TakeTest is BaseTest {
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
-        vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
+        vm.assume(_path[0] != UtilsLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
