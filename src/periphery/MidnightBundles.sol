@@ -18,7 +18,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
-    function buyUnitsTarget(
+    function buyUnitsTargetAndWithdrawCollateral(
         address midnight,
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -85,7 +85,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
-    function sellUnitsTarget(
+    function supplyCollateralAndSellUnitsTarget(
         address midnight,
         uint256 targetUnits,
         address taker,
@@ -147,7 +147,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function buyBuyerAssetsTarget(
+    function buyBuyerAssetsTargetAndWithdrawCollateral(
         address midnight,
         uint256 targetBuyerAssets,
         address taker,
@@ -219,7 +219,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function sellSellerAssetsTarget(
+    function supplyCollateralAndSellSellerAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
         address taker,
@@ -282,9 +282,10 @@ contract MidnightBundles is IMidnightBundles {
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
     }
 
-    /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on Midnight.
+    /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on
+    /// Midnight.
     /// @dev The msg.sender must have approved the contract to transfer `units` of the obligation's loan token.
-    function repay(
+    function repayAndWithdrawCollateral(
         address midnight,
         Obligation calldata obligation,
         uint256 units,
