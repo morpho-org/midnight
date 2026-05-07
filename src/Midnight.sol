@@ -613,17 +613,16 @@ contract Midnight is IMidnight {
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
-            uint256 oldTotalUnits = _obligationState.totalUnits;
-            uint256 oldLossFactor = _obligationState.lossFactor;
+            uint256 _totalUnits = _obligationState.totalUnits;
+            uint256 _lossFactor = _obligationState.lossFactor;
             _obligationState.lossFactor = UtilsLib.toUint128(
-                type(uint128).max
-                    - (type(uint128).max - oldLossFactor).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                type(uint128).max - (type(uint128).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _obligationState.continuousFeeCredit = oldLossFactor < type(uint128).max
+            _obligationState.continuousFeeCredit = _lossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - oldLossFactor)
+                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - _lossFactor)
                 )
                 : 0;
         }
