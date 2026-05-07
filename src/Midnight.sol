@@ -904,7 +904,7 @@ contract Midnight is IMidnight {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
     }
 
-    /// @dev This function should be called with the id corresponding to the obligation.
+    /// @dev Reverts if the obligation has not been created.
     /// @dev This function does not call any oracle if debt is 0.
     function isHealthy(bytes32 id, address borrower) public view returns (bool) {
         return _isHealthy(toObligation(id), id, borrower);
