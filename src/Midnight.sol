@@ -488,9 +488,13 @@ contract Midnight is IMidnight {
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, units);
     }
 
-    function repay(Obligation calldata obligation, uint256 units, address onBehalf, address callback, bytes calldata data)
-        external
-    {
+    function repay(
+        Obligation calldata obligation,
+        uint256 units,
+        address onBehalf,
+        address callback,
+        bytes calldata data
+    ) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchObligation(obligation);
 
