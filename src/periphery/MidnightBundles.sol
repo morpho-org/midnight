@@ -295,8 +295,8 @@ contract MidnightBundles is IMidnightBundles {
         require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
 
         address loanToken = obligation.loanToken;
-        _forceApproveMax(loanToken, midnight);
         SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), units);
+        _forceApproveMax(loanToken, midnight);
 
         IMidnight(midnight).repay(obligation, units, onBehalf, address(0), "");
 
