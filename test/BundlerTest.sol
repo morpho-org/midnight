@@ -291,6 +291,9 @@ contract BundlerTest is BaseTest {
 
     function testBuyBuyerAssetsTargetPermit2() public {
         uint256 targetBuyerAssets = 100e18;
+        vm.prank(lender);
+        loanToken.approve(address(takeBundler), 0);
+
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         for (uint256 i; i <= 6; i++) {
@@ -313,7 +316,6 @@ contract BundlerTest is BaseTest {
         });
 
         vm.startPrank(lender);
-        loanToken.approve(address(takeBundler), 0);
         loanToken.approve(takeBundler.PERMIT2(), targetBuyerAssets);
         vm.stopPrank();
 
