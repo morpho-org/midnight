@@ -313,7 +313,6 @@ contract TakeBundler is ITakeBundler {
     }
 
     /// @dev Pulls `amount` of `token` from `from` to this bundler, optionally using ERC2612 or Permit2.
-    /// @dev `permit.kind == PermitKind.None` skips the permit and falls back to a standard ERC20 pull.
     /// @dev The signed value (ERC2612) and `permitted.amount` (Permit2) are both bound to `amount`, so the
     /// signature must authorize exactly the bundler's pull.
     function _pullToken(address token, address from, uint256 amount, TokenPermit calldata permit) internal {
