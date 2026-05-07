@@ -6,12 +6,19 @@
 // mulDivUp(a, WAD, denom) * denom >= a * WAD — which the relational axioms in
 // Healthiness.spec do not provide.
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function _.price() external => CVL_price(calledContract) expect(uint256);
 
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
+    // Deterministic toId via Utils harness — same obligation always returns the
+    // same id. Avoids the storage write→read link loss seen with the lastId
+    // ghost pattern (where id is symbolic with a post-hoc constraint).
+    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation);
+    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => CVL_toId(obligation);
+    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     function UtilsLib.msb(uint128 bitmap) internal returns (uint256) => CVL_msb(bitmap);
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
@@ -35,34 +42,37 @@ methods {
     function debtOf(bytes32, address) external returns (uint256) envfree;
     function collateralBitmap(bytes32, address) external returns (uint128) envfree;
     function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
-    function isHealthyNoBitmap(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
 }
 
-// Last-id pattern: CVL_toId stashes the returned id into lastId ghost.
-// Each rule binds `bytes32 id;` and requires `id == lastId` after the
-// liquidate call to tie the spec's id reads to the contract's internal id.
-persistent ghost bytes32 lastId;
-
-function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
-    bytes32 id;
-    lastId = id;
-    return id;
+function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
+    return Utils.hashObligation(obligation);
 }
 
 ghost CVL_msb(uint128) returns uint256;
 
 persistent ghost CVL_price(address) returns uint256;
 
-/// Exact mulDivDown: floor(a * b / d)
-function CVL_mulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    require d > 0;
-    return require_uint256((to_mathint(a) * to_mathint(b)) / to_mathint(d));
+// Tight relational mulDiv axioms — uniquely pin floor/ceil values, equivalent
+// to exact mathint but typically faster for the SMT.
+// Axioms proven in MulDiv.spec.
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
 
-/// Exact mulDivUp: ceil(a * b / d)
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+}
+
+function CVL_mulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    require d > 0;
+    return ghostMulDivDown(a, b, d);
+}
+
 function CVL_mulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     require d > 0;
-    return require_uint256((to_mathint(a) * to_mathint(b) + to_mathint(d) - 1) / to_mathint(d));
+    return ghostMulDivUp(a, b, d);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -81,7 +91,7 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -95,7 +105,6 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -121,7 +130,7 @@ rule rcfLiquidationOvershootBoundedRepaidUnits(env e, Midnight.Obligation obliga
     uint256 collatAfter = collateral(id, borrower, 0);
     uint256 debtAfter = debtOf(id, borrower);
 
-    assert isHealthy(e, obligation, id, borrower);
+    assert isHealthy(obligation, id, borrower);
 }
 
 rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation obligation, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
@@ -136,7 +145,7 @@ rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation oblig
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -150,7 +159,6 @@ rule rcfLiquidationBoundedOvershootSeizedAssets(env e, Midnight.Obligation oblig
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -199,7 +207,7 @@ rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, u
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -220,7 +228,6 @@ rule rcfLiquidationSurplusBoundedRepaid(env e, Midnight.Obligation obligation, u
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
 
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
@@ -277,7 +284,7 @@ rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, u
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -298,7 +305,6 @@ rule rcfLiquidationSurplusBoundedSeized(env e, Midnight.Obligation obligation, u
 
     uint256 actualRepaid;
     _, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
 
     uint256 denom = assert_uint256(WAD() - lifTimesLltv);
@@ -330,7 +336,7 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -344,7 +350,6 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
 
     // Mirror maxRepaid
@@ -370,7 +375,7 @@ rule healthyAfterRcfLiquidation(env e, Midnight.Obligation obligation, uint256 s
     require to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized);
     require to_mathint(debtAfter)   == to_mathint(debtBefore)  - to_mathint(actualRepaid);
 
-    assert isHealthyNoBitmap(obligation, id, borrower);
+    assert isHealthy(obligation, id, borrower);
 }
 
 // Two-sided "at the health boundary" rule for RCF max liquidation.
@@ -404,7 +409,7 @@ rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, ui
     require lifTimesLltv < WAD(), "See lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -432,7 +437,6 @@ rule rcfMaxLiquidationAtHealthBoundary(env e, Midnight.Obligation obligation, ui
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
     require actualRepaid == _maxRepaid;            // RCF cap hit
 
@@ -474,7 +478,7 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     require lifTimesLltv < WAD();
 
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -494,7 +498,6 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     uint256 actualSeized;
     uint256 actualRepaid;
     actualSeized, actualRepaid = liquidate(e, obligation, 0, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
 
     require actualRepaid == _maxRepaid;
 
@@ -504,7 +507,7 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
     require to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized);
     require to_mathint(debtAfter)   == to_mathint(debtBefore)  - to_mathint(actualRepaid);
 
-    assert isHealthyNoBitmap(obligation, id, borrower);
+    assert isHealthy(obligation, id, borrower);
 }
 
 // ============================================================================
@@ -514,10 +517,14 @@ rule healthyAfterMaxRcfLiquidation(env e, Midnight.Obligation obligation, uint25
 // to propagate the slot-write inside liquidate to the slot-read after.
 // ============================================================================
 
+// Workaround for CVL tuple-return bug: instead of capturing actualSeized/
+// actualRepaid from liquidate's return tuple (the second element gets bound
+// incorrectly — confirmed via test/RcfReproTest.sol), discard the returns
+// and derive both from storage delta. Forge test confirms storage updates
+// are correct.
+//
 // Tests: in seizedAssets > 0 path, collat[0] decrements by exactly the
-// returned actualSeized value, and debt decrements by actualRepaid.
-// Requires no badDebt — otherwise contract decrements debt by an extra
-// `badDebt` amount that's NOT returned in the liquidate tuple.
+// user's seizedAssets input (contract does not modify it in this branch).
 rule storageLinkSeizedPath(env e, Midnight.Obligation obligation, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
 
@@ -526,7 +533,7 @@ rule storageLinkSeizedPath(env e, Midnight.Obligation obligation, uint256 seized
     require maxLif >= WAD();
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -534,26 +541,28 @@ rule storageLinkSeizedPath(env e, Midnight.Obligation obligation, uint256 seized
     require debtBefore > 0;
     require seizedAssets > 0;
 
-    // No badDebt: contract's badDebt branch decrements debt by an amount not
-    // captured in the liquidate return tuple.
+    // Bitmap pins collat[0] as the only active collateral. Without this,
+    // the no-badDebt require below is vacuous (it bounds debt by a spec-
+    // local hypothetical, but contract's badDebt loop iterates only set
+    // bits, so with bitmap=0 the contract sees badDebt = full debt).
+    require collateralBitmap(id, borrower) == 1;
+    require CVL_msb(1) == 0;
+
+    // No badDebt: with bitmap=1, contract's loop accumulates exactly the
+    // term below, so this require ⇔ contract's badDebt = 0.
     require debtBefore <= CVL_mulDivUp(CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
-    uint256 actualSeized;
-    uint256 actualRepaid;
-    actualSeized, actualRepaid = liquidate(e, obligation, 0, seizedAssets, 0, borrower, receiver, callback, data);
-    require id == lastId;
+    _, _ = liquidate(e, obligation, 0, seizedAssets, 0, borrower, receiver, callback, data);
 
     uint256 collatAfter = collateral(id, borrower, 0);
-    uint256 debtAfter = debtOf(id, borrower);
 
-    assert to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized),
-        "collat decrement mismatch";
-    assert to_mathint(debtAfter) == to_mathint(debtBefore) - to_mathint(actualRepaid),
-        "debt decrement mismatch";
+    // Contract decrements collat[0] by user's seizedAssets exactly.
+    assert to_mathint(collatBefore) - to_mathint(collatAfter) == to_mathint(seizedAssets),
+        "collat decrement equals user's seizedAssets";
 }
 
-// Tests: in repaidUnits > 0 path. Same property as above for the other branch.
-// Same no-badDebt precondition.
+// Tests: in repaidUnits > 0 path, debt decrements by exactly the user's
+// repaidUnits input (contract does not modify it in this branch).
 rule storageLinkRepaidPath(env e, Midnight.Obligation obligation, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     require obligation.collateralParams.length == 1;
 
@@ -562,7 +571,7 @@ rule storageLinkRepaidPath(env e, Midnight.Obligation obligation, uint256 repaid
     require maxLif >= WAD();
     uint256 price = CVL_price(obligation.collateralParams[0].oracle);
 
-    bytes32 id;
+    bytes32 id = toId(e, obligation);
     uint256 collatBefore = collateral(id, borrower, 0);
     uint256 debtBefore = debtOf(id, borrower);
 
@@ -570,18 +579,17 @@ rule storageLinkRepaidPath(env e, Midnight.Obligation obligation, uint256 repaid
     require debtBefore > 0;
     require repaidUnits > 0;
 
+    // Bitmap pins collat[0] as active — same reason as in storageLinkSeizedPath.
+    require collateralBitmap(id, borrower) == 1;
+    require CVL_msb(1) == 0;
+
     require debtBefore <= CVL_mulDivUp(CVL_mulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
-    uint256 actualSeized;
-    uint256 actualRepaid;
-    actualSeized, actualRepaid = liquidate(e, obligation, 0, 0, repaidUnits, borrower, receiver, callback, data);
-    require id == lastId;
+    _, _ = liquidate(e, obligation, 0, 0, repaidUnits, borrower, receiver, callback, data);
 
-    uint256 collatAfter = collateral(id, borrower, 0);
     uint256 debtAfter = debtOf(id, borrower);
 
-    assert to_mathint(collatAfter) == to_mathint(collatBefore) - to_mathint(actualSeized),
-        "collat decrement mismatch";
-    assert to_mathint(debtAfter) == to_mathint(debtBefore) - to_mathint(actualRepaid),
-        "debt decrement mismatch";
+    // Contract decrements debt by user's repaidUnits exactly (no badDebt → only one decrement).
+    assert to_mathint(debtBefore) - to_mathint(debtAfter) == to_mathint(repaidUnits),
+        "debt decrement equals user's repaidUnits";
 }
