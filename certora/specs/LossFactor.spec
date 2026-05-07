@@ -8,7 +8,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function userLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
@@ -61,13 +61,13 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 
     assert lossFactorChanged <=> badDebtOccurred;
 }
 
-/// After updatePosition, the user's lossFactor is synced to the obligation's lossFactor.
-rule updatePositionSyncsLossFactor(env e, Midnight.Obligation obligation, address user) {
+/// After updatePosition, the user's lastLossFactor is synced to the obligation's lossFactor.
+rule updatePositionSyncsLastLossFactor(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
     updatePosition(e, obligation, user);
 
-    assert userLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
+    assert lastLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
 }
 
 /// Assuming that the obligation is created, the loss factor computation in updatePosition does not revert.
@@ -75,7 +75,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address 
     bytes32 id = summaryToId(obligation);
 
     require obligationCreated(id), "obligation must be created";
-    require userLossFactor(id, user) <= currentContract.obligationState[id].lossFactor, "user lossFactor bounded by obligation lossFactor, already proved in Midnight.spec";
+    require lastLossFactor(id, user) <= currentContract.obligationState[id].lossFactor, "lastLossFactor bounded by obligation lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";

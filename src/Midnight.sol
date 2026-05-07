@@ -33,6 +33,16 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Additionally, within a single obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10)
 /// collaterals simultaneously.
 ///
+/// MULTICOLLATS
+/// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
+/// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
+/// change their collateral composition.
+/// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
+/// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
+/// activate such a collateral post-incident to block their own liquidation.
+/// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
+/// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
+///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new obligations. Then, the fee setter can override it.
 /// @dev The trading fee is computed using piecewise linear interpolation between breakpoints.
@@ -148,7 +158,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
-/// @dev creditOf is not up to date. One must use updatePositionView to get the up to date credit.
+/// @dev creditOf, pendingFee, and lossFactor are not up to date. One must use updatePositionView to get the up to date
+/// values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
@@ -603,17 +614,16 @@ contract Midnight is IMidnight {
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
             _position.debt -= uint128(badDebt);
-            uint256 oldTotalUnits = _obligationState.totalUnits;
-            uint256 oldLossFactor = _obligationState.lossFactor;
+            uint256 _totalUnits = _obligationState.totalUnits;
+            uint256 _lossFactor = _obligationState.lossFactor;
             _obligationState.lossFactor = UtilsLib.toUint128(
-                type(uint128).max
-                    - (type(uint128).max - oldLossFactor).mulDivDown(oldTotalUnits - badDebt, oldTotalUnits)
+                type(uint128).max - (type(uint128).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _obligationState.continuousFeeCredit = oldLossFactor < type(uint128).max
+            _obligationState.continuousFeeCredit = _lossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - oldLossFactor)
+                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - _lossFactor)
                 )
                 : 0;
         }
@@ -776,9 +786,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lossFactor = _position.lossFactor;
-        uint256 postSlashCredit = _lossFactor < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lossFactor)
+        uint128 _lastLossFactor = _position.lastLossFactor;
+        uint256 postSlashCredit = _lastLossFactor < type(uint128).max
+            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lastLossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
@@ -814,7 +824,7 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
 
         _position.credit = newCredit;
-        _position.lossFactor = obligationState[id].lossFactor;
+        _position.lastLossFactor = obligationState[id].lossFactor;
         _position.pendingFee = newPendingFee;
         _position.lastAccrual = uint128(block.timestamp);
         obligationState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
@@ -830,8 +840,8 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function userLossFactor(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lossFactor;
+    function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lastLossFactor;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {

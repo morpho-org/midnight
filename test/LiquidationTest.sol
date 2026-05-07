@@ -346,7 +346,7 @@ contract LiquidationTest is BaseTest {
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");
-        assertEq(midnight.userLossFactor(id, lender), lossFactor, "user loss factor");
+        assertEq(midnight.lastLossFactor(id, lender), lossFactor, "last loss factor");
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -603,7 +603,7 @@ contract LiquidationTest is BaseTest {
         vm.assume(units > maxDebt);
 
         // Write debt into Position storage.
-        // Layout: slot 0 = credit | pendingFee, slot 1 = lossFactor | lastAccrual,
+        // Layout: slot 0 = credit | pendingFee, slot 1 = lastLossFactor | lastAccrual,
         // slot 2 = debt | collateralBitmap.
         // Debt is in the lower 128 bits of slot 2.
         uint256 mappingSlot = 0;
@@ -763,13 +763,13 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
         uint128 oblLossFactor = midnight.lossFactor(id);
-        assertGt(oblLossFactor, midnight.userLossFactor(id, borrower), "loss factor stale before");
+        assertGt(oblLossFactor, midnight.lastLossFactor(id, borrower), "last loss factor stale before");
 
         midnight.updatePosition(obligation, borrower);
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit after");
         assertEq(midnight.debtOf(id, borrower), debtBefore, "debt unchanged");
-        assertEq(midnight.userLossFactor(id, borrower), oblLossFactor, "loss factor synced");
+        assertEq(midnight.lastLossFactor(id, borrower), oblLossFactor, "last loss factor synced");
     }
 
     function testSlashAlreadySynced(uint256 units) public {
@@ -783,13 +783,13 @@ contract LiquidationTest is BaseTest {
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
         midnight.updatePosition(obligation, lender);
         uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
-        uint128 lossFactorAfterFirstSlash = midnight.userLossFactor(id, lender);
+        uint128 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
         assertLt(creditAfterFirstSlash, creditBeforeSlash, "first slash reduced credit");
 
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), creditAfterFirstSlash, "credit unchanged");
-        assertEq(midnight.userLossFactor(id, lender), lossFactorAfterFirstSlash, "loss factor unchanged");
+        assertEq(midnight.lastLossFactor(id, lender), lastLossFactorAfterFirstSlash, "last loss factor unchanged");
     }
 
     // full bad debt test.
