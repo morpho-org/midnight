@@ -19,7 +19,6 @@ methods {
     // Skip obligation creation logic: removes the collateral-validation loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
-    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
