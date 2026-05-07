@@ -34,8 +34,8 @@ contract TakeBundler is ITakeBundler {
         address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
-        _forceApproveMax(loanToken, midnight);
         SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
+        _safeApprove(loanToken, midnight, type(uint256).max);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
@@ -62,6 +62,7 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(filledUnits == targetUnits, OutOfOffers());
+        _safeApprove(loanToken, midnight, 0);
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -104,11 +105,12 @@ contract TakeBundler is ITakeBundler {
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
-            _forceApproveMax(token, midnight);
+            _safeApprove(token, midnight, type(uint256).max);
             IMidnight(midnight)
                 .supplyCollateral(
                     obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
                 );
+            _safeApprove(token, midnight, 0);
         }
 
         uint256 filledUnits;
@@ -162,8 +164,8 @@ contract TakeBundler is ITakeBundler {
         require(referralFeePct < WAD, PctExceeded());
 
         address loanToken = takes[0].offer.obligation.loanToken;
-        _forceApproveMax(loanToken, midnight);
         SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), targetBuyerAssets);
+        _safeApprove(loanToken, midnight, type(uint256).max);
 
         uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
@@ -198,6 +200,7 @@ contract TakeBundler is ITakeBundler {
         }
 
         require(filledBuyerAssets == targetFilledBuyerAssets, OutOfOffers());
+        _safeApprove(loanToken, midnight, 0);
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -239,11 +242,12 @@ contract TakeBundler is ITakeBundler {
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
             SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
-            _forceApproveMax(token, midnight);
+            _safeApprove(token, midnight, type(uint256).max);
             IMidnight(midnight)
                 .supplyCollateral(
                     obligation, collateralSupplies[i].collateralIndex, collateralSupplies[i].assets, taker
                 );
+            _safeApprove(token, midnight, 0);
         }
 
         uint256 referralFeeAssets = targetSellerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
@@ -292,14 +296,5 @@ contract TakeBundler is ITakeBundler {
             }
         }
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
-    }
-
-    /// @dev Sets the allowance to `type(uint256).max`, skipping the write entirely when the current allowance
-    /// is already at least half of max. Resets to 0 before re-approving so tokens that disallow non-zero to
-    /// non-zero allowance changes (e.g. USDT) work.
-    function _forceApproveMax(address token, address spender) internal {
-        if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
-        _safeApprove(token, spender, 0);
-        _safeApprove(token, spender, type(uint256).max);
     }
 }
