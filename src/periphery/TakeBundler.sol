@@ -4,7 +4,9 @@ pragma solidity 0.8.34;
 
 import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
 import {IERC20} from "../interfaces/IERC20.sol";
-import {ITakeBundler, Take, CollateralTransfer} from "./interfaces/ITakeBundler.sol";
+import {ITakeBundler, Take, CollateralTransfer, TokenPermit, PermitKind} from "./interfaces/ITakeBundler.sol";
+import {IERC20Permit} from "./interfaces/IERC20Permit.sol";
+import {IPermit2} from "./interfaces/IPermit2.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
@@ -12,6 +14,9 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 
 contract TakeBundler is ITakeBundler {
     using UtilsLib for uint256;
+
+    /// @dev Canonical Permit2 deployment address (same on every chain).
+    address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev The bundler skips every reason why `take` can revert (including ones that are not asynchrony related).
@@ -27,7 +32,8 @@ contract TakeBundler is ITakeBundler {
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
-        address referralFeeRecipient
+        address referralFeeRecipient,
+        TokenPermit calldata loanTokenPermit
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -35,7 +41,7 @@ contract TakeBundler is ITakeBundler {
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         _forceApproveMax(loanToken, midnight);
-        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
+        _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
@@ -93,17 +99,19 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralSupplies,
         uint256 referralFeePct,
-        address referralFeeRecipient
+        address referralFeeRecipient,
+        TokenPermit[] calldata collateralPermits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        require(collateralPermits.length == collateralSupplies.length, InvalidPermitArrayLength());
         address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralPermits[i]);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -155,7 +163,8 @@ contract TakeBundler is ITakeBundler {
         CollateralTransfer[] calldata collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
-        address referralFeeRecipient
+        address referralFeeRecipient,
+        TokenPermit calldata loanTokenPermit
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -164,7 +173,7 @@ contract TakeBundler is ITakeBundler {
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
         _forceApproveMax(loanToken, midnight);
-        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), targetBuyerAssets);
+        _pullToken(loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
 
         uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
@@ -227,10 +236,12 @@ contract TakeBundler is ITakeBundler {
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralSupplies,
         uint256 referralFeePct,
-        address referralFeeRecipient
+        address referralFeeRecipient,
+        TokenPermit[] calldata collateralPermits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        require(collateralPermits.length == collateralSupplies.length, InvalidPermitArrayLength());
         address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
@@ -238,7 +249,7 @@ contract TakeBundler is ITakeBundler {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), collateralSupplies[i].assets);
+            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralPermits[i]);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -299,5 +310,31 @@ contract TakeBundler is ITakeBundler {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
         _safeApprove(token, spender, 0);
         _safeApprove(token, spender, type(uint256).max);
+    }
+
+    /// @dev Pulls `amount` of `token` from `from` to this bundler, optionally using ERC2612 or Permit2.
+    /// @dev `permit.kind == PermitKind.None` skips the permit and falls back to a standard ERC20 pull.
+    /// @dev The signed value (ERC2612) and `permitted.amount` (Permit2) are both bound to `amount`, so the
+    /// signature must authorize exactly the bundler's pull.
+    function _pullToken(address token, address from, uint256 amount, TokenPermit calldata permit) internal {
+        if (permit.kind == PermitKind.ERC2612) {
+            (uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
+                abi.decode(permit.data, (uint256, uint8, bytes32, bytes32));
+            // Tolerate revert: a third party may have already consumed the permit.
+            try IERC20Permit(token).permit(from, address(this), amount, deadline, v, r, s) {} catch {}
+            SafeTransferLib.safeTransferFrom(token, from, address(this), amount);
+        } else if (permit.kind == PermitKind.Permit2) {
+            (uint256 nonce, uint256 deadline, bytes memory signature) =
+                abi.decode(permit.data, (uint256, uint256, bytes));
+            IPermit2(PERMIT2)
+                .permitTransferFrom(
+                    IPermit2.PermitTransferFrom(IPermit2.TokenPermissions(token, amount), nonce, deadline),
+                    IPermit2.SignatureTransferDetails(address(this), amount),
+                    from,
+                    signature
+                );
+        } else {
+            SafeTransferLib.safeTransferFrom(token, from, address(this), amount);
+        }
     }
 }
