@@ -1397,7 +1397,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
-    // Show the effect of the wasLocked variable in `take`.
+    // Show the effect of the wasLocked variable in take.
     // The variable is not necessary but makes the behavior easy to describe.
     // With wasLocked, a nested take does not restore liquidatability.
     function testSellNestedTakeLiquidateRevertsWhileLiquidationLocked() public {
