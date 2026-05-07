@@ -28,33 +28,6 @@ contract BundlerTest is BaseTest {
     bytes32 internal id;
     Offer[] internal offers;
 
-    function _noPermit() internal pure returns (TokenPermit memory) {}
-
-    function _permit2(address token, address owner, uint256 amount, uint256 nonce, uint256 deadline)
-        internal
-        view
-        returns (TokenPermit memory)
-    {
-        bytes32 tokenPermissionsHash =
-            keccak256(abi.encode(keccak256("TokenPermissions(address token,uint256 amount)"), token, amount));
-        bytes32 permitHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
-                ),
-                tokenPermissionsHash,
-                address(takeBundler),
-                nonce,
-                deadline
-            )
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", VendorPermit2(takeBundler.PERMIT2()).DOMAIN_SEPARATOR(), permitHash)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
-        return TokenPermit({kind: PermitKind.Permit2, data: abi.encode(nonce, deadline, abi.encodePacked(r, s, v))});
-    }
-
     function setUp() public override {
         super.setUp();
 
@@ -122,6 +95,33 @@ contract BundlerTest is BaseTest {
 
         vm.prank(lender);
         loanToken.approve(address(takeBundler), type(uint256).max);
+    }
+
+    function _noPermit() internal pure returns (TokenPermit memory) {}
+
+    function _permit2(address token, address owner, uint256 amount, uint256 nonce, uint256 deadline)
+        internal
+        view
+        returns (TokenPermit memory)
+    {
+        bytes32 tokenPermissionsHash =
+            keccak256(abi.encode(keccak256("TokenPermissions(address token,uint256 amount)"), token, amount));
+        bytes32 permitHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+                ),
+                tokenPermissionsHash,
+                address(takeBundler),
+                nonce,
+                deadline
+            )
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", VendorPermit2(takeBundler.PERMIT2()).DOMAIN_SEPARATOR(), permitHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
+        return TokenPermit({kind: PermitKind.Permit2, data: abi.encode(nonce, deadline, abi.encodePacked(r, s, v))});
     }
 
     function testUnauthorized() public {
