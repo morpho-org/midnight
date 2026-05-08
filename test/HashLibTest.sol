@@ -7,10 +7,9 @@ import {Offer} from "../src/interfaces/IMidnight.sol";
 import {OFFER_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
 
 contract HashLibTest is Test {
-    /// @dev Reference implementation: single inlined abi.encode of every EIP-712 field.
-    /// Equivalent to HashLib.hashOffer but does not compile under Certora's mode (stack-too-deep).
-    function referenceHashOffer(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(
+    function testHashOfferMatchesReference(Offer memory offer) public pure {
+        /// Equivalent to HashLib.hashOffer but does not compile under Certora's mode (stack-too-deep).
+        bytes32 expectedHash = keccak256(
             abi.encode(
                 OFFER_TYPEHASH,
                 HashLib.hashObligation(offer.obligation),
@@ -31,9 +30,6 @@ contract HashLibTest is Test {
                 offer.maxBuyerAssets
             )
         );
-    }
-
-    function testHashOfferMatchesReference(Offer memory offer) public pure {
-        assertEq(HashLib.hashOffer(offer), referenceHashOffer(offer));
+        assertEq(HashLib.hashOffer(offer), expectedHash);
     }
 }
