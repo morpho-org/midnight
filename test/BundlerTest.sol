@@ -349,14 +349,22 @@ contract BundlerTest is BaseTest {
         offers[0].maxUnits = offerUnits0;
         offers[1].maxUnits = offerUnits1;
 
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        midnight.touchObligation(obligation);
-        uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
-        uint256 units = targetSellerAssets.mulDivUp(WAD, price - _tradingFee);
-        uint256 fromOffer0 = UtilsLib.min(units, offerUnits0);
-
-        // Extra collateral headroom for the potential extra unit of debt.
-        collateralize(obligation, borrower, units + 1);
+        uint256 fromOffer0;
+        uint256 neededFromOffer1;
+        {
+            uint256 price = TickLib.tickToPrice(MAX_TICK);
+            midnight.touchObligation(obligation);
+            uint256 sellerPrice = price - midnight.tradingFee(id, obligation.maturity - block.timestamp);
+            uint256 units = targetSellerAssets.mulDivUp(WAD, sellerPrice);
+            fromOffer0 = UtilsLib.min(units, offerUnits0);
+            // Extra collateral headroom for the potential extra unit of debt.
+            collateralize(obligation, borrower, units + 1);
+            // Mirror the bundler's exact fill logic to derive units needed from offer1.
+            // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
+            // neededFromOffer1 = 0.
+            uint256 filledSellerAssets0 = fromOffer0.mulDivDown(sellerPrice, WAD);
+            neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
+        }
 
         Take[] memory takes = new Take[](2);
         takes[0] = Take({
@@ -374,12 +382,6 @@ contract BundlerTest is BaseTest {
             proof: proof([offers[1]])
         });
 
-        // Mirror the bundler's exact fill logic to derive units needed from offer1.
-        // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
-        // neededFromOffer1 = 0.
-        uint256 sellerPrice = price - _tradingFee;
-        uint256 filledSellerAssets0 = fromOffer0.mulDivDown(sellerPrice, WAD);
-        uint256 neededFromOffer1 = targetSellerAssets.zeroFloorSub(filledSellerAssets0).mulDivUp(WAD, sellerPrice);
         if (offerUnits1 >= neededFromOffer1) {
             vm.prank(borrower);
             takeBundler.sellSellerAssetsTarget(
