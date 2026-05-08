@@ -300,7 +300,7 @@ contract LiquidationTest is BaseTest {
         assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
     }
 
-    function testLiquidateEmitsLossIndex(uint256 units) public {
+    function testLiquidateEmitsLossFactor(uint256 units) public {
         units = bound(units, 10, MAX_UNITS);
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -308,11 +308,11 @@ contract LiquidationTest is BaseTest {
 
         uint256 expectedBadDebt = _badDebt();
         uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
-        uint256 previousLossIndex = midnight.lossIndex(id);
-        uint256 expectedLossIndex = expectedBadDebt == 0
-            ? previousLossIndex
+        uint256 previousLossFactor = midnight.lossFactor(id);
+        uint256 expectedLossFactor = expectedBadDebt == 0
+            ? previousLossFactor
             : type(uint128).max
-                - (type(uint128).max - previousLossIndex).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+                - (type(uint128).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -323,7 +323,7 @@ contract LiquidationTest is BaseTest {
             0,
             borrower,
             expectedBadDebt,
-            expectedLossIndex,
+            expectedLossFactor,
             address(this),
             address(this)
         );
@@ -338,15 +338,15 @@ contract LiquidationTest is BaseTest {
 
         midnight.liquidate(obligation, 0, 0, 0, borrower, address(this), address(0), "");
 
-        uint256 lossIndex = midnight.lossIndex(id);
-        uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossIndex, type(uint128).max);
+        uint256 lossFactor = midnight.lossFactor(id);
+        uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossFactor, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
         emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");
-        assertEq(midnight.userLossIndex(id, lender), lossIndex, "user loss index");
+        assertEq(midnight.lastLossFactor(id, lender), lossFactor, "last loss factor");
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -603,8 +603,8 @@ contract LiquidationTest is BaseTest {
         vm.assume(units > maxDebt);
 
         // Write debt into Position storage.
-        // Layout: slot 0 = credit | pendingFee, slot 1 = lossIndex | lastAccrual,
-        // slot 2 = debt | activatedCollaterals.
+        // Layout: slot 0 = credit | pendingFee, slot 1 = lastLossFactor | lastAccrual,
+        // slot 2 = debt | collateralBitmap.
         // Debt is in the lower 128 bits of slot 2.
         uint256 mappingSlot = 0;
         bytes32 intermediateSlot = keccak256(abi.encode(id, mappingSlot));
@@ -641,8 +641,8 @@ contract LiquidationTest is BaseTest {
         assertTrue(debtAfter == 0 || collateralAfter == 0, "either debt repaid or collateral seized");
     }
 
-    /// @dev Recovery close factor with two collateralParams contributing to maxDebt.
-    /// Drops price of the lower-lltv collateral to make position unhealthy, then liquidates it.
+    /// @dev Recovery close factor with two collateralParams contributing to maxDebt. Drops price of the lower-lltv
+    /// collateral to make position unhealthy, then liquidates it.
     function testRecoveryCloseFactorMultipleCollaterals(uint256 units) public {
         units = bound(units, 100, MAX_UNITS);
 
@@ -762,14 +762,14 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        uint128 oblLossIndex = midnight.lossIndex(id);
-        assertGt(oblLossIndex, midnight.userLossIndex(id, borrower), "loss index stale before");
+        uint128 oblLossFactor = midnight.lossFactor(id);
+        assertGt(oblLossFactor, midnight.lastLossFactor(id, borrower), "last loss factor stale before");
 
         midnight.updatePosition(obligation, borrower);
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit after");
         assertEq(midnight.debtOf(id, borrower), debtBefore, "debt unchanged");
-        assertEq(midnight.userLossIndex(id, borrower), oblLossIndex, "loss index synced");
+        assertEq(midnight.lastLossFactor(id, borrower), oblLossFactor, "last loss factor synced");
     }
 
     function testSlashAlreadySynced(uint256 units) public {
@@ -783,13 +783,13 @@ contract LiquidationTest is BaseTest {
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
         midnight.updatePosition(obligation, lender);
         uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
-        uint128 lossIndexAfterFirstSlash = midnight.userLossIndex(id, lender);
+        uint128 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
         assertLt(creditAfterFirstSlash, creditBeforeSlash, "first slash reduced credit");
 
         midnight.updatePosition(obligation, lender);
 
         assertEq(midnight.creditOf(id, lender), creditAfterFirstSlash, "credit unchanged");
-        assertEq(midnight.userLossIndex(id, lender), lossIndexAfterFirstSlash, "loss index unchanged");
+        assertEq(midnight.lastLossFactor(id, lender), lastLossFactorAfterFirstSlash, "last loss factor unchanged");
     }
 
     // full bad debt test.
@@ -804,8 +804,8 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        uint128 _lossIndex = midnight.lossIndex(id);
-        assertEq(_lossIndex, type(uint128).max, "loss index");
+        uint128 _lossFactor = midnight.lossFactor(id);
+        assertEq(_lossFactor, type(uint128).max, "loss factor");
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
 
@@ -823,9 +823,9 @@ contract LiquidationTest is BaseTest {
     /// @dev Bad debt as computed in liquidate
     function _badDebt() internal view returns (uint256) {
         uint256 badDebt = midnight.debtOf(id, borrower);
-        uint128 bitmap = midnight.activatedCollaterals(id, borrower);
-        while (bitmap != 0) {
-            uint256 i = UtilsLib.msb(bitmap);
+        uint128 collateralBitmap = midnight.collateralBitmap(id, borrower);
+        while (collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(collateralBitmap);
             CollateralParams memory _collateral = obligation.collateralParams[i];
             uint256 price = IOracle(_collateral.oracle).price();
             badDebt = badDebt.zeroFloorSub(
@@ -833,8 +833,8 @@ contract LiquidationTest is BaseTest {
                     .mulDivUp(WAD, _collateral.maxLif)
             );
             require(i < 128, "i is too large");
-            // forge-lint: disable-next-line(unsafe-typecast) as `i < 128` is checked above.
-            bitmap ^= uint128(1 << i);
+            // forge-lint: disable-next-line(unsafe-typecast) as i < 128 is checked above.
+            collateralBitmap ^= uint128(1 << i);
         }
         return badDebt;
     }
@@ -874,8 +874,8 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(obligation.collateralParams[0].lltv, WAD);
     }
 
-    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18).
-    /// Before the fix, this reverted with a division-by-zero in the recovery close factor check.
+    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18). Before the fix, this reverted
+    /// with a division-by-zero in the recovery close factor check.
     function testLiquidatePreMaturityLltvWad(uint256 units) public {
         units = bound(units, 2, MAX_UNITS);
 

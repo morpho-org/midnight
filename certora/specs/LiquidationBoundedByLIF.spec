@@ -73,7 +73,7 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
 /// LIF BOUNDARIES ///
 

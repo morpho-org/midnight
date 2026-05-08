@@ -150,8 +150,8 @@ strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
 strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
     !Midnight.obligationCreated(id) => currentContract.obligationState[id].continuousFeeCredit == 0;
 
-strong invariant obligationLossIndexIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossIndex == 0;
+strong invariant obligationLossFactorIsEmptyIfNotCreated(bytes32 id)
+    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossFactor == 0;
 
 strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0;
@@ -159,8 +159,8 @@ strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
 strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => Midnight.debtOf(id, user) == 0;
 
-strong invariant obligationActivatedCollateralsAreEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => userHasNoActivatedCollaterals(id, user);
+strong invariant obligationCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => userHasEmptyCollateralBitmap(id, user);
 
 strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
     !Midnight.obligationCreated(id) => userHasNoRemainingContinuousFee(id, user);
@@ -171,15 +171,15 @@ strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 i
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
     !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
-strong invariant positionLossIndexIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => currentContract.position[id][user].lossIndex == 0;
+strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFees(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
-definition userHasNoActivatedCollaterals(bytes32 id, address user) returns bool = currentContract.position[id][user].activatedCollaterals == 0;
+definition userHasEmptyCollateralBitmap(bytes32 id, address user) returns bool = currentContract.position[id][user].collateralBitmap == 0;
 
 definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = Midnight.pendingFee(id, user) == 0;
 

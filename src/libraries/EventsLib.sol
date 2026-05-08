@@ -22,7 +22,7 @@ library EventsLib {
     event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address callback);
     event SupplyCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf);
     event WithdrawCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf, address receiver);
-    event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, uint256 badDebt, uint256 latestLossIndex, address payer, address receiver);
+    event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, uint256 badDebt, uint256 latestLossFactor, address payer, address receiver);
     event SetConsumed(address indexed caller, address indexed onBehalf, bytes32 indexed group, uint256 amount);
     event ShuffleSession(address indexed caller, address indexed onBehalf, bytes32 session);
     event FlashLoan(address indexed caller, address[] tokens, uint256[] assets, address indexed callback);
