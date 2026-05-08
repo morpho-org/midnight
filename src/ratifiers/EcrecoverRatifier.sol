@@ -15,7 +15,7 @@ import {MerkleLib} from "./MerkleLib.sol";
 /// the root of the tree, and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
-// the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
+/// @dev the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
 /// Seaport for this mechanism.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
