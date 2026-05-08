@@ -790,13 +790,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         vm.expectRevert();
@@ -819,13 +813,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         uint256 minSellerAssets = units.mulDivDown(price, WAD) + 1;
         vm.prank(borrower);
@@ -860,13 +848,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         vm.expectRevert(IMidnightBundles.UnitsTooLow.selector);
@@ -898,13 +880,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.UnitsTooHigh.selector);
