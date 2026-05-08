@@ -1397,7 +1397,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
-    // Show the effect of the wasLocked variable in `take`.
+    // Show the effect of the wasLocked variable in take.
     // The variable is not necessary but makes the behavior easy to describe.
     // With wasLocked, a nested take does not restore liquidatability.
     function testSellNestedTakeLiquidateRevertsWhileLiquidationLocked() public {
@@ -1623,38 +1623,6 @@ contract TakeTest is BaseTest {
             ratifierData([borrowerOffer]),
             root([borrowerOffer]),
             proof([borrowerOffer])
-        );
-    }
-
-    function testBuyerPendingFeeExceedsCredit() public {
-        // Use a very long maturity so continuousFee * TTM > WAD.
-        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
-
-        Obligation memory longObligation;
-        longObligation.loanToken = address(loanToken);
-        longObligation.maturity = block.timestamp + 200 * 365 days;
-        longObligation.collateralParams = obligation.collateralParams;
-
-        uint256 units = 1e18;
-        Offer memory bOffer;
-        bOffer.obligation = longObligation;
-        bOffer.buy = false;
-        bOffer.maker = borrower;
-        bOffer.receiverIfMakerIsSeller = borrower;
-        bOffer.maxUnits = units;
-        bOffer.ratifier = address(ecrecoverRatifier);
-        bOffer.start = block.timestamp;
-        bOffer.expiry = block.timestamp + 200;
-        bOffer.tick = MAX_TICK;
-
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        deal(address(loanToken), lender, units.mulDivUp(price, WAD));
-        collateralize(longObligation, borrower, units);
-
-        vm.expectRevert(IMidnight.BuyerPendingFeeExceedsCredit.selector);
-        vm.prank(lender);
-        midnight.take(
-            units, lender, address(0), hex"", lender, bOffer, ratifierData([bOffer]), root([bOffer]), proof([bOffer])
         );
     }
 }

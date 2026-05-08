@@ -59,14 +59,9 @@ persistent ghost bytes32 globalId;
 
 /// HOOKS ///
 
-// lossIndex < max: the protocol stop behaving correctly if this happens (documented).
-hook Sload uint128 value obligationState[KEY bytes32 id].lossIndex {
-    require value < max_uint128;
-}
-
-// Follows from userLossIndexLeqObligationLossIndex in Midnight.spec and the hook above.
-hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossIndex {
-    require value < max_uint128;
+// Follows from lastLossFactorLeqObligationLossFactor in Midnight.spec.
+hook Sload uint128 value position[KEY bytes32 id][KEY address user].lastLossFactor {
+    require value <= currentContract.obligationState[id].lossFactor;
 }
 
 /// SUMMARIES ///
@@ -130,7 +125,7 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Obligation obligation, uint256 co
 
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
     require ghostPrice(obligation.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
-    require summaryGetBit(currentContract.position[globalId][borrower].activatedCollaterals, collateralIndex), "Assumption: liquidated collateral was activated";
+    require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert true;
