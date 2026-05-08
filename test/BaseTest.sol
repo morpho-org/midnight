@@ -10,7 +10,6 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
     WAD,
@@ -32,6 +31,8 @@ import {Midnight} from "../src/Midnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
+import {IdLibBridge} from "./helpers/IdLibBridge.sol";
+import {UtilsLibBridge} from "./helpers/UtilsLibBridge.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
@@ -52,6 +53,8 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
     EcrecoverRatifier internal ecrecoverRatifier;
     EcrecoverAuthorizer internal ecrecoverAuthorizer;
+    IdLibBridge internal idLibBridge;
+    UtilsLibBridge internal utilsLibBridge;
 
     bytes internal emptySig;
 
@@ -59,6 +62,8 @@ abstract contract BaseTest is Test {
         midnight = new Midnight();
         ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
+        idLibBridge = new IdLibBridge();
+        utilsLibBridge = new UtilsLibBridge();
 
         midnight.setFeeSetter(address(this));
 
@@ -143,10 +148,36 @@ abstract contract BaseTest is Test {
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256, uint256) {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
+        // Precompute proof/root/ratifierData before the prank: each goes through xLibBridge,
+        // which is an external staticcall that would otherwise consume the single-shot prank.
+        bytes memory _ratifierData = ratifierData([offer]);
+        bytes32 _root = root([offer]);
+        bytes32[] memory _proof = proof([offer]);
         vm.prank(taker);
-        return midnight.take(
-            units, taker, address(0), hex"", taker, offer, ratifierData([offer]), root([offer]), proof([offer])
-        );
+        return midnight.take(units, taker, address(0), hex"", taker, offer, _ratifierData, _root, _proof);
+    }
+
+    // Same as `take` but precomputes the bridge-using args BEFORE the vm.expectRevert. Use this
+    // wherever a test wraps `take(...)` in `vm.expectRevert(...)` — otherwise the bridge staticcall
+    // (utilsLibBridge.hashOffer) consumes the expectRevert and the test fails with
+    // "next call did not revert as expected".
+    function takeExpectRevert(uint256 units, address taker, Offer memory offer, bytes4 selector) internal {
+        bytes memory _ratifierData = ratifierData([offer]);
+        bytes32 _root = root([offer]);
+        bytes32[] memory _proof = proof([offer]);
+        vm.expectRevert(selector);
+        vm.prank(taker);
+        midnight.take(units, taker, address(0), hex"", taker, offer, _ratifierData, _root, _proof);
+    }
+
+    // Variant that expects any revert.
+    function takeExpectRevert(uint256 units, address taker, Offer memory offer) internal {
+        bytes memory _ratifierData = ratifierData([offer]);
+        bytes32 _root = root([offer]);
+        bytes32[] memory _proof = proof([offer]);
+        vm.expectRevert();
+        vm.prank(taker);
+        midnight.take(units, taker, address(0), hex"", taker, offer, _ratifierData, _root, _proof);
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -216,7 +247,7 @@ abstract contract BaseTest is Test {
     }
 
     function toId(Obligation memory obligation) internal view returns (bytes32) {
-        return IdLib.toId(obligation, block.chainid, address(midnight));
+        return idLibBridge.toId(obligation, block.chainid, address(midnight));
     }
 
     function ratifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
@@ -228,59 +259,61 @@ abstract contract BaseTest is Test {
     }
 
     // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
+    function proof(Offer[2] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](1);
-        _path[0] = UtilsLib.hashOffer(offers[1]);
+        _path[0] = utilsLibBridge.hashOffer(offers[1]);
         return _path;
     }
 
     // 4 leaves, assumes the offer is the first one
-    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+    function proofFirstLeaf(Offer[4] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[1]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[0] = utilsLibBridge.hashOffer(offers[1]);
+        _path[1] = UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[2]), utilsLibBridge.hashOffer(offers[3]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the second one
-    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+    function proofSecondLeaf(Offer[4] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[0]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+        _path[0] = utilsLibBridge.hashOffer(offers[0]);
+        _path[1] = UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[2]), utilsLibBridge.hashOffer(offers[3]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the third one
-    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+    function proofThirdLeaf(Offer[4] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[3]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[0] = utilsLibBridge.hashOffer(offers[3]);
+        _path[1] = UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[0]), utilsLibBridge.hashOffer(offers[1]));
         return _path;
     }
 
     // 4 leaves, assumes the offer is the fourth one
-    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+    function proofFourthLeaf(Offer[4] memory offers) internal view returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
-        _path[0] = UtilsLib.hashOffer(offers[2]);
-        _path[1] = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+        _path[0] = utilsLibBridge.hashOffer(offers[2]);
+        _path[1] = UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[0]), utilsLibBridge.hashOffer(offers[1]));
         return _path;
     }
 
-    function root(Offer memory offer) internal pure returns (bytes32) {
-        return UtilsLib.hashOffer(offer);
+    function root(Offer memory offer) internal view returns (bytes32) {
+        return utilsLibBridge.hashOffer(offer);
     }
 
-    function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.hashOffer(offers[0]);
+    function root(Offer[1] memory offers) internal view returns (bytes32) {
+        return utilsLibBridge.hashOffer(offers[0]);
     }
 
-    function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
+    function root(Offer[2] memory offers) internal view returns (bytes32) {
+        return UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[0]), utilsLibBridge.hashOffer(offers[1]));
     }
 
-    function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[0]), UtilsLib.hashOffer(offers[1]));
-        bytes32 right = UtilsLib.commutativeHash(UtilsLib.hashOffer(offers[2]), UtilsLib.hashOffer(offers[3]));
+    function root(Offer[4] memory offers) internal view returns (bytes32) {
+        bytes32 left =
+            UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[0]), utilsLibBridge.hashOffer(offers[1]));
+        bytes32 right =
+            UtilsLib.commutativeHash(utilsLibBridge.hashOffer(offers[2]), utilsLibBridge.hashOffer(offers[3]));
         return UtilsLib.commutativeHash(left, right);
     }
 
@@ -367,18 +400,11 @@ abstract contract BaseTest is Test {
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;
 
+        bytes memory _ratifierData = ratifierData([borrowerOffer]);
+        bytes32 _root = root([borrowerOffer]);
+        bytes32[] memory _proof = proof([borrowerOffer]);
         vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            address(0),
-            hex"",
-            borrower,
-            borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
+        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, _ratifierData, _root, _proof);
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

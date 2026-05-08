@@ -63,7 +63,7 @@ library UtilsLib {
 
     /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
     /// @dev Hash sorts the inputs lexicographically.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
+    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] calldata proof) internal pure returns (bool) {
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
             currentHash = commutativeHash(currentHash, proof[i]);
@@ -82,7 +82,7 @@ library UtilsLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of a CollateralParams.
-    function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
+    function hashCollateralParams(CollateralParams calldata collateralParams) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
                 COLLATERAL_PARAMS_TYPEHASH,
@@ -95,7 +95,7 @@ library UtilsLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of an Obligation.
-    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
+    function hashObligation(Obligation calldata obligation) internal pure returns (bytes32) {
         bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
         for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
             collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
@@ -116,7 +116,7 @@ library UtilsLib {
 
     /// @dev Computes the EIP-712 hash struct of an Offer.
     /// @dev Split into two abi.encodes to avoid stack-too-deep under via-ir without optimizer.
-    function hashOffer(Offer memory offer) internal pure returns (bytes32) {
+    function hashOffer(Offer calldata offer) internal pure returns (bytes32) {
         return keccak256(
             bytes.concat(
                 abi.encode(

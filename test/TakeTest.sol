@@ -14,7 +14,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
-import {IdLib} from "../src/libraries/IdLib.sol";
+import {IdLibBridge} from "./helpers/IdLibBridge.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -325,8 +325,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, lender, borrowerOffer);
+        takeExpectRevert(units, lender, borrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testSell1PostMaturity() public {
@@ -338,8 +337,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testBuy2PostMaturity() public {
@@ -399,8 +397,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, otherBorrower, borrowerOffer);
+        takeExpectRevert(units, otherBorrower, borrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testSell3PostMaturity() public {
@@ -414,8 +411,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(obligation, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, borrower, otherBorrowerOffer);
+        takeExpectRevert(units, borrower, otherBorrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testBuy4PostMaturity() public {
@@ -493,8 +489,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maxUnits = exitUnits;
         otherBorrowerOffer.reduceOnly = true;
 
-        vm.expectRevert(IMidnight.MakerCreditOrDebtIncreased.selector);
-        take(exitUnits, borrower, otherBorrowerOffer);
+        takeExpectRevert(exitUnits, borrower, otherBorrowerOffer, IMidnight.MakerCreditOrDebtIncreased.selector);
     }
 
     function testReduceOnlySellSuccess(uint256 existingUnits, uint256 exitUnits) public {
@@ -528,8 +523,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.maxUnits = exitUnits;
         otherLenderOffer.reduceOnly = true;
 
-        vm.expectRevert(IMidnight.MakerCreditOrDebtIncreased.selector);
-        take(exitUnits, lender, otherLenderOffer);
+        takeExpectRevert(exitUnits, lender, otherLenderOffer, IMidnight.MakerCreditOrDebtIncreased.selector);
     }
 
     // group tests.
@@ -548,8 +542,7 @@ contract TakeTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        vm.expectRevert(IMidnight.ConsumedUnits.selector);
-        take(secondRevertingTake, lender, borrowerOffer);
+        takeExpectRevert(secondRevertingTake, lender, borrowerOffer, IMidnight.ConsumedUnits.selector);
 
         take(secondPassingTake, lender, borrowerOffer);
     }
@@ -568,8 +561,7 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
-        vm.expectRevert(IMidnight.ConsumedUnits.selector);
-        take(secondRevertingTake, borrower, lenderOffer);
+        takeExpectRevert(secondRevertingTake, borrower, lenderOffer, IMidnight.ConsumedUnits.selector);
 
         take(secondPassingTake, borrower, lenderOffer);
     }
@@ -587,8 +579,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, lender, borrowerOffer);
 
-        vm.expectRevert(IMidnight.ConsumedUnits.selector);
-        take(secondFill + 1, lender, borrowerOffer2);
+        takeExpectRevert(secondFill + 1, lender, borrowerOffer2, IMidnight.ConsumedUnits.selector);
 
         take(secondFill, lender, borrowerOffer2);
     }
@@ -606,8 +597,7 @@ contract TakeTest is BaseTest {
 
         take(firstFill, borrower, lenderOffer);
 
-        vm.expectRevert(IMidnight.ConsumedUnits.selector);
-        take(secondFill + 1, borrower, lenderOffer2);
+        takeExpectRevert(secondFill + 1, borrower, lenderOffer2, IMidnight.ConsumedUnits.selector);
 
         take(secondFill, borrower, lenderOffer2);
     }
@@ -676,8 +666,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(100, lender, borrowerOffer);
+        takeExpectRevert(100, lender, borrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testSellPastMaturity(uint256 timestamp) public {
@@ -689,8 +678,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(obligation, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(100, borrower, lenderOffer);
+        takeExpectRevert(100, borrower, lenderOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testBuyUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
@@ -703,8 +691,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, lender, borrowerOffer);
+        takeExpectRevert(units, lender, borrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testSellUnhealthy(uint256 units, uint256 tick, uint256 collateralized) public {
@@ -717,31 +704,27 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(obligation, borrower, collateralized);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testSession() public {
         vm.prank(lender);
         midnight.shuffleSession(lender);
 
-        vm.expectRevert(IMidnight.InvalidSession.selector);
-        take(100, borrower, lenderOffer);
+        takeExpectRevert(100, borrower, lenderOffer, IMidnight.InvalidSession.selector);
     }
 
     function testTakeOfferNotStarted(uint256 start) public {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
-        vm.expectRevert(IMidnight.OfferNotStarted.selector);
-        take(0, borrower, badOffer);
+        takeExpectRevert(0, borrower, badOffer, IMidnight.OfferNotStarted.selector);
     }
 
     function testTakeOfferExpired(uint256 elapsed) public {
         elapsed = bound(elapsed, 1, type(uint64).max);
         vm.warp(lenderOffer.expiry + elapsed);
-        vm.expectRevert(IMidnight.OfferExpired.selector);
-        take(0, borrower, lenderOffer);
+        takeExpectRevert(0, borrower, lenderOffer, IMidnight.OfferExpired.selector);
     }
 
     function testTakeBuyerAndSellerSame(uint256 pkey) public {
@@ -750,8 +733,7 @@ contract TakeTest is BaseTest {
         privateKey[taker] = pkey;
         lenderOffer.maker = taker;
 
-        vm.expectRevert(IMidnight.SelfTake.selector);
-        take(0, taker, lenderOffer);
+        takeExpectRevert(0, taker, lenderOffer, IMidnight.SelfTake.selector);
     }
 
     // maxSellerAssets / maxBuyerAssets tests.
@@ -764,8 +746,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = 1;
 
-        vm.expectRevert(IMidnight.ConsumedSellerAssets.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.ConsumedSellerAssets.selector);
     }
 
     function testMaxSellerAssetsPass(uint256 units) public {
@@ -789,8 +770,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = 1;
 
-        vm.expectRevert(IMidnight.ConsumedBuyerAssets.selector);
-        take(units, lender, borrowerOffer);
+        takeExpectRevert(units, lender, borrowerOffer, IMidnight.ConsumedBuyerAssets.selector);
     }
 
     function testMaxBuyerAssetsPass(uint256 units) public {
@@ -863,8 +843,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 0;
 
-        vm.expectRevert(IMidnight.MultipleNonZero.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.MultipleNonZero.selector);
     }
 
     function testMultipleMaxRevertUnitsAndSeller() public {
@@ -875,8 +854,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxSellerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZero.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.MultipleNonZero.selector);
     }
 
     function testMultipleMaxRevertAllThree() public {
@@ -888,43 +866,29 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZero.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.MultipleNonZero.selector);
     }
 
     // test tree / signatures.
 
     function testTakeInvalidRoot(bytes32 invalidRoot) public {
         vm.assume(invalidRoot != root([lenderOffer]));
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
         vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            invalidRoot,
-            new bytes32[](0)
+            100, borrower, address(0), hex"", borrower, lenderOffer, _ratifierData, invalidRoot, new bytes32[](0)
         );
     }
 
     function testTakeInvalidSignature() public {
-        vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
         Signature memory _sig = Signature({v: 1, r: 0, s: 0});
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
+        vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
         vm.prank(borrower);
         midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            abi.encode(_sig, uint256(0)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            100, borrower, address(0), hex"", borrower, lenderOffer, abi.encode(_sig, uint256(0)), _root, _proof
         );
     }
 
@@ -940,18 +904,11 @@ contract TakeTest is BaseTest {
         vm.prank(address(ratifier));
 
         midnight.setIsAuthorized(address(ratifier), address(ratifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherPrivateKey));
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
         assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
         assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
     }
@@ -970,55 +927,32 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherPrivateKey));
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
         assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
         assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
     }
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
         vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
-        midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            _path
-        );
+        midnight.take(100, borrower, address(0), hex"", borrower, lenderOffer, _ratifierData, _root, _path);
     }
 
     function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
         vm.assume(_path.length >= 1);
         vm.assume(_path[0] != keccak256(abi.encode(otherOffer)));
+        bytes memory _ratifierData = ratifierData([lenderOffer, otherOffer]);
+        bytes32 _root = root([lenderOffer, otherOffer]);
         vm.expectRevert(IMidnight.InvalidProof.selector);
         vm.prank(borrower);
-        midnight.take(
-            100,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            _path
-        );
+        midnight.take(100, borrower, address(0), hex"", borrower, lenderOffer, _ratifierData, _root, _path);
     }
 
     function testTakeTwoLeaves(uint256 units, Offer memory otherOffer) public {
@@ -1028,18 +962,11 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         lenderOffer.maxUnits = units;
 
+        bytes memory _ratifierData = ratifierData([lenderOffer, otherOffer]);
+        bytes32 _root = root([lenderOffer, otherOffer]);
+        bytes32[] memory _proof = proof([lenderOffer, otherOffer]);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer, otherOffer]),
-            root([lenderOffer, otherOffer]),
-            proof([lenderOffer, otherOffer])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, lenderOffer, _ratifierData, _root, _proof);
     }
 
     // Adding salt to the expiry to test different ordering (see commutativeHash).
@@ -1063,69 +990,37 @@ contract TakeTest is BaseTest {
         Offer memory offer3 = lenderOffer;
         offer3.expiry += bound(saltTimestamp3, 0, type(uint32).max);
 
+        bytes memory _ratifierData = ratifierData([offer0, offer1, offer2, offer3]);
+        bytes32 _root = root([offer0, offer1, offer2, offer3]);
+        bytes32[] memory _proof;
+
         uint256 snapshot = vm.snapshotState();
+        _proof = proofFirstLeaf([offer0, offer1, offer2, offer3]);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            offer0,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofFirstLeaf([offer0, offer1, offer2, offer3])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, offer0, _ratifierData, _root, _proof);
 
         vm.revertToState(snapshot);
+        _proof = proofSecondLeaf([offer0, offer1, offer2, offer3]);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            offer1,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofSecondLeaf([offer0, offer1, offer2, offer3])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, offer1, _ratifierData, _root, _proof);
 
         vm.revertToState(snapshot);
+        _proof = proofThirdLeaf([offer0, offer1, offer2, offer3]);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            offer2,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofThirdLeaf([offer0, offer1, offer2, offer3])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, offer2, _ratifierData, _root, _proof);
 
         vm.revertToState(snapshot);
+        _proof = proofFourthLeaf([offer0, offer1, offer2, offer3]);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            offer3,
-            ratifierData([offer0, offer1, offer2, offer3]),
-            root([offer0, offer1, offer2, offer3]),
-            proofFourthLeaf([offer0, offer1, offer2, offer3])
-        );
+        midnight.take(units, borrower, address(0), hex"", borrower, offer3, _ratifierData, _root, _proof);
     }
 
     function testTakeNotRatified() public {
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.expectRevert();
         vm.prank(borrower);
-        midnight.take(
-            100, borrower, address(0), hex"", borrower, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
-        );
+        midnight.take(100, borrower, address(0), hex"", borrower, lenderOffer, emptySig, _root, _proof);
     }
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
@@ -1136,18 +1031,11 @@ contract TakeTest is BaseTest {
         vm.assume(sender != vm.addr(makerSecretKey));
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testTakeOfferRatified(address maker, address sender) public {
@@ -1159,10 +1047,10 @@ contract TakeTest is BaseTest {
         lenderOffer.ratifier = address(ratifier);
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0, sender, address(0), hex"", sender, lenderOffer, emptySig, root([lenderOffer]), proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, emptySig, _root, _proof);
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
@@ -1176,19 +1064,12 @@ contract TakeTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
 
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherSecretKey));
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
         vm.prank(sender);
-        midnight.take(
-            100,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(100, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testOfferAuthorizationAuthorizedSigner(uint256 makerSecretKey, address sender, uint256 otherSecretKey)
@@ -1209,18 +1090,11 @@ contract TakeTest is BaseTest {
         midnight.setIsAuthorized(vm.addr(makerSecretKey), address(ecrecoverRatifier), true);
         vm.prank(lenderOffer.maker);
         midnight.setIsAuthorized(lenderOffer.maker, vm.addr(otherSecretKey), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherSecretKey));
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherSecretKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
@@ -1235,19 +1109,12 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(signerPrivateKey));
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.expectRevert(IMidnight.RatifierFail.selector);
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(signerPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testOrderNotAuthorized(address taker, address sender) public {
@@ -1255,36 +1122,22 @@ contract TakeTest is BaseTest {
         vm.assume(taker != sender);
         vm.assume(!midnight.isAuthorized(taker, sender));
 
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.expectRevert(IMidnight.TakerUnauthorized.selector);
         vm.prank(sender);
-        midnight.take(
-            100,
-            taker,
-            address(0),
-            hex"",
-            taker,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(100, taker, address(0), hex"", taker, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testOrderByTaker(address taker) public {
         vm.assume(taker != address(0));
         vm.assume(taker != lenderOffer.maker);
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(taker);
-        midnight.take(
-            0,
-            taker,
-            address(0),
-            hex"",
-            taker,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, taker, address(0), hex"", taker, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testOrderByAuthorized(address taker, address sender) public {
@@ -1294,18 +1147,11 @@ contract TakeTest is BaseTest {
         vm.assume(taker != lenderOffer.maker);
         vm.prank(taker);
         midnight.setIsAuthorized(taker, sender, true);
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(sender);
-        midnight.take(
-            0,
-            taker,
-            address(0),
-            hex"",
-            taker,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(0, taker, address(0), hex"", taker, lenderOffer, _ratifierData, _root, _proof);
     }
 
     // test callbacks.
@@ -1346,17 +1192,12 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, callback, true);
 
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(borrower);
         midnight.take(
-            units,
-            borrower,
-            callback,
-            abi.encode(0, collateral),
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            units, borrower, callback, abi.encode(0, collateral), borrower, lenderOffer, _ratifierData, _root, _proof
         );
         assertEq(midnight.collateral(id, borrower, 0), collateral);
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
@@ -1378,6 +1219,9 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(callback), true);
 
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.prank(borrower);
         midnight.take(
             units,
@@ -1386,9 +1230,9 @@ contract TakeTest is BaseTest {
             abi.encode(0, collateral, repaidUnits),
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            _ratifierData,
+            _root,
+            _proof
         );
 
         assertFalse(callback.liquidateSucceeded());
@@ -1417,29 +1261,13 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(callback), true);
 
-        callback.prepare(
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer]),
-            units,
-            0,
-            2 * collateral,
-            repaidUnits
-        );
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
+        callback.prepare(lenderOffer, _ratifierData, _root, _proof, units, 0, 2 * collateral, repaidUnits);
 
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            address(callback),
-            "",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(units, borrower, address(callback), "", borrower, lenderOffer, _ratifierData, _root, _proof);
 
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
@@ -1458,19 +1286,12 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
         address callback = address(new InvalidSellCallback());
 
+        bytes memory _ratifierData = ratifierData([lenderOffer]);
+        bytes32 _root = root([lenderOffer]);
+        bytes32[] memory _proof = proof([lenderOffer]);
         vm.expectRevert(IMidnight.WrongSellCallbackReturnValue.selector);
         vm.prank(borrower);
-        midnight.take(
-            units,
-            borrower,
-            callback,
-            hex"",
-            borrower,
-            lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
-        );
+        midnight.take(units, borrower, callback, hex"", borrower, lenderOffer, _ratifierData, _root, _proof);
     }
 
     function testSellBuyerCallback(uint256 units) public {
@@ -1501,6 +1322,9 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
+        bytes memory _ratifierData = ratifierData([borrowerOffer]);
+        bytes32 _root = root([borrowerOffer]);
+        bytes32[] memory _proof = proof([borrowerOffer]);
         vm.prank(_otherLender);
         midnight.take(
             units,
@@ -1509,9 +1333,9 @@ contract TakeTest is BaseTest {
             abi.encode(address(loanToken), assets),
             address(0),
             borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
+            _ratifierData,
+            _root,
+            _proof
         );
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
@@ -1546,8 +1370,7 @@ contract TakeTest is BaseTest {
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
         collateralize(obligation, borrower, units);
-        vm.expectRevert();
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer);
     }
 
     // fee>0, sell, units
@@ -1585,19 +1408,12 @@ contract TakeTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Signature memory badSig;
+        bytes32 _root = root(zeroOffer);
 
         vm.expectRevert(IMidnight.RatifierUnauthorized.selector);
         vm.prank(borrower);
         midnight.take(
-            units,
-            borrower,
-            address(0),
-            hex"",
-            borrower,
-            zeroOffer,
-            abi.encode(badSig),
-            root(zeroOffer),
-            new bytes32[](0)
+            units, borrower, address(0), hex"", borrower, zeroOffer, abi.encode(badSig), _root, new bytes32[](0)
         );
     }
 
@@ -1611,19 +1427,12 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), callback, assets);
         collateralize(obligation, borrower, units);
 
+        bytes memory _ratifierData = ratifierData([borrowerOffer]);
+        bytes32 _root = root([borrowerOffer]);
+        bytes32[] memory _proof = proof([borrowerOffer]);
         vm.expectRevert(IMidnight.WrongBuyCallbackReturnValue.selector);
         vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            callback,
-            hex"",
-            address(0),
-            borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
+        midnight.take(units, lender, callback, hex"", address(0), borrowerOffer, _ratifierData, _root, _proof);
     }
 }
 
@@ -1640,12 +1449,13 @@ contract InvalidBuyCallback is IBuyCallback {
 contract BorrowCallback is ISellCallback {
     bytes public recordedData;
     bytes32 public recordedId;
+    IdLibBridge internal idLibBridge = new IdLibBridge();
 
     function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
-        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        require(id == idLibBridge.toId(obligation, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         recordedData = data;
         (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
@@ -1659,12 +1469,13 @@ contract BorrowCallback is ISellCallback {
 contract ReentrantLiquidateBorrowCallback is ISellCallback {
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
+    IdLibBridge internal idLibBridge = new IdLibBridge();
 
     function onSell(bytes32 id, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
-        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        require(id == idLibBridge.toId(obligation, block.chainid, msg.sender), "wrong id");
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
         address collateralToken = obligation.collateralParams[collateralIndex].token;
@@ -1702,6 +1513,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
     uint256 internal storedCollateralIndex;
     uint256 internal storedCollateralAmount;
     uint256 internal storedRepaidUnits;
+    IdLibBridge internal idLibBridge = new IdLibBridge();
 
     function prepare(
         Offer memory _offer,
@@ -1727,7 +1539,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         external
         returns (bytes32)
     {
-        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        require(id == idLibBridge.toId(obligation, block.chainid, msg.sender), "wrong id");
         if (!reentered) {
             uint256 idx = storedCollateralIndex;
             address collateralToken = obligation.collateralParams[idx].token;
@@ -1763,12 +1575,13 @@ contract LendCallback is IBuyCallback {
     bytes public recordedData;
 
     bytes32 public recordedId;
+    IdLibBridge internal idLibBridge = new IdLibBridge();
 
     function onBuy(bytes32 id, Obligation memory obligation, address, uint256 buyerAssets, uint256, bytes memory data)
         external
         returns (bytes32)
     {
-        require(id == IdLib.toId(obligation, block.chainid, msg.sender), "wrong id");
+        require(id == idLibBridge.toId(obligation, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         recordedData = data;
         ERC20(obligation.loanToken).approve(msg.sender, buyerAssets);

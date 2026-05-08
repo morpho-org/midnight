@@ -98,8 +98,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert(UtilsLib.CastOverflow.selector);
-        take(amount, lender, borrowerOffer);
+        takeExpectRevert(amount, lender, borrowerOffer, UtilsLib.CastOverflow.selector);
     }
 
     function testSupplyCollateralMaxAmount() public {

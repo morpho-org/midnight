@@ -209,8 +209,7 @@ contract TradingFeeTest is BaseTest {
 
         collateralize(obligation, borrower, MAX_DEBT);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
-        take(units, lender, borrowerOffer);
+        takeExpectRevert(units, lender, borrowerOffer, IMidnight.SellerIsLiquidatable.selector);
     }
 
     function testEarlyTradingFee(uint256 units, uint256 sellerTick, uint256 tradingFee360Days, uint256 maturity)

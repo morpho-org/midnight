@@ -100,8 +100,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(borrower, true);
 
-        vm.expectRevert(IMidnight.BuyerGatedFromIncreasingCredit.selector);
-        take(units, lender, borrowerOffer);
+        takeExpectRevert(units, lender, borrowerOffer, IMidnight.BuyerGatedFromIncreasingCredit.selector);
     }
 
     function testEnterGateBlocksNonWhitelistedSeller(uint256 units) public {
@@ -110,8 +109,7 @@ contract GateTest is BaseTest {
 
         gate.setWhitelisted(lender, true);
 
-        vm.expectRevert(IMidnight.SellerGatedFromIncreasingDebt.selector);
-        take(units, borrower, lenderOffer);
+        takeExpectRevert(units, borrower, lenderOffer, IMidnight.SellerGatedFromIncreasingDebt.selector);
     }
 
     function testEnterGateAllowsWhitelistedUsers(uint256 units) public {

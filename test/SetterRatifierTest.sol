@@ -47,7 +47,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testOnRatifyAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = utilsLibBridge.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, borrower, true);
@@ -62,7 +62,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = utilsLibBridge.hashOffer(offer);
 
         vm.prank(lender);
         midnight.setIsAuthorized(lender, address(setterRatifier), true);
@@ -78,7 +78,7 @@ contract SetterRatifierTest is BaseTest {
 
     function testOnRatifyNotMidnight() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = UtilsLib.hashOffer(offer);
+        bytes32 _root = utilsLibBridge.hashOffer(offer);
 
         vm.prank(lender);
         setterRatifier.setIsRatified(lender, _root, true);

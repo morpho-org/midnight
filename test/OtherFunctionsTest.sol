@@ -11,7 +11,7 @@ import {
     IFlashLoanCallback
 } from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {IdLib} from "../src/libraries/IdLib.sol";
+import {IdLibBridge} from "./helpers/IdLibBridge.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -721,6 +721,7 @@ contract RepayCallback {
     bytes public recordedData;
     uint256 public recordedUnits;
     address public recordedOnBehalf;
+    IdLibBridge internal idLibBridge = new IdLibBridge();
 
     function repay(Midnight midnight, Obligation memory obligation, uint256 units, address onBehalf, bytes memory data)
         external
@@ -736,7 +737,7 @@ contract RepayCallback {
         address onBehalf,
         bytes memory data
     ) external returns (bytes32) {
-        require(obligationId == IdLib.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
+        require(obligationId == idLibBridge.toId(obligation, block.chainid, msg.sender), "wrong obligationId");
         recordedObligationId = obligationId;
         recordedData = data;
         recordedUnits = units;

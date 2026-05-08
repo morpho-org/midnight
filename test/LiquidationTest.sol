@@ -11,7 +11,6 @@ import {
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
 import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -918,7 +917,7 @@ contract LiquidationTest is BaseTest {
         address,
         bytes memory data
     ) public returns (bytes32) {
-        require(_id == IdLib.toId(_obligation, block.chainid, msg.sender), "wrong id");
+        require(_id == idLibBridge.toId(_obligation, block.chainid, msg.sender), "wrong id");
         recordedRepaidUnits = _repaidUnits;
         recordedData = data;
         return CALLBACK_SUCCESS;
