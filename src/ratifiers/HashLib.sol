@@ -40,31 +40,26 @@ library HashLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of an Offer.
-    /// @dev Split into two abi.encodes to avoid stack-too-deep without optimizer (Certora compiles in that mode).
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         return keccak256(
-            bytes.concat(
-                abi.encode(
-                    OFFER_TYPEHASH,
-                    hashObligation(offer.obligation),
-                    offer.buy,
-                    offer.maker,
-                    offer.start,
-                    offer.expiry,
-                    offer.tick,
-                    offer.group,
-                    offer.session
-                ),
-                abi.encode(
-                    offer.callback,
-                    keccak256(offer.callbackData),
-                    offer.receiverIfMakerIsSeller,
-                    offer.ratifier,
-                    offer.reduceOnly,
-                    offer.maxUnits,
-                    offer.maxSellerAssets,
-                    offer.maxBuyerAssets
-                )
+            abi.encode(
+                OFFER_TYPEHASH,
+                hashObligation(offer.obligation),
+                offer.buy,
+                offer.maker,
+                offer.start,
+                offer.expiry,
+                offer.tick,
+                offer.group,
+                offer.session,
+                offer.callback,
+                keccak256(offer.callbackData),
+                offer.receiverIfMakerIsSeller,
+                offer.ratifier,
+                offer.reduceOnly,
+                offer.maxUnits,
+                offer.maxSellerAssets,
+                offer.maxBuyerAssets
             )
         );
     }
