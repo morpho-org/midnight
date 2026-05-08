@@ -445,7 +445,15 @@ contract MidnightBundlesTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight), 1000, type(uint256).max, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+            address(midnight),
+            1000,
+            type(uint256).max,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
         );
     }
 
@@ -530,7 +538,15 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), units, 0, borrower, receiver, takes, new CollateralTransfer[](0), referralFeePct, referrer
+            address(midnight),
+            units,
+            0,
+            borrower,
+            receiver,
+            takes,
+            new CollateralTransfer[](0),
+            referralFeePct,
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), units, "units sold");
@@ -675,7 +691,15 @@ contract MidnightBundlesTest is BaseTest {
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight), 1, type(uint256).max, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
+            address(midnight),
+            1,
+            type(uint256).max,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            WAD,
+            address(0)
         );
         vm.stopPrank();
     }
