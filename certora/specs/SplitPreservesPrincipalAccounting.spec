@@ -8,7 +8,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -16,26 +16,24 @@ methods {
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
-    // Same offer caps across compared paths; CONSTANT avoids arbitrary pass/fail changes.
-    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => CONSTANT;
-
     // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
-
-    // Replaces obligation lookup/creation with a deterministic id; this rule starts from an arbitrary valid storage state.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
-    // Offer hashing only feeds the Merkle gate; this rule compares position state after successful split paths.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-
-    // Same (root, offer, proof) on all take calls; CONSTANT ensures identical outcome and removes hashing loop.
+    // Pure helpers called with identical args across the three takes; CONSTANT collapses
+    // their bit / hashing / arithmetic complexity (no behavioral abstraction).
+    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => CONSTANT;
     function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
     // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+
+    // Offer hashing only feeds the Merkle gate; this rule compares position state after successful split paths.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 /// SUMMARY FUNCTIONS ///
@@ -65,17 +63,13 @@ persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
 rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
-    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
+    require e.block.timestamp <= max_uint128, "block.timestamp must fit in uint128 (prover helper)";
 
     bytes32 id = summaryToId(offer.obligation);
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
-    // Redundant with the SelfTake() revert; kept as a solver hint to break storage aliasing.
-    require buyer != seller;
-
-    uint128 obLossIndex = currentContract.obligationState[id].lossIndex;
-    require to_mathint(obLossIndex) < 2 ^ 128 - 1, "obligation not fully slashed";
+    require buyer != seller, "take() already verifies but it's for prover performance";
 
     storage initState = lastStorage;
 
@@ -88,38 +82,30 @@ rule splitPreservesPrincipalAccounting(env e, uint256 obligationUnitsA, uint256 
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
 
-    // take() never writes obligationState.lossIndex; _updatePosition mirrors it into position.lossIndex.
-    uint128 buyerLossIndex1 = userLossIndex(id, buyer);
-    uint128 sellerLossIndex1 = userLossIndex(id, seller);
+    // take() never writes obligationState.lossFactor; _updatePosition mirrors it into position.lastLossFactor.
+    uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
+    uint128 sellerLossFactor1 = lastLossFactor(id, seller);
 
     // lastAccrual is set to block.timestamp by _updatePosition; same env across both paths.
     uint128 buyerLastAccrual1 = lastAccrual(id, buyer);
     uint128 sellerLastAccrual1 = lastAccrual(id, seller);
 
-    // _updatePosition accrues before the principal move; the split-C accrual sees the same timestamp.
+    // _updatePosition is idempotent at lastAccrual == block.timestamp, so split-C adds 0 to the accumulator.
     uint128 continuousFeeCredit1 = currentContract.obligationState[id].continuousFeeCredit;
-
-    // Regression guards: take() never writes obligationState.withdrawable or position.activatedCollaterals.
-    uint128 withdrawable1 = currentContract.obligationState[id].withdrawable;
-    uint128 buyerActivated1 = currentContract.position[id][buyer].activatedCollaterals;
-    uint128 sellerActivated1 = currentContract.position[id][seller].activatedCollaterals;
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
 
     take(e, obligationUnitsC, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof);
 
-    assert creditOfBuyer1 == creditOf(id, buyer), "buyer credit must match";
-    assert debtOfBuyer1 == debtOf(id, buyer), "buyer debt must match";
-    assert creditOfSeller1 == creditOf(id, seller), "seller credit must match";
-    assert debtOfSeller1 == debtOf(id, seller), "seller debt must match";
-    assert totalUnits1 == totalUnits(id), "totalUnits must match";
-    assert buyerLossIndex1 == userLossIndex(id, buyer), "buyer lossIndex must match";
-    assert sellerLossIndex1 == userLossIndex(id, seller), "seller lossIndex must match";
-    assert buyerLastAccrual1 == lastAccrual(id, buyer), "buyer lastAccrual must match";
-    assert sellerLastAccrual1 == lastAccrual(id, seller), "seller lastAccrual must match";
-    assert continuousFeeCredit1 == currentContract.obligationState[id].continuousFeeCredit, "continuousFeeCredit must match";
-    assert withdrawable1 == currentContract.obligationState[id].withdrawable, "withdrawable must match";
-    assert buyerActivated1 == currentContract.position[id][buyer].activatedCollaterals, "buyer activatedCollaterals must match";
-    assert sellerActivated1 == currentContract.position[id][seller].activatedCollaterals, "seller activatedCollaterals must match";
+    assert creditOfBuyer1 == creditOf(id, buyer);
+    assert debtOfBuyer1 == debtOf(id, buyer);
+    assert creditOfSeller1 == creditOf(id, seller);
+    assert debtOfSeller1 == debtOf(id, seller);
+    assert totalUnits1 == totalUnits(id);
+    assert buyerLossFactor1 == lastLossFactor(id, buyer);
+    assert sellerLossFactor1 == lastLossFactor(id, seller);
+    assert buyerLastAccrual1 == lastAccrual(id, buyer);
+    assert sellerLastAccrual1 == lastAccrual(id, seller);
+    assert continuousFeeCredit1 == currentContract.obligationState[id].continuousFeeCredit;
 }

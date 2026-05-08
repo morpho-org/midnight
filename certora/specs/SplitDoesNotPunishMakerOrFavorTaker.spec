@@ -7,30 +7,30 @@ methods {
 
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
-    // Same offer.tick across all take calls; CONSTANT ensures identical return value.
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
+    // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
+    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
+    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 
     // Summarize toId: deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // Offer hashing only feeds the Merkle gate; this rule asserts asset arithmetic on successful split paths.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-
-    // Merkle proof: irrelevant to asset computation, removes hashing loop.
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
-
     // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
+
+    // Pure helpers called with identical args across the three takes; CONSTANT collapses
+    // their bit / hashing / arithmetic complexity (no behavioral abstraction).
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
+    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => CONSTANT;
 
     // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
+    // Offer hashing only feeds the Merkle gate; this rule asserts asset arithmetic on successful split paths.
+    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+
     // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
-
-    // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
-    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
-    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
 }
 
 /// GHOSTS ///
@@ -65,12 +65,11 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 /// Splitting an offer does not punish the maker or favor the taker on asset amounts.
 /// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal (within 1 wei) when split, taker receives less or equal when split.
-/// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal ((within 1 wei) when split, taker pays more or equal when split.
+/// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal (within 1 wei) when split, taker pays more or equal when split.
 rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint256 obligationUnitsB, uint256 obligationUnitsC, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require obligationUnitsA == require_uint256(obligationUnitsB + obligationUnitsC), "obligationUnitsA must be equal to obligationUnitsB + obligationUnitsC";
 
-    // block.timestamp must fit in uint128 (Midnight.sol casts it).
-    require to_mathint(e.block.timestamp) < 2 ^ 128, "block.timestamp must fit in uint128";
+    require e.block.timestamp <= max_uint128, "block.timestamp must fit in uint128";
 
     storage initState = lastStorage;
 
@@ -116,18 +115,17 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) >= to_mathint(buyerAssetsA);
     assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA) + 1;
 
-    // Protocol trading fee delta (buyerAssets - sellerAssets) drifts by at most 1 wei across splits.
-    // Derivable from the bounds above: in each rounding mode, buyer- and seller-side deviations are
-    // co-directional, so the delta tightens to ±1 rather than ±2.
+    // Protocol trading fee delta (buyerAssets - sellerAssets) can change by at most 1 wei across splits.
     assert to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) + 1;
     assert to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) <= to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) + 1;
 
-    // Maker's offer cap consumption drifts by at most 1 wei across splits, regardless of mode
-    // (maxUnits: exact; maxSellerAssets/maxBuyerAssets: bounded by the asset deviation).
+    // Maker's offer cap consumption can change by at most 1 wei across splits in maxSellerAssets/maxBuyerAssets mode
+    // (bounded by the asset deviation), and is exact in maxUnits mode (consumed += units, with A == B + C).
     assert to_mathint(consumedAfterA) <= to_mathint(consumedAfterBC) + 1;
     assert to_mathint(consumedAfterBC) <= to_mathint(consumedAfterA) + 1;
+    assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumedAfterA == consumedAfterBC;
 
-    // Protocol fee storage drift matches the delta drift: claimableTradingFee += buyerAssets - sellerAssets per take.
+    // Protocol fee storage can change matches the delta changes: claimableTradingFee += buyerAssets - sellerAssets per take.
     assert to_mathint(claimableAfterA) <= to_mathint(claimableAfterBC) + 1;
     assert to_mathint(claimableAfterBC) <= to_mathint(claimableAfterA) + 1;
 }
