@@ -152,8 +152,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
-/// @dev creditOf, pendingFee, and lossFactor are not up to date. One must use updatePositionView to get the up to date
-/// values.
+/// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
@@ -879,6 +878,7 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
+    /// @dev The trading fees are 0 until the obligation is created, then set to the default value.
     function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
         return [
             obligationState[id].tradingFee0,
@@ -891,6 +891,7 @@ contract Midnight is IMidnight {
         ];
     }
 
+    /// @dev The continuous fee is 0 until the obligation is created, then set to the default value.
     function continuousFee(bytes32 id) external view returns (uint32) {
         return obligationState[id].continuousFee;
     }

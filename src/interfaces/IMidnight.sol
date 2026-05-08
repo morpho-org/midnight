@@ -37,6 +37,7 @@ struct Offer {
     uint256 maxBuyerAssets;
 }
 
+/// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossFactor;
