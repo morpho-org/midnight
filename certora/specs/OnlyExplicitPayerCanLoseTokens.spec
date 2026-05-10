@@ -25,8 +25,6 @@ methods {
     // Over-approximation for view functions: we are not looking at reverts and they cannot call callbacks.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 }
 
 persistent ghost address topLevelCaller;
@@ -96,7 +94,7 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 /// 1. msg.sender (when !offer.buy and buyerCallback == 0),
 /// 2. the buyerCallback that returned CALLBACK_SUCCESS,
 /// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker is the buyer with no callback).
-rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
     require e.msg.sender != currentContract, "only external calls";
 
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
@@ -113,14 +111,14 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
     allowFlashLoanCallbackAsPayer = false;
     badPullSeen = false;
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
 
     assert !badPullSeen;
 }
 
 /// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender
 /// or from a callback that returned CALLBACK_SUCCESS.
-rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector } {
+rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector } {
     require e.msg.sender != currentContract, "only external calls";
 
     topLevelCaller = e.msg.sender;
