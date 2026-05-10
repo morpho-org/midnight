@@ -12,8 +12,8 @@ uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
 uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
-uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("midnight.liquidationLocked"));
-bytes32 constant CALLBACK_SUCCESS = keccak256("MIDNIGHT CALLBACK SUCCESS");
+uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
+bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 /// @dev keccak256(COLLATERAL_PARAMS_TYPE)
@@ -36,7 +36,7 @@ uint256 constant LLTV_6 = 0.965e18;
 uint256 constant LLTV_7 = 0.98e18;
 uint256 constant LLTV_8 = 1e18;
 
-/// @dev Returns true if `lltv` is one of the allowed LLTV tiers.
+/// @dev Returns true if lltv is one of the allowed LLTV tiers.
 function isLltvAllowed(uint256 lltv) pure returns (bool) {
     return lltv == LLTV_0 || lltv == LLTV_1 || lltv == LLTV_2 || lltv == LLTV_3 || lltv == LLTV_4 || lltv == LLTV_5 || lltv == LLTV_6 || lltv == LLTV_7 || lltv == LLTV_8;
 }

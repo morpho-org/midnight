@@ -19,10 +19,6 @@ methods {
     // Skip obligation creation logic: removes the collateral-validation loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
-    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -73,7 +69,7 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
 
 /// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].activatedCollaterals, collateralIndex));
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
 /// LIF BOUNDARIES ///
 

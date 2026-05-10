@@ -10,4 +10,9 @@ fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
 wrap_comments = true
 
 [lint]
-exclude_lints = ["asm-keccak256", "unsafe-cheatcode", "incorrect-shift"]
+exclude_lints = [
+    "asm-keccak256",
+    "unsafe-cheatcode",
+    "incorrect-shift",
+    "block-timestamp",
+]
