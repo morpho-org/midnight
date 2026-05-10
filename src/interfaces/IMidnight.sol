@@ -37,6 +37,7 @@ struct Offer {
     uint256 maxBuyerAssets;
 }
 
+/// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossFactor;
@@ -56,7 +57,7 @@ struct ObligationState {
 struct Position {
     uint128 credit;
     uint128 pendingFee;
-    uint128 lossFactor;
+    uint128 lastLossFactor;
     uint128 lastAccrual;
     uint128 debt;
     uint128 collateralBitmap;
@@ -81,7 +82,6 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
-    error InvalidProof();
     error InvalidSession();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
@@ -115,7 +115,7 @@ interface IMidnight {
     function INITIAL_CHAIN_ID() external view returns (uint256);
 
     /// STORAGE GETTERS ///
-    function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
+    function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
     function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
@@ -142,7 +142,7 @@ interface IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
+    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
     function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
@@ -159,7 +159,7 @@ interface IMidnight {
     function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
-    function userLossFactor(bytes32 id, address user) external view returns (uint128);
+    function lastLossFactor(bytes32 id, address user) external view returns (uint128);
     function collateralBitmap(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Obligation memory obligation) external view returns (bytes32);
