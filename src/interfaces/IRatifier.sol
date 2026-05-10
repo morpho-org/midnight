@@ -5,5 +5,5 @@ pragma solidity >=0.5.0;
 import {Offer} from "./IMidnight.sol";
 
 interface IRatifier {
-    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external returns (bytes32);
+    function onRatify(Offer memory offer, bytes memory ratifierData) external returns (bytes32);
 }

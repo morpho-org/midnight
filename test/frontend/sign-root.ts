@@ -113,7 +113,7 @@ async function main() {
   const account = accounts[0].toLowerCase();
   const chainId = Number(await window.ethereum.request({ method: "eth_chainId" }));
 
-  const offerTree = buildOfferTree();
+  const offerTree = buildOfferTree(account);
 
   app.innerHTML = `
     <p>Connected: <code>${account}</code> &middot; Chain <code>${chainId}</code></p>
