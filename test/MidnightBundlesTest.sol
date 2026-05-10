@@ -1009,7 +1009,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(borrower);
         midnightBundles.repayAndWithdrawCollateral(
-            address(midnight), obligation, repayUnits, borrower, withdrawals, collateralReceiver
+            address(midnight), obligation, repayUnits, borrower, withdrawals, collateralReceiver, _noPermit()
         );
 
         assertEq(midnight.debtOf(id, borrower), units - repayUnits, "debt");

@@ -44,6 +44,6 @@ interface IMidnightBundles {
     function supplyCollateralAndUnitsTargetSell(address midnight, uint256 targetUnits, uint256 minSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient, TokenPermit[] memory collateralPermits) external;
     function assetsTargetBuyAndWithdrawCollateral(address midnight, uint256 targetBuyerAssets, uint256 minUnits, address taker, Take[] memory takes, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient, TokenPermit memory loanTokenPermit) external;
     function supplyCollateralAndAssetsTargetSell(address midnight, uint256 targetSellerAssets, uint256 maxUnits, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient, TokenPermit[] memory collateralPermits) external;
-    function repayAndWithdrawCollateral(address midnight, Obligation memory obligation, uint256 units, address onBehalf, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver) external;
+    function repayAndWithdrawCollateral(address midnight, Obligation memory obligation, uint256 units, address onBehalf, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, TokenPermit memory loanTokenPermit) external;
     // forgefmt: disable-end
 }

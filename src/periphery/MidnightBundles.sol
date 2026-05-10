@@ -266,12 +266,13 @@ contract MidnightBundles is IMidnightBundles {
         uint256 units,
         address onBehalf,
         CollateralTransfer[] calldata collateralWithdrawals,
-        address collateralReceiver
+        address collateralReceiver,
+        TokenPermit calldata loanTokenPermit
     ) external {
         require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
 
         address loanToken = obligation.loanToken;
-        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), units);
+        _pullToken(loanToken, msg.sender, units, loanTokenPermit);
         _forceApproveMax(loanToken, midnight);
 
         IMidnight(midnight).repay(obligation, units, onBehalf, address(0), "");
