@@ -339,7 +339,9 @@ contract SignatureTransfer is ISignatureTransfer, EIP712 {
     }
 
     function bitmapPositions(uint256 nonce) private pure returns (uint256 wordPos, uint256 bitPos) {
+        // forge-lint: disable-next-line(unsafe-typecast)
         wordPos = uint248(nonce >> 8);
+        // forge-lint: disable-next-line(unsafe-typecast)
         bitPos = uint8(nonce);
     }
 

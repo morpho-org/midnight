@@ -16,4 +16,3 @@ exclude_lints = [
     "incorrect-shift",
     "block-timestamp",
 ]
-ignore = ["test/vendor/Permit2.sol"]
