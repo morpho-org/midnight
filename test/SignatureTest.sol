@@ -9,6 +9,7 @@ import {
     Signature,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract SignatureTest is BaseTest {
@@ -22,31 +23,33 @@ contract SignatureTest is BaseTest {
         assertEq(domainSeparator, expectedDomainSeparator);
     }
 
-    function testOnRatifyValidSignature(bytes32 root, uint256 privateKey) public {
+    function testOnRatifyValidSignature(uint256 privateKey) public {
         privateKey = boundPrivateKey(privateKey);
         address maker = vm.addr(privateKey);
 
-        Signature memory signature = signature(root, privateKey, address(ecrecoverRatifier), 0);
-
         Offer memory offer;
         offer.maker = maker;
+        bytes32 root = HashLib.hashOffer(offer);
+
+        Signature memory signature = signature(root, privateKey, address(ecrecoverRatifier), 0);
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ecrecoverRatifier), true);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.onRatify(offer, root, abi.encode(signature, uint256(0)));
+        bytes32 result = ecrecoverRatifier.onRatify(offer, abi.encode(signature, uint256(0), root, new bytes32[](0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    function testOnRatifyInvalidSignature(bytes32 root) public {
+    function testOnRatifyInvalidSignature() public {
         Offer memory offer;
         offer.maker = borrower;
+        bytes32 root = HashLib.hashOffer(offer);
 
         Signature memory badSig;
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
-        ecrecoverRatifier.onRatify(offer, root, abi.encode(badSig, uint256(0)));
+        ecrecoverRatifier.onRatify(offer, abi.encode(badSig, uint256(0), root, new bytes32[](0)));
     }
 }

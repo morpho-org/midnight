@@ -11,9 +11,6 @@ methods {
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivUp(a, b, denominator);
 
-    // Over-approximation of the hashOffer function.
-    function UtilsLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => NONDET;
-
     // IdLib summary: remember the last id returned by toId.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
