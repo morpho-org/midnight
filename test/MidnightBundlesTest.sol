@@ -546,7 +546,7 @@ contract MidnightBundlesTest is BaseTest {
 
         offers[0].maxUnits = units;
 
-        // Zero trading fees so the borrower receives exactly `units` loan tokens for the sale.
+        // Zero trading fees so the borrower receives exactly units loan tokens for the sale.
         for (uint256 i; i <= 6; i++) {
             midnight.setObligationTradingFee(id, i, 0);
         }
@@ -562,8 +562,8 @@ contract MidnightBundlesTest is BaseTest {
         // Bound assets so the derived units never exceed outstanding debt.
         uint256 maxAssets = units.mulDivDown(WAD, WAD - referralFeePct);
         assets = bound(assets, 0, maxAssets);
-        uint256 expectedUnits = assets.mulDivDown(WAD - referralFeePct, WAD);
-        uint256 expectedFee = assets - expectedUnits;
+        uint256 expectedFee = assets.mulDivDown(referralFeePct, WAD);
+        uint256 expectedUnits = assets - expectedFee;
 
         // Top up the borrower so they can pay exactly assets.
         deal(address(loanToken), borrower, assets);
@@ -584,6 +584,50 @@ contract MidnightBundlesTest is BaseTest {
         );
 
         assertEq(midnight.debtOf(id, borrower), units - expectedUnits, "debt");
+        assertEq(loanToken.balanceOf(referrer), expectedFee, "referrer fee");
+        assertEq(loanToken.balanceOf(borrower), 0, "borrower spent assets");
+        assertEq(loanToken.balanceOf(address(midnightBundles)), 0, "bundler residual");
+    }
+
+    function testRepayWithReferralFeeFullDebtInversion(uint256 debt, uint256 referralFeePct) public {
+        debt = bound(debt, 1, uint256(type(uint128).max) * 3 / 4);
+        referralFeePct = bound(referralFeePct, 0, WAD - 1);
+        address referrer = makeAddr("referrer");
+
+        offers[0].maxUnits = debt;
+
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        Take[] memory sellTakes = new Take[](1);
+        sellTakes[0] = Take({offer: offers[0], units: debt, ratifierData: merkleRatifierData([offers[0]])});
+        collateralize(obligation, borrower, debt);
+        vm.prank(borrower);
+        midnightBundles.supplyCollateralAndUnitsTargetSell(
+            address(midnight), debt, 0, borrower, borrower, sellTakes, new CollateralTransfer[](0), 0, address(0)
+        );
+
+        uint256 assets = debt.mulDivDown(WAD, WAD - referralFeePct);
+        uint256 expectedFee = assets.mulDivDown(referralFeePct, WAD);
+
+        deal(address(loanToken), borrower, assets);
+        vm.prank(borrower);
+        loanToken.approve(address(midnightBundles), assets);
+
+        vm.prank(borrower);
+        midnightBundles.repayAndWithdrawCollateral(
+            address(midnight),
+            obligation,
+            assets,
+            borrower,
+            new CollateralTransfer[](0),
+            address(0),
+            referralFeePct,
+            referrer
+        );
+
+        assertEq(midnight.debtOf(id, borrower), 0, "debt fully repaid");
         assertEq(loanToken.balanceOf(referrer), expectedFee, "referrer fee");
         assertEq(loanToken.balanceOf(borrower), 0, "borrower spent assets");
         assertEq(loanToken.balanceOf(address(midnightBundles)), 0, "bundler residual");
@@ -725,7 +769,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight), targetBuyerAssets, 0, lender, takes, withdrawals, receiver, 0, address(0)
+            address(midnight), targetBuyerAssets, 0, lender, tkes, ithdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {

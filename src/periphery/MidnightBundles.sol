@@ -296,9 +296,9 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on
     /// Midnight.
-    /// @dev The msg.sender must have approved the contract to transfer `assets` of the obligation's loan token.
-    /// @dev Units repaid = assets * (WAD - pct) / WAD; fee = assets - units.
-    /// @dev To fully repay a debt `D`, pass assets = ceil(D * WAD / (WAD - pct)).
+    /// @dev The msg.sender must have approved the contract to transfer assets of the obligation's loan token.
+    /// @dev Fee = assets * pct / WAD; units repaid = assets - fee.
+    /// @dev To fully repay a debt D, pass assets = floor(D * WAD / (WAD - pct)).
     function repayAndWithdrawCollateral(
         address midnight,
         Obligation calldata obligation,
@@ -313,8 +313,8 @@ contract MidnightBundles is IMidnightBundles {
         require(referralFeePct < WAD, PctExceeded());
 
         address loanToken = obligation.loanToken;
-        uint256 units = assets.mulDivDown(WAD - referralFeePct, WAD);
-        uint256 referralFeeAssets = assets - units;
+        uint256 referralFeeAssets = assets.mulDivDown(referralFeePct, WAD);
+        uint256 units = assets - referralFeeAssets;
         SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), assets);
         _forceApproveMax(loanToken, midnight);
 
