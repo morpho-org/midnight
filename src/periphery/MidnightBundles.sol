@@ -50,8 +50,9 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            (uint256 b,, uint256 u) =
-                this.tryTake(midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(0), takes[i]);
+            (uint256 b,, uint256 u) = this.tryTake(
+                midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(0), takes[i]
+            );
             filledUnits += u;
             filledBuyerAssets += b;
         }
@@ -116,8 +117,9 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            (, uint256 s, uint256 u) =
-                this.tryTake(midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(this), takes[i]);
+            (, uint256 s, uint256 u) = this.tryTake(
+                midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(this), takes[i]
+            );
             filledUnits += u;
             filledSellerAssets += s;
         }
@@ -166,11 +168,12 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = UtilsLib
-                .min(
-                    TakeAmountsLib.buyerAssetsToUnits(midnight, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets),
-                    takes[i].units
-                );
+            uint256 unitsToTake = UtilsLib.min(
+                TakeAmountsLib.buyerAssetsToUnits(
+                    midnight, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
+                ),
+                takes[i].units
+            );
             (uint256 b,, uint256 u) = this.tryTake(midnight, unitsToTake, taker, address(0), takes[i]);
             filledBuyerAssets += b;
             filledUnits += u;
@@ -240,11 +243,12 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = UtilsLib
-                .min(
-                    TakeAmountsLib.sellerAssetsToUnits(midnight, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets),
-                    takes[i].units
-                );
+            uint256 unitsToTake = UtilsLib.min(
+                TakeAmountsLib.sellerAssetsToUnits(
+                    midnight, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets
+                ),
+                takes[i].units
+            );
             (, uint256 s, uint256 u) = this.tryTake(midnight, unitsToTake, taker, address(this), takes[i]);
             filledSellerAssets += s;
             filledUnits += u;
@@ -338,9 +342,9 @@ contract MidnightBundles is IMidnightBundles {
         returns (uint256 buyerAssets, uint256 sellerAssets, uint256 unitsTaken)
     {
         require(msg.sender == address(this), Unauthorized());
-        try IMidnight(midnight)
-            .take(units, taker, address(0), "", receiver, take_.offer, take_.ratifierData)
-        returns (uint256 b, uint256 s, uint256 u) {
+        try IMidnight(midnight).take(units, taker, address(0), "", receiver, take_.offer, take_.ratifierData) returns (
+            uint256 b, uint256 s, uint256 u
+        ) {
             return (b, s, u);
         } catch {
             return (0, 0, 0);

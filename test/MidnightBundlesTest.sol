@@ -877,16 +877,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight),
-            targetBuyerAssets,
-            0,
-            lender,
-            takes,
-            withdrawals,
-            receiver,
-            0,
-            address(0),
-            _noPermit()
+            address(midnight), targetBuyerAssets, 0, lender, takes, withdrawals, receiver, 0, address(0), _noPermit()
         );
 
         for (uint256 i; i < numCollaterals; i++) {
