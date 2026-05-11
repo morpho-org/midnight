@@ -34,10 +34,11 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        address loanToken = takes[0].offer.obligation.loanToken;
 
-        _forceApproveMax(loanToken, midnight);
-        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
+        _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
+        SafeTransferLib.safeTransferFrom(
+            takes[0].offer.obligation.loanToken, msg.sender, address(this), maxBuyerAssets
+        );
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
@@ -63,6 +64,7 @@ contract MidnightBundles is IMidnightBundles {
         require(filledUnits == targetUnits, OutOfOffers());
 
         Obligation memory obligation = takes[0].offer.obligation;
+        address loanToken = obligation.loanToken;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
             IMidnight(midnight)
                 .withdrawCollateral(
