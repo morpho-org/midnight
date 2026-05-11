@@ -92,12 +92,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
 /// @dev Offers should have the current session to be valid.
 ///
-/// ROOT
-/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
-/// the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
-/// Seaport for this mechanism.
-///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
 /// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
@@ -158,8 +152,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
-/// @dev creditOf, pendingFee, and lossFactor are not up to date. One must use updatePositionView to get the up to date
-/// values.
+/// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
@@ -352,9 +345,7 @@ contract Midnight is IMidnight {
         bytes memory takerCallbackData,
         address receiverIfTakerIsSeller,
         Offer memory offer,
-        bytes memory ratifierData,
-        bytes32 root,
-        bytes32[] memory proof
+        bytes memory ratifierData
     ) external returns (uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
@@ -366,10 +357,9 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
-        require(UtilsLib.isLeaf(root, UtilsLib.hashOffer(offer), proof), InvalidProof());
         require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).onRatify(offer, root, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
+        require(IRatifier(offer.ratifier).onRatify(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
@@ -933,6 +923,7 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
+    /// @dev The trading fees are 0 until the obligation is created, then set to the default value.
     function tradingFees(bytes32 id) external view returns (uint16[7] memory) {
         return [
             obligationState[id].tradingFee0,
@@ -945,6 +936,7 @@ contract Midnight is IMidnight {
         ];
     }
 
+    /// @dev The continuous fee is 0 until the obligation is created, then set to the default value.
     function continuousFee(bytes32 id) external view returns (uint32) {
         return obligationState[id].continuousFee;
     }
