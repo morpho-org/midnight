@@ -16,7 +16,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 
 /// MAX AMOUNTS
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
-/// @dev To create a "max" offer, use `type(uint128).max` for `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits`.
+/// @dev To create a "max" offer, use `type(uint128).max` for `maxAssets` or `maxUnits`.
 ///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in `touchObligation`):
@@ -51,7 +51,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of `maxSellerAssets`, `maxBuyerAssets`, or `maxUnits` can be nonzero per offer.
+/// @dev Only one of `maxAssets` or `maxUnits` can be nonzero per offer.
+/// @dev `maxAssets` caps max buyer assets if `offer.buy` is true, and caps max seller assets otherwise.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
@@ -267,7 +268,7 @@ contract Midnight is IMidnight {
     ) external returns (uint256, uint256, uint256) {
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), "multiple max");
+        require(UtilsLib.atMostOneNonZero(offer.maxAssets, offer.maxUnits), "multiple max");
         require(taker == msg.sender || isAuthorized[taker][msg.sender], "taker unauthorized");
         require(block.timestamp >= offer.start, "offer not started");
         require(block.timestamp <= offer.expiry, "offer expired");
@@ -312,19 +313,11 @@ contract Midnight is IMidnight {
         require(sellerPrice > 0, "seller price is zero");
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 currentConsumed = consumed[offer.maker][offer.group];
-        if (offer.maxSellerAssets > 0) {
+        if (offer.maxAssets > 0) {
+            uint256 consumable = offer.maxAssets - currentConsumed;
             units = UtilsLib.min(
                 units,
-                offer.buy
-                    ? (offer.maxSellerAssets - currentConsumed + 1).mulDivUp(WAD, sellerPrice) - 1
-                    : (offer.maxSellerAssets - currentConsumed).mulDivDown(WAD, sellerPrice)
-            );
-        } else if (offer.maxBuyerAssets > 0) {
-            units = UtilsLib.min(
-                units,
-                offer.buy
-                    ? (offer.maxBuyerAssets - currentConsumed + 1).mulDivUp(WAD, buyerPrice) - 1
-                    : (offer.maxBuyerAssets - currentConsumed).mulDivDown(WAD, buyerPrice)
+                offer.buy ? (consumable + 1).mulDivUp(WAD, offerPrice) - 1 : consumable.mulDivDown(WAD, offerPrice)
             );
         } else {
             units = UtilsLib.min(units, offer.maxUnits - currentConsumed);
@@ -333,8 +326,7 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 consumedDelta =
-            offer.maxSellerAssets > 0 ? sellerAssets : (offer.maxBuyerAssets > 0 ? buyerAssets : units);
+        uint256 consumedDelta = offer.maxAssets > 0 ? (offer.buy ? buyerAssets : sellerAssets) : units;
         uint256 newConsumed = consumed[offer.maker][offer.group] = currentConsumed + consumedDelta;
 
         Position storage buyerPos = position[id][buyer];
