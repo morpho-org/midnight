@@ -898,6 +898,10 @@ contract TakeTest is BaseTest {
         lenderOffer.maxBuyerAssets = 1;
         lenderOffer.tick = MAX_TICK - 1; // offerPrice < WAD
 
+        // Fully consume the offer before the take.
+        vm.prank(lender);
+        midnight.setConsumed(lenderOffer.group, lenderOffer.maxBuyerAssets, lender);
+
         uint256 lenderCreditBefore = midnight.creditOf(id, lender);
         uint256 borrowerDebtBefore = midnight.debtOf(id, borrower);
         uint256 totalUnitsBefore = midnight.totalUnits(id);
@@ -910,7 +914,7 @@ contract TakeTest is BaseTest {
         assertEq(sellerAssets, 0);
 
         // Nothing observable to the cap or token balances changed:
-        assertEq(midnight.consumed(lender, lenderOffer.group), 0);
+        assertEq(midnight.consumed(lender, lenderOffer.group), lenderOffer.maxBuyerAssets);
         assertEq(loanToken.balanceOf(lender), lenderBalBefore);
         assertEq(loanToken.balanceOf(borrower), borrowerBalBefore);
         // But position state strictly changed:
