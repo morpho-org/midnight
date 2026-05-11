@@ -28,6 +28,10 @@ contract Utils {
         return UtilsLib.msb(bitmap);
     }
 
+    function countBits(uint128 bitmap) external pure returns (uint256) {
+        return UtilsLib.countBits(bitmap);
+    }
+
     function emptyOffer() external pure returns (Offer memory) {
         Offer memory offer;
         return offer;

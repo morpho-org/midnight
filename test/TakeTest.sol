@@ -3,16 +3,11 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {
-    IEcrecoverRatifier,
-    Signature,
-    EIP712_DOMAIN_TYPEHASH
-} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
-import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
@@ -929,7 +924,7 @@ contract TakeTest is BaseTest {
     function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender) public {
         vm.assume(sender != address(0));
         otherPrivateKey = boundPrivateKey(otherPrivateKey);
-        RatifyCallback ratifier = new RatifyCallback();
+        IsRatifiedCallback ratifier = new IsRatifiedCallback();
         lenderOffer.maker = address(ratifier);
         lenderOffer.ratifier = address(ratifier);
 
@@ -938,18 +933,10 @@ contract TakeTest is BaseTest {
         vm.prank(address(ratifier));
 
         midnight.setIsAuthorized(address(ratifier), address(ratifier), true);
+        bytes memory _ratifierData = merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey));
+        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey))
-        );
-        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
-        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData);
     }
 
     function testTakeByRatificationDifferentFromMaker(address maker, address sender, uint256 otherPrivateKey) public {
@@ -957,7 +944,7 @@ contract TakeTest is BaseTest {
         vm.assume(sender != address(0));
         vm.assume(maker != sender);
         vm.assume(maker != address(0));
-        RatifyCallback ratifier = new RatifyCallback();
+        IsRatifiedCallback ratifier = new IsRatifiedCallback();
         vm.assume(maker != address(ratifier));
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
@@ -966,18 +953,10 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
+        bytes memory _ratifierData = merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey));
+        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
         vm.prank(sender);
-        midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey))
-        );
-        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
-        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
+        midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData);
     }
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
@@ -1122,7 +1101,7 @@ contract TakeTest is BaseTest {
         vm.assume(sender != address(0));
         vm.assume(maker != sender);
         vm.assume(maker != address(0));
-        RatifyCallback ratifier = new RatifyCallback();
+        IsRatifiedCallback ratifier = new IsRatifiedCallback();
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
         vm.prank(maker);
@@ -1190,7 +1169,7 @@ contract TakeTest is BaseTest {
         vm.assume(maker != address(0));
         signerPrivateKey = boundPrivateKey(signerPrivateKey);
         privateKey[vm.addr(signerPrivateKey)] = signerPrivateKey;
-        RatifyCallback ratifier = new RatifyCallback();
+        IsRatifiedCallback ratifier = new IsRatifiedCallback();
         ratifier.setReturnValue(bytes32(0));
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
@@ -1653,27 +1632,10 @@ contract InvalidSellCallback is ISellCallback {
     }
 }
 
-contract RatifyCallback is IRatifier {
-    address public recordedSigner;
-    Offer internal _recordedOffer;
+contract IsRatifiedCallback is IRatifier {
     bytes32 public returnValue = CALLBACK_SUCCESS;
 
-    function recordedOffer() public view returns (Offer memory) {
-        return _recordedOffer;
-    }
-
-    function onRatify(Offer memory offer, bytes memory ratifierData) external returns (bytes32) {
-        _recordedOffer = offer;
-
-        if (ratifierData.length > 0) {
-            (Signature memory signature, uint256 height, bytes32 root,) =
-                abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[]));
-            bytes32 structHash = keccak256(abi.encode(MerkleLib.offerTreeTypeHash(height), root));
-            bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
-            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
-            recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        }
-
+    function isRatified(Offer memory, bytes memory) external view returns (bytes32) {
         return returnValue;
     }
 

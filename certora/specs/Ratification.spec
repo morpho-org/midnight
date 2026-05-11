@@ -5,7 +5,7 @@ methods {
 
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
-    function _.onRatify(Midnight.Offer, bytes) external => DISPATCHER(true);
+    function _.isRatified(Midnight.Offer, bytes) external => DISPATCHER(true);
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;

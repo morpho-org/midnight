@@ -19,5 +19,5 @@ interface ISetterRatifier is IRatifier {
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
-    function isRatified(address maker, bytes32 root) external view returns (bool);
+    function isRootRatified(address maker, bytes32 root) external view returns (bool);
 }

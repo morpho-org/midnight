@@ -20,17 +20,17 @@ contract EcrecoverRatifierTest is BaseTest {
         offer.expiry = block.timestamp + 200;
     }
 
-    function testOnRatifyMakerSigns() public {
+    function testIsRatifiedMakerSigns() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.onRatify(offer, ratifierData);
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    function testOnRatifyAuthorizedSigns() public {
+    function testIsRatifiedAuthorizedSigns() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
 
@@ -40,30 +40,30 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.onRatify(offer, ratifierData);
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    function testOnRatifyNotMidnight() public {
+    function testIsRatifiedNotMidnight() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.expectRevert(IEcrecoverRatifier.NotMidnight.selector);
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
-    function testOnRatifyUnauthorizedSigner() public {
+    function testIsRatifiedUnauthorizedSigner() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
-    function testOnRatifyInvalidSignature() public {
+    function testIsRatifiedInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = abi.encode(
@@ -72,20 +72,20 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
-    function testOnRatifyWrongRoot() public {
+    function testIsRatifiedWrongRoot() public {
         Offer memory offer = makeOffer(lender);
         bytes32 wrongRoot = keccak256("wrong");
         bytes memory ratifierData = buildRatifierData(wrongRoot, lender);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
-    function testOnRatifyRevokeAuthorizationInvalidates() public {
+    function testIsRatifiedRevokeAuthorizationInvalidates() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
 
@@ -96,7 +96,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         // Works while authorized.
         vm.prank(address(midnight));
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
 
         // Revoke.
         vm.prank(lender);
@@ -104,6 +104,6 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.onRatify(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 }
