@@ -36,9 +36,7 @@ contract MidnightBundles is IMidnightBundles {
         require(referralFeePct < WAD, PctExceeded());
 
         _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
-        SafeTransferLib.safeTransferFrom(
-            takes[0].offer.obligation.loanToken, msg.sender, address(this), maxBuyerAssets
-        );
+        SafeTransferLib.safeTransferFrom(takes[0].offer.obligation.loanToken, msg.sender, address(this), maxBuyerAssets);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
