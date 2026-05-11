@@ -7,15 +7,11 @@ methods {
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => CVL_tickToPrice(tick);
     function tradingFee(bytes32 id, uint256 timeToMaturity) internal returns (uint256) => CVL_tradingFee(id, timeToMaturity);
 
-    function _.price() external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
 }
 
 // IdLib summary: remember the last id returned by toId.

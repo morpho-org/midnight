@@ -24,7 +24,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         MIDNIGHT = _midnight;
     }
 
-    function onRatify(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, uint256 height, bytes32 root, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[]));
