@@ -334,9 +334,6 @@ contract MidnightBundles is IMidnightBundles {
         }
     }
 
-    /// @dev External self-call helper. Reverts unless invoked by the contract itself.
-    /// @dev Wraps `IMidnight.take` in try/catch and returns zeros on revert. Routed through `this.tryTake`
-    /// so the take call's wide argument list is not inlined into the trading functions.
     function tryTake(address midnight, uint256 units, address taker, address receiver, Take calldata take_)
         external
         returns (uint256 buyerAssets, uint256 sellerAssets, uint256 unitsTaken)
