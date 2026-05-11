@@ -20,7 +20,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
-    function unitsTargetBuyAndWithdrawCollateral(
+    function buyWithUnitsTargetAndWithdrawCollateral(
         address midnight,
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -87,7 +87,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
-    function supplyCollateralAndUnitsTargetSell(
+    function supplyCollateralAndSellWithUnitsTarget(
         address midnight,
         uint256 targetUnits,
         uint256 minSellerAssets,
@@ -153,7 +153,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Total cost is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function assetsTargetBuyAndWithdrawCollateral(
+    function buyWithAssetsTargetAndWithdrawCollateral(
         address midnight,
         uint256 targetBuyerAssets,
         uint256 minUnits,
@@ -229,7 +229,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Total receipt is targetSellerAssets.
     /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    function supplyCollateralAndAssetsTargetSell(
+    function supplyCollateralAndSellWithAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
         uint256 maxUnits,
