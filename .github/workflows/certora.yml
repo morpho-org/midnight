@@ -51,13 +51,11 @@ jobs:
           echo "Fix lint errors by applying the following diff to $file:"
           diff -u "$file" <(certoraCVLFormatter "$file")
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
-
-      - name: Copy solc
+      - name: Install solc (0.8.34)
         run: |
-          forge build
-          cp ~/.svm/0.8.34/solc-0.8.34 /usr/local/bin
+          wget https://github.com/ethereum/solidity/releases/download/v0.8.34/solc-static-linux
+          chmod +x solc-static-linux
+          sudo mv solc-static-linux /usr/local/bin/solc-0.8.34
 
       - name: Verify ${{ matrix.conf }}
         run: certoraRun certora/confs/${{ matrix.conf }}.conf
