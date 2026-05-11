@@ -17,7 +17,7 @@ import {MerkleLib} from "./MerkleLib.sol";
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
-    mapping(address maker => mapping(bytes32 root => bool)) public isRatified;
+    mapping(address maker => mapping(bytes32 root => bool)) public isRootRatified;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
@@ -25,15 +25,15 @@ contract SetterRatifier is ISetterRatifier {
 
     function setIsRatified(address maker, bytes32 root, bool newIsRatified) public {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
-        isRatified[maker][root] = newIsRatified;
+        isRootRatified[maker][root] = newIsRatified;
         emit SetIsRatified(maker, root, newIsRatified);
     }
 
-    function onRatify(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, bytes32[] memory proof) = abi.decode(ratifierData, (bytes32, bytes32[]));
         require(MerkleLib.isLeaf(root, HashLib.hashOffer(offer), proof), InvalidProof());
-        require(isRatified[offer.maker][root], NotRatified());
+        require(isRootRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
     }
 }

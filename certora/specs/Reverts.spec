@@ -33,7 +33,7 @@ methods {
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onRatify(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onFlashLoan(address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
@@ -408,7 +408,7 @@ rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uin
     assert lastReverted;
 }
 
-/// If a buy/sell/onRatify callback reverts or returns something other than CALLBACK_SUCCESS, take reverts.
+/// If a buy/sell/isRatified callback reverts or returns something other than CALLBACK_SUCCESS, take reverts.
 rule callbackRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require takerCallback != 0 || offer.callback != 0 || offer.ratifier != 0, "callback-enabled take";
