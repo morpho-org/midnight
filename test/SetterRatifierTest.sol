@@ -42,7 +42,7 @@ contract SetterRatifierTest is BaseTest {
         vm.prank(lender);
         setterRatifier.setIsRatified(lender, _root, true);
 
-        assertTrue(setterRatifier._isRatified(lender, _root));
+        assertTrue(setterRatifier.isRootRatified(lender, _root));
     }
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
