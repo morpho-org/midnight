@@ -140,11 +140,11 @@ ghost mapping(bytes32 => mapping(address => mathint)) claimableTradingFeeMirror 
     init_state axiom (forall address token. claimableTradingFeeSum(token) == 0);
 }
 
-hook Sload uint128 value obligationState[KEY bytes32 id].claimableTradingFee {
+hook Sload uint256 value obligationState[KEY bytes32 id].claimableTradingFee {
     require value == claimableTradingFeeMirror[id][loantoken[id]], "ghost mirror";
 }
 
-hook Sstore obligationState[KEY bytes32 id].claimableTradingFee uint128 newClaimableTradingFee (uint128 oldClaimableTradingFee) {
+hook Sstore obligationState[KEY bytes32 id].claimableTradingFee uint256 newClaimableTradingFee (uint256 oldClaimableTradingFee) {
     claimableTradingFeeMirror[id][loantoken[id]] = newClaimableTradingFee;
 }
 
