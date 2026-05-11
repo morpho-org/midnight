@@ -323,11 +323,6 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testBuyBuyerAssetsTargetPermit() public {
-        // Replace loanToken's bytecode with an ERC2612-capable permit token; storage (balances, allowances) is
-        // preserved.
-        ERC20Permit permitToken = new ERC20Permit("loan", "loan");
-        vm.etch(address(loanToken), address(permitToken).code);
-
         uint256 targetBuyerAssets = 100e18;
         vm.prank(lender);
         loanToken.approve(address(midnightBundles), 0);
