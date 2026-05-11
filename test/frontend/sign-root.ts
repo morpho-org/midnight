@@ -53,9 +53,8 @@ function buildTypes(height: number) {
       { name: "receiverIfMakerIsSeller", type: "address" },
       { name: "ratifier", type: "address" },
       { name: "reduceOnly", type: "bool" },
-      { name: "maxUnits", type: "uint256" },
-      { name: "maxSellerAssets", type: "uint256" },
-      { name: "maxBuyerAssets", type: "uint256" },
+      { name: "maxUnits", type: "uint128" },
+      { name: "maxAssets", type: "uint128" },
     ],
   };
 }
@@ -83,8 +82,7 @@ function defaultOffer(number: string) {
     ratifier: RATIFIER,
     reduceOnly: false,
     maxUnits: "0",
-    maxSellerAssets: "0",
-    maxBuyerAssets: "0",
+    maxAssets: "0",
   };
 }
 
