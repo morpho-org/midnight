@@ -7,6 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {ERC20Permit} from "./erc20s/ERC20Permit.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {MidnightBundles} from "../src/periphery/MidnightBundles.sol";
 import {
@@ -122,6 +123,22 @@ contract MidnightBundlesTest is BaseTest {
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
         return TokenPermit({kind: PermitKind.Permit2, data: abi.encode(nonce, deadline, abi.encodePacked(r, s, v))});
+    }
+
+    function _erc2612(address token, address owner, uint256 amount, uint256 nonce, uint256 deadline)
+        internal
+        view
+        returns (TokenPermit memory)
+    {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                ERC20Permit(token).PERMIT_TYPEHASH(), owner, address(midnightBundles), amount, nonce, deadline
+            )
+        );
+        bytes32 digest =
+            keccak256(abi.encodePacked("\x19\x01", ERC20Permit(token).DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
+        return TokenPermit({kind: PermitKind.ERC2612, data: abi.encode(deadline, v, r, s)});
     }
 
     function testUnauthorized() public {
@@ -304,6 +321,51 @@ contract MidnightBundlesTest is BaseTest {
 
         assertEq(loanToken.allowance(lender, address(midnightBundles)), 0);
         assertEq(loanToken.allowance(lender, midnightBundles.PERMIT2()), 0);
+        assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets);
+        assertEq(midnight.creditOf(id, lender), units);
+    }
+
+    function testBuyBuyerAssetsTargetPermit() public {
+        // Replace loanToken's bytecode with an ERC2612-capable permit token; storage (balances, allowances) is preserved.
+        ERC20Permit permitToken = new ERC20Permit("loan", "loan");
+        vm.etch(address(loanToken), address(permitToken).code);
+
+        uint256 targetBuyerAssets = 100e18;
+        vm.prank(lender);
+        loanToken.approve(address(midnightBundles), 0);
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = units;
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
+
+        TokenPermit memory permit =
+            _erc2612(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
+        vm.prank(lender);
+        midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
+            address(midnight),
+            targetBuyerAssets,
+            0,
+            lender,
+            takes,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0),
+            permit
+        );
+
+        assertEq(loanToken.allowance(lender, address(midnightBundles)), 0);
         assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets);
         assertEq(midnight.creditOf(id, lender), units);
     }
