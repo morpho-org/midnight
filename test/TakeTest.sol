@@ -749,78 +749,63 @@ contract TakeTest is BaseTest {
         take(0, taker, lenderOffer);
     }
 
-    // maxSellerAssets / maxBuyerAssets tests.
+    // maxAssets tests.
 
-    function testMaxSellerAssetsCapped(uint256 units) public {
+    function testMaxAssetsCappedBuy(uint256 units) public {
         units = bound(units, 2, maxAssets);
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = 1;
-        (, uint256 sellerAssets, uint256 filledUnits) = take(units, borrower, lenderOffer);
-        assertTrue(filledUnits < units, "units capped");
-        assertLe(sellerAssets, 1, "seller assets within limit");
-    }
-
-    function testMaxSellerAssetsPass(uint256 units) public {
-        units = bound(units, 1, maxAssets);
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-
-        lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = type(uint128).max;
-
-        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
-
-        assertTrue(sellerAssets > 0);
-    }
-
-    function testBuyMaxSellerAssetsUsesExactInverse() public {
-        uint256 units = 2;
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-
-        lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = 1;
-        lenderOffer.tick = MAX_TICK - 1;
-
-        (, uint256 sellerAssets, uint256 filledUnits) = take(units, borrower, lenderOffer);
-
-        assertEq(filledUnits, units, "should fill exact remaining capacity");
-        assertEq(sellerAssets, 1, "seller assets consumed");
-    }
-
-    function testMaxBuyerAssetsCapped(uint256 units) public {
-        units = bound(units, 2, maxAssets);
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-        borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = 1;
-        (uint256 buyerAssets,, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        lenderOffer.maxAssets = 1;
+        (uint256 buyerAssets,, uint256 filledUnits) = take(units, borrower, lenderOffer);
         assertTrue(filledUnits < units, "units capped");
         assertLe(buyerAssets, 1, "buyer assets within limit");
     }
 
-    function testMaxBuyerAssetsPass(uint256 units) public {
+    function testMaxAssetsCappedSell(uint256 units) public {
+        units = bound(units, 2, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = 1;
+        (, uint256 sellerAssets, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        assertTrue(filledUnits < units, "units capped");
+        assertLe(sellerAssets, 1, "seller assets within limit");
+    }
+
+    function testMaxAssetsPassBuy(uint256 units) public {
+        units = bound(units, 1, maxAssets);
+        deal(address(loanToken), lender, units);
+        collateralize(obligation, borrower, units);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = type(uint128).max;
+
+        (uint256 buyerAssets,,) = take(units, borrower, lenderOffer);
+
+        assertTrue(buyerAssets > 0);
+    }
+
+    function testMaxAssetsPassSell(uint256 units) public {
         units = bound(units, 1, maxAssets);
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
         borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = type(uint128).max;
+        borrowerOffer.maxAssets = type(uint128).max;
 
-        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+        (, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
 
-        assertTrue(buyerAssets > 0);
+        assertTrue(sellerAssets > 0);
     }
 
-    function testBuyMaxBuyerAssetsUsesExactInverse() public {
+    function testBuyMaxAssetsUsesExactInverse() public {
         uint256 units = 2;
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxBuyerAssets = 1;
+        lenderOffer.maxAssets = 1;
         lenderOffer.tick = MAX_TICK - 1;
 
         (uint256 buyerAssets,, uint256 filledUnits) = take(units, borrower, lenderOffer);
@@ -829,52 +814,42 @@ contract TakeTest is BaseTest {
         assertEq(buyerAssets, 1, "buyer assets consumed");
     }
 
-    function testMaxSellerAssetsExact() public {
+    function testMaxAssetsExactBuy() public {
         uint256 units = 100e18;
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
-        uint256 expectedSellerAssets = units.mulDivDown(price, WAD);
+        uint256 expectedBuyerAssets = units.mulDivDown(price, WAD);
 
         lenderOffer.maxUnits = 0;
-        lenderOffer.maxSellerAssets = UtilsLib.toUint128(expectedSellerAssets);
+        lenderOffer.maxAssets = UtilsLib.toUint128(expectedBuyerAssets);
 
-        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
-        assertEq(sellerAssets, expectedSellerAssets);
-    }
-
-    function testMaxBuyerAssetsExact() public {
-        uint256 units = 100e18;
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-        uint256 price = TickLib.tickToPrice(MAX_TICK);
-        uint256 expectedBuyerAssets = units.mulDivUp(price, WAD);
-
-        borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxBuyerAssets = UtilsLib.toUint128(expectedBuyerAssets);
-
-        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets,,) = take(units, borrower, lenderOffer);
         assertEq(buyerAssets, expectedBuyerAssets);
     }
 
-    function testMaxSellerAssetsZeroMeansNoLimit(uint256 units) public {
-        units = bound(units, 1, maxAssets);
+    function testMaxAssetsExactSell() public {
+        uint256 units = 100e18;
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 expectedSellerAssets = units.mulDivUp(price, WAD);
 
-        lenderOffer.maxSellerAssets = 0;
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = UtilsLib.toUint128(expectedSellerAssets);
 
-        take(units, borrower, lenderOffer);
+        (, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
+        assertEq(sellerAssets, expectedSellerAssets);
     }
 
-    function testMaxBuyerAssetsZeroMeansNoLimit(uint256 units) public {
+    function testMaxAssetsZeroMeansNoLimit(uint256 units) public {
         units = bound(units, 1, maxAssets);
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        borrowerOffer.maxBuyerAssets = 0;
+        lenderOffer.maxAssets = 0;
 
-        take(units, lender, borrowerOffer);
+        take(units, borrower, lenderOffer);
     }
 
     function testMultipleMaxRevert() public {
@@ -882,33 +857,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(obligation, borrower, units);
 
-        lenderOffer.maxSellerAssets = 1e18;
-        lenderOffer.maxBuyerAssets = 1e18;
-        lenderOffer.maxUnits = 0;
-
-        vm.expectRevert("multiple max");
-        take(units, borrower, lenderOffer);
-    }
-
-    function testMultipleMaxRevertUnitsAndSeller() public {
-        uint256 units = 100e18;
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-
-        lenderOffer.maxSellerAssets = 1e18;
-        lenderOffer.maxUnits = 1e18;
-
-        vm.expectRevert("multiple max");
-        take(units, borrower, lenderOffer);
-    }
-
-    function testMultipleMaxRevertAllThree() public {
-        uint256 units = 100e18;
-        deal(address(loanToken), lender, units);
-        collateralize(obligation, borrower, units);
-
-        lenderOffer.maxSellerAssets = 1e18;
-        lenderOffer.maxBuyerAssets = 1e18;
+        lenderOffer.maxAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
         vm.expectRevert("multiple max");

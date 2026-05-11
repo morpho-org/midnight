@@ -33,8 +33,7 @@ struct Offer {
     address ratifier;
     bool reduceOnly;
     uint128 maxUnits;
-    uint128 maxSellerAssets;
-    uint128 maxBuyerAssets;
+    uint128 maxAssets;
 }
 
 struct ObligationState {
