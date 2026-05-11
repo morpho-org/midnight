@@ -26,7 +26,7 @@ methods {
     // body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
+    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
     function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => NONDET;
     function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;

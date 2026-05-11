@@ -36,7 +36,7 @@ methods {
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onRatify(Midnight.Offer offer, bytes) external => CVL_onRatify(offer) expect(bytes32);
+    function _.isRatified(Midnight.Offer offer, bytes) external => CVL_isRatified(offer) expect(bytes32);
     function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -48,7 +48,7 @@ ghost mapping(address => bool) makerRatified {
     init_state axiom forall address a. makerRatified[a] == false;
 }
 
-function CVL_onRatify(Midnight.Offer offer) returns bytes32 {
+function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
     bytes32 result;
     makerRatified[offer.maker] = true;
     return result;
