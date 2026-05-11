@@ -33,10 +33,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Additionally, within a single obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10)
 /// collaterals simultaneously.
 ///
-/// MULTICOLLATS
-/// @dev A borrower can `supplyCollateral` and `withdrawCollateral` at any time, subject only to an instantaneous
-/// health check on withdrawal. In particular, the borrowers of multicollat obligations can completely
-/// change their collateral composition.
+/// MULTI-COLLATERAL OBLIGATIONS
+/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
+/// particular, the borrowers of multicollat obligations can completely change their collateral composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
@@ -100,7 +99,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
 /// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
 /// authorized accounts can authorize other accounts on behalf of the user.
-/// - Under which conditions the account can return CALLBACK_SUCCESS when its onRatify function is called.
+/// - Under which conditions the account can return CALLBACK_SUCCESS when its isRatified function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
@@ -353,7 +352,7 @@ contract Midnight is IMidnight {
         require(offer.maker != taker, SelfTake());
         require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).onRatify(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
+        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
