@@ -21,9 +21,7 @@ methods {
     // Summary for deterministic toId for the global obligation.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
-    // Those functions are checked manually to not cause a division by zero.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    // This function is checked manually to not cause a division by zero.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     // Hook on mulDivDown and mulDivUp to check that the denominator is not zero, and add the necessary lemmas.

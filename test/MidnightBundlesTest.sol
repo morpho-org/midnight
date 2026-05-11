@@ -94,13 +94,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maker = borrower;
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 100,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(address(0xdead));
         vm.expectRevert(IMidnightBundles.Unauthorized.selector);
@@ -118,25 +112,13 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(borrower);
             midnightBundles.supplyCollateralAndUnitsTargetSell(
-                address(midnight), units, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+                address(midnight), units, 0, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -148,7 +130,7 @@ contract MidnightBundlesTest is BaseTest {
             vm.prank(borrower);
             vm.expectRevert(IMidnightBundles.OutOfOffers.selector);
             midnightBundles.supplyCollateralAndUnitsTargetSell(
-                address(midnight), units, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+                address(midnight), units, 0, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
             );
         }
     }
@@ -178,26 +160,15 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         if (offerUnits1 >= units - fromOffer0) {
             vm.prank(lender);
             midnightBundles.assetsTargetBuyAndWithdrawCollateral(
                 address(midnight),
                 targetBuyerAssets,
+                0,
                 lender,
                 takes,
                 new CollateralTransfer[](0),
@@ -217,6 +188,7 @@ contract MidnightBundlesTest is BaseTest {
             midnightBundles.assetsTargetBuyAndWithdrawCollateral(
                 address(midnight),
                 targetBuyerAssets,
+                0,
                 lender,
                 takes,
                 new CollateralTransfer[](0),
@@ -242,20 +214,8 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(lender);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
@@ -281,25 +241,13 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), 2, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+            address(midnight), 2, 0, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
         );
     }
 
@@ -322,25 +270,13 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(lender);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight), 1000, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
+            address(midnight), 1000, 0, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
         );
     }
 
@@ -359,20 +295,8 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units + 1);
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: offerUnits0,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: offerUnits1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: offerUnits0, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: offerUnits1, ratifierData: merkleRatifierData([offers[1]])});
 
         // Mirror the bundler's exact fill logic to derive units needed from offer1.
         // When offer0 fills everything, filledSellerAssets0 >= targetSellerAssets, zeroFloorSub → 0, so
@@ -385,6 +309,7 @@ contract MidnightBundlesTest is BaseTest {
             midnightBundles.supplyCollateralAndAssetsTargetSell(
                 address(midnight),
                 targetSellerAssets,
+                type(uint256).max,
                 borrower,
                 borrower,
                 takes,
@@ -404,6 +329,7 @@ contract MidnightBundlesTest is BaseTest {
             midnightBundles.supplyCollateralAndAssetsTargetSell(
                 address(midnight),
                 targetSellerAssets,
+                type(uint256).max,
                 borrower,
                 borrower,
                 takes,
@@ -423,25 +349,21 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].maxUnits = 1;
 
         Take[] memory takes = new Take[](2);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
-        takes[1] = Take({
-            offer: offers[1],
-            units: 1,
-            ratifierData: ratifierData([offers[1]]),
-            root: root([offers[1]]),
-            proof: proof([offers[1]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(borrower);
         vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight), 1000, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
+            address(midnight),
+            1000,
+            type(uint256).max,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
         );
     }
 
@@ -468,13 +390,7 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         midnightBundles.unitsTargetBuyAndWithdrawCollateral(
@@ -516,17 +432,19 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), units, borrower, receiver, takes, new CollateralTransfer[](0), referralFeePct, referrer
+            address(midnight),
+            units,
+            0,
+            borrower,
+            receiver,
+            takes,
+            new CollateralTransfer[](0),
+            referralFeePct,
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), units, "units sold");
@@ -558,18 +476,13 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(lender);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
             address(midnight),
             targetBuyerAssets,
+            0,
             lender,
             takes,
             new CollateralTransfer[](0),
@@ -606,18 +519,13 @@ contract MidnightBundlesTest is BaseTest {
         collateralize(obligation, borrower, units + 1);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: type(uint256).max,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: type(uint256).max, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
             address(midnight),
             targetSellerAssets,
+            type(uint256).max,
             borrower,
             receiver,
             takes,
@@ -633,23 +541,11 @@ contract MidnightBundlesTest is BaseTest {
 
     function testPctExceeded() public {
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
 
         offers[0].buy = false;
         Take[] memory buyTakes = new Take[](1);
-        buyTakes[0] = Take({
-            offer: offers[0],
-            units: 1,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        buyTakes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.startPrank(lender);
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
@@ -658,18 +554,26 @@ contract MidnightBundlesTest is BaseTest {
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight), 1, lender, buyTakes, new CollateralTransfer[](0), address(0), WAD, address(0)
+            address(midnight), 1, 0, lender, buyTakes, new CollateralTransfer[](0), address(0), WAD, address(0)
         );
         vm.stopPrank();
 
         vm.startPrank(borrower);
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), 1, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
+            address(midnight), 1, 0, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight), 1, borrower, borrower, takes, new CollateralTransfer[](0), WAD, address(0)
+            address(midnight),
+            1,
+            type(uint256).max,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            WAD,
+            address(0)
         );
         vm.stopPrank();
     }
@@ -715,13 +619,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256[] memory amounts = _supplyTakerCollateral(lender, numCollaterals, units);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
@@ -763,13 +661,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 targetBuyerAssets = units.mulDivUp(price, WAD);
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
         CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
@@ -779,7 +671,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight), targetBuyerAssets, lender, takes, withdrawals, receiver, 0, address(0)
+            address(midnight), targetBuyerAssets, 0, lender, takes, withdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -804,17 +696,11 @@ contract MidnightBundlesTest is BaseTest {
         }
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), units, borrower, borrower, takes, supplies, 0, address(0)
+            address(midnight), units, 0, borrower, borrower, takes, supplies, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -837,18 +723,12 @@ contract MidnightBundlesTest is BaseTest {
 
         // Borrower sells units to get loan token + accumulate debt and collateral on Midnight.
         Take[] memory sellTakes = new Take[](1);
-        sellTakes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        sellTakes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
         collateralize(obligation, borrower, units);
         uint256 collateralAmount = midnight.collateral(id, borrower, 0);
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), units, borrower, borrower, sellTakes, new CollateralTransfer[](0), 0, address(0)
+            address(midnight), units, 0, borrower, borrower, sellTakes, new CollateralTransfer[](0), 0, address(0)
         );
 
         uint256 maxWithdrawable = collateralAmount - _collateralAmount(0, units - repayUnits);
@@ -902,22 +782,142 @@ contract MidnightBundlesTest is BaseTest {
         }
 
         Take[] memory takes = new Take[](1);
-        takes[0] = Take({
-            offer: offers[0],
-            units: units,
-            ratifierData: ratifierData([offers[0]]),
-            root: root([offers[0]]),
-            proof: proof([offers[0]])
-        });
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight), targetSellerAssets, borrower, borrower, takes, supplies, 0, address(0)
+            address(midnight), targetSellerAssets, type(uint256).max, borrower, borrower, takes, supplies, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
             assertEq(midnight.collateral(id, borrower, i), supplies[i].assets);
         }
         assertEq(loanToken.balanceOf(borrower), targetSellerAssets);
+    }
+
+    // Average price.
+
+    function testBuyUnitsTargetAveragePriceExceeded(uint256 tick) public {
+        tick = bound(tick, 1, MAX_TICK);
+        uint256 units = 100e18;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = units;
+        offers[0].tick = tick;
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+        uint256 price = TickLib.tickToPrice(tick);
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
+
+        vm.prank(lender);
+        vm.expectRevert();
+        midnightBundles.unitsTargetBuyAndWithdrawCollateral(
+            address(midnight), units, price - 1, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
+        );
+    }
+
+    function testSellUnitsTargetAveragePriceTooLow(uint256 tick) public {
+        tick = bound(tick, 1, MAX_TICK);
+        uint256 units = 100e18;
+
+        offers[0].maxUnits = units;
+        offers[0].tick = tick;
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+        uint256 price = TickLib.tickToPrice(tick);
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
+
+        uint256 minSellerAssets = units.mulDivDown(price, WAD) + 1;
+        vm.prank(borrower);
+        vm.expectRevert(IMidnightBundles.SellerAssetsTooLow.selector);
+        midnightBundles.supplyCollateralAndUnitsTargetSell(
+            address(midnight),
+            units,
+            minSellerAssets,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
+        );
+    }
+
+    function testBuyBuyerAssetsTargetAveragePriceExceeded(uint256 tick) public {
+        tick = bound(tick, 1, MAX_TICK);
+        uint256 units = 100e18;
+
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = units;
+        offers[0].tick = tick;
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+        uint256 price = TickLib.tickToPrice(tick);
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
+
+        vm.prank(lender);
+        vm.expectRevert(IMidnightBundles.UnitsTooLow.selector);
+        midnightBundles.assetsTargetBuyAndWithdrawCollateral(
+            address(midnight),
+            units.mulDivUp(price, WAD),
+            units + 2,
+            lender,
+            takes,
+            new CollateralTransfer[](0),
+            address(0),
+            0,
+            address(0)
+        );
+    }
+
+    function testSellSellerAssetsTargetAveragePriceTooLow(uint256 tick) public {
+        tick = bound(tick, 1, MAX_TICK);
+        uint256 units = 100e18;
+
+        offers[0].maxUnits = units;
+        offers[0].tick = tick;
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+        uint256 price = TickLib.tickToPrice(tick);
+        uint256 targetSellerAssets = units.mulDivDown(price, WAD);
+
+        collateralize(obligation, borrower, units);
+
+        Take[] memory takes = new Take[](1);
+        takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
+
+        vm.prank(borrower);
+        vm.expectRevert(IMidnightBundles.UnitsTooHigh.selector);
+        midnightBundles.supplyCollateralAndAssetsTargetSell(
+            address(midnight),
+            targetSellerAssets,
+            price + 1,
+            borrower,
+            borrower,
+            takes,
+            new CollateralTransfer[](0),
+            0,
+            address(0)
+        );
     }
 }

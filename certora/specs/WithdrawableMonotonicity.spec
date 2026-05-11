@@ -7,8 +7,7 @@ methods {
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function toId(Midnight.Obligation) external returns (bytes32);
 
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
+    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
@@ -67,7 +66,7 @@ rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, add
     assert claimableTradingFee(token) == before - amount;
 }
 
-rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
+rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
     uint256 before = claimableTradingFee(token);
     f(e, args);
     assert claimableTradingFee(token) == before;
