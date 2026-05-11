@@ -13,8 +13,6 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
-    function _.price() external => NONDET;
-
     // Deterministic toId needed to link obligation arguments to stored state.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
