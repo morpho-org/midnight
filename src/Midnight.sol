@@ -34,9 +34,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// collaterals simultaneously.
 ///
 /// MULTI-COLLATERAL OBLIGATIONS
-/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an instantaneous health check on
-/// withdrawal. In particular, the borrowers of multicollat obligations can completely change their collateral
-/// composition.
+/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
+/// particular, the borrowers of multicollat obligations can completely change their collateral composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
 /// activate such a collateral post-incident to block their own liquidation.
