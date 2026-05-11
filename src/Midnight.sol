@@ -33,9 +33,9 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Additionally, within a single obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10)
 /// collaterals simultaneously.
 ///
-/// MULTICOLLATS
-/// @dev A borrower can supplyCollateral and withdrawCollateral at any time, subject only to an instantaneous health
-/// check on withdrawal. In particular, the borrowers of multicollat obligations can completely change their collateral
+/// MULTI-COLLATERAL OBLIGATIONS
+/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an instantaneous health check on
+/// withdrawal. In particular, the borrowers of multicollat obligations can completely change their collateral
 /// composition.
 /// @dev Liquidation iterates over all activated collaterals and reverts if any of their oracles reverts (see LIVENESS).
 /// A single reverting oracle blocks liquidation for every borrower with that collateral activated, and a borrower can
