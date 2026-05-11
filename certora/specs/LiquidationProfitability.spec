@@ -8,10 +8,6 @@ methods {
     function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
-    // Offer proof checks only gate take(); they do not affect liquidation profitability arithmetic.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 

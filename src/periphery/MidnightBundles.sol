@@ -18,6 +18,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
+    /// @dev The msg.sender will pay at most maxBuyerAssets.
     /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
     function buyWithUnitsTargetAndWithdrawCollateral(
         address midnight,
@@ -51,9 +52,7 @@ contract MidnightBundles is IMidnightBundles {
                     "",
                     address(0),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
@@ -86,10 +85,12 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
+    /// @dev The receiver will receive at least minSellerAssets.
     /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
     function supplyCollateralAndSellWithUnitsTarget(
         address midnight,
         uint256 targetUnits,
+        uint256 minSellerAssets,
         address taker,
         address receiver,
         Take[] calldata takes,
@@ -127,9 +128,7 @@ contract MidnightBundles is IMidnightBundles {
                     "",
                     address(this),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
                 uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
@@ -141,6 +140,7 @@ contract MidnightBundles is IMidnightBundles {
         require(filledUnits == targetUnits, OutOfOffers());
 
         uint256 referralFeeAssets = filledSellerAssets.mulDivDown(referralFeePct, WAD);
+        require(filledSellerAssets - referralFeeAssets >= minSellerAssets, SellerAssetsTooLow());
         address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, receiver, filledSellerAssets - referralFeeAssets);
@@ -151,10 +151,12 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
+    /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyWithAssetsTargetAndWithdrawCollateral(
         address midnight,
         uint256 targetBuyerAssets,
+        uint256 minUnits,
         address taker,
         Take[] calldata takes,
         CollateralTransfer[] calldata collateralWithdrawals,
@@ -175,6 +177,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
 
         uint256 filledBuyerAssets;
+        uint256 filledUnits;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
@@ -191,17 +194,17 @@ contract MidnightBundles is IMidnightBundles {
                     "",
                     address(0),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
-                uint256 resBuyerAssets, uint256, uint256
+                uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
                 filledBuyerAssets += resBuyerAssets;
+                filledUnits += resUnits;
             } catch {}
         }
 
         require(filledBuyerAssets == targetFilledBuyerAssets, OutOfOffers());
+        require(filledUnits >= minUnits, UnitsTooLow());
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
@@ -224,10 +227,12 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
+    /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function supplyCollateralAndSellWithAssetsTarget(
         address midnight,
         uint256 targetSellerAssets,
+        uint256 maxUnits,
         address taker,
         address receiver,
         Take[] calldata takes,
@@ -255,6 +260,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetFilledSellerAssets = targetSellerAssets + referralFeeAssets;
 
         uint256 filledSellerAssets;
+        uint256 filledUnits;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
@@ -271,17 +277,17 @@ contract MidnightBundles is IMidnightBundles {
                     "",
                     address(this),
                     takes[i].offer,
-                    takes[i].ratifierData,
-                    takes[i].root,
-                    takes[i].proof
+                    takes[i].ratifierData
                 ) returns (
-                uint256, uint256 resSellerAssets, uint256
+                uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
                 filledSellerAssets += resSellerAssets;
+                filledUnits += resUnits;
             } catch {}
         }
 
         require(filledSellerAssets == targetFilledSellerAssets, OutOfOffers());
+        require(filledUnits <= maxUnits, UnitsTooHigh());
 
         address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);

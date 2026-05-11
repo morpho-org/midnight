@@ -6,6 +6,7 @@ import {IRatifier} from "../../interfaces/IRatifier.sol";
 
 interface ISetterRatifier is IRatifier {
     /// ERRORS ///
+    error InvalidProof();
     error Unauthorized();
     error NotMidnight();
     error NotRatified();

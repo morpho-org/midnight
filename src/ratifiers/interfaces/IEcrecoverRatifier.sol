@@ -14,6 +14,7 @@ bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainI
 
 interface IEcrecoverRatifier is IRatifier {
     /// ERRORS ///
+    error InvalidProof();
     error InvalidSignature();
     error NotMidnight();
     error Unauthorized();
