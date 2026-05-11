@@ -282,11 +282,8 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
         require(_obligationState.created, ObligationNotCreated());
-
         _obligationState.claimableTradingFee -= UtilsLib.toUint128(amount);
-
         emit EventsLib.ClaimTradingFee(msg.sender, id, amount, receiver);
-
         SafeTransferLib.safeTransfer(obligation.loanToken, receiver, amount);
     }
 
