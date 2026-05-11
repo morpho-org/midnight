@@ -15,6 +15,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -34,14 +35,17 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        address loanToken = takes[0].offer.obligation.loanToken;
+        bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
-        _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
-        SafeTransferLib.safeTransferFrom(takes[0].offer.obligation.loanToken, msg.sender, address(this), maxBuyerAssets);
+        _forceApproveMax(loanToken, midnight);
+        SafeTransferLib.safeTransferFrom(loanToken, msg.sender, address(this), maxBuyerAssets);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - filledUnits, takes[i].units),
@@ -62,7 +66,6 @@ contract MidnightBundles is IMidnightBundles {
         require(filledUnits == targetUnits, OutOfOffers());
 
         Obligation memory obligation = takes[0].offer.obligation;
-        address loanToken = obligation.loanToken;
         for (uint256 i; i < collateralWithdrawals.length; i++) {
             IMidnight(midnight)
                 .withdrawCollateral(
@@ -81,6 +84,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -100,6 +104,7 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = takes[0].offer.obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
@@ -118,6 +123,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - filledUnits, takes[i].units),
@@ -146,6 +152,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -179,6 +186,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledUnits;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -221,6 +229,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -262,6 +271,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledUnits;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(

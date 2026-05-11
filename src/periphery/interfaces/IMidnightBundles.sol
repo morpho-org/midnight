@@ -17,6 +17,7 @@ struct CollateralTransfer {
 
 interface IMidnightBundles {
     /// ERRORS ///
+    error InconsistentObligation();
     error InconsistentSide();
     error OutOfOffers();
     error PctExceeded();
