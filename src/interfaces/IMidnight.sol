@@ -37,6 +37,7 @@ struct Offer {
     uint256 maxBuyerAssets;
 }
 
+/// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossFactor;
@@ -82,7 +83,6 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
-    error InvalidProof();
     error InvalidSession();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
@@ -143,7 +143,7 @@ interface IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData, bytes32 root, bytes32[] memory proof) external returns (uint256, uint256, uint256);
+    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData) external returns (uint256, uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
     function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;

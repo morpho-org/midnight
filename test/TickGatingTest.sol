@@ -83,7 +83,7 @@ contract TickGatingTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
         midnight.take(
-            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+            units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer])
         );
     }
 
@@ -100,7 +100,7 @@ contract TickGatingTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
         midnight.take(
-            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+            units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer])
         );
     }
 
@@ -119,7 +119,7 @@ contract TickGatingTest is BaseTest {
         vm.prank(borrower);
         vm.expectRevert("tick not accessible at obligation level");
         midnight.take(
-            units, borrower, address(0), hex"", borrower, offer, ratifierData([offer]), root([offer]), proof([offer])
+            units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer])
         );
 
         // Refine to spacing 2.
