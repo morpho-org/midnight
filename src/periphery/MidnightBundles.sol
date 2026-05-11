@@ -60,10 +60,10 @@ contract MidnightBundles is IMidnightBundles {
                     take_.offer,
                     take_.ratifierData
                 ) returns (
-                uint256 b, uint256, uint256 u
+                uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
-                filledUnits += u;
-                filledBuyerAssets += b;
+                filledUnits += resUnits;
+                filledBuyerAssets += resBuyerAssets;
             } catch {}
         }
 
@@ -139,10 +139,10 @@ contract MidnightBundles is IMidnightBundles {
                     take_.offer,
                     take_.ratifierData
                 ) returns (
-                uint256, uint256 s, uint256 u
+                uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
-                filledUnits += u;
-                filledSellerAssets += s;
+                filledUnits += resUnits;
+                filledSellerAssets += resSellerAssets;
             } catch {}
         }
 
@@ -198,10 +198,10 @@ contract MidnightBundles is IMidnightBundles {
             );
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(0), take_.offer, take_.ratifierData) returns (
-                uint256 b, uint256, uint256 u
+                uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
-                filledBuyerAssets += b;
-                filledUnits += u;
+                filledBuyerAssets += resBuyerAssets;
+                filledUnits += resUnits;
             } catch {}
         }
 
@@ -279,10 +279,10 @@ contract MidnightBundles is IMidnightBundles {
             );
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(this), take_.offer, take_.ratifierData) returns (
-                uint256, uint256 s, uint256 u
+                uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
-                filledSellerAssets += s;
-                filledUnits += u;
+                filledSellerAssets += resSellerAssets;
+                filledUnits += resUnits;
             } catch {}
         }
 
