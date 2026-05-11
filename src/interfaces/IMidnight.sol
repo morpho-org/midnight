@@ -43,6 +43,7 @@ struct ObligationState {
     uint128 lossFactor;
     uint128 withdrawable;
     uint128 continuousFeeCredit;
+    uint256 claimableTradingFee;
     uint16 tradingFee0;
     uint16 tradingFee1;
     uint16 tradingFee2;
@@ -52,7 +53,6 @@ struct ObligationState {
     uint16 tradingFee6;
     uint32 continuousFee;
     bool created;
-    uint128 claimableTradingFee;
 }
 
 struct Position {
@@ -117,7 +117,7 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created, uint128 claimableTradingFee);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint256 claimableTradingFee, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);

@@ -283,7 +283,7 @@ contract Midnight is IMidnight {
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
         require(_obligationState.created, ObligationNotCreated());
 
-        _obligationState.claimableTradingFee -= UtilsLib.toUint128(amount);
+        _obligationState.claimableTradingFee -= amount;
 
         emit EventsLib.ClaimTradingFee(msg.sender, id, amount, receiver);
 
@@ -439,7 +439,7 @@ contract Midnight is IMidnight {
         }
 
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        _obligationState.claimableTradingFee += UtilsLib.toUint128(buyerAssets - sellerAssets);
+        _obligationState.claimableTradingFee += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
