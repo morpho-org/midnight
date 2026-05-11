@@ -3,8 +3,6 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function _.price() external => NONDET;
-
     // The following summaries are sound since they do not read/write credit.
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -13,8 +11,6 @@ methods {
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
     function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
-
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
 
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
     function _updatePosition(Midnight.Obligation memory, bytes32 id, address user) internal returns (uint128, uint128, uint128) => summaryUpdatePosition(id, user);
