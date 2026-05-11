@@ -131,12 +131,9 @@ contract MidnightBundlesTest is BaseTest {
         returns (TokenPermit memory)
     {
         bytes32 structHash = keccak256(
-            abi.encode(
-                ERC20Permit(token).PERMIT_TYPEHASH(), owner, address(midnightBundles), amount, nonce, deadline
-            )
+            abi.encode(ERC20Permit(token).PERMIT_TYPEHASH(), owner, address(midnightBundles), amount, nonce, deadline)
         );
-        bytes32 digest =
-            keccak256(abi.encodePacked("\x19\x01", ERC20Permit(token).DOMAIN_SEPARATOR(), structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", ERC20Permit(token).DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
         return TokenPermit({kind: PermitKind.ERC2612, data: abi.encode(deadline, v, r, s)});
     }
@@ -326,7 +323,8 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testBuyBuyerAssetsTargetPermit() public {
-        // Replace loanToken's bytecode with an ERC2612-capable permit token; storage (balances, allowances) is preserved.
+        // Replace loanToken's bytecode with an ERC2612-capable permit token; storage (balances, allowances) is
+        // preserved.
         ERC20Permit permitToken = new ERC20Permit("loan", "loan");
         vm.etch(address(loanToken), address(permitToken).code);
 
@@ -349,8 +347,7 @@ contract MidnightBundlesTest is BaseTest {
         Take[] memory takes = new Take[](1);
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
-        TokenPermit memory permit =
-            _erc2612(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
+        TokenPermit memory permit = _erc2612(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
         vm.prank(lender);
         midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
             address(midnight),
