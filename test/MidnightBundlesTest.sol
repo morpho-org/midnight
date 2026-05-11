@@ -1037,7 +1037,7 @@ contract MidnightBundlesTest is BaseTest {
 
         // Offer 0 has 70 available; bundler caps and fills 30 from offer 1.
         vm.prank(borrower);
-        midnightBundles.supplyCollateralAndUnitsTargetSell(
+        midnightBundles.supplyCollateralAndSellWithUnitsTarget(
             address(midnight), 100, 0, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
         );
 
@@ -1068,7 +1068,7 @@ contract MidnightBundlesTest is BaseTest {
         takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(borrower);
-        midnightBundles.supplyCollateralAndAssetsTargetSell(
+        midnightBundles.supplyCollateralAndSellWithAssetsTarget(
             address(midnight),
             targetSellerAssets,
             type(uint256).max,
@@ -1118,7 +1118,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 maxBuyerAssets = uint256(100).mulDivUp(price, WAD);
 
         vm.prank(lender);
-        midnightBundles.unitsTargetBuyAndWithdrawCollateral(
+        midnightBundles.buyWithUnitsTargetAndWithdrawCollateral(
             address(midnight),
             100,
             maxBuyerAssets,
@@ -1164,7 +1164,7 @@ contract MidnightBundlesTest is BaseTest {
         takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
 
         vm.prank(lender);
-        midnightBundles.assetsTargetBuyAndWithdrawCollateral(
+        midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
             address(midnight),
             targetBuyerAssets,
             0,
