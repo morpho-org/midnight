@@ -40,8 +40,8 @@ library HashLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of an Offer.
-    /// @dev Same as kecccak256(abi.encode(OFFER_TYPEHASH, ...));
-    function hashOffer(Offer memory offer) internal pure returns (bytes32 result) {
+    /// @dev Same as keccak256(abi.encode(OFFER_TYPEHASH, ...));
+    function hashOffer(Offer memory offer) internal pure returns (bytes32) {
         bytes32[17] memory w;
         w[0] = OFFER_TYPEHASH;
         w[1] = hashObligation(offer.obligation);
@@ -60,8 +60,10 @@ library HashLib {
         w[14] = bytes32(offer.maxUnits);
         w[15] = bytes32(offer.maxSellerAssets);
         w[16] = bytes32(offer.maxBuyerAssets);
+        bytes32 result;
         assembly ("memory-safe") {
             result := keccak256(w, 0x220)
         }
+        return result;
     }
 }
