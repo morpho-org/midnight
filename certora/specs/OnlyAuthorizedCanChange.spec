@@ -16,9 +16,6 @@ methods {
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
 
-    // Summarize oracle calls.
-    function _.price() external => NONDET;
-
     // Summarize complex internal functions irrelevant to authorization checks.
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
