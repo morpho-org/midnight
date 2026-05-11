@@ -3,11 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {
-    IEcrecoverRatifier,
-    Signature,
-    EIP712_DOMAIN_TYPEHASH
-} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -940,20 +936,14 @@ contract TakeTest is BaseTest {
         vm.prank(address(ratifier));
 
         midnight.setIsAuthorized(address(ratifier), address(ratifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherPrivateKey));
+        vm.expectCall(
+            address(ratifier), abi.encodeCall(IRatifier.onRatify, (lenderOffer, root([lenderOffer]), _ratifierData))
+        );
         vm.prank(sender);
         midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, root([lenderOffer]), proof([lenderOffer])
         );
-        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
-        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
     }
 
     function testTakeByRatificationDifferentFromMaker(address maker, address sender, uint256 otherPrivateKey) public {
@@ -970,20 +960,14 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ratifier), true);
+        bytes memory _ratifierData = ratifierData([lenderOffer], vm.addr(otherPrivateKey));
+        vm.expectCall(
+            address(ratifier), abi.encodeCall(IRatifier.onRatify, (lenderOffer, root([lenderOffer]), _ratifierData))
+        );
         vm.prank(sender);
         midnight.take(
-            0,
-            sender,
-            address(0),
-            hex"",
-            sender,
-            lenderOffer,
-            ratifierData([lenderOffer], vm.addr(otherPrivateKey)),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            0, sender, address(0), hex"", sender, lenderOffer, _ratifierData, root([lenderOffer]), proof([lenderOffer])
         );
-        assertEq(ratifier.recordedSigner(), vm.addr(otherPrivateKey), "recorded signer");
-        assertEq(keccak256(abi.encode(ratifier.recordedOffer())), keccak256(abi.encode(lenderOffer)), "recorded offer");
     }
 
     function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
@@ -1787,25 +1771,9 @@ contract InvalidSellCallback is ISellCallback {
 }
 
 contract RatifyCallback is IRatifier {
-    address public recordedSigner;
-    Offer internal _recordedOffer;
     bytes32 public returnValue = CALLBACK_SUCCESS;
 
-    function recordedOffer() public view returns (Offer memory) {
-        return _recordedOffer;
-    }
-
-    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external returns (bytes32) {
-        _recordedOffer = offer;
-
-        if (ratifierData.length > 0) {
-            (Signature memory signature, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
-            bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
-            bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
-            bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
-            recordedSigner = ecrecover(digest, signature.v, signature.r, signature.s);
-        }
-
+    function onRatify(Offer memory, bytes32, bytes memory) external view returns (bytes32) {
         return returnValue;
     }
 
