@@ -158,7 +158,8 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
 /// offers are "filled" (consumed=max).
 /// @dev It is possible to sell nonzero units to a a fully consumed buy offer with price < WAD. This constitutes a gift
-/// to the maker of the offer. @dev NatSpec comments are included only when they bring clarity.
+/// to the maker of the offer.
+/// @dev NatSpec comments are included only when they bring clarity.
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
 /// there can be some obligation id clashes.
