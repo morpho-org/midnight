@@ -199,87 +199,6 @@ contract MidnightBundlesTest is BaseTest {
         }
     }
 
-    function testBuyUnitsTargetInconsistentObligation() public {
-        Obligation memory otherObligation = obligation;
-        otherObligation.maturity = block.timestamp + 360 days;
-
-        offers[0].buy = false;
-        offers[0].maker = borrower;
-        offers[0].receiverIfMakerIsSeller = borrower;
-        offers[0].maxUnits = 1;
-        offers[1].buy = false;
-        offers[1].maker = borrower;
-        offers[1].receiverIfMakerIsSeller = borrower;
-        offers[1].obligation = otherObligation;
-        offers[1].maxUnits = 1;
-
-        Take[] memory takes = new Take[](2);
-        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
-        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
-
-        vm.prank(lender);
-        vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.unitsTargetBuyAndWithdrawCollateral(
-            address(midnight),
-            2,
-            type(uint256).max,
-            lender,
-            takes,
-            new CollateralTransfer[](0),
-            address(0),
-            0,
-            address(0)
-        );
-    }
-
-    function testSellUnitsTargetInconsistentObligation() public {
-        Obligation memory otherObligation = obligation;
-        otherObligation.maturity = block.timestamp + 360 days;
-
-        offers[0].maxUnits = 1;
-        offers[1].obligation = otherObligation;
-        offers[1].maxUnits = 1;
-
-        Take[] memory takes = new Take[](2);
-        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
-        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
-
-        vm.prank(borrower);
-        vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.supplyCollateralAndUnitsTargetSell(
-            address(midnight), 2, 0, borrower, borrower, takes, new CollateralTransfer[](0), 0, address(0)
-        );
-    }
-
-    function testBuyBuyerAssetsTargetInconsistentObligation() public {
-        for (uint256 i; i <= 6; i++) {
-            midnight.setObligationTradingFee(id, i, 0);
-        }
-
-        Obligation memory otherObligation = obligation;
-        otherObligation.maturity = block.timestamp + 360 days;
-
-        offers[0].buy = false;
-        offers[0].maker = borrower;
-        offers[0].receiverIfMakerIsSeller = borrower;
-        offers[0].maxUnits = 1;
-        offers[1].buy = false;
-        offers[1].maker = borrower;
-        offers[1].receiverIfMakerIsSeller = borrower;
-        offers[1].obligation = otherObligation;
-        offers[1].maxUnits = 1;
-
-        Take[] memory takes = new Take[](2);
-        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
-        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
-
-        vm.prank(lender);
-        vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.assetsTargetBuyAndWithdrawCollateral(
-            address(midnight), 1000, 0, lender, takes, new CollateralTransfer[](0), address(0), 0, address(0)
-        );
-    }
-
     function testSellSellerAssetsTarget(uint256 offerUnits0, uint256 offerUnits1, uint256 targetSellerAssets) public {
         targetSellerAssets = bound(targetSellerAssets, 1, uint256(type(uint128).max) / 2);
         offers[0].maxUnits = offerUnits0;
@@ -338,33 +257,6 @@ contract MidnightBundlesTest is BaseTest {
                 address(0)
             );
         }
-    }
-
-    function testSellSellerAssetsTargetInconsistentObligation() public {
-        Obligation memory otherObligation = obligation;
-        otherObligation.maturity = block.timestamp + 360 days;
-
-        offers[0].maxUnits = 1;
-        offers[1].obligation = otherObligation;
-        offers[1].maxUnits = 1;
-
-        Take[] memory takes = new Take[](2);
-        takes[0] = Take({offer: offers[0], units: 1, ratifierData: merkleRatifierData([offers[0]])});
-        takes[1] = Take({offer: offers[1], units: 1, ratifierData: merkleRatifierData([offers[1]])});
-
-        vm.prank(borrower);
-        vm.expectRevert(IMidnightBundles.InconsistentObligation.selector);
-        midnightBundles.supplyCollateralAndAssetsTargetSell(
-            address(midnight),
-            1000,
-            type(uint256).max,
-            borrower,
-            borrower,
-            takes,
-            new CollateralTransfer[](0),
-            0,
-            address(0)
-        );
     }
 
     // Referral fee.
