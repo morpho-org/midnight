@@ -30,31 +30,41 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetUnits,
         uint256 maxBuyerAssets,
         address taker,
-        Take[] calldata takes,
-        CollateralTransfer[] calldata collateralWithdrawals,
+        Take[] memory takes,
+        CollateralTransfer[] memory collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
         address referralFeeRecipient,
-        TokenPermit calldata loanTokenPermit
+        TokenPermit memory loanTokenPermit
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
-        _forceApproveMax(loanToken, midnight);
-        _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
+        _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
+        _pullToken(takes[0].offer.obligation.loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
-            require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            (uint256 b,, uint256 u) = this.tryTake(
-                midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(0), takes[i]
-            );
-            filledUnits += u;
-            filledBuyerAssets += b;
+            Take memory take_ = takes[i];
+            require(!take_.offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - filledUnits, take_.units),
+                    taker,
+                    address(0),
+                    "",
+                    address(0),
+                    take_.offer,
+                    take_.ratifierData
+                ) returns (
+                uint256 b, uint256, uint256 u
+            ) {
+                filledUnits += u;
+                filledBuyerAssets += b;
+            } catch {}
         }
 
         require(filledUnits == targetUnits, OutOfOffers());
@@ -72,6 +82,7 @@ contract MidnightBundles is IMidnightBundles {
         }
 
         uint256 referralFeeAssets = filledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
+        address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - filledBuyerAssets - referralFeeAssets);
     }
@@ -89,11 +100,11 @@ contract MidnightBundles is IMidnightBundles {
         uint256 minSellerAssets,
         address taker,
         address receiver,
-        Take[] calldata takes,
-        CollateralTransfer[] calldata collateralSupplies,
+        Take[] memory takes,
+        CollateralTransfer[] memory collateralSupplies,
         uint256 referralFeePct,
         address referralFeeRecipient,
-        TokenPermit[] calldata collateralPermits
+        TokenPermit[] memory collateralPermits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -115,13 +126,24 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledUnits;
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
-            require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            (, uint256 s, uint256 u) = this.tryTake(
-                midnight, UtilsLib.min(targetUnits - filledUnits, takes[i].units), taker, address(this), takes[i]
-            );
-            filledUnits += u;
-            filledSellerAssets += s;
+            Take memory take_ = takes[i];
+            require(take_.offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
+            try IMidnight(midnight)
+                .take(
+                    UtilsLib.min(targetUnits - filledUnits, take_.units),
+                    taker,
+                    address(0),
+                    "",
+                    address(this),
+                    take_.offer,
+                    take_.ratifierData
+                ) returns (
+                uint256, uint256 s, uint256 u
+            ) {
+                filledUnits += u;
+                filledSellerAssets += s;
+            } catch {}
         }
 
         require(filledUnits == targetUnits, OutOfOffers());
@@ -144,21 +166,20 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetBuyerAssets,
         uint256 minUnits,
         address taker,
-        Take[] calldata takes,
-        CollateralTransfer[] calldata collateralWithdrawals,
+        Take[] memory takes,
+        CollateralTransfer[] memory collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
         address referralFeeRecipient,
-        TokenPermit calldata loanTokenPermit
+        TokenPermit memory loanTokenPermit
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
 
-        address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
-        _forceApproveMax(loanToken, midnight);
-        _pullToken(loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
+        _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
+        _pullToken(takes[0].offer.obligation.loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
 
         uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
@@ -166,17 +187,22 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledBuyerAssets;
         uint256 filledUnits;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
-            require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
+            Take memory take_ = takes[i];
+            require(!take_.offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
             uint256 unitsToTake = UtilsLib.min(
                 TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
+                    midnight, id, take_.offer, targetFilledBuyerAssets - filledBuyerAssets
                 ),
-                takes[i].units
+                take_.units
             );
-            (uint256 b,, uint256 u) = this.tryTake(midnight, unitsToTake, taker, address(0), takes[i]);
-            filledBuyerAssets += b;
-            filledUnits += u;
+            try IMidnight(midnight)
+                .take(unitsToTake, taker, address(0), "", address(0), take_.offer, take_.ratifierData) returns (
+                uint256 b, uint256, uint256 u
+            ) {
+                filledBuyerAssets += b;
+                filledUnits += u;
+            } catch {}
         }
 
         require(filledBuyerAssets == targetFilledBuyerAssets, OutOfOffers());
@@ -194,6 +220,7 @@ contract MidnightBundles is IMidnightBundles {
                 );
         }
 
+        address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
@@ -211,11 +238,11 @@ contract MidnightBundles is IMidnightBundles {
         uint256 maxUnits,
         address taker,
         address receiver,
-        Take[] calldata takes,
-        CollateralTransfer[] calldata collateralSupplies,
+        Take[] memory takes,
+        CollateralTransfer[] memory collateralSupplies,
         uint256 referralFeePct,
         address referralFeeRecipient,
-        TokenPermit[] calldata collateralPermits
+        TokenPermit[] memory collateralPermits
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -241,17 +268,22 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         uint256 filledUnits;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
-            require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
+            Take memory take_ = takes[i];
+            require(take_.offer.buy, InconsistentSide());
+            require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
             uint256 unitsToTake = UtilsLib.min(
                 TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets
+                    midnight, id, take_.offer, targetFilledSellerAssets - filledSellerAssets
                 ),
-                takes[i].units
+                take_.units
             );
-            (, uint256 s, uint256 u) = this.tryTake(midnight, unitsToTake, taker, address(this), takes[i]);
-            filledSellerAssets += s;
-            filledUnits += u;
+            try IMidnight(midnight)
+                .take(unitsToTake, taker, address(0), "", address(this), take_.offer, take_.ratifierData) returns (
+                uint256, uint256 s, uint256 u
+            ) {
+                filledSellerAssets += s;
+                filledUnits += u;
+            } catch {}
         }
 
         require(filledSellerAssets == targetFilledSellerAssets, OutOfOffers());
@@ -266,12 +298,12 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender must have approved the contract to transfer `units` of the obligation's loan token.
     function repayAndWithdrawCollateral(
         address midnight,
-        Obligation calldata obligation,
+        Obligation memory obligation,
         uint256 units,
         address onBehalf,
-        CollateralTransfer[] calldata collateralWithdrawals,
+        CollateralTransfer[] memory collateralWithdrawals,
         address collateralReceiver,
-        TokenPermit calldata loanTokenPermit
+        TokenPermit memory loanTokenPermit
     ) external {
         require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
 
@@ -312,7 +344,7 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev Pulls `amount` of `token` from `from` to this bundler, optionally using ERC2612 or Permit2.
-    function _pullToken(address token, address from, uint256 amount, TokenPermit calldata permit) internal {
+    function _pullToken(address token, address from, uint256 amount, TokenPermit memory permit) internal {
         if (permit.kind == PermitKind.ERC2612) {
             (uint256 deadline, uint8 v, bytes32 r, bytes32 s) =
                 abi.decode(permit.data, (uint256, uint8, bytes32, bytes32));
@@ -331,23 +363,6 @@ contract MidnightBundles is IMidnightBundles {
                 );
         } else {
             SafeTransferLib.safeTransferFrom(token, from, address(this), amount);
-        }
-    }
-
-    /// @dev External self-call helper. Reverts unless invoked by the contract itself.
-    /// @dev Wraps `IMidnight.take` in try/catch and returns zeros on revert. Routed through `this.tryTake`
-    /// so the take call's wide argument list is not inlined into the trading functions.
-    function tryTake(address midnight, uint256 units, address taker, address receiver, Take calldata take_)
-        external
-        returns (uint256 buyerAssets, uint256 sellerAssets, uint256 unitsTaken)
-    {
-        require(msg.sender == address(this), Unauthorized());
-        try IMidnight(midnight).take(units, taker, address(0), "", receiver, take_.offer, take_.ratifierData) returns (
-            uint256 b, uint256 s, uint256 u
-        ) {
-            return (b, s, u);
-        } catch {
-            return (0, 0, 0);
         }
     }
 }
