@@ -14,6 +14,8 @@ contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -81,6 +83,8 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -147,6 +151,8 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
@@ -222,6 +228,8 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
+    /// @dev This function should only be called with the same obligation for all takes.
+    /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.

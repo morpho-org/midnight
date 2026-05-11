@@ -10,10 +10,10 @@ import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
+address constant ACCOUNT = 0xe05fcC23807536bEe418f142D19fa0d21BB0cfF7;
 uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x201a68090d982e5e166937f7fd652ccbdcb0c9c71ab72ea7f12ec7fdf5b8e07e;
-bytes32 constant SIG_S = 0x38c48036a2c1b2257e9532ef90b366deec4fa2e79af395f61b69ff9d1afe7658;
+bytes32 constant SIG_R = 0x5fea74a65f595be3072bf95a6d5a1f1d8b80bb292c310816f3ac050b703c39c8;
+bytes32 constant SIG_S = 0x55c4dd50dade77e996fff02a45196c9293d92444183dc2a043f93d7bdeff9046;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
@@ -52,6 +52,21 @@ contract FrontendSignatureTest is Test {
         proof0[0] = h1;
         proof0[1] = right;
         assertTrue(MerkleLib.isLeaf(_root, h0, proof0));
+
+        bytes32[] memory proof1 = new bytes32[](2);
+        proof1[0] = h0;
+        proof1[1] = right;
+        assertTrue(MerkleLib.isLeaf(_root, h1, proof1));
+
+        bytes32[] memory proof2 = new bytes32[](2);
+        proof2[0] = h3;
+        proof2[1] = left;
+        assertTrue(MerkleLib.isLeaf(_root, h2, proof2));
+
+        bytes32[] memory proof3 = new bytes32[](2);
+        proof3[0] = h2;
+        proof3[1] = left;
+        assertTrue(MerkleLib.isLeaf(_root, h3, proof3));
 
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
