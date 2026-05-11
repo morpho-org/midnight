@@ -40,6 +40,7 @@ library HashLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of an Offer.
+    /// @dev Same as kecccak256(abi.encode(OFFER_TYPEHASH, ...));
     function hashOffer(Offer memory offer) internal pure returns (bytes32 result) {
         bytes32[17] memory w;
         w[0] = OFFER_TYPEHASH;
