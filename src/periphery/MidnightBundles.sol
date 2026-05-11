@@ -295,20 +295,27 @@ contract MidnightBundles is IMidnightBundles {
 
     /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on
     /// Midnight.
-    /// @dev The msg.sender must have approved the contract to transfer `units` of the obligation's loan token.
+    /// @dev The msg.sender must have approved the contract to transfer assets of the obligation's loan token.
+    /// @dev Fee = assets * pct / WAD; units repaid = assets - fee.
+    /// @dev To fully repay a debt D, pass assets = floor(D * WAD / (WAD - pct)).
     function repayAndWithdrawCollateral(
         address midnight,
         Obligation memory obligation,
-        uint256 units,
+        uint256 assets,
         address onBehalf,
         CollateralTransfer[] memory collateralWithdrawals,
         address collateralReceiver,
+        uint256 referralFeePct,
+        address referralFeeRecipient,
         TokenPermit memory loanTokenPermit
     ) external {
         require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
+        require(referralFeePct < WAD, PctExceeded());
 
         address loanToken = obligation.loanToken;
-        _pullToken(loanToken, msg.sender, units, loanTokenPermit);
+        uint256 referralFeeAssets = assets.mulDivDown(referralFeePct, WAD);
+        uint256 units = assets - referralFeeAssets;
+        _pullToken(loanToken, msg.sender, assets, loanTokenPermit);
         _forceApproveMax(loanToken, midnight);
 
         IMidnight(midnight).repay(obligation, units, onBehalf, address(0), "");
@@ -323,6 +330,8 @@ contract MidnightBundles is IMidnightBundles {
                     collateralReceiver
                 );
         }
+
+        if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
     function _safeApprove(address token, address spender, uint256 value) internal {
