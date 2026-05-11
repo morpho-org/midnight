@@ -2,7 +2,6 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
-    function _.price() external => NONDET;
 
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
@@ -16,8 +15,6 @@ methods {
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
 }
 
 ///  Only setConsumed and take can modify the consumed mapping.

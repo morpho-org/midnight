@@ -11,7 +11,6 @@ methods {
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the tradingFee intervals in Midnight.sol.

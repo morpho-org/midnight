@@ -5,8 +5,6 @@ methods {
 
     function claimableTradingFee(address token) external returns (uint256) envfree;
 
-    function _.price() external => NONDET;
-
     // Summarize mulDivUp and mulDivDown by ghost functions. This is for performance of the prover.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
@@ -20,7 +18,6 @@ methods {
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function _.onRatify(Midnight.Offer, bytes) external => NONDET;
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
