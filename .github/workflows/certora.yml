@@ -52,8 +52,12 @@ jobs:
           diff -u "$file" <(certoraCVLFormatter "$file")
 
       - name: Install solc (0.8.34)
+        env:
+          EXPECTED_SOLC_SHA256: d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39
         run: |
           wget https://github.com/ethereum/solidity/releases/download/v0.8.34/solc-static-linux
+          actual="$(sha256 -q solc-static-linux)"
+          [ "$actual" = "$EXPECTED_SOLC_SHA256" ] || { echo "solc hash mismatch"; exit 1; }
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc-0.8.34
 
