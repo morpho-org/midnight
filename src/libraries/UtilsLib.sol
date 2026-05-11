@@ -3,10 +3,12 @@
 pragma solidity ^0.8.0;
 
 library UtilsLib {
-    /// @dev Returns true if at most one of `x` and `y` is nonzero.
+    error CastOverflow();
+
+    /// @dev Returns true if at most one of x and y is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
         assembly {
-            z := gt(add(iszero(x), iszero(y)), 0)
+            z := or(iszero(x), iszero(y))
         }
     }
 
@@ -23,38 +25,18 @@ library UtilsLib {
         }
     }
 
-    /// @dev Returns (`x` * `y`) / `d` rounded down.
+    /// @dev Returns (x * y) / d rounded down.
     function mulDivDown(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y) / d;
     }
 
-    /// @dev Returns (`x` * `y`) / `d` rounded up.
+    /// @dev Returns (x * y) / d rounded up.
     function mulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y + (d - 1)) / d;
     }
 
-    /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
-    /// @dev Hash sorts the inputs lexicographically.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
-        bytes32 currentHash = leafHash;
-        for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = commutativeHash(currentHash, proof[i]);
-        }
-        return currentHash == root;
-    }
-
-    /// @dev Returns the keccak256 hash of the sorted concatenation of `a` and `b`.
-    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
-        if (a > b) (a, b) = (b, a);
-        assembly ("memory-safe") {
-            mstore(0x00, a)
-            mstore(0x20, b)
-            value := keccak256(0x00, 0x40)
-        }
-    }
-
     function toUint128(uint256 x) internal pure returns (uint128) {
-        require(x <= type(uint128).max, "uint256 overflows uint128");
+        require(x <= type(uint128).max, CastOverflow());
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
         return uint128(x);
     }
@@ -68,26 +50,26 @@ library UtilsLib {
         }
     }
 
-    /// @dev Assumes `bitmap` is not zero.
+    /// @dev Assumes bitmap is not zero.
     function msb(uint128 bitmap) internal pure returns (uint256 res) {
         assembly {
             res := sub(255, clz(bitmap))
         }
     }
 
-    /// @dev Assumes `bit` is less than 128.
+    /// @dev Assumes bit is less than 128.
     function setBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast) as bit < 128
         return uint128(bitmap | (1 << bit));
     }
 
-    /// @dev Assumes `bit` is less than 128.
+    /// @dev Assumes bit is less than 128.
     function clearBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast)
         return uint128(bitmap & ~(1 << bit));
     }
 
-    /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
+    /// @dev Sets a boolean in transient storage keyed by a (bytes32, address) pair.
     /// @dev Returns the previous value at the written slot.
     function tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool previous) {
         uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
@@ -97,7 +79,7 @@ library UtilsLib {
         }
     }
 
-    /// @dev Gets a boolean from transient storage keyed by a `(bytes32, address)` pair.
+    /// @dev Gets a boolean from transient storage keyed by a (bytes32, address) pair.
     function tGet(uint256 baseSlot, bytes32 key1, address key2) internal view returns (bool value) {
         uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
         assembly ("memory-safe") {
