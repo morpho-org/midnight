@@ -5,7 +5,6 @@ using Midnight as Midnight;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
-    function _.price() external => NONDET;
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
@@ -20,15 +19,12 @@ methods {
     function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
 
@@ -41,11 +37,6 @@ methods {
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-
-    // Gate functions are view and cannot modify state.
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -88,8 +79,8 @@ rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligati
     assert obligationIsCreated(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
-    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData, root, proof);
+rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
     assert obligationIsCreated(offer.obligation);
 }
 
@@ -122,7 +113,7 @@ rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, ui
 rule onlyTouchObligationCreatesObligation(env e, method f, calldataarg args, bytes32 id)
 filtered {
     f -> f.selector != sig:touchObligation(Midnight.Obligation).selector
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
         && f.selector != sig:withdraw(Midnight.Obligation, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector
         && f.selector != sig:supplyCollateral(Midnight.Obligation, uint256, uint256, address).selector
@@ -171,8 +162,8 @@ strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 i
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
     !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
-strong invariant positionLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => currentContract.position[id][user].lossFactor == 0;
+strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+    !Midnight.obligationCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFees(id);
