@@ -17,6 +17,36 @@ bytes constant OFFER_TYPE =
 bytes32 constant OFFER_TYPEHASH = 0xa75bd7b6468a41ab66f3aa9c068cf8ba48ebfb736e548c3fda0ef0f9e18857a5;
 
 library HashLib {
+    /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
+    function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
+        bytes memory offerTreeType = "OfferTree(Offer";
+        for (uint256 i = 0; i < height; i++) {
+            offerTreeType = bytes.concat(offerTreeType, "[2]");
+        }
+        offerTreeType = bytes.concat(offerTreeType, " offerTree)");
+        return keccak256(bytes.concat(offerTreeType, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
+    }
+
+    /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
+    /// @dev Hash sorts the inputs lexicographically.
+    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
+        bytes32 currentHash = leafHash;
+        for (uint256 i = 0; i < proof.length; i++) {
+            currentHash = commutativeHash(currentHash, proof[i]);
+        }
+        return currentHash == root;
+    }
+
+    /// @dev Returns the keccak256 hash of the sorted concatenation of a and b.
+    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
+        if (a > b) (a, b) = (b, a);
+        assembly ("memory-safe") {
+            mstore(0x00, a)
+            mstore(0x20, b)
+            value := keccak256(0x00, 0x40)
+        }
+    }
+
     /// @dev Computes the EIP-712 hash struct of a CollateralParams.
     function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
         return keccak256(
