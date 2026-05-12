@@ -319,7 +319,8 @@ contract Midnight is IMidnight {
     /// @dev `maxUnits` values above `type(uint128).max` might still succeed after capping, but might also revert early
     /// due to overflow depending on which offer-cap path is taken.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
-    /// @dev If an offer has max == consumed, takes can still happen (but no assets/units will be taken/sent).
+    /// @dev If an offer has max == consumed, takes may happen but no assets will be transferred. Units may be
+    /// transferred.
     /// @dev Returns buyerAssets, sellerAssets, units.
     function take(
         uint256 maxUnits,
