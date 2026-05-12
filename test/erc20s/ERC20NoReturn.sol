@@ -2,10 +2,18 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-contract ERC20NoReturn {
+import {PermitExt} from "./PermitExt.sol";
+
+contract ERC20NoReturn is PermitExt {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+
+    constructor(string memory _name) PermitExt(_name) {}
+
+    function _setAllowance(address owner, address spender, uint256 value) internal override {
+        allowance[owner][spender] = value;
+    }
 
     function _transfer(address _from, address _to, uint256 _amount) internal {
         balanceOf[_from] -= _amount;
