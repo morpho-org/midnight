@@ -128,7 +128,7 @@ contract MaxAmountsTest is BaseTest {
 
         midnight.setIsAuthorized(borrower, address(this), true);
 
-        vm.expectRevert("uint256 overflows uint128");
+        vm.expectRevert(UtilsLib.CastOverflow.selector);
         midnight.supplyCollateral(obligation, 0, amount, borrower);
     }
 }

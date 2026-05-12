@@ -10,6 +10,8 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -29,9 +31,9 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH, ROOT_TYPEHASH} from "../src/interfaces/IEcrecover.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {EcrecoverAuthorizer} from "../src/authorizers/EcrecoverAuthorizer.sol";
+import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 abstract contract BaseTest is Test {
@@ -144,7 +146,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, sig([offer]), root([offer]), proof([offer]));
+        return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
     }
 
     function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
@@ -177,7 +179,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
-        badBorrowerOffer.maxUnits = 100;
+        badBorrowerOffer.maxUnits = UtilsLib.toUint128(100);
         badBorrowerOffer.ratifier = address(ecrecoverRatifier);
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
@@ -200,13 +202,13 @@ abstract contract BaseTest is Test {
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(obligation, 0, 0, 0, badBorrower, "");
+        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
         deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, hex"");
+        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, address(0), hex"");
         assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
 
         // reset the price.
@@ -217,8 +219,10 @@ abstract contract BaseTest is Test {
         return IdLib.toId(obligation, block.chainid, address(midnight));
     }
 
-    function sig(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        return abi.encode(signature(root(offers), privateKey[_signer], offers[0].ratifier));
+    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
+        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -228,46 +232,111 @@ abstract contract BaseTest is Test {
     // assumes the offer is the first one!
     function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](1);
-        _path[0] = keccak256(abi.encode(offers[1]));
+        _path[0] = HashLib.hashOffer(offers[1]);
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the first one
+    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = HashLib.hashOffer(offers[1]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the second one
+    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = HashLib.hashOffer(offers[0]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the third one
+    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = HashLib.hashOffer(offers[3]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return _path;
+    }
+
+    // 4 leaves, assumes the offer is the fourth one
+    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
+        bytes32[] memory _path = new bytes32[](2);
+        _path[0] = HashLib.hashOffer(offers[2]);
+        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _path;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offer));
+        return HashLib.hashOffer(offer);
     }
 
     function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return keccak256(abi.encode(offers[0]));
+        return HashLib.hashOffer(offers[0]);
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return UtilsLib.commutativeHash(keccak256(abi.encode(offers[0])), keccak256(abi.encode(offers[1])));
+        return MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+    }
+
+    function root(Offer[4] memory offers) internal pure returns (bytes32) {
+        bytes32 left = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        bytes32 right = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return MerkleLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
     }
 
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract)
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
         internal
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(ROOT_TYPEHASH, _root));
+        bytes32 structHash = keccak256(abi.encode(MerkleLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
         return _signature;
     }
 
-    function sig(Offer[1] memory offers) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+    function _encodeMerkleRatifierData(Signature memory _sig, uint256 _height, bytes32 _root, bytes32[] memory _proof)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encode(_sig, _height, _root, _proof);
     }
 
-    function sig(Offer[2] memory offers) internal view returns (bytes memory) {
+    function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        return abi.encode(signature(_root, privateKey[offers[0].maker], offers[0].ratifier));
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
+        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
+    }
+
+    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1);
+        return _encodeMerkleRatifierData(_sig, 1, _root, _proof);
+    }
+
+    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2);
+        return _encodeMerkleRatifierData(_sig, 2, _root, _proof);
+    }
+
+    /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
+    /// the signed root or the proof is intentionally inconsistent with the offer.
+    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
+        internal
+        view
+        returns (bytes memory)
+    {
+        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
+        return _encodeMerkleRatifierData(_sig, _height, _root, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -290,9 +359,10 @@ abstract contract BaseTest is Test {
     }
 
     /// @dev Returns an obligation with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
-    function validObligation(Obligation memory obligation) internal pure returns (Obligation memory) {
+    function validObligation(Obligation memory obligation) internal view returns (Obligation memory) {
         uint256 len =
             obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+        vm.assume(len > 0);
         CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
@@ -303,13 +373,25 @@ abstract contract BaseTest is Test {
         }
         collateralParams = sortCollateralParams(collateralParams);
         obligation.collateralParams = collateralParams;
+        obligation.maturity = bound(obligation.maturity, 0, block.timestamp + 100 * 365 days);
         return obligation;
     }
 
     function setupObligation(Obligation memory obligation, uint256 units) internal {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
-        Offer memory borrowerOffer;
+        Offer memory borrowerOffer = _setupObligationOffer(obligation, units);
+        bytes memory rd = merkleRatifierData([borrowerOffer]);
+
+        vm.prank(lender);
+        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
+    }
+
+    function _setupObligationOffer(Obligation memory obligation, uint256 units)
+        private
+        view
+        returns (Offer memory borrowerOffer)
+    {
         borrowerOffer.obligation = obligation;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
@@ -319,19 +401,6 @@ abstract contract BaseTest is Test {
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;
-
-        vm.prank(lender);
-        midnight.take(
-            units,
-            lender,
-            address(0),
-            hex"",
-            borrower,
-            borrowerOffer,
-            sig([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
-        );
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

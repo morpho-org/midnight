@@ -3,11 +3,12 @@
 pragma solidity ^0.8.0;
 
 import {
+    IEcrecoverAuthorizer,
     Authorization,
     Signature,
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
-} from "../src/interfaces/IEcrecover.sol";
+} from "../src/periphery/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverAuthorizerTest is BaseTest {
@@ -76,7 +77,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);
@@ -88,7 +89,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.deadline = block.timestamp - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert("expired");
+        vm.expectRevert(IEcrecoverAuthorizer.Expired.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
@@ -97,7 +98,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         auth.nonce = 999; // wrong nonce
         Signature memory sig = signAuthorization(auth, borrower);
 
-        vm.expectRevert("invalid nonce");
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidNonce.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
