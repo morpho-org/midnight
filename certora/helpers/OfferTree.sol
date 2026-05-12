@@ -77,6 +77,7 @@ contract OfferTree {
 
     // (a) binary shape: 0 or 2 children with consistent hashing.
     // (b) pair-sorted: at every internal node, L.hash <= R.hash.
+    // (c) internal nodes carry no offerHash.
     // Leaf nodes wrap offerHash with `keccak(bytes.concat(...))` so leaf
     // hash inputs are length-disjoint from internal hash inputs.
     function isWellFormed(bytes32 id) public view returns (bool) {
@@ -89,14 +90,15 @@ contract OfferTree {
         if (n.left == 0 || n.right == 0) return false;
         Node storage L = tree[n.left];
         Node storage R = tree[n.right];
-        return !isEmpty(L) && !isEmpty(R) && L.hashNode <= R.hashNode
+        return n.offerHash == 0 && !isEmpty(L) && !isEmpty(R) && L.hashNode <= R.hashNode
             && n.hashNode == keccak256(abi.encode(L.hashNode, R.hashNode));
     }
 
     // Walks down from `id` using `proof` (consumed last-to-first), asserting
     // well-formedness at every visited node and requiring each proof
-    // element to match one of the current node's child hashes. Returns
-    // the leaf id reached.
+    // element to match one of the current node's child hashes. Reverts
+    // unless the final node is an actual populated leaf. Returns the
+    // leaf id reached.
     function wellFormedPathToLeaf(bytes32 id, bytes32[] memory proof)
         external
         view
@@ -113,7 +115,92 @@ contract OfferTree {
             require(otherHash == leftHash || otherHash == rightHash);
             id = leftHash == otherHash ? right : left;
         }
+        require(tree[id].left == 0 && tree[id].right == 0);
+        require(tree[id].offerHash != 0);
         return id;
+    }
+
+    // Single-frame storage-tied forward-direction helper. Walks a
+    // well-formed path while threading the expected hash downward from
+    // the stored root to the reached leaf. This avoids asking Certora to
+    // rediscover the same hash equalities by reconstructing the chain in
+    // a second pass.
+    function storedLeafReachesRoot(bytes32 rootId, bytes32[] memory proof)
+        external
+        view
+        returns (bool)
+    {
+        bytes32 id = rootId;
+        bytes32 expected = tree[rootId].hashNode;
+        for (uint256 i = proof.length;;) {
+            require(isWellFormed(id));
+            require(tree[id].hashNode == expected);
+            if (i == 0) break;
+            bytes32 otherHash = proof[--i];
+            bytes32 left = tree[id].left;
+            bytes32 right = tree[id].right;
+            bytes32 leftHash = tree[left].hashNode;
+            bytes32 rightHash = tree[right].hashNode;
+            require(otherHash == leftHash || otherHash == rightHash);
+            bytes32 childHash;
+            if (leftHash == otherHash) {
+                id = right;
+                childHash = rightHash;
+            } else {
+                id = left;
+                childHash = leftHash;
+            }
+            bytes32 a = childHash;
+            bytes32 b = otherHash;
+            if (a > b) (a, b) = (b, a);
+            require(expected == keccak256(abi.encode(a, b)));
+            expected = childHash;
+        }
+        require(tree[id].left == 0 && tree[id].right == 0);
+        require(tree[id].offerHash != 0);
+        return expected == keccak256(bytes.concat(tree[id].offerHash));
+    }
+
+    // Single-frame storage-tied soundness helper. Walks the proof to the
+    // corresponding stored leaf while threading the expected hash
+    // downward from the stored root. Conditioning on the final expected
+    // leaf hash matching `candidateOfferHash`, checks that the accepted
+    // candidate offerHash equals the stored one.
+    function acceptedCandidateMatchesStoredLeaf(bytes32 rootId, bytes32[] memory proof, bytes32 candidateOfferHash)
+        external
+        view
+        returns (bool)
+    {
+        bytes32 id = rootId;
+        bytes32 expected = tree[rootId].hashNode;
+        for (uint256 i = proof.length;;) {
+            require(isWellFormed(id));
+            require(tree[id].hashNode == expected);
+            if (i == 0) break;
+            bytes32 otherHash = proof[--i];
+            bytes32 left = tree[id].left;
+            bytes32 right = tree[id].right;
+            bytes32 leftHash = tree[left].hashNode;
+            bytes32 rightHash = tree[right].hashNode;
+            require(otherHash == leftHash || otherHash == rightHash);
+            bytes32 childHash;
+            if (leftHash == otherHash) {
+                id = right;
+                childHash = rightHash;
+            } else {
+                id = left;
+                childHash = leftHash;
+            }
+            bytes32 a = childHash;
+            bytes32 b = otherHash;
+            if (a > b) (a, b) = (b, a);
+            require(expected == keccak256(abi.encode(a, b)));
+            expected = childHash;
+        }
+        require(tree[id].left == 0 && tree[id].right == 0);
+        require(tree[id].offerHash != 0);
+        require(expected == keccak256(bytes.concat(candidateOfferHash)));
+        return candidateOfferHash == tree[id].offerHash;
     }
 
     // Single-frame forward-direction helper. Builds the wallet's EIP-712

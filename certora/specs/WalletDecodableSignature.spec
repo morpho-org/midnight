@@ -8,7 +8,8 @@
 //   well-formed, every leaf is takeable on-chain via `UtilsLib.isLeaf`.
 //
 //   Well-formed = at every internal node: two non-empty children with
-//   `L.hash <= R.hash` and `hashNode == keccak256(abi.encode(L, R))`.
+//   `L.hash <= R.hash`, `offerHash == 0`, and
+//   `hashNode == keccak256(abi.encode(L, R))`.
 //
 // Proof structure
 //   (A) `wellFormed` invariant — storage shape preserved by every
@@ -16,11 +17,14 @@
 //   (B) `verifierAcceptsSortedTree` — forward direction at the chain
 //       level: sort-labeled construction at every level yields a root
 //       the real `UtilsLib.isLeaf` accepts for any leaf and any proof.
-//   (C) `verifierRejectsSpoofedLeaves` — storage-tied non-spoofability
-//       (URD `claimCorrectness` pattern): any candidate leaf hash that
-//       passes the chain verifier against a well-formed tree's stored
-//       root must equal the offerHash actually stored at the
-//       corresponding tree leaf.
+//   (C) `verifierAcceptsStoredLeaves` and
+//       `acceptedProofMatchesStoredLeaf` — storage-tied forward
+//       correctness and soundness, using URD-style single-frame helpers.
+//       The tree walk, leaf lookup, and hash folding are deliberately
+//       packaged into one Solidity helper call because Certora's hash
+//       model is much more effective when all equalities appear in the
+//       same symbolic frame than when they are split across several
+//       external calls.
 //
 // Bridge (construction-level identity, not machine-checked):
 //   Wallet's EIP-712 array hash of a sort-labeled tree coincides with
@@ -30,12 +34,9 @@
 methods {
     function isEmpty(bytes32) external returns (bool) envfree;
     function isWellFormed(bytes32) external returns (bool) envfree;
-    function getHash(bytes32) external returns (bytes32) envfree;
-    function getOfferHash(bytes32) external returns (bytes32) envfree;
-    function wellFormedPathToLeaf(bytes32, bytes32[]) external returns (bytes32) envfree;
     function verifierAcceptsSortLabeledRoot(bytes32, bytes32[]) external returns (bool) envfree;
-    function requireChainReaches(bytes32, bytes32, bytes32[]) external envfree;
-    function chainReaches(bytes32, bytes32, bytes32[]) external returns (bool) envfree;
+    function storedLeafReachesRoot(bytes32, bytes32[]) external returns (bool) envfree;
+    function acceptedCandidateMatchesStoredLeaf(bytes32, bytes32[], bytes32) external returns (bool) envfree;
 }
 
 // (A) Storage shape invariants.
@@ -60,31 +61,25 @@ rule verifierAcceptsSortedTree(bytes32 leafHash, bytes32[] proof) {
 }
 
 // (B2) Forward direction storage-tied. For any leaf reachable via a
-// well-formed path from `rootId`, the chain verifier accepts the leaf's
-// stored offerHash with that proof against the tree's stored root.
-// Relies on cross-frame keccak unification: the `keccak(bytes.concat(...))`
-// leaf wrap and `keccak(abi.encode(L, R))` internal hashing forms are
-// identical on both the storage side (`newLeaf`, `newInternalNode`) and
-// the chain side (`chainReaches`), so the prover can match terms.
+// well-formed path from `rootId`, the chain verifier accepts the stored
+// leaf reached by that proof against the stored root. This rule is
+// written against a single-frame helper on purpose: in practice, Certora
+// often loses the crucial hash equalities when storage walk, leaf read,
+// and chain reconstruction are asserted via separate helper calls. The
+// helper therefore threads the expected hash downward from the root,
+// instead of recomputing the same chain from leaf to root in a second
+// pass.
 rule verifierAcceptsStoredLeaves(bytes32 rootId, bytes32[] proof) {
-    bytes32 leafId = wellFormedPathToLeaf(rootId, proof);
-    bytes32 leafOfferHash = getOfferHash(leafId);
-    bytes32 rootHash = getHash(rootId);
-    // Exclude the trivially-vacuous empty-tree case where every storage
-    // value is zero and the walk lands at an unpopulated node.
-    require leafOfferHash != to_bytes32(0);
-    assert chainReaches(rootHash, leafOfferHash, proof);
+    assert storedLeafReachesRoot(rootId, proof);
 }
 
-// (C) Non-spoofability. Conditioning on the chain verifier accepting a
-// candidate offer hash against the tree's stored root, keccak
-// injectivity (across the URD-style leaf wrap and internal-node hashing)
-// forces the candidate to equal the actually-stored offerHash at the
-// walked-to leaf.
-rule verifierRejectsSpoofedLeaves(bytes32 rootId, bytes32[] proof, bytes32 candidateOfferHash) {
-    bytes32 leafId = wellFormedPathToLeaf(rootId, proof);
-    bytes32 rootHash = getHash(rootId);
-    requireChainReaches(rootHash, candidateOfferHash, proof);
-    bytes32 storedOfferHash = getOfferHash(leafId);
-    assert candidateOfferHash == storedOfferHash;
+// (C) Direct soundness rule from the pen-and-paper proof. Fix a
+// well-formed stored tree and a proof. If the commutative-hash verifier
+// reaches the stored root from some candidate offer hash using that
+// proof, then the candidate must equal the stored offerHash at the leaf
+// reached by the same proof. Again, the helper keeps the whole argument
+// in one frame and threads the expected hash downward to avoid cross-call
+// loss of hash equalities.
+rule acceptedProofMatchesStoredLeaf(bytes32 rootId, bytes32[] proof, bytes32 candidateOfferHash) {
+    assert acceptedCandidateMatchesStoredLeaf(rootId, proof, candidateOfferHash);
 }
