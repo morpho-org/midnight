@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 library UtilsLib {
-    error CastOverflow();
+    error CastOverflowUint128();
+    error CastOverflowUint120();
 
     /// @dev Returns true if at most one of x and y is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
@@ -43,13 +44,13 @@ library UtilsLib {
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
-        require(x <= type(uint128).max, CastOverflow());
+        require(x <= type(uint128).max, CastOverflowUint128());
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint128).max
         return uint128(x);
     }
 
     function toUint120(uint256 x) internal pure returns (uint120) {
-        require(x <= type(uint120).max, CastOverflow());
+        require(x <= type(uint120).max, CastOverflowUint120());
         // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint120).max
         return uint120(x);
     }

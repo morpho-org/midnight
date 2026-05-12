@@ -7,7 +7,7 @@ methods {
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
-    function continuousFee(bytes32 id) external returns (uint32) envfree;
+    function continuousFee(bytes32 id) external returns (uint256) envfree;
     function claimableTradingFee(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function withdrawable(bytes32 id) external returns (uint256) envfree;
@@ -25,7 +25,9 @@ methods {
 
 definition FEE_STEP() returns uint256 = 10 ^ 12;
 
-definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+definition CONTINUOUS_FEE_CBP() returns uint256 = 10 ^ 4;
+
+definition MAX_CONTINUOUS_FEE() returns uint256 = 317097910000;
 
 definition rawObligationTradingFee(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFee0 : index == 1 ? currentContract.obligationState[id].tradingFee1 : index == 2 ? currentContract.obligationState[id].tradingFee2 : index == 3 ? currentContract.obligationState[id].tradingFee3 : index == 4 ? currentContract.obligationState[id].tradingFee4 : index == 5 ? currentContract.obligationState[id].tradingFee5 : currentContract.obligationState[id].tradingFee6;
 
@@ -126,20 +128,22 @@ rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, u
 rule feeSetterCanSetObligationContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
     address feeSetterBefore = feeSetter();
     bool obligationExists = obligationCreated(id);
+    bool validFee = newContinuousFee <= MAX_CONTINUOUS_FEE() && newContinuousFee % CONTINUOUS_FEE_CBP() == 0;
 
     setObligationContinuousFee@withrevert(e, id, newContinuousFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && obligationExists;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && obligationExists;
     assert !reverted => continuousFee(id) == newContinuousFee;
 }
 
 rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newContinuousFee) {
     address feeSetterBefore = feeSetter();
+    bool validFee = newContinuousFee <= MAX_CONTINUOUS_FEE() && newContinuousFee % CONTINUOUS_FEE_CBP() == 0;
 
     setDefaultContinuousFee@withrevert(e, loanToken, newContinuousFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE();
-    assert !reverted => currentContract.defaultContinuousFee[loanToken] == newContinuousFee;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee;
+    assert !reverted => currentContract.defaultContinuousFeeCbp[loanToken] * CONTINUOUS_FEE_CBP() == newContinuousFee;
 }
 
 /// FEE SETTER: ACCESS CONTROL ///
@@ -148,7 +152,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 /// Once an obligation is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require obligationCreated(id), "obligation must exist";
-    uint32 continuousFeeBefore = continuousFee(id);
+    uint256 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
 
     f(e, args);
@@ -157,12 +161,12 @@ rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, 
 }
 
 rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg args, address loanToken) filtered { f -> !f.isView } {
-    uint32 defaultContinuousFeeBefore = currentContract.defaultContinuousFee[loanToken];
+    uint16 defaultContinuousFeeBefore = currentContract.defaultContinuousFeeCbp[loanToken];
     address feeSetterBefore = feeSetter();
 
     f(e, args);
 
-    assert currentContract.defaultContinuousFee[loanToken] != defaultContinuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setDefaultContinuousFee(address, uint256).selector;
+    assert currentContract.defaultContinuousFeeCbp[loanToken] != defaultContinuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setDefaultContinuousFee(address, uint256).selector;
 }
 
 /// FEE CLAIMER: ACCESS CONTROL ///

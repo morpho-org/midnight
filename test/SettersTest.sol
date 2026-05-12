@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {MAX_CONTINUOUS_FEE, CONTINUOUS_FEE_STEP} from "../src/libraries/ConstantsLib.sol";
+import {MAX_CONTINUOUS_FEE, CONTINUOUS_FEE_CBP} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
@@ -122,14 +122,14 @@ contract SettersTest is BaseTest {
 
     function testSetObligationContinuousFeeNotMultipleOfFeeStep(bytes32 id, uint256 fee) public {
         fee = bound(fee, 1, MAX_CONTINUOUS_FEE);
-        vm.assume(fee % CONTINUOUS_FEE_STEP != 0);
+        vm.assume(fee % CONTINUOUS_FEE_CBP != 0);
         vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setObligationContinuousFee(id, fee);
     }
 
     function testSetDefaultContinuousFeeNotMultipleOfFeeStep(address loanToken, uint256 fee) public {
         fee = bound(fee, 1, MAX_CONTINUOUS_FEE);
-        vm.assume(fee % CONTINUOUS_FEE_STEP != 0);
+        vm.assume(fee % CONTINUOUS_FEE_CBP != 0);
         vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
         midnight.setDefaultContinuousFee(loanToken, fee);
     }
@@ -140,7 +140,7 @@ contract SettersTest is BaseTest {
     }
 
     function testSetObligationContinuousFeeObligationNotCreated(bytes32 id, uint256 fee) public {
-        fee = bound(fee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        fee = bound(fee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.setObligationContinuousFee(id, fee);
     }
@@ -358,12 +358,12 @@ contract SettersTest is BaseTest {
     }
 
     function testSetContinuousFeeSuccess(uint256 fee, uint256 fee2) public {
-        fee = bound(fee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
-        fee2 = bound(fee2, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        fee = bound(fee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
+        fee2 = bound(fee2, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         vm.assume(fee != fee2);
 
         midnight.setDefaultContinuousFee(address(loanToken), fee);
-        assertEq(midnight.defaultContinuousFee(address(loanToken)), fee / CONTINUOUS_FEE_STEP, "default fee updated");
+        assertEq(midnight.defaultContinuousFeeCbp(address(loanToken)), fee / CONTINUOUS_FEE_CBP, "default fee updated");
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -380,8 +380,8 @@ contract SettersTest is BaseTest {
         midnight.touchObligation(obligation);
         bytes32 id = toId(obligation);
 
-        assertEq(midnight.continuousFee(id), fee / CONTINUOUS_FEE_STEP, "obligation inherits default fee");
+        assertEq(midnight.continuousFeeCbp(id), fee / CONTINUOUS_FEE_CBP, "obligation inherits default fee");
         midnight.setObligationContinuousFee(id, fee2);
-        assertEq(midnight.continuousFee(id), fee2 / CONTINUOUS_FEE_STEP, "obligation fee updated");
+        assertEq(midnight.continuousFeeCbp(id), fee2 / CONTINUOUS_FEE_CBP, "obligation fee updated");
     }
 }

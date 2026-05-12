@@ -8,7 +8,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint120) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
@@ -32,7 +32,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 
 /// The obligation's lossFactor is only modified by liquidate.
 rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
-    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
+    uint120 lossFactorBefore = currentContract.obligationState[id].lossFactor;
 
     f(e, args);
 
@@ -42,10 +42,10 @@ rule onlyLiquidateChangesObligationLossFactor(bytes32 id, method f, env e, calld
 /// In liquidate, the obligation's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
 rule lossFactorChangesIffBadDebt(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(obligation);
-    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
+    uint120 lossFactorBefore = currentContract.obligationState[id].lossFactor;
     uint256 totalUnitsBefore = totalUnits(id);
 
-    require lossFactorBefore < max_uint128, "obligation lossFactor must not be saturated";
+    require lossFactorBefore < max_uint120, "obligation lossFactor must not be saturated";
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
 

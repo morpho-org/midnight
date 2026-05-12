@@ -53,7 +53,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
-/// @dev The continuous fee is stored divided by CONTINUOUS_FEE_STEP (10000) to fit in 16 bits.
+/// @dev The continuous fee is stored in cbp (continuousFee / CONTINUOUS_FEE_CBP) to fit in 16 bits.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the obligation's continuous fee changes, the
 /// pending fee of existing lenders is not updated (=> their fee is fixed).
 /// @dev Absent bad debt, the face value of a lender's position is credit - pendingFee.
@@ -184,7 +184,7 @@ contract Midnight is IMidnight {
     mapping(address user => bytes32) public session;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
-    mapping(address loanToken => uint16) public defaultContinuousFee;
+    mapping(address loanToken => uint16) public defaultContinuousFeeCbp;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -265,21 +265,21 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
-        require(newContinuousFee % CONTINUOUS_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
+        require(newContinuousFee % CONTINUOUS_FEE_CBP == 0, FeeNotMultipleOfFeeStep());
         require(_obligationState.created, ObligationNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < uint16.max *
-        // CONTINUOUS_FEE_STEP
-        _obligationState.continuousFee = uint16(newContinuousFee / CONTINUOUS_FEE_STEP);
+        // CONTINUOUS_FEE_CBP
+        _obligationState.continuousFeeCbp = uint16(newContinuousFee / CONTINUOUS_FEE_CBP);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
     }
 
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
-        require(newContinuousFee % CONTINUOUS_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
+        require(newContinuousFee % CONTINUOUS_FEE_CBP == 0, FeeNotMultipleOfFeeStep());
         // forge-lint: disable-next-item(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < uint16.max *
-        // CONTINUOUS_FEE_STEP
-        defaultContinuousFee[loanToken] = uint16(newContinuousFee / CONTINUOUS_FEE_STEP);
+        // CONTINUOUS_FEE_CBP
+        defaultContinuousFeeCbp[loanToken] = uint16(newContinuousFee / CONTINUOUS_FEE_CBP);
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
@@ -376,7 +376,7 @@ contract Midnight is IMidnight {
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         uint256 sellerDebtIncrease = units - sellerCreditDecrease;
         uint128 buyerPendingFeeIncrease = UtilsLib.toUint128(
-            buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * CONTINUOUS_FEE_STEP * timeToMaturity, WAD)
+            buyerCreditIncrease.mulDivDown(_obligationState.continuousFeeCbp * CONTINUOUS_FEE_CBP * timeToMaturity, WAD)
         );
         uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
@@ -766,7 +766,7 @@ contract Midnight is IMidnight {
             _obligationState.tradingFee4 = _defaultTradingFees[4];
             _obligationState.tradingFee5 = _defaultTradingFees[5];
             _obligationState.tradingFee6 = _defaultTradingFees[6];
-            _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
+            _obligationState.continuousFeeCbp = defaultContinuousFeeCbp[obligation.loanToken];
             IdLib.storeInCode(obligation, INITIAL_CHAIN_ID);
 
             emit EventsLib.ObligationCreated(id, obligation);
@@ -900,14 +900,14 @@ contract Midnight is IMidnight {
         ];
     }
 
-    /// @dev The continuous fee is 0 until the obligation is created, then set to the default value.
-    function continuousFee(bytes32 id) external view returns (uint16) {
-        return obligationState[id].continuousFee;
+    /// @dev The continuous fee cbp is 0 until the obligation is created, then set to the default value.
+    function continuousFeeCbp(bytes32 id) external view returns (uint16) {
+        return obligationState[id].continuousFeeCbp;
     }
 
-    /// @dev Returns the continuous fee scaled by CONTINUOUS_FEE_STEP (i.e., the actual fee rate per second in WAD).
-    function continuousFeeRate(bytes32 id) external view returns (uint256) {
-        return obligationState[id].continuousFee * CONTINUOUS_FEE_STEP;
+    /// @dev Returns the continuous fee scaled by CONTINUOUS_FEE_CBP (i.e., the actual fee rate per second in WAD).
+    function continuousFee(bytes32 id) external view returns (uint256) {
+        return obligationState[id].continuousFeeCbp * CONTINUOUS_FEE_CBP;
     }
 
     function continuousFeeCredit(bytes32 id) external view returns (uint256) {

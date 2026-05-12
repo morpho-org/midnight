@@ -12,7 +12,7 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint120) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
@@ -35,7 +35,7 @@ methods {
 
 /// HELPERS ///
 
-definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+definition MAX_CONTINUOUS_FEE_CBP() returns uint256 = 31709;
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
@@ -101,22 +101,22 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
 }
 
 rule obligationLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
+    uint120 lossFactorBefore = currentContract.obligationState[id].lossFactor;
     f(e, args);
-    uint128 lossFactorAfter = currentContract.obligationState[id].lossFactor;
+    uint120 lossFactorAfter = currentContract.obligationState[id].lossFactor;
     assert lossFactorAfter >= lossFactorBefore;
 }
 
 rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant lastLossFactorLeqObligationLossFactor(id, user);
-    uint128 lastLossFactorBefore = lastLossFactor(id, user);
+    uint120 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    uint120 lastLossFactorAfter = lastLossFactor(id, user);
     assert lastLossFactorAfter >= lastLossFactorBefore;
 }
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
-    require currentContract.obligationState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    require currentContract.obligationState[id].lossFactor == max_uint120, "assume loss factor is maxed out";
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
 
@@ -132,10 +132,10 @@ strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
     to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
 
 strong invariant defaultContinuousFeeBoundedAll()
-    forall address token. currentContract.defaultContinuousFee[token] <= MAX_CONTINUOUS_FEE();
+    forall address token. currentContract.defaultContinuousFeeCbp[token] <= MAX_CONTINUOUS_FEE_CBP();
 
 strong invariant continuousFeeBounded(bytes32 id)
-    currentContract.obligationState[id].continuousFee <= MAX_CONTINUOUS_FEE()
+    currentContract.obligationState[id].continuousFeeCbp <= MAX_CONTINUOUS_FEE_CBP()
     {
         preserved with (env e) {
             requireInvariant defaultContinuousFeeBoundedAll();

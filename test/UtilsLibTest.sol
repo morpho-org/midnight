@@ -77,8 +77,15 @@ contract UtilsLibTest is Test {
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
-        vm.expectRevert(UtilsLib.CastOverflow.selector);
+        vm.expectRevert(UtilsLib.CastOverflowUint128.selector);
         UtilsLib.toUint128(x);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testToUint120Overflow(uint256 x) public {
+        x = bound(x, uint256(type(uint120).max) + 1, type(uint256).max);
+        vm.expectRevert(UtilsLib.CastOverflowUint120.selector);
+        UtilsLib.toUint120(x);
     }
 
     function mulDivDown(uint256 x, uint256 y, uint256 d) external pure {

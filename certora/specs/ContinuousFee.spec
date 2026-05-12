@@ -7,7 +7,7 @@ methods {
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function continuousFee(bytes32 id) external returns (uint32) envfree;
+    function continuousFee(bytes32 id) external returns (uint256) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.

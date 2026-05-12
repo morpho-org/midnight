@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {WAD, MAX_CONTINUOUS_FEE, CONTINUOUS_FEE_STEP} from "../src/libraries/ConstantsLib.sol";
+import {WAD, MAX_CONTINUOUS_FEE, CONTINUOUS_FEE_CBP} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -67,7 +67,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testAccrualPreMaturity(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -106,7 +106,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testAccrualPostMaturity(uint256 credit, uint256 feeRate, uint256 ttm, uint256 extraTime) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 1, 360 days);
         extraTime = bound(extraTime, 0, 360 days);
 
@@ -144,7 +144,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed2
     ) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 4, 360 days);
         elapsed1 = bound(elapsed1, 1, ttm / 2);
         elapsed2 = bound(elapsed2, 1, ttm / 2);
@@ -172,7 +172,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testSingleLend(uint256 credit, uint256 feeRate, uint256 ttm) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 1, 360 days);
 
         setupLender(credit, feeRate, ttm);
@@ -205,8 +205,8 @@ contract ContinuousFeeTest is BaseTest {
     ) public {
         credit1 = bound(credit1, 1e18, MAX_CREDIT / 2);
         credit2 = bound(credit2, 1, MAX_CREDIT / 2);
-        rate1 = bound(rate1, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
-        rate2 = bound(rate2, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        rate1 = bound(rate1, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
+        rate2 = bound(rate2, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -241,7 +241,7 @@ contract ContinuousFeeTest is BaseTest {
         public
     {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 0, ttm - 1);
 
@@ -315,7 +315,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed
     ) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 0, ttm - 1);
 
@@ -366,7 +366,7 @@ contract ContinuousFeeTest is BaseTest {
         uint256 elapsed2
     ) public {
         credit = bound(credit, 100, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 10, 360 days);
         elapsed1 = bound(elapsed1, 1, ttm - 2);
         elapsed2 = bound(elapsed2, 1, ttm - elapsed1 - 1);
@@ -404,7 +404,7 @@ contract ContinuousFeeTest is BaseTest {
         public
     {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -446,7 +446,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testClaimContinuousFeeExcessReverts(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed) public {
         credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 2, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -471,7 +471,7 @@ contract ContinuousFeeTest is BaseTest {
         bool withBadDebt
     ) public {
         credit = bound(credit, 100, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 10, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 
@@ -497,7 +497,7 @@ contract ContinuousFeeTest is BaseTest {
         bool withBadDebt
     ) public {
         credit = bound(credit, 100, MAX_CREDIT);
-        feeRate = bound(feeRate, CONTINUOUS_FEE_STEP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        feeRate = bound(feeRate, CONTINUOUS_FEE_CBP, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_CBP * CONTINUOUS_FEE_CBP;
         ttm = bound(ttm, 10, 360 days);
         elapsed = bound(elapsed, 1, ttm - 1);
 

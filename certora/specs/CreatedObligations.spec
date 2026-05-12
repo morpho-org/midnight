@@ -9,7 +9,7 @@ methods {
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
-    function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
+    function Midnight.continuousFee(bytes32) external returns (uint256) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.toObligation(bytes32) external returns (Midnight.Obligation memory) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
