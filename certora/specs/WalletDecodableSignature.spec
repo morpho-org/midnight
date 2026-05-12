@@ -35,6 +35,7 @@ methods {
     function wellFormedPathToLeaf(bytes32, bytes32[]) external returns (bytes32) envfree;
     function verifierAcceptsSortLabeledRoot(bytes32, bytes32[]) external returns (bool) envfree;
     function requireChainReaches(bytes32, bytes32, bytes32[]) external envfree;
+    function chainReaches(bytes32, bytes32, bytes32[]) external returns (bool) envfree;
 }
 
 // (A) Storage shape invariants.
@@ -49,10 +50,30 @@ strong invariant wellFormed(bytes32 id)
         }
     }
 
-// (B) Forward direction. Sort-labeled chain reaches a root the on-chain
-// verifier accepts. Universally quantified over leaf hash and proof.
+// (B1) Forward direction at the chain level. Sort-labeled construction
+// yields a root the production `UtilsLib.isLeaf` accepts. Same single
+// frame, both sides reduce to `keccak(min, max)` per level — provable
+// by Certora's intra-frame keccak determinism. Mostly serves as a
+// regression check on the helper's correspondence to production.
 rule verifierAcceptsSortedTree(bytes32 leafHash, bytes32[] proof) {
     assert verifierAcceptsSortLabeledRoot(leafHash, proof);
+}
+
+// (B2) Forward direction storage-tied. For any leaf reachable via a
+// well-formed path from `rootId`, the chain verifier accepts the leaf's
+// stored offerHash with that proof against the tree's stored root.
+// Relies on cross-frame keccak unification: the `keccak(bytes.concat(...))`
+// leaf wrap and `keccak(abi.encode(L, R))` internal hashing forms are
+// identical on both the storage side (`newLeaf`, `newInternalNode`) and
+// the chain side (`chainReaches`), so the prover can match terms.
+rule verifierAcceptsStoredLeaves(bytes32 rootId, bytes32[] proof) {
+    bytes32 leafId = wellFormedPathToLeaf(rootId, proof);
+    bytes32 leafOfferHash = getOfferHash(leafId);
+    bytes32 rootHash = getHash(rootId);
+    // Exclude the trivially-vacuous empty-tree case where every storage
+    // value is zero and the walk lands at an unpopulated node.
+    require leafOfferHash != to_bytes32(0);
+    assert chainReaches(rootHash, leafOfferHash, proof);
 }
 
 // (C) Non-spoofability. Conditioning on the chain verifier accepting a

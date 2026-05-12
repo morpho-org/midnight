@@ -158,4 +158,21 @@ contract OfferTree {
         }
         require(current == root);
     }
+
+    // Boolean variant of `requireChainReaches`. Returns whether the chain
+    // from the wrapped candidate offerHash with `proof` reaches `root`.
+    function chainReaches(bytes32 root, bytes32 candidateOfferHash, bytes32[] memory proof)
+        external
+        pure
+        returns (bool)
+    {
+        bytes32 current = keccak256(bytes.concat(candidateOfferHash));
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 a = current;
+            bytes32 b = proof[i];
+            if (a > b) (a, b) = (b, a);
+            current = keccak256(abi.encode(a, b));
+        }
+        return current == root;
+    }
 }
