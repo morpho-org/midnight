@@ -99,6 +99,7 @@ interface IMidnight {
     error SelfTake();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
+    error SellerPriceZero();
     error TakerUnauthorized();
     error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
