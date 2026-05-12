@@ -66,17 +66,13 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
-    uint256 unitsOutput;
 
     uint256 claimableBefore = claimableTradingFee(offer.obligation.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
-
-    // The output units is equal to the input.
-    assert unitsOutput == unitsInput;
+    buyerAssetsOutput, sellerAssetsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
 
     // If the input is zero, all the output arguments are zero.
-    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && unitsOutput == 0;
+    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
 
     // The claimable trading fee increases by exactly the spread.
     assert claimableTradingFee(offer.obligation.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;

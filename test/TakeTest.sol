@@ -773,7 +773,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = type(uint256).max;
 
-        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
+        (, uint256 sellerAssets) = take(units, borrower, lenderOffer);
 
         assertTrue(sellerAssets > 0);
     }
@@ -798,7 +798,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = type(uint256).max;
 
-        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets,) = take(units, lender, borrowerOffer);
 
         assertTrue(buyerAssets > 0);
     }
@@ -813,7 +813,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxSellerAssets = expectedSellerAssets;
 
-        (, uint256 sellerAssets,) = take(units, borrower, lenderOffer);
+        (, uint256 sellerAssets) = take(units, borrower, lenderOffer);
         assertEq(sellerAssets, expectedSellerAssets);
     }
 
@@ -827,7 +827,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxBuyerAssets = expectedBuyerAssets;
 
-        (uint256 buyerAssets,,) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets,) = take(units, lender, borrowerOffer);
         assertEq(buyerAssets, expectedBuyerAssets);
     }
 
@@ -908,7 +908,7 @@ contract TakeTest is BaseTest {
         uint256 lenderBalBefore = loanToken.balanceOf(lender);
         uint256 borrowerBalBefore = loanToken.balanceOf(borrower);
 
-        (uint256 buyerAssets, uint256 sellerAssets,) = take(1, borrower, lenderOffer);
+        (uint256 buyerAssets, uint256 sellerAssets) = take(1, borrower, lenderOffer);
 
         assertEq(buyerAssets, 0);
         assertEq(sellerAssets, 0);
@@ -1439,7 +1439,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
         collateralize(obligation, borrower, units);
-        (uint256 buyerAssets, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets, uint256 sellerAssets) = take(units, lender, borrowerOffer);
         assertEq(buyerAssets, 0, "buyerAssets");
         assertEq(sellerAssets, 0, "sellerAssets");
         assertEq(midnight.creditOf(id, lender), units, "creditOf");
@@ -1469,7 +1469,7 @@ contract TakeTest is BaseTest {
         uint256 expectedBuyerAssets = units.mulDivUp(fee, WAD);
         deal(address(loanToken), lender, expectedBuyerAssets);
         collateralize(obligation, borrower, units);
-        (uint256 buyerAssets, uint256 sellerAssets,) = take(units, lender, borrowerOffer);
+        (uint256 buyerAssets, uint256 sellerAssets) = take(units, lender, borrowerOffer);
         assertEq(buyerAssets, expectedBuyerAssets, "buyerAssets");
         assertEq(sellerAssets, 0, "sellerAssets");
         assertEq(midnight.creditOf(id, lender), units, "creditOf");
