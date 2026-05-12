@@ -9,6 +9,7 @@ methods {
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
 
+    // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
