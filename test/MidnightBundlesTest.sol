@@ -123,10 +123,7 @@ contract MidnightBundlesTest is BaseTest {
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", VendorPermit2(PERMIT2).DOMAIN_SEPARATOR(), permitHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
-        return
-            TokenPermit({
-                kind: PermitKind.Permit2, data: abi.encode(PERMIT2, nonce, deadline, abi.encodePacked(r, s, v))
-            });
+        return TokenPermit({kind: PermitKind.Permit2, data: abi.encode(nonce, deadline, abi.encodePacked(r, s, v))});
     }
 
     function _erc2612(address token, address owner, uint256 amount, uint256 nonce, uint256 deadline)

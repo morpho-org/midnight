@@ -22,6 +22,9 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
+    /// @dev Canonical Permit2 deployment.
+    address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev This function should only be called with the same obligation for all takes.
     /// @dev The collateral transfers always use the first offer's obligation.
@@ -355,9 +358,9 @@ contract MidnightBundles is IMidnightBundles {
             try IERC20Permit(token).permit(from, address(this), amount, deadline, v, r, s) {} catch {}
             SafeTransferLib.safeTransferFrom(token, from, address(this), amount);
         } else if (permit.kind == PermitKind.Permit2) {
-            (address permit2, uint256 nonce, uint256 deadline, bytes memory signature) =
-                abi.decode(permit.data, (address, uint256, uint256, bytes));
-            IPermit2(permit2)
+            (uint256 nonce, uint256 deadline, bytes memory signature) =
+                abi.decode(permit.data, (uint256, uint256, bytes));
+            IPermit2(PERMIT2)
                 .permitTransferFrom(
                     IPermit2.PermitTransferFrom(IPermit2.TokenPermissions(token, amount), nonce, deadline),
                     IPermit2.SignatureTransferDetails(address(this), amount),
