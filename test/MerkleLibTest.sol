@@ -38,4 +38,37 @@ contract MerkleLibTest is Test {
         proof[1] = rightNode;
         assertTrue(MerkleLib.isLeaf(root, x, proof));
     }
+
+    function repeat(string memory str, uint256 n) internal pure returns (string memory) {
+        bytes memory result;
+        for (uint256 i = 0; i < n; i++) {
+            result = bytes.concat(result, bytes(str));
+        }
+        return string(result);
+    }
+
+    function testOfferTreeTypeHashes() public pure {
+        for (uint256 height = 0; height <= 20; height++) {
+            assertEq(
+                MerkleLib.offerTreeTypeHash(height),
+                keccak256(
+                    bytes.concat(
+                        "OfferTree(Offer",
+                        bytes(repeat("[2]", height)),
+                        " offerTree)",
+                        COLLATERAL_PARAMS_TYPE,
+                        OBLIGATION_TYPE,
+                        OFFER_TYPE
+                    )
+                )
+            );
+        }
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
+        height = bound(height, 21, type(uint256).max);
+        vm.expectRevert(MerkleLib.TreeTooHigh.selector);
+        MerkleLib.offerTreeTypeHash(height);
+    }
 }
