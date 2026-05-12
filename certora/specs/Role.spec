@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -11,6 +13,7 @@ methods {
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function withdrawable(bytes32 id) external returns (uint256) envfree;
+    function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
 
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -23,8 +26,6 @@ methods {
 /// HELPERS ///
 
 definition FEE_STEP() returns uint256 = 10 ^ 12;
-
-definition maxTradingFee(uint256 index) returns uint256 = index == 0 ? 14000000000000 : index == 1 ? 14000000000000 : index == 2 ? 98000000000000 : index == 3 ? 417000000000000 : index == 4 ? 1250000000000000 : index == 5 ? 2500000000000000 : index == 6 ? 5000000000000000 : 0;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -104,7 +105,7 @@ rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filter
 rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_STEP() == 0;
+    bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % FEE_STEP() == 0;
     bool obligationExists = obligationCreated(id);
 
     setObligationTradingFee@withrevert(e, id, index, newTradingFee);
@@ -116,7 +117,7 @@ rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint2
 rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_STEP() == 0;
+    bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % FEE_STEP() == 0;
 
     setDefaultTradingFee@withrevert(e, loanToken, index, newTradingFee);
     bool reverted = lastReverted;
