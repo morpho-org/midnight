@@ -233,7 +233,7 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, MAX_CONTINUOUS_FEE);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, maxTradingFee(i));
         }
 
         bytes32 _id = midnight.touchObligation(_obligation);
@@ -663,7 +663,7 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, _defaultContinuousFee);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, maxTradingFee(i));
         }
 
         bytes32 _id = midnight.touchObligation(_obligation);

@@ -41,7 +41,7 @@ contract MidnightBundlesTest is BaseTest {
         // Set trading fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
         for (uint256 i; i <= 6; i++) {
-            midnight.setDefaultTradingFee(address(loanToken), i, midnight.maxTradingFee(i));
+            midnight.setDefaultTradingFee(address(loanToken), i, maxTradingFee(i));
         }
 
         obligation.loanToken = address(loanToken);

@@ -28,7 +28,8 @@ import {
     LLTV_5,
     LLTV_6,
     LLTV_7,
-    LLTV_8
+    LLTV_8,
+    maxTradingFee as _maxTradingFee
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
@@ -418,5 +419,9 @@ abstract contract BaseTest is Test {
 
     function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
         return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+    }
+
+    function maxTradingFee(uint256 index) internal pure returns (uint256) {
+        return _maxTradingFee(index);
     }
 }
