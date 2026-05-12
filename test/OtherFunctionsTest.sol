@@ -656,37 +656,36 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
 
-        (
-            uint128 totalUnits,
-            uint120 _lossFactor,
-            uint128 _withdrawable,
-            uint128 _continuousFeeCredit,
-            uint256 _claimableTradingFee,
-            uint16 tradingFee0,
-            uint16 tradingFee1,
-            uint16 tradingFee2,
-            uint16 tradingFee3,
-            uint16 tradingFee4,
-            uint16 tradingFee5,
-            uint16 tradingFee6,
-            uint16 _continuousFee,
-            bool created
-        ) = midnight.obligationState(_id);
+        {
+            (
+                uint128 totalUnits,
+                uint120 _lossFactor,
+                bool created,
+                uint128 _withdrawable,
+                uint128 _continuousFeeCredit,
+                uint128 _claimableTradingFee,
+                ,,,,,,,
+                uint16 _continuousFee
+            ) = midnight.obligationState(_id);
 
-        assertTrue(created, "obligation should be created");
-        assertEq(totalUnits, 0, "totalUnits");
-        assertEq(_lossFactor, 0, "lossFactor");
-        assertEq(_withdrawable, 0, "withdrawable");
-        assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
-        assertEq(_claimableTradingFee, 0, "claimableTradingFee");
-        assertEq(_continuousFee, _defaultContinuousFee / CONTINUOUS_FEE_STEP, "continuousFee");
-        assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
-        assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
-        assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");
-        assertEq(tradingFee3, midnight.defaultTradingFees(_obligation.loanToken, 3), "tradingFee3");
-        assertEq(tradingFee4, midnight.defaultTradingFees(_obligation.loanToken, 4), "tradingFee4");
-        assertEq(tradingFee5, midnight.defaultTradingFees(_obligation.loanToken, 5), "tradingFee5");
-        assertEq(tradingFee6, midnight.defaultTradingFees(_obligation.loanToken, 6), "tradingFee6");
+            assertTrue(created, "obligation should be created");
+            assertEq(totalUnits, 0, "totalUnits");
+            assertEq(_lossFactor, 0, "lossFactor");
+            assertEq(_withdrawable, 0, "withdrawable");
+            assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
+            assertEq(_claimableTradingFee, 0, "claimableTradingFee");
+            assertEq(_continuousFee, _defaultContinuousFee / CONTINUOUS_FEE_STEP, "continuousFee");
+        }
+        {
+            (,,,,,, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6,) = midnight.obligationState(_id);
+            assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
+            assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
+            assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");
+            assertEq(tradingFee3, midnight.defaultTradingFees(_obligation.loanToken, 3), "tradingFee3");
+            assertEq(tradingFee4, midnight.defaultTradingFees(_obligation.loanToken, 4), "tradingFee4");
+            assertEq(tradingFee5, midnight.defaultTradingFees(_obligation.loanToken, 5), "tradingFee5");
+            assertEq(tradingFee6, midnight.defaultTradingFees(_obligation.loanToken, 6), "tradingFee6");
+        }
     }
 
     function testObligationStateAfterTrade() public {
@@ -696,7 +695,7 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        (uint128 totalUnits,,,,,,,,,,,, uint16 _continuousFee, bool created) = midnight.obligationState(id);
+        (uint128 totalUnits,, bool created,,,,,,,,,,, uint16 _continuousFee) = midnight.obligationState(id);
 
         assertTrue(created, "should be created");
         assertEq(totalUnits, units, "totalUnits after trade");
