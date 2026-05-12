@@ -48,7 +48,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
-/// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / FEE_CBP.
+/// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
 /// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
 ///
@@ -237,10 +237,10 @@ contract Midnight is IMidnight {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % FEE_CBP == 0, FeeNotMultipleOfFeeCbp());
+        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         require(_obligationState.created, ObligationNotCreated());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_CBP
-        uint16 newTradingFeeCbp = uint16(newTradingFee / FEE_CBP);
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
+        uint16 newTradingFeeCbp = uint16(newTradingFee / CBP);
         if (index == 0) _obligationState.tradingFeeCbp0 = newTradingFeeCbp;
         else if (index == 1) _obligationState.tradingFeeCbp1 = newTradingFeeCbp;
         else if (index == 2) _obligationState.tradingFeeCbp2 = newTradingFeeCbp;
@@ -255,9 +255,9 @@ contract Midnight is IMidnight {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % FEE_CBP == 0, FeeNotMultipleOfFeeCbp());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_CBP
-        defaultTradingFeeCbp[loanToken][index] = uint16(newTradingFee / FEE_CBP);
+        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
+        defaultTradingFeeCbp[loanToken][index] = uint16(newTradingFee / CBP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
@@ -944,16 +944,16 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.created, ObligationNotCreated());
 
-        if (timeToMaturity >= 360 days) return _obligationState.tradingFeeCbp6 * FEE_CBP;
+        if (timeToMaturity >= 360 days) return _obligationState.tradingFeeCbp6 * CBP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.tradingFeeCbp0 * FEE_CBP, _obligationState.tradingFeeCbp1 * FEE_CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.tradingFeeCbp1 * FEE_CBP, _obligationState.tradingFeeCbp2 * FEE_CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.tradingFeeCbp2 * FEE_CBP, _obligationState.tradingFeeCbp3 * FEE_CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.tradingFeeCbp3 * FEE_CBP, _obligationState.tradingFeeCbp4 * FEE_CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.tradingFeeCbp4 * FEE_CBP, _obligationState.tradingFeeCbp5 * FEE_CBP) :
-                                        (180 days, 360 days, _obligationState.tradingFeeCbp5 * FEE_CBP, _obligationState.tradingFeeCbp6 * FEE_CBP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.tradingFeeCbp0 * CBP, _obligationState.tradingFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.tradingFeeCbp1 * CBP, _obligationState.tradingFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.tradingFeeCbp2 * CBP, _obligationState.tradingFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.tradingFeeCbp3 * CBP, _obligationState.tradingFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.tradingFeeCbp4 * CBP, _obligationState.tradingFeeCbp5 * CBP) :
+                                        (180 days, 360 days, _obligationState.tradingFeeCbp5 * CBP, _obligationState.tradingFeeCbp6 * CBP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
