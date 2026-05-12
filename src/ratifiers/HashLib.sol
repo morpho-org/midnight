@@ -27,6 +27,7 @@ library HashLib {
         }
 
         bytes32 collateralParamsHash;
+        // same as keccak256(abi.encodePacked(collateralParamsHashes));
         assembly ("memory-safe") {
             collateralParamsHash := keccak256(
                 add(collateralParamsHashes, 0x20),
