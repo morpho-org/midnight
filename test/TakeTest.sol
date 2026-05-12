@@ -889,6 +889,40 @@ contract TakeTest is BaseTest {
         take(units, borrower, lenderOffer);
     }
 
+    // Show that a buy offer with offerPrice < WAD can be taken with units > 0
+    function testBugBuyMaxBuyerAssetsBypass() public {
+        deal(address(loanToken), lender, 0); // lender pays 0
+        collateralize(obligation, borrower, 100);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxBuyerAssets = 1;
+        lenderOffer.tick = MAX_TICK - 1; // offerPrice < WAD
+
+        // Fully consume the offer before the take.
+        vm.prank(lender);
+        midnight.setConsumed(lenderOffer.group, lenderOffer.maxBuyerAssets, lender);
+
+        uint256 lenderCreditBefore = midnight.creditOf(id, lender);
+        uint256 borrowerDebtBefore = midnight.debtOf(id, borrower);
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+        uint256 lenderBalBefore = loanToken.balanceOf(lender);
+        uint256 borrowerBalBefore = loanToken.balanceOf(borrower);
+
+        (uint256 buyerAssets, uint256 sellerAssets,) = take(1, borrower, lenderOffer);
+
+        assertEq(buyerAssets, 0);
+        assertEq(sellerAssets, 0);
+
+        // Nothing observable to the cap or token balances changed:
+        assertEq(midnight.consumed(lender, lenderOffer.group), lenderOffer.maxBuyerAssets);
+        assertEq(loanToken.balanceOf(lender), lenderBalBefore);
+        assertEq(loanToken.balanceOf(borrower), borrowerBalBefore);
+        // But position state strictly changed:
+        assertGt(midnight.creditOf(id, lender), lenderCreditBefore);
+        assertGt(midnight.debtOf(id, borrower), borrowerDebtBefore);
+        assertGt(midnight.totalUnits(id), totalUnitsBefore);
+    }
+
     // test tree / signatures.
 
     function testTakeInvalidRoot(bytes32 invalidRoot) public {
