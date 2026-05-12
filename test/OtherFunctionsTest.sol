@@ -647,7 +647,8 @@ contract OtherFunctionsTest is BaseTest {
     function testObligationStateGetter(Obligation memory _obligation, uint256 _defaultContinuousFee) public {
         vm.assume(_obligation.collateralParams.length > 0);
         _obligation = validObligation(_obligation);
-        _defaultContinuousFee = bound(_defaultContinuousFee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
+        _defaultContinuousFee =
+            bound(_defaultContinuousFee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, _defaultContinuousFee);
         for (uint256 i = 0; i < 7; i++) {
@@ -663,8 +664,7 @@ contract OtherFunctionsTest is BaseTest {
                 bool created,
                 uint128 _withdrawable,
                 uint128 _continuousFeeCredit,
-                uint128 _claimableTradingFee,
-                ,,,,,,,
+                uint128 _claimableTradingFee,,,,,,,,
                 uint16 _continuousFee
             ) = midnight.obligationState(_id);
 
@@ -677,7 +677,16 @@ contract OtherFunctionsTest is BaseTest {
             assertEq(_continuousFee, _defaultContinuousFee / CONTINUOUS_FEE_STEP, "continuousFee");
         }
         {
-            (,,,,,, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6,) = midnight.obligationState(_id);
+            (
+                ,,,,,,
+                uint16 tradingFee0,
+                uint16 tradingFee1,
+                uint16 tradingFee2,
+                uint16 tradingFee3,
+                uint16 tradingFee4,
+                uint16 tradingFee5,
+                uint16 tradingFee6,
+            ) = midnight.obligationState(_id);
             assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
             assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
             assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");

@@ -363,9 +363,7 @@ contract SettersTest is BaseTest {
         vm.assume(fee != fee2);
 
         midnight.setDefaultContinuousFee(address(loanToken), fee);
-        assertEq(
-            midnight.defaultContinuousFee(address(loanToken)), fee / CONTINUOUS_FEE_STEP, "default fee updated"
-        );
+        assertEq(midnight.defaultContinuousFee(address(loanToken)), fee / CONTINUOUS_FEE_STEP, "default fee updated");
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
