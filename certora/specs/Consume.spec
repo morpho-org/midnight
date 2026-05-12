@@ -78,7 +78,7 @@ rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address taker
     assert offer.maxAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
-/// After a successful take in units mode, the change in consumed equals min(units, available).
+/// After a successful take with an offer in units mode, the change in consumed equals min(units, available).
 rule takeConsumedDelta(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     require offer.maxAssets == 0;
 
@@ -91,7 +91,7 @@ rule takeConsumedDelta(env e, uint256 units, address taker, address takerCallbac
     assert consumed(offer.maker, offer.group) == consumedBefore + cappedUnits;
 }
 
-/// If consumed[offer.maker][offer.group] is already at or above maxUnits before a take in units mode, it remains unchanged.
+/// If consumed[offer.maker][offer.group] is already at or above maxUnits before taking an offer in units mode, it remains unchanged.
 rule takeConsumedAtMaxUnchangedUnits(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     require offer.maxAssets == 0;
 
@@ -102,7 +102,7 @@ rule takeConsumedAtMaxUnchangedUnits(env e, uint256 units, address taker, addres
     assert consumedBefore >= offer.maxUnits => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
-/// If consumed is already at or above maxAssets before a take in assets mode, it remains unchanged.
+/// If consumed is already at or above maxAssets before taking an offer in assets mode, it remains unchanged.
 rule takeConsumedAtMaxUnchangedAssets(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     require offer.maxUnits == 0;
 

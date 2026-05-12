@@ -21,10 +21,6 @@ import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
 
-/// MAX AMOUNTS
-/// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
-/// @dev To create a "max" offer, use `type(uint128).max` for `maxAssets` or `maxUnits`.
-///
 /// OBLIGATIONS
 /// @dev The following constraints are enforced on obligation creation (in touchObligation):
 /// - maturity <= block.timestamp + 100 years: the obligation must have a maturity that is not too far in the future.
@@ -89,8 +85,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of `maxAssets` or `maxUnits` can be nonzero per offer.
-/// @dev `maxAssets` caps max buyer assets if `offer.buy` is true, and caps max seller assets otherwise.
+///
+/// MAX VALUES
+/// @dev offer.maxAssets and offer.maxUnits cannot both be nonzero per offer.
+/// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
+/// @dev If maxAssets is zero, maxUnits caps the units. If maxUnits is zero, maxAssets caps the assets.
+/// @dev To create a "max" offer, use type(uint128).max for maxAssets or maxUnits.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
