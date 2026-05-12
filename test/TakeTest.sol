@@ -761,7 +761,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.maxUnits = 0;
         borrowerOffer.maxAssets = 1;
 
-        vm.expectRevert(IMidnight.ConsumedSellerAssets.selector);
+        vm.expectRevert(IMidnight.ConsumedAssets.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -786,7 +786,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxUnits = 0;
         lenderOffer.maxAssets = 1;
 
-        vm.expectRevert(IMidnight.ConsumedBuyerAssets.selector);
+        vm.expectRevert(IMidnight.ConsumedAssets.selector);
         take(units, borrower, lenderOffer);
     }
 

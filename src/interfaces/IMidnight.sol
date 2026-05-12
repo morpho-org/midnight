@@ -68,8 +68,7 @@ interface IMidnight {
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
     error CollateralParamsNotSorted();
-    error ConsumedBuyerAssets();
-    error ConsumedSellerAssets();
+    error ConsumedAssets();
     error ConsumedUnits();
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeStep();
