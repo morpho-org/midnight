@@ -3,14 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
-import {
-    COLLATERAL_PARAMS_TYPE,
-    COLLATERAL_PARAMS_TYPEHASH,
-    OBLIGATION_TYPE,
-    OBLIGATION_TYPEHASH,
-    OFFER_TYPE,
-    OFFER_TYPEHASH
-} from "../src/libraries/ConstantsLib.sol";
 
 contract MerkleLibTest is Test {
     function testIsLeafSingle(bytes32 x) public pure {

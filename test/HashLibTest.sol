@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {Offer, Obligation} from "../src/interfaces/IMidnight.sol";
-import {OBLIGATION_TYPEHASH, OFFER_TYPEHASH} from "../src/libraries/ConstantsLib.sol";
+import {OBLIGATION_TYPEHASH, OFFER_TYPEHASH} from "../src/ratifiers/ConstantsLib.sol";
 
 contract HashLibTest is Test {
     function testHashOfferMatchesReference(Offer memory offer) public pure {

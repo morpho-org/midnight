@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
-import {COLLATERAL_PARAMS_TYPEHASH, OBLIGATION_TYPEHASH, OFFER_TYPEHASH} from "../libraries/ConstantsLib.sol";
+import {COLLATERAL_PARAMS_TYPEHASH, OBLIGATION_TYPEHASH, OFFER_TYPEHASH} from "./ConstantsLib.sol";
 
 library HashLib {
     /// @dev Computes the EIP-712 hash struct of a CollateralParams.

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE} from "../libraries/ConstantsLib.sol";
+import {COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE} from "./ConstantsLib.sol";
 
 /// @dev Helpers for verifying signed Merkle trees of offers.
 library MerkleLib {
