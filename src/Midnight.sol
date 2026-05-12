@@ -48,11 +48,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
-/// @dev Trading fees are stored divided by FEE_STEP (1e12) to fit in 16 bits.
+/// @dev Trading fees are stored divided by TRADING_FEE_STEP (1e12) to fit in 16 bits.
 /// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly. For post maturity, 0.14 bps.
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
+/// @dev The continuous fee is stored divided by CONTINUOUS_FEE_STEP (10000) to fit in 16 bits.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the obligation's continuous fee changes, the
 /// pending fee of existing lenders is not updated (=> their fee is fixed).
 /// @dev Absent bad debt, the face value of a lender's position is credit - pendingFee.
@@ -183,7 +184,7 @@ contract Midnight is IMidnight {
     mapping(address user => bytes32) public session;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultTradingFees;
-    mapping(address loanToken => uint32) public defaultContinuousFee;
+    mapping(address loanToken => uint16) public defaultContinuousFee;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -234,10 +235,11 @@ contract Midnight is IMidnight {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % FEE_STEP == 0, FeeNotMultipleOfFeeStep());
+        require(newTradingFee % TRADING_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
         require(_obligationState.created, ObligationNotCreated());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
-        uint16 toStore = uint16(newTradingFee / FEE_STEP);
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max *
+        // TRADING_FEE_STEP
+        uint16 toStore = uint16(newTradingFee / TRADING_FEE_STEP);
         if (index == 0) _obligationState.tradingFee0 = toStore;
         else if (index == 1) _obligationState.tradingFee1 = toStore;
         else if (index == 2) _obligationState.tradingFee2 = toStore;
@@ -252,9 +254,10 @@ contract Midnight is IMidnight {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % FEE_STEP == 0, FeeNotMultipleOfFeeStep());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * FEE_STEP
-        defaultTradingFees[loanToken][index] = uint16(newTradingFee / FEE_STEP);
+        require(newTradingFee % TRADING_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
+        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max *
+        // TRADING_FEE_STEP
+        defaultTradingFees[loanToken][index] = uint16(newTradingFee / TRADING_FEE_STEP);
         emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
     }
 
@@ -262,17 +265,21 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
+        require(newContinuousFee % CONTINUOUS_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
         require(_obligationState.created, ObligationNotCreated());
-        // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
-        _obligationState.continuousFee = uint32(newContinuousFee);
+        // forge-lint: disable-next-item(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < uint16.max *
+        // CONTINUOUS_FEE_STEP
+        _obligationState.continuousFee = uint16(newContinuousFee / CONTINUOUS_FEE_STEP);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
     }
 
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
-        // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
-        defaultContinuousFee[loanToken] = uint32(newContinuousFee);
+        require(newContinuousFee % CONTINUOUS_FEE_STEP == 0, FeeNotMultipleOfFeeStep());
+        // forge-lint: disable-next-item(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < uint16.max *
+        // CONTINUOUS_FEE_STEP
+        defaultContinuousFee[loanToken] = uint16(newContinuousFee / CONTINUOUS_FEE_STEP);
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
@@ -368,8 +375,9 @@ contract Midnight is IMidnight {
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         uint256 sellerDebtIncrease = units - sellerCreditDecrease;
-        uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * timeToMaturity, WAD));
+        uint128 buyerPendingFeeIncrease = UtilsLib.toUint128(
+            buyerCreditIncrease.mulDivDown(_obligationState.continuousFee * CONTINUOUS_FEE_STEP * timeToMaturity, WAD)
+        );
         uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
@@ -893,8 +901,13 @@ contract Midnight is IMidnight {
     }
 
     /// @dev The continuous fee is 0 until the obligation is created, then set to the default value.
-    function continuousFee(bytes32 id) external view returns (uint32) {
+    function continuousFee(bytes32 id) external view returns (uint16) {
         return obligationState[id].continuousFee;
+    }
+
+    /// @dev Returns the continuous fee scaled by CONTINUOUS_FEE_STEP (i.e., the actual fee rate per second in WAD).
+    function continuousFeeRate(bytes32 id) external view returns (uint256) {
+        return obligationState[id].continuousFee * CONTINUOUS_FEE_STEP;
     }
 
     function continuousFeeCredit(bytes32 id) external view returns (uint256) {
@@ -953,16 +966,16 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.created, ObligationNotCreated());
 
-        if (timeToMaturity >= 360 days) return _obligationState.tradingFee6 * FEE_STEP;
+        if (timeToMaturity >= 360 days) return _obligationState.tradingFee6 * TRADING_FEE_STEP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.tradingFee0 * FEE_STEP, _obligationState.tradingFee1 * FEE_STEP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.tradingFee1 * FEE_STEP, _obligationState.tradingFee2 * FEE_STEP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.tradingFee2 * FEE_STEP, _obligationState.tradingFee3 * FEE_STEP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.tradingFee3 * FEE_STEP, _obligationState.tradingFee4 * FEE_STEP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.tradingFee4 * FEE_STEP, _obligationState.tradingFee5 * FEE_STEP) :
-                                        (180 days, 360 days, _obligationState.tradingFee5 * FEE_STEP, _obligationState.tradingFee6 * FEE_STEP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _obligationState.tradingFee0 * TRADING_FEE_STEP, _obligationState.tradingFee1 * TRADING_FEE_STEP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _obligationState.tradingFee1 * TRADING_FEE_STEP, _obligationState.tradingFee2 * TRADING_FEE_STEP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _obligationState.tradingFee2 * TRADING_FEE_STEP, _obligationState.tradingFee3 * TRADING_FEE_STEP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _obligationState.tradingFee3 * TRADING_FEE_STEP, _obligationState.tradingFee4 * TRADING_FEE_STEP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _obligationState.tradingFee4 * TRADING_FEE_STEP, _obligationState.tradingFee5 * TRADING_FEE_STEP) :
+                                        (180 days, 360 days, _obligationState.tradingFee5 * TRADING_FEE_STEP, _obligationState.tradingFee6 * TRADING_FEE_STEP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);

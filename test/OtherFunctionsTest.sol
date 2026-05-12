@@ -21,6 +21,7 @@ import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
     MAX_CONTINUOUS_FEE,
+    CONTINUOUS_FEE_STEP,
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
@@ -243,7 +244,7 @@ contract OtherFunctionsTest is BaseTest {
             assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
         }
-        assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
+        assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE / CONTINUOUS_FEE_STEP, "continuousFee");
     }
 
     function testToObligation(Obligation memory _obligation) public {
@@ -646,7 +647,7 @@ contract OtherFunctionsTest is BaseTest {
     function testObligationStateGetter(Obligation memory _obligation, uint256 _defaultContinuousFee) public {
         vm.assume(_obligation.collateralParams.length > 0);
         _obligation = validObligation(_obligation);
-        _defaultContinuousFee = bound(_defaultContinuousFee, 0, MAX_CONTINUOUS_FEE);
+        _defaultContinuousFee = bound(_defaultContinuousFee, 0, MAX_CONTINUOUS_FEE) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, _defaultContinuousFee);
         for (uint256 i = 0; i < 7; i++) {
@@ -668,7 +669,7 @@ contract OtherFunctionsTest is BaseTest {
             uint16 tradingFee4,
             uint16 tradingFee5,
             uint16 tradingFee6,
-            uint32 _continuousFee,
+            uint16 _continuousFee,
             bool created
         ) = midnight.obligationState(_id);
 
@@ -678,7 +679,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_claimableTradingFee, 0, "claimableTradingFee");
-        assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
+        assertEq(_continuousFee, _defaultContinuousFee / CONTINUOUS_FEE_STEP, "continuousFee");
         assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
         assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
         assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");
@@ -695,11 +696,11 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        (uint128 totalUnits,,,,,,,,,,,, uint32 _continuousFee, bool created) = midnight.obligationState(id);
+        (uint128 totalUnits,,,,,,,,,,,, uint16 _continuousFee, bool created) = midnight.obligationState(id);
 
         assertTrue(created, "should be created");
         assertEq(totalUnits, units, "totalUnits after trade");
-        assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after trade");
+        assertEq(_continuousFee, MAX_CONTINUOUS_FEE / CONTINUOUS_FEE_STEP, "continuousFee after trade");
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {

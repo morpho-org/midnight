@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 // forgefmt: disable-start
 uint256 constant WAD = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
-uint256 constant FEE_STEP = 1e12;
-uint32 constant MAX_CONTINUOUS_FEE = uint32(uint256(0.01e18) / uint256(365 days));
+uint256 constant TRADING_FEE_STEP = 1e12;
+uint256 constant CONTINUOUS_FEE_STEP = 10000;
+uint256 constant MAX_CONTINUOUS_FEE = uint256(0.01e18) / uint256(365 days) / CONTINUOUS_FEE_STEP * CONTINUOUS_FEE_STEP;
 uint256 constant TIME_TO_MAX_LIF = 15 minutes;
 uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 10;
