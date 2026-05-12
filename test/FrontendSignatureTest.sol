@@ -53,6 +53,21 @@ contract FrontendSignatureTest is Test {
         proof0[1] = right;
         assertTrue(MerkleLib.isLeaf(_root, h0, proof0));
 
+        bytes32[] memory proof1 = new bytes32[](2);
+        proof1[0] = h0;
+        proof1[1] = right;
+        assertTrue(MerkleLib.isLeaf(_root, h1, proof1));
+
+        bytes32[] memory proof2 = new bytes32[](2);
+        proof2[0] = h3;
+        proof2[1] = left;
+        assertTrue(MerkleLib.isLeaf(_root, h2, proof2));
+
+        bytes32[] memory proof3 = new bytes32[](2);
+        proof3[0] = h2;
+        proof3[1] = left;
+        assertTrue(MerkleLib.isLeaf(_root, h3, proof3));
+
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
