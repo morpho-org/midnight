@@ -329,8 +329,7 @@ contract Midnight is IMidnight {
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
-        require(!offer.buy || offer.maxSellerAssets == 0, MaxSellerAssetsForBuyOffer());
-        require(offer.buy || offer.maxBuyerAssets == 0, MaxBuyerAssetsForSellOffer());
+        require(offer.buy ? offer.maxSellerAssets == 0 : offer.maxBuyerAssets == 0, InconsistentInput());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
