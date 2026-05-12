@@ -156,7 +156,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
 /// offers are "filled" (consumed=max).
-/// @dev It is possible to give units to a fully consumed buyerAssets-based buy offer with price < WAD.
+/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < WAD.
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
@@ -348,8 +348,7 @@ contract Midnight is IMidnight {
         if (offer.maxAssets > 0) {
             uint256 makerAssets = offer.buy ? buyerAssets : sellerAssets;
             newConsumed = consumed[offer.maker][offer.group] += makerAssets;
-            if (offer.buy) require(newConsumed <= offer.maxAssets, ConsumedBuyerAssets());
-            else require(newConsumed <= offer.maxAssets, ConsumedSellerAssets());
+            require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
             newConsumed = consumed[offer.maker][offer.group] += units;
             require(newConsumed <= offer.maxUnits, ConsumedUnits());

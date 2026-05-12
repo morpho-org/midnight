@@ -10,10 +10,10 @@ import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A;
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
 uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x6fd764bae7dca042f26e70b37fcfc17a9acf14f22258a49ba2089972710ffa38;
-bytes32 constant SIG_S = 0x26564af47fc62ac20989d7acb7b8dbe2fdf2600820a56f1eac942e8e10218e32;
+bytes32 constant SIG_R = 0xddcb537c210632f65370d6191dd371ccbafa63c1825fc95f64017c928b671e07;
+bytes32 constant SIG_S = 0x42ca943e3eb8cf496f5814a4c133773865c303c2096a3a5a21d00049c28b4ebb;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
@@ -35,8 +35,8 @@ contract FrontendSignatureTest is Test {
 
     function testFrontendSignatureVerification() public view {
         Offer[4] memory offers;
-        offers[0] = defaultOffer(1);
-        offers[1] = defaultOffer(2);
+        offers[0] = defaultOffer(2);
+        offers[1] = defaultOffer(1);
         offers[2] = defaultOffer(3);
         offers[3] = defaultOffer(4);
 
