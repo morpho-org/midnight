@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 // forgefmt: disable-start
 uint256 constant WAD = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
-uint256 constant FEE_STEP = 1e12;
+uint256 constant CBP = 1e12;
 uint256 constant MAX_TRADING_FEE_0_DAYS = 0.000014e18;
 uint256 constant MAX_TRADING_FEE_1_DAY = 0.000014e18;
 uint256 constant MAX_TRADING_FEE_7_DAYS = 0.000098e18;
