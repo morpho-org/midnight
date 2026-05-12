@@ -4,7 +4,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function tradingFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
-    function maxTradingFee(uint256 index) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
@@ -23,6 +22,8 @@ definition lowerIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 
 definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 6 : ttm >= breakpointTime(4) ? 5 : ttm >= breakpointTime(3) ? 4 : ttm >= breakpointTime(2) ? 3 : ttm >= breakpointTime(1) ? 2 : 1;
 
 definition FEE_STEP() returns uint256 = 1000000000000;
+
+definition maxTradingFee(uint256 index) returns uint256 = index == 0 ? 14000000000000 : index == 1 ? 14000000000000 : index == 2 ? 98000000000000 : index == 3 ? 417000000000000 : index == 4 ? 1250000000000000 : index == 5 ? 2500000000000000 : index == 6 ? 5000000000000000 : 0;
 
 definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
