@@ -62,9 +62,9 @@ contract MidnightBundles is IMidnightBundles {
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
             uint256 available;
-            if (takes[i].offer.maxSellerAssets > 0) {
+            if (takes[i].offer.maxAssets > 0) {
                 available = TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxSellerAssets.zeroFloorSub(consumed)
+                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
                 );
             } else if (takes[i].offer.maxUnits > 0) {
                 available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
@@ -142,9 +142,9 @@ contract MidnightBundles is IMidnightBundles {
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
             uint256 available;
-            if (takes[i].offer.maxBuyerAssets > 0) {
+            if (takes[i].offer.maxAssets > 0) {
                 available = TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxBuyerAssets.zeroFloorSub(consumed)
+                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
                 );
             } else if (takes[i].offer.maxUnits > 0) {
                 available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
@@ -208,9 +208,9 @@ contract MidnightBundles is IMidnightBundles {
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
             uint256 available;
-            if (takes[i].offer.maxSellerAssets > 0) {
+            if (takes[i].offer.maxAssets > 0) {
                 available = TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxSellerAssets.zeroFloorSub(consumed)
+                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
                 );
             } else if (takes[i].offer.maxUnits > 0) {
                 available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
@@ -297,9 +297,9 @@ contract MidnightBundles is IMidnightBundles {
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
             uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
             uint256 available;
-            if (takes[i].offer.maxBuyerAssets > 0) {
+            if (takes[i].offer.maxAssets > 0) {
                 available = TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxBuyerAssets.zeroFloorSub(consumed)
+                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
                 );
             } else if (takes[i].offer.maxUnits > 0) {
                 available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
