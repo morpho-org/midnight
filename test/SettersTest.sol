@@ -2,11 +2,30 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {
+    MAX_CONTINUOUS_FEE,
+    MAX_TRADING_FEE_0_DAYS,
+    MAX_TRADING_FEE_1_DAY,
+    MAX_TRADING_FEE_7_DAYS,
+    MAX_TRADING_FEE_30_DAYS,
+    MAX_TRADING_FEE_90_DAYS,
+    MAX_TRADING_FEE_180_DAYS,
+    MAX_TRADING_FEE_360_DAYS
+} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
+    function testMaxTradingFeeConstants() public view {
+        assertEq(midnight.maxTradingFee(0), MAX_TRADING_FEE_0_DAYS, "0 days max trading fee");
+        assertEq(midnight.maxTradingFee(1), MAX_TRADING_FEE_1_DAY, "1 day max trading fee");
+        assertEq(midnight.maxTradingFee(2), MAX_TRADING_FEE_7_DAYS, "7 days max trading fee");
+        assertEq(midnight.maxTradingFee(3), MAX_TRADING_FEE_30_DAYS, "30 days max trading fee");
+        assertEq(midnight.maxTradingFee(4), MAX_TRADING_FEE_90_DAYS, "90 days max trading fee");
+        assertEq(midnight.maxTradingFee(5), MAX_TRADING_FEE_180_DAYS, "180 days max trading fee");
+        assertEq(midnight.maxTradingFee(6), MAX_TRADING_FEE_360_DAYS, "360 days max trading fee");
+    }
+
     function testInitialRoleSetter() public view {
         assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }

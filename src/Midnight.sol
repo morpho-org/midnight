@@ -940,7 +940,15 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the max trading fee for the given index.
     function maxTradingFee(uint256 index) public pure returns (uint256) {
-        return [0.000014e18, 0.000014e18, 0.000098e18, 0.000417e18, 0.00125e18, 0.0025e18, 0.005e18][index];
+        return [
+            MAX_TRADING_FEE_0_DAYS,
+            MAX_TRADING_FEE_1_DAY,
+            MAX_TRADING_FEE_7_DAYS,
+            MAX_TRADING_FEE_30_DAYS,
+            MAX_TRADING_FEE_90_DAYS,
+            MAX_TRADING_FEE_180_DAYS,
+            MAX_TRADING_FEE_360_DAYS
+        ][index];
     }
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
