@@ -85,7 +85,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of maxSellerAssets, maxBuyerAssets, or maxUnits can be nonzero per offer.
+/// @dev Only one of maxAssets or maxUnits can be nonzero per offer.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
@@ -156,7 +156,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev Zero checks are not systematically performed.
 /// @dev No-ops are allowed. In particular, Midnight can call the callback of offers through a no-op take, even if those
 /// offers are "filled" (consumed=max).
-/// @dev It is possible to give units to a fully consumed buyerAssets-based buy offer with price < WAD.
+/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < WAD.
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
@@ -326,9 +326,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(_obligationState.lossFactor < type(uint128).max, ObligationLossFactorMaxedOut());
-        require(
-            UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
-        );
+        require(UtilsLib.atMostOneNonZero(offer.maxAssets, offer.maxUnits), MultipleNonZero());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
@@ -347,12 +345,9 @@ contract Midnight is IMidnight {
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
         uint256 newConsumed;
-        if (offer.maxSellerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += sellerAssets;
-            require(newConsumed <= offer.maxSellerAssets, ConsumedSellerAssets());
-        } else if (offer.maxBuyerAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += buyerAssets;
-            require(newConsumed <= offer.maxBuyerAssets, ConsumedBuyerAssets());
+        if (offer.maxAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
             newConsumed = consumed[offer.maker][offer.group] += units;
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
@@ -936,11 +931,6 @@ contract Midnight is IMidnight {
     /// @dev Returns the max LIF for the given lltv and cursor.
     function maxLif(uint256 lltv, uint256 cursor) public pure returns (uint256) {
         return WAD.mulDivDown(WAD, WAD - cursor.mulDivDown(WAD - lltv, WAD));
-    }
-
-    /// @dev Returns the max trading fee for the given index.
-    function maxTradingFee(uint256 index) public pure returns (uint256) {
-        return [0.000014e18, 0.000014e18, 0.000098e18, 0.000417e18, 0.00125e18, 0.0025e18, 0.005e18][index];
     }
 
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.

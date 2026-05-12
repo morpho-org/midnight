@@ -25,8 +25,7 @@ contract HashLibTest is Test {
                 offer.ratifier,
                 offer.reduceOnly,
                 offer.maxUnits,
-                offer.maxSellerAssets,
-                offer.maxBuyerAssets
+                offer.maxAssets
             )
         );
         assertEq(HashLib.hashOffer(offer), expectedHash);

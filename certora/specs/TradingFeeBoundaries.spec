@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function tradingFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
-    function maxTradingFee(uint256 index) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
     function obligationCreated(bytes32 id) external returns (bool) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
+    function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
@@ -22,7 +24,7 @@ definition lowerIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 
 /// Upper enclosing breakpoint index for a given time-to-maturity.
 definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 6 : ttm >= breakpointTime(4) ? 5 : ttm >= breakpointTime(3) ? 4 : ttm >= breakpointTime(2) ? 3 : ttm >= breakpointTime(1) ? 2 : 1;
 
-definition FEE_STEP() returns uint256 = 1000000000000;
+definition FEE_STEP() returns uint256 = 10 ^ 12;
 
 definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
 
@@ -32,11 +34,11 @@ definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = ass
 
 /// Default trading fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultTradingFeePerIndexBound(address loanToken, uint256 index)
-    index <= 6 => defaultTradingFee(loanToken, index) <= maxTradingFee(index);
+    index <= 6 => defaultTradingFee(loanToken, index) <= Utils.maxTradingFee(index);
 
 /// Every obligation's trading fee breakpoints are bounded by the per-index maximum.
 invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
-    index <= 6 => obligationTradingFee(id, index) <= maxTradingFee(index)
+    index <= 6 => obligationTradingFee(id, index) <= Utils.maxTradingFee(index)
     {
         preserved touchObligation(Midnight.Obligation obligation) with (env e) {
             requireInvariant defaultTradingFeePerIndexBound(obligation.loanToken, index);
