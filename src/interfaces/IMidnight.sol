@@ -33,8 +33,7 @@ struct Offer {
     address ratifier;
     bool reduceOnly;
     uint256 maxUnits;
-    uint256 maxSellerAssets;
-    uint256 maxBuyerAssets;
+    uint256 maxAssets;
 }
 
 /// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
