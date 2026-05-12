@@ -68,7 +68,7 @@ contract MerkleLibTest is Test {
     /// forge-config: default.allow_internal_expect_revert = true
     function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
         height = bound(height, 20, type(uint256).max);
-        vm.expectRevert(MerkleLib.InvalidOfferTreeHeight.selector);
+        vm.expectRevert(MerkleLib.TreeTooHigh.selector);
         MerkleLib.offerTreeTypeHash(height);
     }
 }
