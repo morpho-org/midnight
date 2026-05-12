@@ -10,10 +10,10 @@ import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0xfeb2ed7a0e74fbb980b076de95f71bed72efd01f76c9df841f6b837e6ade59b7;
-bytes32 constant SIG_S = 0x6cdf78417a5fddf77f22a94b164d9e8e99d46578578be28f482c9c1f4ce7bbf4;
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
+uint8 constant SIG_V = 28;
+bytes32 constant SIG_R = 0xddcb537c210632f65370d6191dd371ccbafa63c1825fc95f64017c928b671e07;
+bytes32 constant SIG_S = 0x42ca943e3eb8cf496f5814a4c133773865c303c2096a3a5a21d00049c28b4ebb;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
