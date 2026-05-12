@@ -55,8 +55,8 @@ contract TakeAmountsTest is BaseTest {
     }
 
     function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {
-        tradingFee0 = bound(tradingFee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        tradingFee1 = bound(tradingFee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee0 = bound(tradingFee0, 0, maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee1 = bound(tradingFee1, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 0, tradingFee0);
         midnight.setObligationTradingFee(id, 1, tradingFee1);

@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -887,6 +887,40 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.MultipleNonZero.selector);
         take(units, borrower, lenderOffer);
+    }
+
+    // Show that a buy offer with offerPrice < WAD can be taken with units > 0
+    function testBugBuyMaxBuyerAssetsBypass() public {
+        deal(address(loanToken), lender, 0); // lender pays 0
+        collateralize(obligation, borrower, 100);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxBuyerAssets = 1;
+        lenderOffer.tick = MAX_TICK - 1; // offerPrice < WAD
+
+        // Fully consume the offer before the take.
+        vm.prank(lender);
+        midnight.setConsumed(lenderOffer.group, lenderOffer.maxBuyerAssets, lender);
+
+        uint256 lenderCreditBefore = midnight.creditOf(id, lender);
+        uint256 borrowerDebtBefore = midnight.debtOf(id, borrower);
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+        uint256 lenderBalBefore = loanToken.balanceOf(lender);
+        uint256 borrowerBalBefore = loanToken.balanceOf(borrower);
+
+        (uint256 buyerAssets, uint256 sellerAssets,) = take(1, borrower, lenderOffer);
+
+        assertEq(buyerAssets, 0);
+        assertEq(sellerAssets, 0);
+
+        // Nothing observable to the cap or token balances changed:
+        assertEq(midnight.consumed(lender, lenderOffer.group), lenderOffer.maxBuyerAssets);
+        assertEq(loanToken.balanceOf(lender), lenderBalBefore);
+        assertEq(loanToken.balanceOf(borrower), borrowerBalBefore);
+        // But position state strictly changed:
+        assertGt(midnight.creditOf(id, lender), lenderCreditBefore);
+        assertGt(midnight.debtOf(id, borrower), borrowerDebtBefore);
+        assertGt(midnight.totalUnits(id), totalUnitsBefore);
     }
 
     // test tree / signatures.
