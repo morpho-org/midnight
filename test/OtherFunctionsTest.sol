@@ -657,7 +657,7 @@ contract OtherFunctionsTest is BaseTest {
 
         (
             uint128 totalUnits,
-            uint128 _lossIndex,
+            uint128 _lossFactor,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
             uint16 tradingFee0,
@@ -673,7 +673,7 @@ contract OtherFunctionsTest is BaseTest {
 
         assertTrue(created, "obligation should be created");
         assertEq(totalUnits, 0, "totalUnits");
-        assertEq(_lossIndex, 0, "lossIndex");
+        assertEq(_lossFactor, 0, "lossFactor");
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");

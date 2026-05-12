@@ -12,26 +12,20 @@ methods {
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function userLossIndex(bytes32 id, address user) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function Midnight.obligationCreated(bytes32 id) external returns (bool) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
-    function _.price() external => NONDET;
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
-
-    function _.onRatify(Midnight.Offer, bytes32, bytes) external => NONDET;
 
     // Tokens are assumed to not reenter.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
@@ -69,14 +63,14 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
     uint256 unitsOutput;
 
     uint256 claimableBefore = claimableTradingFee(offer.obligation.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData, root, proof);
+    buyerAssetsOutput, sellerAssetsOutput, unitsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
 
     // The output units is equal to the input.
     assert unitsOutput == unitsInput;
@@ -105,19 +99,30 @@ rule liquidateInputOutputConsistency(env e, Midnight.Obligation obligation, uint
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
 }
 
-rule obligationLossIndexMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossIndexBefore = currentContract.obligationState[id].lossIndex;
+rule obligationLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
+    uint128 lossFactorBefore = currentContract.obligationState[id].lossFactor;
     f(e, args);
-    uint128 lossIndexAfter = currentContract.obligationState[id].lossIndex;
-    assert lossIndexAfter >= lossIndexBefore;
+    uint128 lossFactorAfter = currentContract.obligationState[id].lossFactor;
+    assert lossFactorAfter >= lossFactorBefore;
 }
 
-rule userLossIndexMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
-    requireInvariant userLossIndexLeqObligationLossIndex(id, user);
-    uint128 lossIndexBefore = userLossIndex(id, user);
+rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
+    requireInvariant lastLossFactorLeqObligationLossFactor(id, user);
+    uint128 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lossIndexAfter = userLossIndex(id, user);
-    assert lossIndexAfter >= lossIndexBefore;
+    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    assert lastLossFactorAfter >= lastLossFactorBefore;
+}
+
+rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
+    require currentContract.obligationState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    uint256 creditBefore = creditOf(id, user);
+    uint256 debtBefore = debtOf(id, user);
+
+    f(e, args);
+
+    assert creditOf(id, user) <= creditBefore;
+    assert debtOf(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -143,7 +148,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
         }
-        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) with (env e) {
+        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             require to_mathint(offer.obligation.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
@@ -155,8 +160,8 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
-strong invariant userLossIndexLeqObligationLossIndex(bytes32 id, address user)
-    userLossIndex(id, user) <= currentContract.obligationState[id].lossIndex;
+strong invariant lastLossFactorLeqObligationLossFactor(bytes32 id, address user)
+    lastLossFactor(id, user) <= currentContract.obligationState[id].lossFactor;
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)

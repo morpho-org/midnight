@@ -4,14 +4,6 @@ pragma solidity ^0.8.0;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
-import {
-    COLLATERAL_PARAMS_TYPE,
-    COLLATERAL_PARAMS_TYPEHASH,
-    OBLIGATION_TYPE,
-    OBLIGATION_TYPEHASH,
-    OFFER_TYPE,
-    OFFER_TYPEHASH
-} from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
     function testFuzzCountBits(uint128 bitmap) public pure {
@@ -82,32 +74,6 @@ contract UtilsLibTest is Test {
         this.mulDivUp(x, y, d);
     }
 
-    function testIsLeafSingle(bytes32 x) public pure {
-        assertTrue(UtilsLib.isLeaf(x, x, new bytes32[](0)));
-    }
-
-    function testIsLeaf2Leaves(bytes32 x, bytes32 y) public pure {
-        bytes32 root = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = y;
-        assertTrue(UtilsLib.isLeaf(root, x, proof));
-    }
-
-    function testIsLeaf4Leaves(bytes32 x, bytes32 y, bytes32 z, bytes32 w) public pure {
-        x = bytes32(bound(uint256(x), 0, type(uint256).max - 3));
-        y = bytes32(bound(uint256(y), uint256(x), type(uint256).max - 2));
-        z = bytes32(bound(uint256(z), uint256(y), type(uint256).max - 1));
-        w = bytes32(bound(uint256(w), uint256(z), type(uint256).max));
-        bytes32 leftNode = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32 rightNode = keccak256(z < w ? abi.encode(z, w) : abi.encode(w, z));
-        bytes32 root =
-            keccak256(leftNode < rightNode ? abi.encode(leftNode, rightNode) : abi.encode(rightNode, leftNode));
-        bytes32[] memory proof = new bytes32[](2);
-        proof[0] = y;
-        proof[1] = rightNode;
-        assertTrue(UtilsLib.isLeaf(root, x, proof));
-    }
-
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
@@ -165,44 +131,5 @@ contract UtilsLibTest is Test {
         assertApproxEqRel(TickLib.wExp(18 ether), 65659969.137330511139838976 ether, 0.001 ether, "exp(18)");
         assertApproxEqRel(TickLib.wExp(19 ether), 178482300.96318726092869632 ether, 0.001 ether, "exp(19)");
         assertApproxEqRel(TickLib.wExp(20 ether), 485165195.409790277969936384 ether, 0.001 ether, "exp(20)");
-    }
-
-    function testTypehashes() public pure {
-        assertEq(COLLATERAL_PARAMS_TYPEHASH, keccak256(COLLATERAL_PARAMS_TYPE));
-        assertEq(OBLIGATION_TYPEHASH, keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE)));
-        assertEq(OFFER_TYPEHASH, keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE)));
-    }
-
-    function repeat(string memory str, uint256 n) internal pure returns (string memory) {
-        bytes memory result;
-        for (uint256 i = 0; i < n; i++) {
-            result = bytes.concat(result, bytes(str));
-        }
-        return string(result);
-    }
-
-    function testOfferTreeTypeHashes() public pure {
-        for (uint256 height = 0; height <= 19; height++) {
-            assertEq(
-                UtilsLib.offerTreeTypeHash(height),
-                keccak256(
-                    bytes.concat(
-                        "OfferTree(Offer",
-                        bytes(repeat("[2]", height)),
-                        " offerTree)",
-                        COLLATERAL_PARAMS_TYPE,
-                        OBLIGATION_TYPE,
-                        OFFER_TYPE
-                    )
-                )
-            );
-        }
-    }
-
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
-        height = bound(height, 20, type(uint256).max);
-        vm.expectRevert(UtilsLib.InvalidOfferTreeHeight.selector);
-        UtilsLib.offerTreeTypeHash(height);
     }
 }
