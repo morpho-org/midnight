@@ -48,7 +48,7 @@ contract MerkleLibTest is Test {
     }
 
     function testOfferTreeTypeHashes() public pure {
-        for (uint256 height = 0; height <= 19; height++) {
+        for (uint256 height = 0; height <= 20; height++) {
             assertEq(
                 MerkleLib.offerTreeTypeHash(height),
                 keccak256(
@@ -67,7 +67,7 @@ contract MerkleLibTest is Test {
 
     /// forge-config: default.allow_internal_expect_revert = true
     function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
-        height = bound(height, 20, type(uint256).max);
+        height = bound(height, 21, type(uint256).max);
         vm.expectRevert(MerkleLib.TreeTooHigh.selector);
         MerkleLib.offerTreeTypeHash(height);
     }

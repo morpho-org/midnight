@@ -8,9 +8,10 @@ library MerkleLib {
 
     /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
     /// @dev Same as keccak256(bytes.concat("OfferTree(Offer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE,
-    /// OBLIGATION_TYPE, OFFER_TYPE))
+    /// OBLIGATION_TYPE, OFFER_TYPE)).
+    /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
-        if (height < 10) {
+        if (height < 11) {
             if (height == 0) return 0x0e43d8df2f3684b785fa9fcc30e9fb1854aabdc3b41299c295e40719905aa409;
             if (height == 1) return 0x5d2cda016e26c76fc76abd14730b171e5728b985396fdd915f578684ebbe7c08;
             if (height == 2) return 0xefac405c5f69bfadf16128c7517214821f43ed43418cb105786797e775c82208;
@@ -20,9 +21,9 @@ library MerkleLib {
             if (height == 6) return 0x60b0a7b9b8026fb0843b29674731a80da02604c07e87380acba1e834127c036d;
             if (height == 7) return 0xb57b5627fd51b740272bee7750d8a0f52856db5761767bbc90795d1166400f91;
             if (height == 8) return 0xd9ea3b8d089568ca3a3e0858ec120441ef7ac3714712f451d18de174961ac92f;
-            return 0x7b1ceacb8b39729bf3887cec726d34a4b6944eb84eb8e9cdfe0d7070ad75ca30;
+            if (height == 9) return 0x7b1ceacb8b39729bf3887cec726d34a4b6944eb84eb8e9cdfe0d7070ad75ca30;
+            return 0x56d6ab434a3896c1d1c814fe3e7c22fc7c1f9b9177a50f2f79e754bb2199cdb0;
         } else {
-            if (height == 10) return 0x56d6ab434a3896c1d1c814fe3e7c22fc7c1f9b9177a50f2f79e754bb2199cdb0;
             if (height == 11) return 0x93f78fd001e8bafca3563f60c2f0f17b7a4eae11cd7f2009af2488b318b32e30;
             if (height == 12) return 0x7f4b555dd8cdba4396e42215d878847ba64c29ea68d852161264ccd43008e2df;
             if (height == 13) return 0x3b3c022990f3110616cb95bee08380dee66e3a47a67d9c2c7ec1828102367957;
@@ -32,6 +33,7 @@ library MerkleLib {
             if (height == 17) return 0x9a955710808f486fc37d0607e120c223cc8b2029dab35c6ec7840ff9aea1ff52;
             if (height == 18) return 0x419a52abde7cb2ff4d4eeb2f65b93dc2e05a12ea6f7a9c379b0b25558c34741f;
             if (height == 19) return 0x9cf0a4c02fe1d55648b3c157e49872c82d1bc404e3c5359c02aba6cb0d934ddb;
+            if (height == 20) return 0x23172699c5aaea9a0c03c717e0c036ac5642252f5af36f002526d1a312aef9b9;
             revert TreeTooHigh();
         }
     }
