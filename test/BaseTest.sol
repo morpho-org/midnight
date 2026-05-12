@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {ERC20Permit} from "./erc20s/ERC20Permit.sol";
 import {ERC20NoRevert} from "./erc20s/ERC20NoRevert.sol";
 import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
 import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
@@ -27,7 +28,8 @@ import {
     LLTV_5,
     LLTV_6,
     LLTV_7,
-    LLTV_8
+    LLTV_8,
+    maxTradingFee as _maxTradingFee
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
@@ -86,25 +88,25 @@ abstract contract BaseTest is Test {
 
         uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
         if (tokenType == 1) {
-            loanToken = ERC20(address(new ERC20NoRevert()));
-            collateralToken1 = ERC20(address(new ERC20NoRevert()));
-            collateralToken2 = ERC20(address(new ERC20NoRevert()));
+            loanToken = ERC20(address(new ERC20NoRevert("loan")));
+            collateralToken1 = ERC20(address(new ERC20NoRevert("collat1")));
+            collateralToken2 = ERC20(address(new ERC20NoRevert("collat2")));
         } else if (tokenType == 2) {
-            loanToken = ERC20(address(new ERC20USDT()));
-            collateralToken1 = ERC20(address(new ERC20USDT()));
-            collateralToken2 = ERC20(address(new ERC20USDT()));
+            loanToken = ERC20(address(new ERC20USDT("loan")));
+            collateralToken1 = ERC20(address(new ERC20USDT("collat1")));
+            collateralToken2 = ERC20(address(new ERC20USDT("collat2")));
         } else if (tokenType == 3) {
-            loanToken = ERC20(address(new ERC20RevertToZero()));
-            collateralToken1 = ERC20(address(new ERC20RevertToZero()));
-            collateralToken2 = ERC20(address(new ERC20RevertToZero()));
+            loanToken = ERC20(address(new ERC20RevertToZero("loan")));
+            collateralToken1 = ERC20(address(new ERC20RevertToZero("collat1")));
+            collateralToken2 = ERC20(address(new ERC20RevertToZero("collat2")));
         } else if (tokenType == 4) {
-            loanToken = ERC20(address(new ERC20NoReturn()));
-            collateralToken1 = ERC20(address(new ERC20NoReturn()));
-            collateralToken2 = ERC20(address(new ERC20NoReturn()));
+            loanToken = ERC20(address(new ERC20NoReturn("loan")));
+            collateralToken1 = ERC20(address(new ERC20NoReturn("collat1")));
+            collateralToken2 = ERC20(address(new ERC20NoReturn("collat2")));
         } else {
-            loanToken = new ERC20("loan", "loan");
-            collateralToken1 = new ERC20("collat1", "collat1");
-            collateralToken2 = new ERC20("collat2", "collat2");
+            loanToken = new ERC20Permit("loan", "loan");
+            collateralToken1 = new ERC20Permit("collat1", "collat1");
+            collateralToken2 = new ERC20Permit("collat2", "collat2");
         }
 
         oracle1 = new Oracle();
@@ -428,5 +430,9 @@ abstract contract BaseTest is Test {
 
     function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
         return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+    }
+
+    function maxTradingFee(uint256 index) internal pure returns (uint256) {
+        return _maxTradingFee(index);
     }
 }

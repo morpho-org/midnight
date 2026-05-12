@@ -236,7 +236,7 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, MAX_CONTINUOUS_FEE);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, maxTradingFee(i));
         }
 
         bytes32 _id = midnight.touchObligation(_obligation);
@@ -426,6 +426,19 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.expectRevert(IMidnight.TooManyCollateralParams.selector);
         midnight.touchObligation(_obligation);
+    }
+
+    function testExactMaxCollaterals() public {
+        Obligation memory _obligation = _createMultiCollateralObligation(MAX_COLLATERALS);
+
+        bytes32 _id = midnight.touchObligation(_obligation);
+        address sstore2Address = address(uint160(uint256(_id)));
+        Obligation memory obligationFromId = midnight.toObligation(_id);
+
+        assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        assertEq(sstore2Address.code.length, abi.encode(_obligation).length, "stored obligation code size");
+        assertLt(sstore2Address.code.length, 24_576, "stored obligation code size below EIP-170 limit");
+        assertEq(obligationFromId.collateralParams.length, MAX_COLLATERALS, "collateralParams length");
     }
 
     function testCollateralsNotSorted() public {
@@ -656,7 +669,7 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_obligation.loanToken, _defaultContinuousFee);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_obligation.loanToken, i, midnight.maxTradingFee(i));
+            midnight.setDefaultTradingFee(_obligation.loanToken, i, maxTradingFee(i));
         }
 
         bytes32 _id = midnight.touchObligation(_obligation);
