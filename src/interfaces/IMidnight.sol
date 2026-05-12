@@ -33,7 +33,7 @@ struct Offer {
     address ratifier;
     bool reduceOnly;
     uint128 maxUnits;
-    uint128 maxAssets;
+    uint128 maxAssets; // buyerAssets if offer.buy else sellerAssets
 }
 
 /// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
@@ -175,7 +175,6 @@ interface IMidnight {
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256);
-    function maxTradingFee(uint256 index) external pure returns (uint256);
     function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
     // forgefmt: disable-end
 }

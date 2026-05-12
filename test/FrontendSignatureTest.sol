@@ -35,8 +35,8 @@ contract FrontendSignatureTest is Test {
 
     function testFrontendSignatureVerification() public view {
         Offer[4] memory offers;
-        offers[0] = defaultOffer(1);
-        offers[1] = defaultOffer(2);
+        offers[0] = defaultOffer(2);
+        offers[1] = defaultOffer(1);
         offers[2] = defaultOffer(3);
         offers[3] = defaultOffer(4);
 

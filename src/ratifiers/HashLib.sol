@@ -26,11 +26,20 @@ library HashLib {
             collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
         }
 
+        bytes32 collateralParamsHash;
+        // same as keccak256(abi.encodePacked(collateralParamsHashes));
+        assembly ("memory-safe") {
+            collateralParamsHash := keccak256(
+                add(collateralParamsHashes, 0x20),
+                mul(mload(collateralParamsHashes), 0x20)
+            )
+        }
+
         return keccak256(
             abi.encode(
                 OBLIGATION_TYPEHASH,
                 obligation.loanToken,
-                keccak256(abi.encodePacked(collateralParamsHashes)),
+                collateralParamsHash,
                 obligation.maturity,
                 obligation.rcfThreshold,
                 obligation.enterGate,

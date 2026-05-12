@@ -752,9 +752,7 @@ contract TakeTest is BaseTest {
         take(0, taker, lenderOffer);
     }
 
-    // maxSellerAssets / maxBuyerAssets tests.
-
-    // maxAssets tests.
+    // maxAssets tests. maxAssets caps buyerAssets for buy offers and sellerAssets for sell offers.
 
     function testMaxAssetsCappedBuy(uint256 units) public {
         units = bound(units, 2, maxAssets);

@@ -87,7 +87,7 @@ contract TradingFeeTest is BaseTest {
         sellerTick = bound(sellerTick, 1, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee = bound(tradingFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         borrowerOffer.tick = sellerTick;
 
@@ -110,7 +110,7 @@ contract TradingFeeTest is BaseTest {
         buyerTick = bound(buyerTick, 1, MAX_TICK);
         uint256 buyerPrice = TickLib.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= MIN_SELLER_PRICE);
-        tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee = bound(tradingFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         lenderOffer.tick = buyerTick;
 
@@ -132,7 +132,7 @@ contract TradingFeeTest is BaseTest {
         sellerTick = bound(sellerTick, 1, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        tradingFee = bound(tradingFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee = bound(tradingFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         borrowerOffer.tick = sellerTick;
 
@@ -160,8 +160,8 @@ contract TradingFeeTest is BaseTest {
         sellerTick = bound(sellerTick, 1, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        tradingFee1Day = bound(tradingFee1Day, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        tradingFee7Days = bound(tradingFee7Days, tradingFee1Day, midnight.maxTradingFee(2)) / 1e12 * 1e12;
+        tradingFee1Day = bound(tradingFee1Day, 0, maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee7Days = bound(tradingFee7Days, tradingFee1Day, maxTradingFee(2)) / 1e12 * 1e12;
 
         obligation.maturity = block.timestamp + 3 days;
 
@@ -198,7 +198,7 @@ contract TradingFeeTest is BaseTest {
         sellerTick = bound(sellerTick, 1, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        tradingFee0Day = bound(tradingFee0Day, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee0Day = bound(tradingFee0Day, 0, maxTradingFee(0)) / 1e12 * 1e12;
         maturity = bound(maturity, 0, block.timestamp - 1);
         obligation.maturity = maturity;
         id = toId(obligation);
@@ -221,7 +221,7 @@ contract TradingFeeTest is BaseTest {
         sellerTick = bound(sellerTick, 1, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
-        tradingFee360Days = bound(tradingFee360Days, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        tradingFee360Days = bound(tradingFee360Days, 0, maxTradingFee(6)) / 1e12 * 1e12;
         maturity = bound(maturity, block.timestamp + 360 days, block.timestamp + 36500 days);
 
         obligation.maturity = maturity;
@@ -250,7 +250,7 @@ contract TradingFeeTest is BaseTest {
 
     function testClaimTradingFee(uint256 tradingFee, uint256 units, uint256 withdrawAmount) public {
         units = bound(units, 1, MAX_DEBT);
-        tradingFee = bound(tradingFee, 1e12, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee = bound(tradingFee, 1e12, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
 
         collateralize(obligation, borrower, MAX_DEBT);
@@ -276,7 +276,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testClaimTradingFeeExcessReverts() public {
-        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        uint256 tradingFee = maxTradingFee(1) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         borrowerOffer.tick = 1;
 
@@ -291,7 +291,7 @@ contract TradingFeeTest is BaseTest {
     }
 
     function testTradingFeesAccumulate() public {
-        uint256 tradingFee = midnight.maxTradingFee(1) / 1e12 * 1e12;
+        uint256 tradingFee = maxTradingFee(1) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         borrowerOffer.tick = 1;
         borrowerOffer.group = keccak256("g1");

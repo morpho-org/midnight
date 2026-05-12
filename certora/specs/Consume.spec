@@ -71,8 +71,6 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
 }
 
 /// After a successful take, consumed[offer.maker][offer.group] does not exceed the effective max.
-/// The new take enforces currentConsumed + consumedDelta <= activeMax, so the bound holds unconditionally
-/// (including for cancellation paths where the maker raised consumed past the cap via setConsumed).
 rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
@@ -80,7 +78,7 @@ rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address taker
     assert offer.maxAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
-/// After a successful take, the change in consumed equals min(units, available).
+/// After a successful take in units mode, the change in consumed equals min(units, available).
 rule takeConsumedDelta(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
     require offer.maxAssets == 0;
 
