@@ -7,7 +7,6 @@ import {IERC20} from "../interfaces/IERC20.sol";
 import {IMidnightBundles, Take, CollateralTransfer} from "./interfaces/IMidnightBundles.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
-import {TickLib} from "../libraries/TickLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
@@ -37,7 +36,7 @@ contract MidnightBundles is IMidnightBundles {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.obligation.loanToken;
-        // touchObligation to have the correct trading fees in _availableUnits.
+        // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         _forceApproveMax(loanToken, midnight);
@@ -48,7 +47,15 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 available = _availableUnits(midnight, id, takes[i].offer);
+            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
+            uint256 available;
+            if (takes[i].offer.maxSellerAssets > 0) {
+                available = TakeAmountsLib.sellerAssetsToUnits(
+                    midnight, id, takes[i].offer, takes[i].offer.maxSellerAssets.zeroFloorSub(consumed)
+                );
+            } else if (takes[i].offer.maxUnits > 0) {
+                available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
+            }
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - filledUnits, UtilsLib.min(takes[i].units, available)),
@@ -107,7 +114,7 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        // touchObligation to have the correct trading fees in _availableUnits.
+        // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
 
         for (uint256 i; i < collateralSupplies.length; i++) {
@@ -128,7 +135,15 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 available = _availableUnits(midnight, id, takes[i].offer);
+            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
+            uint256 available;
+            if (takes[i].offer.maxBuyerAssets > 0) {
+                available = TakeAmountsLib.buyerAssetsToUnits(
+                    midnight, id, takes[i].offer, takes[i].offer.maxBuyerAssets.zeroFloorSub(consumed)
+                );
+            } else if (takes[i].offer.maxUnits > 0) {
+                available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
+            }
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(targetUnits - filledUnits, UtilsLib.min(takes[i].units, available)),
@@ -192,7 +207,15 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 available = _availableUnits(midnight, id, takes[i].offer);
+            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
+            uint256 available;
+            if (takes[i].offer.maxSellerAssets > 0) {
+                available = TakeAmountsLib.sellerAssetsToUnits(
+                    midnight, id, takes[i].offer, takes[i].offer.maxSellerAssets.zeroFloorSub(consumed)
+                );
+            } else if (takes[i].offer.maxUnits > 0) {
+                available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
+            }
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -278,7 +301,15 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 available = _availableUnits(midnight, id, takes[i].offer);
+            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
+            uint256 available;
+            if (takes[i].offer.maxBuyerAssets > 0) {
+                available = TakeAmountsLib.buyerAssetsToUnits(
+                    midnight, id, takes[i].offer, takes[i].offer.maxBuyerAssets.zeroFloorSub(consumed)
+                );
+            } else if (takes[i].offer.maxUnits > 0) {
+                available = takes[i].offer.maxUnits.zeroFloorSub(consumed);
+            }
             try IMidnight(midnight)
                 .take(
                     UtilsLib.min(
@@ -365,27 +396,5 @@ contract MidnightBundles is IMidnightBundles {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
         _safeApprove(token, spender, 0);
         _safeApprove(token, spender, type(uint256).max);
-    }
-
-    function _availableUnits(address midnight, bytes32 id, Offer memory offer) private view returns (uint256) {
-        uint256 currentConsumed = IMidnight(midnight).consumed(offer.maker, offer.group);
-        if (offer.maxSellerAssets > 0) {
-            uint256 remaining = offer.maxSellerAssets.zeroFloorSub(currentConsumed);
-            uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-            uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-            uint256 sellerPrice =
-                offer.buy ? offerPrice - IMidnight(midnight).tradingFee(id, timeToMaturity) : offerPrice;
-            return remaining.mulDivDown(WAD, sellerPrice);
-        } else if (offer.maxBuyerAssets > 0) {
-            uint256 remaining = offer.maxBuyerAssets.zeroFloorSub(currentConsumed);
-            uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-            uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
-            uint256 _tradingFee = IMidnight(midnight).tradingFee(id, timeToMaturity);
-            uint256 buyerPrice = offer.buy ? offerPrice : offerPrice + _tradingFee;
-            return remaining.mulDivDown(WAD, buyerPrice);
-        } else if (offer.maxUnits > 0) {
-            return offer.maxUnits.zeroFloorSub(currentConsumed);
-        }
-        return type(uint256).max;
     }
 }
