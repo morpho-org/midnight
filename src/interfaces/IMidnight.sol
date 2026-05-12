@@ -87,6 +87,8 @@ interface IMidnight {
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
     error MaturityTooFar();
+    error MaxBuyerAssetsForSellOffer();
+    error MaxSellerAssetsForBuyOffer();
     error MultipleNonZero();
     error NoCollateralParams();
     error NotLiquidatable();
