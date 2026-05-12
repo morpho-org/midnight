@@ -346,8 +346,7 @@ contract Midnight is IMidnight {
 
         uint256 newConsumed;
         if (offer.maxAssets > 0) {
-            uint256 makerAssets = offer.buy ? buyerAssets : sellerAssets;
-            newConsumed = consumed[offer.maker][offer.group] += makerAssets;
+newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
             require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
             newConsumed = consumed[offer.maker][offer.group] += units;
