@@ -47,4 +47,17 @@ uint256 constant LLTV_8 = 1e18;
 function isLltvAllowed(uint256 lltv) pure returns (bool) {
     return lltv == LLTV_0 || lltv == LLTV_1 || lltv == LLTV_2 || lltv == LLTV_3 || lltv == LLTV_4 || lltv == LLTV_5 || lltv == LLTV_6 || lltv == LLTV_7 || lltv == LLTV_8;
 }
+
+/// @dev Returns the max trading fee for the given index.
+function maxTradingFee(uint256 index) pure returns (uint256) {
+    return [
+        MAX_TRADING_FEE_0_DAYS,
+        MAX_TRADING_FEE_1_DAY,
+        MAX_TRADING_FEE_7_DAYS,
+        MAX_TRADING_FEE_30_DAYS,
+        MAX_TRADING_FEE_90_DAYS,
+        MAX_TRADING_FEE_180_DAYS,
+        MAX_TRADING_FEE_360_DAYS
+    ][index];
+}
 // forgefmt: disable-end
