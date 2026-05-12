@@ -668,13 +668,11 @@ contract OtherFunctionsTest is BaseTest {
             uint16 tradingFee5,
             uint16 tradingFee6,
             uint32 _continuousFee,
-            uint8 spacing,
-            bool created
+            uint8 spacing
         ) = midnight.obligationState(_id);
 
         uint8 expectedSpacing = 4;
 
-        assertTrue(created, "obligation should be created");
         assertEq(totalUnits, 0, "totalUnits");
         assertEq(_lossFactor, 0, "lossFactor");
         assertEq(_withdrawable, 0, "withdrawable");
@@ -697,10 +695,8 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
 
-        (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, uint8 spacing, bool created) =
-            midnight.obligationState(id);
+        (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, uint8 spacing) = midnight.obligationState(id);
 
-        assertTrue(created, "should be created");
         assertEq(totalUnits, units, "totalUnits after trade");
         assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after trade");
         assertEq(spacing, 4, "spacing after trade");

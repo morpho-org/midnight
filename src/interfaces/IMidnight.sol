@@ -52,7 +52,6 @@ struct ObligationState {
     uint16 tradingFee6;
     uint32 continuousFee;
     uint8 spacing;
-    bool created;
 }
 
 struct Position {
@@ -84,6 +83,7 @@ interface IMidnight {
     error InvalidFeeIndex();
     error InvalidMaxLif();
     error InvalidSession();
+    error InvalidSpacing();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
@@ -98,13 +98,16 @@ interface IMidnight {
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
     error OnlyRoleSetter();
+    error OnlySpacingSetter();
     error RatifierFail();
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
     error SelfTake();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
+    error SpacingNotDecreasing();
     error TakerUnauthorized();
+    error TickNotAccessible();
     error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
     error TradingFeeTooHigh();
@@ -117,7 +120,7 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, uint8 spacing, bool created);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, uint8 spacing);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);

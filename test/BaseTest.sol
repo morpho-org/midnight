@@ -63,7 +63,7 @@ abstract contract BaseTest is Test {
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
 
         midnight.setFeeSetter(address(this));
-        midnight.setTickSetter(address(this));
+        midnight.setSpacingSetter(address(this));
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");

@@ -81,7 +81,7 @@ contract TickGatingTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         vm.prank(borrower);
-        vm.expectRevert("tick not accessible at obligation level");
+        vm.expectRevert(IMidnight.TickNotAccessible.selector);
         midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
     }
 
@@ -96,7 +96,7 @@ contract TickGatingTest is BaseTest {
         collateralize(obligation, borrower, units);
 
         vm.prank(borrower);
-        vm.expectRevert("tick not accessible at obligation level");
+        vm.expectRevert(IMidnight.TickNotAccessible.selector);
         midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
     }
 
@@ -113,7 +113,7 @@ contract TickGatingTest is BaseTest {
 
         // Should fail at spacing 4.
         vm.prank(borrower);
-        vm.expectRevert("tick not accessible at obligation level");
+        vm.expectRevert(IMidnight.TickNotAccessible.selector);
         midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
 
         // Refine to spacing 2.
@@ -126,41 +126,41 @@ contract TickGatingTest is BaseTest {
 
     // --- setObligationSpacing governance ---
 
-    function testSetObligationSpacingOnlyTickSetter() public {
+    function testSetObligationSpacingOnlySpacingSetter() public {
         vm.prank(lender);
-        vm.expectRevert("only tick setter");
+        vm.expectRevert(IMidnight.OnlySpacingSetter.selector);
         midnight.setObligationSpacing(id, 2);
     }
 
     function testSetObligationSpacingCanOnlyDecrease() public {
         midnight.setObligationSpacing(id, 1);
 
-        vm.expectRevert("can only decrease spacing");
+        vm.expectRevert(IMidnight.SpacingNotDecreasing.selector);
         midnight.setObligationSpacing(id, 1);
 
-        vm.expectRevert("can only decrease spacing");
+        vm.expectRevert(IMidnight.SpacingNotDecreasing.selector);
         midnight.setObligationSpacing(id, 2);
     }
 
     function testSetObligationSpacingInvalid() public {
-        vm.expectRevert("invalid spacing");
+        vm.expectRevert(IMidnight.InvalidSpacing.selector);
         midnight.setObligationSpacing(id, 3);
 
-        vm.expectRevert("invalid spacing");
+        vm.expectRevert(IMidnight.InvalidSpacing.selector);
         midnight.setObligationSpacing(id, 0);
     }
 
     function testSetObligationSpacingRequiresCreated() public {
-        vm.expectRevert("obligation not created");
+        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
         midnight.setObligationSpacing(bytes32(uint256(42)), 1);
     }
 
-    // --- setTickSetter governance ---
+    // --- setSpacingSetter governance ---
 
-    function testSetTickSetterOnlyOwner() public {
+    function testSetSpacingSetterOnlyOwner() public {
         vm.prank(lender);
         vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
-        midnight.setTickSetter(lender);
+        midnight.setSpacingSetter(lender);
     }
 
     // --- Coarser ticks remain valid after refinement ---
