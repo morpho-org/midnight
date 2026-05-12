@@ -28,9 +28,9 @@ bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c4
 bytes constant OBLIGATION_TYPE = "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 /// @dev keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE))
 bytes32 constant OBLIGATION_TYPEHASH = 0xdcb3d766540d305590a1ee685cb2636a7271c1eea05949c19a23eb48c7492d24;
-bytes constant OFFER_TYPE = "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxSellerAssets,uint256 maxBuyerAssets)";
+bytes constant OFFER_TYPE = "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE))
-bytes32 constant OFFER_TYPEHASH = 0xa75bd7b6468a41ab66f3aa9c068cf8ba48ebfb736e548c3fda0ef0f9e18857a5;
+bytes32 constant OFFER_TYPEHASH = 0x832d2325d9fdecb4919fae592db91c04ed32e757cf419102a9ca1b54187a02aa;
 
 /// @dev The allowed LLTV values, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
 uint256 constant LLTV_0 = 0.385e18;
