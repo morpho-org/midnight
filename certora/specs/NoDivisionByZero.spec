@@ -4,7 +4,7 @@
 //
 // All other Solidity divisions in the codebase use non-zero denominators:
 // - tradingFee: divides by (end - start), always a positive constant from the breakpoint table.
-// - setObligationTradingFee / setDefaultTradingFee: divide by FEE_STEP (1e12).
+// - setObligationTradingFee / setDefaultTradingFee: divide by CBP (1e12).
 // - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
