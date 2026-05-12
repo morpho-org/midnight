@@ -23,15 +23,15 @@ methods {
 
 /// HELPERS ///
 
-definition FEE_PIP() returns uint256 = 10 ^ 12;
+definition FEE_CBP() returns uint256 = 10 ^ 12;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
-definition obligationTradingFeePips(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFeePips0 : index == 1 ? currentContract.obligationState[id].tradingFeePips1 : index == 2 ? currentContract.obligationState[id].tradingFeePips2 : index == 3 ? currentContract.obligationState[id].tradingFeePips3 : index == 4 ? currentContract.obligationState[id].tradingFeePips4 : index == 5 ? currentContract.obligationState[id].tradingFeePips5 : currentContract.obligationState[id].tradingFeePips6;
+definition obligationTradingFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFeeCbp0 : index == 1 ? currentContract.obligationState[id].tradingFeeCbp1 : index == 2 ? currentContract.obligationState[id].tradingFeeCbp2 : index == 3 ? currentContract.obligationState[id].tradingFeeCbp3 : index == 4 ? currentContract.obligationState[id].tradingFeeCbp4 : index == 5 ? currentContract.obligationState[id].tradingFeeCbp5 : currentContract.obligationState[id].tradingFeeCbp6;
 
-definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(obligationTradingFeePips(id, index) * FEE_PIP());
+definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(obligationTradingFeeCbp(id, index) * FEE_CBP());
 
-definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFeePips[loanToken][index] * FEE_PIP());
+definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFeeCbp[loanToken][index] * FEE_CBP());
 
 ghost mapping(address => mapping(address => mathint)) tokenBalance;
 
@@ -103,7 +103,7 @@ rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filter
 rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_PIP() == 0;
+    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_CBP() == 0;
     bool obligationExists = obligationCreated(id);
 
     setObligationTradingFee@withrevert(e, id, index, newTradingFee);
@@ -115,7 +115,7 @@ rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint2
 rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_PIP() == 0;
+    bool validFee = validIndex && newTradingFee <= maxTradingFee(index) && newTradingFee % FEE_CBP() == 0;
 
     setDefaultTradingFee@withrevert(e, loanToken, index, newTradingFee);
     bool reverted = lastReverted;
