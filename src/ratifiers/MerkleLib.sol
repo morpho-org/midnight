@@ -12,28 +12,28 @@ library MerkleLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height < 11) {
-            if (height == 0) return 0x0e43d8df2f3684b785fa9fcc30e9fb1854aabdc3b41299c295e40719905aa409;
-            if (height == 1) return 0x5d2cda016e26c76fc76abd14730b171e5728b985396fdd915f578684ebbe7c08;
-            if (height == 2) return 0xefac405c5f69bfadf16128c7517214821f43ed43418cb105786797e775c82208;
-            if (height == 3) return 0x31c93107b446078165ed61fdc00f9d9fcd4f3caaa1190a450d2ea6f5458eaccf;
-            if (height == 4) return 0xe0dee184a8590b1f885af247ca09e36c68586dbffa6867fa9b3b59558beffc15;
-            if (height == 5) return 0xd6e86cf62241738635bac0675446526dba2111139cd29cbe51540d1951f0f9d9;
-            if (height == 6) return 0x60b0a7b9b8026fb0843b29674731a80da02604c07e87380acba1e834127c036d;
-            if (height == 7) return 0xb57b5627fd51b740272bee7750d8a0f52856db5761767bbc90795d1166400f91;
-            if (height == 8) return 0xd9ea3b8d089568ca3a3e0858ec120441ef7ac3714712f451d18de174961ac92f;
-            if (height == 9) return 0x7b1ceacb8b39729bf3887cec726d34a4b6944eb84eb8e9cdfe0d7070ad75ca30;
-            return 0x56d6ab434a3896c1d1c814fe3e7c22fc7c1f9b9177a50f2f79e754bb2199cdb0;
+            if (height == 0) return 0xe44a06d7beccd42078013099c75f6bf15bbf7011b32f0fac5f0d1be11209fb45;
+            if (height == 1) return 0xe76957cbe055f833a3535c27c910d8b3ff551c57122cd7c144664dcaf6ef57c2;
+            if (height == 2) return 0x8ed636f96d015ec0b37331755bd1ed810b518651d1f608ef0da8faf8a716a9fa;
+            if (height == 3) return 0xed435d712423199e157e3b5a09dae057b80f4e24c66506fab90a532a281f119b;
+            if (height == 4) return 0xc0be3e3e3db20135f4e4b0e0ec303b2370bff3a6c6f1694e590688679d3c791d;
+            if (height == 5) return 0xa11a82bad74d349c4815e64b3d1c0e8b67996a416bed7de5be2a3f99c713f0ea;
+            if (height == 6) return 0x26b9fced7071170acdd2cccb33b167efab84a6e642da76eb114c28bfa65b64fa;
+            if (height == 7) return 0x8fe59ac3e9ed3d2b996863d15a70fc04e25d57b0c38a84a106f382d650a852d7;
+            if (height == 8) return 0xb5a57691ae822b37e31d9777d494a7c87678280f896cbad814b660390eea6b61;
+            if (height == 9) return 0xd87a4d4c8046ebabe9b990871cb18534f7f62534e5659e739c679aa6378d5519;
+            return 0x52d7e6cdfd06ffa64fec4914dd59d23b2a18610350763964ffe997412517b37a;
         } else {
-            if (height == 11) return 0x93f78fd001e8bafca3563f60c2f0f17b7a4eae11cd7f2009af2488b318b32e30;
-            if (height == 12) return 0x7f4b555dd8cdba4396e42215d878847ba64c29ea68d852161264ccd43008e2df;
-            if (height == 13) return 0x3b3c022990f3110616cb95bee08380dee66e3a47a67d9c2c7ec1828102367957;
-            if (height == 14) return 0x2519b2c8c6476345d46d5f543ee11f421886319e2d68f2df4ec54344393d402f;
-            if (height == 15) return 0x342d2f85060d6c90578ac9783b38ba80e002837fc89448ae771ac246d4c68ce3;
-            if (height == 16) return 0xe3ff3face5c6307122b29d3f23b7106ab79793236005007af9e94bbc4d9836a7;
-            if (height == 17) return 0x9a955710808f486fc37d0607e120c223cc8b2029dab35c6ec7840ff9aea1ff52;
-            if (height == 18) return 0x419a52abde7cb2ff4d4eeb2f65b93dc2e05a12ea6f7a9c379b0b25558c34741f;
-            if (height == 19) return 0x9cf0a4c02fe1d55648b3c157e49872c82d1bc404e3c5359c02aba6cb0d934ddb;
-            if (height == 20) return 0x23172699c5aaea9a0c03c717e0c036ac5642252f5af36f002526d1a312aef9b9;
+            if (height == 11) return 0xfa83a2c65fb1461f15e882933fe76b1bdc109593e0290fc9e7b8b1cf563ab45b;
+            if (height == 12) return 0x48c3385bb136122d66812803a4900c7fe06ea36fcd4b1723a73d83e7ca0cc741;
+            if (height == 13) return 0x20e338378ffdffb282b5d15c84729a501620e94aee44ce9f79b51226dad53da3;
+            if (height == 14) return 0x1245eebd3b0c0d2eb646c2774d01ac8e25e5e15546e0c541da165f3fd323b4ea;
+            if (height == 15) return 0xdbe18915d349eb57a97c0c27074f78cdd7ef74c4bbb462f3c2af5f6309c7d333;
+            if (height == 16) return 0xfe68c4beb45b8b211183073f7ba722b88b74c83dd8106a32b99a67223773c1a3;
+            if (height == 17) return 0xf3d480585999f714d3c14b21dc8778a5b482ab9de408b58d1d9b2eda9e72c728;
+            if (height == 18) return 0x5ca45d9e6845331c5349cd07435d2a3f2b9fe342794a628f12067aca895432fe;
+            if (height == 19) return 0x27ab2cec644494459bf6cfbde6c271fdc8b089d0552aa014bef0c44965cbfa71;
+            if (height == 20) return 0xdb06b6765eb9ed46556b2d149c00a81e61a0f019925b5948d368a37c841ef7f9;
             revert TreeTooHigh();
         }
     }
