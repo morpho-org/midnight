@@ -29,11 +29,11 @@ contract RateRatifier is IRateRatifier {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         if (offer.buy) {
-          uint256 priceLimitDown = WAD.mulDivDown(WAD, WAD + rate * timeToMaturity);
-          require(offerPrice <= priceLimitDown, WorsePrice());
+            uint256 priceLimitDown = WAD.mulDivDown(WAD, WAD + rate * timeToMaturity);
+            require(offerPrice <= priceLimitDown, WorsePrice());
         } else {
-          uint256 priceLimitUp = WAD.mulDivUp(WAD, WAD + rate * timeToMaturity);
-          require(offerPrice >= priceLimitUp, WorsePrice());
+            uint256 priceLimitUp = WAD.mulDivUp(WAD, WAD + rate * timeToMaturity);
+            require(offerPrice >= priceLimitUp, WorsePrice());
         }
         bytes32 structHash = HashLib.hashRateOffer(offer, rate);
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
