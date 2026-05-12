@@ -315,13 +315,13 @@ contract Midnight is IMidnight {
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
-    /// @dev `units` values above `type(uint128).max` might still succeed after capping, but might also revert early due
-    /// to overflow depending on which offer-cap path is taken.
+    /// @dev `maxUnits` values above `type(uint128).max` might still succeed after capping, but might also revert early
+    /// due to overflow depending on which offer-cap path is taken.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev If an offer has max == consumed, takes can still happen (but no assets/units will be taken/sent).
     /// @dev Returns buyerAssets, sellerAssets, units.
     function take(
-        uint256 units,
+        uint256 maxUnits,
         address taker,
         address takerCallback,
         bytes memory takerCallbackData,
@@ -347,17 +347,17 @@ contract Midnight is IMidnight {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
         uint256 _tradingFee = tradingFee(id, timeToMaturity);
         uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        require(sellerPrice > 0, SellerPriceZero());
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 currentConsumed = consumed[offer.maker][offer.group];
+        uint256 units;
         if (offer.maxAssets > 0) {
             uint256 consumable = offer.maxAssets - currentConsumed;
             units = UtilsLib.min(
-                units,
+                maxUnits,
                 offer.buy ? (consumable + 1).mulDivUp(WAD, offerPrice) - 1 : consumable.mulDivDown(WAD, offerPrice)
             );
         } else {
-            units = UtilsLib.min(units, offer.maxUnits - currentConsumed);
+            units = UtilsLib.min(maxUnits, offer.maxUnits - currentConsumed);
         }
 
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);

@@ -15,6 +15,7 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
+import {stdError} from "../lib/forge-std/src/Test.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
@@ -1369,46 +1370,136 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
     }
 
-    // Summary of zero price tests:
-    //
-    // Trading at 0 succeeds in those cases:
-    // - any offer / unit take input / 0 trading fee.
-    // - sell offer / unit take input / > 0 trading fee.
-    //
-    // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // Price 0 cases. With maxUnits, takes work. With maxAssets, takes revert. With no cap, takes fill 0.
 
-    // fee=0, sell, units
-    function testPriceZeroNoTradingFeeSell() public {
+    // Both caps 0: take fills 0 units.
+    function testPriceZeroBothCapsZeroNoFill() public {
+        uint256 units = 1e18;
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = 0;
+        (uint256 buyerAssets, uint256 sellerAssets, uint256 filledUnits) = take(units, borrower, lenderOffer);
+        assertEq(filledUnits, 0, "filledUnits");
+        assertEq(buyerAssets, 0, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(midnight.creditOf(id, lender), 0, "creditOf");
+        assertEq(midnight.debtOf(id, borrower), 0, "debtOf");
+        assertEq(midnight.consumed(lenderOffer.maker, lenderOffer.group), 0, "consumed");
+    }
+
+    // Sell, maxAssets cap, no fee: take reverts in the cap math.
+    function testPriceZeroMaxAssetsSellReverts() public {
+        uint256 units = 1e18;
+        borrowerOffer.tick = 0;
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = type(uint128).max;
+        vm.expectRevert(stdError.divisionError);
+        take(units, lender, borrowerOffer);
+    }
+
+    // Sell, maxAssets cap, with fee: take reverts in the cap math.
+    function testPriceZeroMaxAssetsSellWithFeeReverts() public {
+        midnight.touchObligation(obligation);
+        midnight.setObligationTradingFee(id, 1, 1e12);
+        uint256 units = 1e18;
+        borrowerOffer.tick = 0;
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = type(uint128).max;
+        vm.expectRevert(stdError.divisionError);
+        take(units, lender, borrowerOffer);
+    }
+
+    // Buy, maxAssets cap, no fee: take reverts in the cap math.
+    function testPriceZeroMaxAssetsBuyReverts() public {
+        uint256 units = 1e18;
+        lenderOffer.tick = 0;
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = type(uint128).max;
+        vm.expectRevert(stdError.arithmeticError);
+        take(units, borrower, lenderOffer);
+    }
+
+    // Buy, maxAssets cap, with fee: sellerPrice underflows, take reverts.
+    function testPriceZeroMaxAssetsBuyWithFeeReverts() public {
+        midnight.touchObligation(obligation);
+        midnight.setObligationTradingFee(id, 1, 1e12);
+        uint256 units = 1e18;
+        lenderOffer.tick = 0;
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = type(uint128).max;
+        vm.expectRevert(stdError.arithmeticError);
+        take(units, borrower, lenderOffer);
+    }
+
+    // Sell, maxUnits cap, no fee: take fills up to maxUnits.
+    function testPriceZeroMaxUnitsSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = UtilsLib.toUint128(units);
         collateralize(obligation, borrower, units);
-        vm.expectRevert(TickLib.TickOutOfRange.selector);
-        take(units, lender, borrowerOffer);
+        (uint256 buyerAssets, uint256 sellerAssets, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        assertEq(filledUnits, units, "filledUnits");
+        assertEq(buyerAssets, 0, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(midnight.creditOf(id, lender), units, "creditOf");
+        assertEq(midnight.debtOf(id, borrower), units, "debtOf");
+        assertEq(midnight.consumed(borrowerOffer.maker, borrowerOffer.group), units, "consumed");
     }
 
-    // fee>0, buy, units
-    function testPriceZeroWithTradingFeeBuy() public {
+    // Sell, maxUnits cap, with fee: take fills up to maxUnits, buyer pays the fee.
+    function testPriceZeroMaxUnitsSellWithFee() public {
+        midnight.touchObligation(obligation);
+        midnight.setObligationTradingFee(id, 1, 1e12);
+        uint256 fee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 units = 1e18;
+        borrowerOffer.tick = 0;
+        borrowerOffer.maxUnits = UtilsLib.toUint128(units);
+        uint256 expectedBuyerAssets = units.mulDivUp(fee, WAD);
+        deal(address(loanToken), lender, expectedBuyerAssets);
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets, uint256 filledUnits) = take(units, lender, borrowerOffer);
+        assertEq(filledUnits, units, "filledUnits");
+        assertEq(buyerAssets, expectedBuyerAssets, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(midnight.creditOf(id, lender), units, "creditOf");
+        assertEq(midnight.debtOf(id, borrower), units, "debtOf");
+        assertEq(midnight.consumed(borrowerOffer.maker, borrowerOffer.group), units, "consumed");
+    }
+
+    // Buy, maxUnits cap, no fee: take fills up to maxUnits.
+    function testPriceZeroMaxUnitsBuy() public {
+        uint256 units = 1e18;
+        lenderOffer.tick = 0;
+        lenderOffer.maxUnits = UtilsLib.toUint128(units);
+        collateralize(obligation, borrower, units);
+        (uint256 buyerAssets, uint256 sellerAssets, uint256 filledUnits) = take(units, borrower, lenderOffer);
+        assertEq(filledUnits, units, "filledUnits");
+        assertEq(buyerAssets, 0, "buyerAssets");
+        assertEq(sellerAssets, 0, "sellerAssets");
+        assertEq(midnight.creditOf(id, lender), units, "creditOf");
+        assertEq(midnight.debtOf(id, borrower), units, "debtOf");
+        assertEq(midnight.consumed(lenderOffer.maker, lenderOffer.group), units, "consumed");
+    }
+
+    // Buy, maxUnits cap, with fee: sellerPrice underflows, take reverts.
+    function testPriceZeroMaxUnitsBuyWithFeeReverts() public {
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 1, 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = UtilsLib.toUint128(units);
         collateralize(obligation, borrower, units);
-        vm.expectRevert(TickLib.TickOutOfRange.selector);
+        vm.expectRevert(stdError.arithmeticError);
         take(units, borrower, lenderOffer);
     }
 
-    // fee>0, sell, units
-    function testPriceZeroWithTradingFeeSell() public {
-        midnight.touchObligation(obligation);
-        midnight.setObligationTradingFee(id, 1, 1e12);
+    // Cancel a maxUnits offer with setConsumed: take reverts.
+    function testPriceZeroMaxUnitsCancellation() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = UtilsLib.toUint128(units);
-        collateralize(obligation, borrower, units);
-        vm.expectRevert(TickLib.TickOutOfRange.selector);
+        vm.prank(borrower);
+        midnight.setConsumed(borrowerOffer.group, type(uint256).max, borrower);
+        vm.expectRevert(stdError.arithmeticError);
         take(units, lender, borrowerOffer);
     }
 

@@ -14,9 +14,7 @@ methods {
 
     // Summaries for complex internals irrelevant to token balance tracking.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
-
-    // Sound: tickToPrice requires tick > 0 and always returns a positive value.
-    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => tickToPriceSummary(tick);
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -54,12 +52,6 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
     }
     return success;
-}
-
-// TickLib summaries.
-
-ghost tickToPriceSummary(uint256) returns uint256 {
-    axiom forall uint256 t. tickToPriceSummary(t) > 0;
 }
 
 // UtilsLib summaries.

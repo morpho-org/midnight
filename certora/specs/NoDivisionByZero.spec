@@ -21,8 +21,8 @@ methods {
     // Summary for deterministic toId for the global obligation.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
-    // Sound: tickToPrice requires tick > 0 and always returns a positive value.
-    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => tickToPriceSummary(tick);
+    // This function is checked manually to not cause a division by zero.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     // Hook on mulDivDown and mulDivUp to check that the denominator is not zero, and add the necessary lemmas.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
@@ -30,10 +30,6 @@ methods {
 }
 
 /// GHOSTS ///
-
-ghost tickToPriceSummary(uint256) returns uint256 {
-    axiom forall uint256 t. tickToPriceSummary(t) > 0;
-}
 
 // Reuse part of the setup of Healthiness.spec.
 

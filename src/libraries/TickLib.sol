@@ -38,7 +38,7 @@ library TickLib {
     }
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
-        require(tick > 0 && tick <= MAX_TICK, TickOutOfRange());
+        require(tick <= MAX_TICK, TickOutOfRange());
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
@@ -50,7 +50,7 @@ library TickLib {
     /// @dev Returns the lowest tick with a higher price.
     function priceToTick(uint256 price) internal pure returns (uint256) {
         require(price <= 1e18, PriceGreaterThanOne());
-        uint256 low = 1;
+        uint256 low = 0;
         uint256 high = MAX_TICK;
         while (low != high) {
             unchecked {
