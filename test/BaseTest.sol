@@ -391,11 +391,7 @@ abstract contract BaseTest is Test {
         midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
     }
 
-    function _setupObligationOffer(bytes32 id, uint256 units)
-        private
-        view
-        returns (Offer memory borrowerOffer)
-    {
+    function _setupObligationOffer(bytes32 id, uint256 units) private view returns (Offer memory borrowerOffer) {
         borrowerOffer.id = id;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
