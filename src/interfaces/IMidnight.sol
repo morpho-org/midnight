@@ -37,19 +37,19 @@ struct Offer {
     uint256 maxBuyerAssets;
 }
 
-/// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
+/// @dev Trading fee pips and the continuous fee are 0 until the obligation is created, then set to the default values.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossFactor;
     uint128 withdrawable;
     uint128 continuousFeeCredit;
-    uint16 tradingFee0;
-    uint16 tradingFee1;
-    uint16 tradingFee2;
-    uint16 tradingFee3;
-    uint16 tradingFee4;
-    uint16 tradingFee5;
-    uint16 tradingFee6;
+    uint16 tradingFeePips0;
+    uint16 tradingFeePips1;
+    uint16 tradingFeePips2;
+    uint16 tradingFeePips3;
+    uint16 tradingFeePips4;
+    uint16 tradingFeePips5;
+    uint16 tradingFeePips6;
     uint32 continuousFee;
     bool created;
 }
@@ -73,7 +73,7 @@ interface IMidnight {
     error ConsumedSellerAssets();
     error ConsumedUnits();
     error ContinuousFeeTooHigh();
-    error FeeNotMultipleOfFeeStep();
+    error FeeNotMultipleOfFeePip();
     error InconsistentInput();
     error WrongBuyCallbackReturnValue();
     error WrongSellCallbackReturnValue();
@@ -116,11 +116,11 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, bool created);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeePips0, uint16 tradingFeePips1, uint16 tradingFeePips2, uint16 tradingFeePips3, uint16 tradingFeePips4, uint16 tradingFeePips5, uint16 tradingFeePips6, uint32 continuousFee, bool created);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
-    function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
+    function defaultTradingFeePips(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
     function roleSetter() external view returns (address);
@@ -170,7 +170,7 @@ interface IMidnight {
     function lossFactor(bytes32 id) external view returns (uint128);
     function obligationCreated(bytes32 id) external view returns (bool);
     function withdrawable(bytes32 id) external view returns (uint256);
-    function tradingFees(bytes32 id) external view returns (uint16[7] memory);
+    function tradingFeePips(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
     function continuousFeeCredit(bytes32 id) external view returns (uint256);
     function pendingFee(bytes32 id, address user) external view returns (uint128);

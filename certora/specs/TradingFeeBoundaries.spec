@@ -22,13 +22,13 @@ definition lowerIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 
 /// Upper enclosing breakpoint index for a given time-to-maturity.
 definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 6 : ttm >= breakpointTime(4) ? 5 : ttm >= breakpointTime(3) ? 4 : ttm >= breakpointTime(2) ? 3 : ttm >= breakpointTime(1) ? 2 : 1;
 
-definition FEE_STEP() returns uint256 = 1000000000000;
+definition FEE_PIP() returns uint256 = 1000000000000;
 
-definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFees[loanToken][index] * FEE_STEP());
+definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFeePips[loanToken][index] * FEE_PIP());
 
-definition rawObligationTradingFee(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFee0 : index == 1 ? currentContract.obligationState[id].tradingFee1 : index == 2 ? currentContract.obligationState[id].tradingFee2 : index == 3 ? currentContract.obligationState[id].tradingFee3 : index == 4 ? currentContract.obligationState[id].tradingFee4 : index == 5 ? currentContract.obligationState[id].tradingFee5 : currentContract.obligationState[id].tradingFee6;
+definition obligationTradingFeePips(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFeePips0 : index == 1 ? currentContract.obligationState[id].tradingFeePips1 : index == 2 ? currentContract.obligationState[id].tradingFeePips2 : index == 3 ? currentContract.obligationState[id].tradingFeePips3 : index == 4 ? currentContract.obligationState[id].tradingFeePips4 : index == 5 ? currentContract.obligationState[id].tradingFeePips5 : currentContract.obligationState[id].tradingFeePips6;
 
-definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(rawObligationTradingFee(id, index) * FEE_STEP());
+definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(obligationTradingFeePips(id, index) * FEE_PIP());
 
 /// Default trading fees for any loan token at each index are bounded by its specific maxTradingFee cap.
 invariant defaultTradingFeePerIndexBound(address loanToken, uint256 index)

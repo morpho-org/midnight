@@ -104,19 +104,19 @@ contract SettersTest is BaseTest {
         midnight.setObligationTradingFee(id, index, feeTooHigh);
     }
 
-    function testSetTradingFeeNotMultipleOfFeeStep(bytes32 id, uint256 index, uint256 fee) public {
+    function testSetTradingFeeNotMultipleOfFeePip(bytes32 id, uint256 index, uint256 fee) public {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeePip.selector);
         midnight.setObligationTradingFee(id, index, fee);
     }
 
-    function testSetDefaultTradingFeeNotMultipleOfFeeStep(address loanToken, uint256 index, uint256 fee) public {
+    function testSetDefaultTradingFeeNotMultipleOfFeePip(address loanToken, uint256 index, uint256 fee) public {
         index = bound(index, 0, 6);
         fee = bound(fee, 1, midnight.maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeePip.selector);
         midnight.setDefaultTradingFee(loanToken, index, fee);
     }
 
