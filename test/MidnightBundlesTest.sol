@@ -13,7 +13,8 @@ import {MidnightBundles} from "../src/periphery/MidnightBundles.sol";
 import {
     IMidnightBundles,
     Take,
-    CollateralTransfer,
+    CollateralWithdrawal,
+    CollateralSupply,
     TokenPermit,
     PermitKind
 } from "../src/periphery/interfaces/IMidnightBundles.sol";
@@ -22,6 +23,8 @@ import {BaseTest} from "./BaseTest.sol";
 
 contract MidnightBundlesTest is BaseTest {
     using UtilsLib for uint256;
+
+    address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     MidnightBundles internal midnightBundles;
 
@@ -33,7 +36,7 @@ contract MidnightBundlesTest is BaseTest {
         super.setUp();
 
         midnightBundles = new MidnightBundles();
-        deployCodeTo("Permit2", midnightBundles.PERMIT2());
+        deployCodeTo("Permit2", PERMIT2);
 
         // Set trading fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
@@ -118,11 +121,13 @@ contract MidnightBundlesTest is BaseTest {
                 deadline
             )
         );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", VendorPermit2(midnightBundles.PERMIT2()).DOMAIN_SEPARATOR(), permitHash)
-        );
+        bytes32 digest =
+            keccak256(abi.encodePacked("\x19\x01", VendorPermit2(PERMIT2).DOMAIN_SEPARATOR(), permitHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey[owner], digest);
-        return TokenPermit({kind: PermitKind.Permit2, data: abi.encode(nonce, deadline, abi.encodePacked(r, s, v))});
+        return TokenPermit({
+            kind: PermitKind.Permit2,
+            data: abi.encode(PERMIT2, nonce, deadline, abi.encodePacked(r, s, v))
+        });
     }
 
     function _erc2612(address token, address owner, uint256 amount, uint256 nonce, uint256 deadline)
@@ -152,12 +157,12 @@ contract MidnightBundlesTest is BaseTest {
             100,
             0,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
     }
 
@@ -181,11 +186,10 @@ contract MidnightBundlesTest is BaseTest {
                 0,
                 borrower,
                 borrower,
+                new CollateralSupply[](0),
                 takes,
-                new CollateralTransfer[](0),
                 0,
-                address(0),
-                new TokenPermit[](0)
+                address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -202,11 +206,10 @@ contract MidnightBundlesTest is BaseTest {
                 0,
                 borrower,
                 borrower,
+                new CollateralSupply[](0),
                 takes,
-                new CollateralTransfer[](0),
                 0,
-                address(0),
-                new TokenPermit[](0)
+                address(0)
             );
         }
     }
@@ -246,12 +249,12 @@ contract MidnightBundlesTest is BaseTest {
                 targetBuyerAssets,
                 0,
                 lender,
+                _noPermit(),
                 takes,
-                new CollateralTransfer[](0),
+                new CollateralWithdrawal[](0),
                 address(0),
                 0,
-                address(0),
-                _noPermit()
+                address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -267,12 +270,12 @@ contract MidnightBundlesTest is BaseTest {
                 targetBuyerAssets,
                 0,
                 lender,
+                _noPermit(),
                 takes,
-                new CollateralTransfer[](0),
+                new CollateralWithdrawal[](0),
                 address(0),
                 0,
-                address(0),
-                _noPermit()
+                address(0)
             );
         }
     }
@@ -298,7 +301,7 @@ contract MidnightBundlesTest is BaseTest {
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         vm.startPrank(lender);
-        loanToken.approve(midnightBundles.PERMIT2(), targetBuyerAssets);
+        loanToken.approve(PERMIT2, targetBuyerAssets);
         vm.stopPrank();
 
         TokenPermit memory permit = _permit2(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
@@ -308,16 +311,16 @@ contract MidnightBundlesTest is BaseTest {
             targetBuyerAssets,
             0,
             lender,
+            permit,
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            permit
+            address(0)
         );
 
         assertEq(loanToken.allowance(lender, address(midnightBundles)), 0);
-        assertEq(loanToken.allowance(lender, midnightBundles.PERMIT2()), 0);
+        assertEq(loanToken.allowance(lender, PERMIT2), 0);
         assertEq(loanToken.balanceOf(lender), type(uint256).max - targetBuyerAssets);
         assertEq(midnight.creditOf(id, lender), units);
     }
@@ -349,12 +352,12 @@ contract MidnightBundlesTest is BaseTest {
             targetBuyerAssets,
             0,
             lender,
+            permit,
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            permit
+            address(0)
         );
 
         assertEq(loanToken.allowance(lender, address(midnightBundles)), 0);
@@ -381,7 +384,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.startPrank(lender);
         loanToken.approve(address(midnightBundles), 0);
-        loanToken.approve(midnightBundles.PERMIT2(), maxBuyerAssets);
+        loanToken.approve(PERMIT2, maxBuyerAssets);
         vm.stopPrank();
 
         TokenPermit memory permit = _permit2(address(loanToken), lender, maxBuyerAssets, 0, block.timestamp + 1);
@@ -391,16 +394,16 @@ contract MidnightBundlesTest is BaseTest {
             units,
             maxBuyerAssets,
             lender,
+            permit,
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            permit
+            address(0)
         );
 
         assertEq(loanToken.allowance(lender, address(midnightBundles)), 0);
-        assertEq(loanToken.allowance(lender, midnightBundles.PERMIT2()), 0);
+        assertEq(loanToken.allowance(lender, PERMIT2), 0);
         assertEq(loanToken.balanceOf(lender), type(uint256).max - maxBuyerAssets);
         assertEq(midnight.creditOf(id, lender), units);
     }
@@ -430,12 +433,12 @@ contract MidnightBundlesTest is BaseTest {
             2,
             type(uint256).max,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
     }
 
@@ -459,11 +462,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
     }
 
@@ -496,12 +498,12 @@ contract MidnightBundlesTest is BaseTest {
             1000,
             0,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
     }
 
@@ -537,11 +539,10 @@ contract MidnightBundlesTest is BaseTest {
                 type(uint256).max,
                 borrower,
                 borrower,
+                new CollateralSupply[](0),
                 takes,
-                new CollateralTransfer[](0),
                 0,
-                address(0),
-                new TokenPermit[](0)
+                address(0)
             );
 
             uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
@@ -558,11 +559,10 @@ contract MidnightBundlesTest is BaseTest {
                 type(uint256).max,
                 borrower,
                 borrower,
+                new CollateralSupply[](0),
                 takes,
-                new CollateralTransfer[](0),
                 0,
-                address(0),
-                new TokenPermit[](0)
+                address(0)
             );
         }
     }
@@ -587,11 +587,10 @@ contract MidnightBundlesTest is BaseTest {
             type(uint256).max,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
     }
 
@@ -626,12 +625,12 @@ contract MidnightBundlesTest is BaseTest {
             units,
             type(uint256).max,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             referralFeePct,
-            referrer,
-            _noPermit()
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), units, "units filled");
@@ -670,11 +669,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             receiver,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             referralFeePct,
-            referrer,
-            new TokenPermit[](0)
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), units, "units sold");
@@ -714,12 +712,12 @@ contract MidnightBundlesTest is BaseTest {
             targetBuyerAssets,
             0,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             referralFeePct,
-            referrer,
-            _noPermit()
+            referrer
         );
 
         assertEq(type(uint256).max - loanToken.balanceOf(lender), targetBuyerAssets, "taker total cost");
@@ -759,11 +757,10 @@ contract MidnightBundlesTest is BaseTest {
             type(uint256).max,
             borrower,
             receiver,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             referralFeePct,
-            referrer,
-            new TokenPermit[](0)
+            referrer
         );
 
         assertEq(loanToken.balanceOf(receiver), targetSellerAssets, "receiver net");
@@ -793,11 +790,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             sellTakes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
 
         // Bound assets so the derived units never exceed outstanding debt.
@@ -818,11 +814,11 @@ contract MidnightBundlesTest is BaseTest {
             obligation,
             assets,
             borrower,
-            new CollateralTransfer[](0),
+            _noPermit(),
+            new CollateralWithdrawal[](0),
             address(0),
             referralFeePct,
-            referrer,
-            _noPermit()
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), units - expectedUnits, "debt");
@@ -852,11 +848,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             sellTakes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
 
         uint256 assets = debt.mulDivDown(WAD, WAD - referralFeePct);
@@ -872,11 +867,11 @@ contract MidnightBundlesTest is BaseTest {
             obligation,
             assets,
             borrower,
-            new CollateralTransfer[](0),
+            _noPermit(),
+            new CollateralWithdrawal[](0),
             address(0),
             referralFeePct,
-            referrer,
-            _noPermit()
+            referrer
         );
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt fully repaid");
@@ -900,12 +895,12 @@ contract MidnightBundlesTest is BaseTest {
             1,
             0,
             lender,
+            _noPermit(),
             buyTakes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             WAD,
-            address(0),
-            _noPermit()
+            address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
@@ -913,12 +908,12 @@ contract MidnightBundlesTest is BaseTest {
             1,
             0,
             lender,
+            _noPermit(),
             buyTakes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             WAD,
-            address(0),
-            _noPermit()
+            address(0)
         );
         vm.stopPrank();
 
@@ -930,11 +925,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             WAD,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.supplyCollateralAndSellWithAssetsTarget(
@@ -943,11 +937,10 @@ contract MidnightBundlesTest is BaseTest {
             type(uint256).max,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             WAD,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
         vm.expectRevert(IMidnightBundles.PctExceeded.selector);
         midnightBundles.repayAndWithdrawCollateral(
@@ -955,11 +948,11 @@ contract MidnightBundlesTest is BaseTest {
             obligation,
             0,
             borrower,
-            new CollateralTransfer[](0),
+            _noPermit(),
+            new CollateralWithdrawal[](0),
             address(0),
             WAD,
-            address(0),
-            _noPermit()
+            address(0)
         );
         vm.stopPrank();
     }
@@ -1008,9 +1001,9 @@ contract MidnightBundlesTest is BaseTest {
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
-        CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
+        CollateralWithdrawal[] memory withdrawals = new CollateralWithdrawal[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralWithdrawal({collateralIndex: i, assets: amounts[i] / 4});
         }
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -1018,7 +1011,7 @@ contract MidnightBundlesTest is BaseTest {
 
         vm.prank(lender);
         midnightBundles.buyWithUnitsTargetAndWithdrawCollateral(
-            address(midnight), units, maxBuyerAssets, lender, takes, withdrawals, receiver, 0, address(0), _noPermit()
+            address(midnight), units, maxBuyerAssets, lender, _noPermit(), takes, withdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -1050,14 +1043,14 @@ contract MidnightBundlesTest is BaseTest {
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
 
         address receiver = makeAddr("collateralReceiver");
-        CollateralTransfer[] memory withdrawals = new CollateralTransfer[](numCollaterals);
+        CollateralWithdrawal[] memory withdrawals = new CollateralWithdrawal[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
-            withdrawals[i] = CollateralTransfer({collateralIndex: i, assets: amounts[i] / 4});
+            withdrawals[i] = CollateralWithdrawal({collateralIndex: i, assets: amounts[i] / 4});
         }
 
         vm.prank(lender);
         midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
-            address(midnight), targetBuyerAssets, 0, lender, takes, withdrawals, receiver, 0, address(0), _noPermit()
+            address(midnight), targetBuyerAssets, 0, lender, _noPermit(), takes, withdrawals, receiver, 0, address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -1072,13 +1065,13 @@ contract MidnightBundlesTest is BaseTest {
 
         offers[0].maxUnits = units;
 
-        CollateralTransfer[] memory supplies = new CollateralTransfer[](numCollaterals);
+        CollateralSupply[] memory supplies = new CollateralSupply[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
             uint256 amount = _collateralAmount(i, units / numCollaterals + 1);
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(midnightBundles), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralSupply({collateralIndex: i, assets: amount, permit: _noPermit()});
         }
 
         Take[] memory takes = new Take[](1);
@@ -1091,11 +1084,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
-            takes,
             supplies,
+            takes,
             0,
-            address(0),
-            new TokenPermit[](numCollaterals)
+            address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -1110,8 +1102,6 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 amount = _collateralAmount(0, units);
         deal(obligation.collateralParams[0].token, borrower, amount);
-        CollateralTransfer[] memory supplies = new CollateralTransfer[](1);
-        supplies[0] = CollateralTransfer({collateralIndex: 0, assets: amount});
 
         Take[] memory takes = new Take[](1);
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
@@ -1119,18 +1109,22 @@ contract MidnightBundlesTest is BaseTest {
         address collateralToken = obligation.collateralParams[0].token;
         vm.startPrank(borrower);
         ERC20(collateralToken).approve(address(midnightBundles), 0);
-        ERC20(collateralToken).approve(midnightBundles.PERMIT2(), amount);
+        ERC20(collateralToken).approve(PERMIT2, amount);
         vm.stopPrank();
 
-        TokenPermit[] memory permits = new TokenPermit[](1);
-        permits[0] = _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1);
+        CollateralSupply[] memory supplies = new CollateralSupply[](1);
+        supplies[0] = CollateralSupply({
+            collateralIndex: 0,
+            assets: amount,
+            permit: _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1)
+        });
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndSellWithUnitsTarget(
-            address(midnight), units, 0, borrower, borrower, takes, supplies, 0, address(0), permits
+            address(midnight), units, 0, borrower, borrower, supplies, takes, 0, address(0)
         );
 
         assertEq(ERC20(collateralToken).allowance(borrower, address(midnightBundles)), 0);
-        assertEq(ERC20(collateralToken).allowance(borrower, midnightBundles.PERMIT2()), 0);
+        assertEq(ERC20(collateralToken).allowance(borrower, PERMIT2), 0);
         assertEq(midnight.collateral(id, borrower, 0), amount);
         assertEq(midnight.debtOf(id, borrower), units);
     }
@@ -1159,11 +1153,10 @@ contract MidnightBundlesTest is BaseTest {
             0,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             sellTakes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
 
         uint256 maxWithdrawable = collateralAmount - _collateralAmount(0, units - repayUnits);
@@ -1173,8 +1166,8 @@ contract MidnightBundlesTest is BaseTest {
         vm.prank(borrower);
         loanToken.approve(address(midnightBundles), repayUnits);
 
-        CollateralTransfer[] memory withdrawals = new CollateralTransfer[](1);
-        withdrawals[0] = CollateralTransfer({collateralIndex: 0, assets: withdrawAssets});
+        CollateralWithdrawal[] memory withdrawals = new CollateralWithdrawal[](1);
+        withdrawals[0] = CollateralWithdrawal({collateralIndex: 0, assets: withdrawAssets});
 
         uint256 borrowerLoanBalanceBefore = loanToken.balanceOf(borrower);
 
@@ -1184,11 +1177,11 @@ contract MidnightBundlesTest is BaseTest {
             obligation,
             repayUnits,
             borrower,
+            _noPermit(),
             withdrawals,
             collateralReceiver,
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
 
         assertEq(midnight.debtOf(id, borrower), units - repayUnits, "debt");
@@ -1215,13 +1208,13 @@ contract MidnightBundlesTest is BaseTest {
         uint256 sellerPrice = price - _tradingFee;
         uint256 targetSellerAssets = units.mulDivDown(sellerPrice, WAD);
 
-        CollateralTransfer[] memory supplies = new CollateralTransfer[](numCollaterals);
+        CollateralSupply[] memory supplies = new CollateralSupply[](numCollaterals);
         for (uint256 i; i < numCollaterals; i++) {
             uint256 amount = _collateralAmount(i, units / numCollaterals + 1);
             deal(obligation.collateralParams[i].token, borrower, amount);
             vm.prank(borrower);
             ERC20(obligation.collateralParams[i].token).approve(address(midnightBundles), amount);
-            supplies[i] = CollateralTransfer({collateralIndex: i, assets: amount});
+            supplies[i] = CollateralSupply({collateralIndex: i, assets: amount, permit: _noPermit()});
         }
 
         Take[] memory takes = new Take[](1);
@@ -1234,11 +1227,10 @@ contract MidnightBundlesTest is BaseTest {
             type(uint256).max,
             borrower,
             borrower,
-            takes,
             supplies,
+            takes,
             0,
-            address(0),
-            new TokenPermit[](numCollaterals)
+            address(0)
         );
 
         for (uint256 i; i < numCollaterals; i++) {
@@ -1260,8 +1252,6 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 amount = _collateralAmount(0, units);
         deal(obligation.collateralParams[0].token, borrower, amount);
-        CollateralTransfer[] memory supplies = new CollateralTransfer[](1);
-        supplies[0] = CollateralTransfer({collateralIndex: 0, assets: amount});
 
         Take[] memory takes = new Take[](1);
         takes[0] = Take({offer: offers[0], units: units, ratifierData: merkleRatifierData([offers[0]])});
@@ -1269,11 +1259,15 @@ contract MidnightBundlesTest is BaseTest {
         address collateralToken = obligation.collateralParams[0].token;
         vm.startPrank(borrower);
         ERC20(collateralToken).approve(address(midnightBundles), 0);
-        ERC20(collateralToken).approve(midnightBundles.PERMIT2(), amount);
+        ERC20(collateralToken).approve(PERMIT2, amount);
         vm.stopPrank();
 
-        TokenPermit[] memory permits = new TokenPermit[](1);
-        permits[0] = _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1);
+        CollateralSupply[] memory supplies = new CollateralSupply[](1);
+        supplies[0] = CollateralSupply({
+            collateralIndex: 0,
+            assets: amount,
+            permit: _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1)
+        });
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndSellWithAssetsTarget(
             address(midnight),
@@ -1281,15 +1275,14 @@ contract MidnightBundlesTest is BaseTest {
             type(uint256).max,
             borrower,
             borrower,
-            takes,
             supplies,
+            takes,
             0,
-            address(0),
-            permits
+            address(0)
         );
 
         assertEq(ERC20(collateralToken).allowance(borrower, address(midnightBundles)), 0);
-        assertEq(ERC20(collateralToken).allowance(borrower, midnightBundles.PERMIT2()), 0);
+        assertEq(ERC20(collateralToken).allowance(borrower, PERMIT2), 0);
         assertEq(midnight.collateral(id, borrower, 0), amount);
         assertEq(loanToken.balanceOf(borrower), targetSellerAssets);
     }
@@ -1322,12 +1315,12 @@ contract MidnightBundlesTest is BaseTest {
             units,
             price - 1,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
     }
 
@@ -1356,11 +1349,10 @@ contract MidnightBundlesTest is BaseTest {
             minSellerAssets,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
     }
 
@@ -1390,12 +1382,12 @@ contract MidnightBundlesTest is BaseTest {
             units.mulDivUp(price, WAD),
             units + 2,
             lender,
+            _noPermit(),
             takes,
-            new CollateralTransfer[](0),
+            new CollateralWithdrawal[](0),
             address(0),
             0,
-            address(0),
-            _noPermit()
+            address(0)
         );
     }
 
@@ -1424,11 +1416,10 @@ contract MidnightBundlesTest is BaseTest {
             price + 1,
             borrower,
             borrower,
+            new CollateralSupply[](0),
             takes,
-            new CollateralTransfer[](0),
             0,
-            address(0),
-            new TokenPermit[](0)
+            address(0)
         );
     }
 }

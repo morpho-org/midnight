@@ -4,7 +4,14 @@ pragma solidity 0.8.34;
 
 import {IMidnight, Obligation} from "../interfaces/IMidnight.sol";
 import {IERC20} from "../interfaces/IERC20.sol";
-import {IMidnightBundles, Take, CollateralTransfer, TokenPermit, PermitKind} from "./interfaces/IMidnightBundles.sol";
+import {
+    IMidnightBundles,
+    Take,
+    CollateralWithdrawal,
+    CollateralSupply,
+    TokenPermit,
+    PermitKind
+} from "./interfaces/IMidnightBundles.sol";
 import {IERC20Permit} from "./interfaces/IERC20Permit.sol";
 import {IPermit2} from "./interfaces/IPermit2.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
@@ -14,9 +21,6 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
-
-    /// @dev Canonical Permit2 deployment address (same on every chain).
-    address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
@@ -30,19 +34,20 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetUnits,
         uint256 maxBuyerAssets,
         address taker,
+        TokenPermit memory loanTokenPermit,
         Take[] memory takes,
-        CollateralTransfer[] memory collateralWithdrawals,
+        CollateralWithdrawal[] memory collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
-        address referralFeeRecipient,
-        TokenPermit memory loanTokenPermit
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
-        _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
-        _pullToken(takes[0].offer.obligation.loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
+        _forceApproveMax(loanToken, midnight);
+        _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
@@ -50,16 +55,9 @@ contract MidnightBundles is IMidnightBundles {
             Take memory take_ = takes[i];
             require(!take_.offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
+            uint256 unitsToTake = UtilsLib.min(targetUnits - filledUnits, take_.units);
             try IMidnight(midnight)
-                .take(
-                    UtilsLib.min(targetUnits - filledUnits, take_.units),
-                    taker,
-                    address(0),
-                    "",
-                    address(0),
-                    take_.offer,
-                    take_.ratifierData
-                ) returns (
+                .take(unitsToTake, taker, address(0), "", address(0), take_.offer, take_.ratifierData) returns (
                 uint256 resBuyerAssets, uint256, uint256 resUnits
             ) {
                 filledUnits += resUnits;
@@ -82,7 +80,6 @@ contract MidnightBundles is IMidnightBundles {
         }
 
         uint256 referralFeeAssets = filledBuyerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
-        address loanToken = takes[0].offer.obligation.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
         SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - filledBuyerAssets - referralFeeAssets);
     }
@@ -100,22 +97,20 @@ contract MidnightBundles is IMidnightBundles {
         uint256 minSellerAssets,
         address taker,
         address receiver,
+        CollateralSupply[] memory collateralSupplies,
         Take[] memory takes,
-        CollateralTransfer[] memory collateralSupplies,
         uint256 referralFeePct,
-        address referralFeeRecipient,
-        TokenPermit[] memory collateralPermits
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        require(collateralPermits.length == collateralSupplies.length, InvalidPermitArrayLength());
         address loanToken = takes[0].offer.obligation.loanToken;
         bytes32 id = IMidnight(midnight).toId(takes[0].offer.obligation);
 
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralPermits[i]);
+            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralSupplies[i].permit);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -129,16 +124,9 @@ contract MidnightBundles is IMidnightBundles {
             Take memory take_ = takes[i];
             require(take_.offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(take_.offer.obligation) == id, InconsistentObligation());
+            uint256 unitsToTake = UtilsLib.min(targetUnits - filledUnits, take_.units);
             try IMidnight(midnight)
-                .take(
-                    UtilsLib.min(targetUnits - filledUnits, take_.units),
-                    taker,
-                    address(0),
-                    "",
-                    address(this),
-                    take_.offer,
-                    take_.ratifierData
-                ) returns (
+                .take(unitsToTake, taker, address(0), "", address(this), take_.offer, take_.ratifierData) returns (
                 uint256, uint256 resSellerAssets, uint256 resUnits
             ) {
                 filledUnits += resUnits;
@@ -166,12 +154,12 @@ contract MidnightBundles is IMidnightBundles {
         uint256 targetBuyerAssets,
         uint256 minUnits,
         address taker,
+        TokenPermit memory loanTokenPermit,
         Take[] memory takes,
-        CollateralTransfer[] memory collateralWithdrawals,
+        CollateralWithdrawal[] memory collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
-        address referralFeeRecipient,
-        TokenPermit memory loanTokenPermit
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -238,15 +226,13 @@ contract MidnightBundles is IMidnightBundles {
         uint256 maxUnits,
         address taker,
         address receiver,
+        CollateralSupply[] memory collateralSupplies,
         Take[] memory takes,
-        CollateralTransfer[] memory collateralSupplies,
         uint256 referralFeePct,
-        address referralFeeRecipient,
-        TokenPermit[] memory collateralPermits
+        address referralFeeRecipient
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-        require(collateralPermits.length == collateralSupplies.length, InvalidPermitArrayLength());
         address loanToken = takes[0].offer.obligation.loanToken;
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
@@ -254,7 +240,7 @@ contract MidnightBundles is IMidnightBundles {
         Obligation memory obligation = takes[0].offer.obligation;
         for (uint256 i; i < collateralSupplies.length; i++) {
             address token = obligation.collateralParams[collateralSupplies[i].collateralIndex].token;
-            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralPermits[i]);
+            _pullToken(token, msg.sender, collateralSupplies[i].assets, collateralSupplies[i].permit);
             _forceApproveMax(token, midnight);
             IMidnight(midnight)
                 .supplyCollateral(
@@ -303,11 +289,11 @@ contract MidnightBundles is IMidnightBundles {
         Obligation memory obligation,
         uint256 assets,
         address onBehalf,
-        CollateralTransfer[] memory collateralWithdrawals,
+        TokenPermit memory loanTokenPermit,
+        CollateralWithdrawal[] memory collateralWithdrawals,
         address collateralReceiver,
         uint256 referralFeePct,
-        address referralFeeRecipient,
-        TokenPermit memory loanTokenPermit
+        address referralFeeRecipient
     ) external {
         require(onBehalf == msg.sender || IMidnight(midnight).isAuthorized(onBehalf, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
@@ -361,9 +347,9 @@ contract MidnightBundles is IMidnightBundles {
             try IERC20Permit(token).permit(from, address(this), amount, deadline, v, r, s) {} catch {}
             SafeTransferLib.safeTransferFrom(token, from, address(this), amount);
         } else if (permit.kind == PermitKind.Permit2) {
-            (uint256 nonce, uint256 deadline, bytes memory signature) =
-                abi.decode(permit.data, (uint256, uint256, bytes));
-            IPermit2(PERMIT2)
+            (address permit2, uint256 nonce, uint256 deadline, bytes memory signature) =
+                abi.decode(permit.data, (address, uint256, uint256, bytes));
+            IPermit2(permit2)
                 .permitTransferFrom(
                     IPermit2.PermitTransferFrom(IPermit2.TokenPermissions(token, amount), nonce, deadline),
                     IPermit2.SignatureTransferDetails(address(this), amount),

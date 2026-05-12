@@ -10,11 +10,6 @@ struct Take {
     bytes ratifierData;
 }
 
-struct CollateralTransfer {
-    uint256 collateralIndex;
-    uint256 assets;
-}
-
 enum PermitKind {
     None,
     ERC2612,
@@ -26,11 +21,21 @@ struct TokenPermit {
     bytes data;
 }
 
+struct CollateralWithdrawal {
+    uint256 collateralIndex;
+    uint256 assets;
+}
+
+struct CollateralSupply {
+    uint256 collateralIndex;
+    uint256 assets;
+    TokenPermit permit;
+}
+
 interface IMidnightBundles {
     /// ERRORS ///
     error InconsistentObligation();
     error InconsistentSide();
-    error InvalidPermitArrayLength();
     error OutOfOffers();
     error PctExceeded();
     error SellerAssetsTooLow();
@@ -40,10 +45,10 @@ interface IMidnightBundles {
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
-    function buyWithUnitsTargetAndWithdrawCollateral(address midnight, uint256 targetUnits, uint256 maxBuyerAssets, address taker, Take[] memory takes, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient, TokenPermit memory loanTokenPermit) external;
-    function supplyCollateralAndSellWithUnitsTarget(address midnight, uint256 targetUnits, uint256 minSellerAssets, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient, TokenPermit[] memory collateralPermits) external;
-    function buyWithAssetsTargetAndWithdrawCollateral(address midnight, uint256 targetBuyerAssets, uint256 minUnits, address taker, Take[] memory takes, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient, TokenPermit memory loanTokenPermit) external;
-    function supplyCollateralAndSellWithAssetsTarget(address midnight, uint256 targetSellerAssets, uint256 maxUnits, address taker, address receiverIfTakerIsSeller, Take[] memory takes, CollateralTransfer[] memory collateralSupplies, uint256 referralFeePct, address referralFeeRecipient, TokenPermit[] memory collateralPermits) external;
-    function repayAndWithdrawCollateral(address midnight, Obligation memory obligation, uint256 assets, address onBehalf, CollateralTransfer[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient, TokenPermit memory loanTokenPermit) external;
+    function buyWithUnitsTargetAndWithdrawCollateral(address midnight, uint256 targetUnits, uint256 maxBuyerAssets, address taker, TokenPermit memory loanTokenPermit, Take[] memory takes, CollateralWithdrawal[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient) external;
+    function supplyCollateralAndSellWithUnitsTarget(address midnight, uint256 targetUnits, uint256 minSellerAssets, address taker, address receiverIfTakerIsSeller, CollateralSupply[] memory collateralSupplies, Take[] memory takes, uint256 referralFeePct, address referralFeeRecipient) external;
+    function buyWithAssetsTargetAndWithdrawCollateral(address midnight, uint256 targetBuyerAssets, uint256 minUnits, address taker, TokenPermit memory loanTokenPermit, Take[] memory takes, CollateralWithdrawal[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient) external;
+    function supplyCollateralAndSellWithAssetsTarget(address midnight, uint256 targetSellerAssets, uint256 maxUnits, address taker, address receiverIfTakerIsSeller, CollateralSupply[] memory collateralSupplies, Take[] memory takes, uint256 referralFeePct, address referralFeeRecipient) external;
+    function repayAndWithdrawCollateral(address midnight, Obligation memory obligation, uint256 assets, address onBehalf, TokenPermit memory loanTokenPermit, CollateralWithdrawal[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient) external;
     // forgefmt: disable-end
 }
