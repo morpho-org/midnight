@@ -48,6 +48,12 @@ library UtilsLib {
         return uint128(x);
     }
 
+    function toUint120(uint256 x) internal pure returns (uint120) {
+        require(x <= type(uint120).max, CastOverflow());
+        // forge-lint: disable-next-item(unsafe-typecast) as x is less than type(uint120).max
+        return uint120(x);
+    }
+
     function countBits(uint128 x) internal pure returns (uint256) {
         unchecked {
             x = x - ((x >> 1) & 0x55555555555555555555555555555555);

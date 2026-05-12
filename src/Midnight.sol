@@ -326,7 +326,7 @@ contract Midnight is IMidnight {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
-        require(_obligationState.lossFactor < type(uint128).max, ObligationLossFactorMaxedOut());
+        require(_obligationState.lossFactor < type(uint120).max, ObligationLossFactorMaxedOut());
         require(
             UtilsLib.atMostOneNonZero(offer.maxSellerAssets, offer.maxBuyerAssets, offer.maxUnits), MultipleNonZero()
         );
@@ -607,14 +607,14 @@ contract Midnight is IMidnight {
             _position.debt -= uint128(badDebt);
             uint256 _totalUnits = _obligationState.totalUnits;
             uint256 _lossFactor = _obligationState.lossFactor;
-            _obligationState.lossFactor = UtilsLib.toUint128(
-                type(uint128).max - (type(uint128).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
+            _obligationState.lossFactor = UtilsLib.toUint120(
+                type(uint120).max - (type(uint120).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
             );
             _obligationState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _obligationState.continuousFeeCredit = _lossFactor < type(uint128).max
+            _obligationState.continuousFeeCredit = _lossFactor < type(uint120).max
                 ? UtilsLib.toUint128(
                     _obligationState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _obligationState.lossFactor, type(uint128).max - _lossFactor)
+                        .mulDivDown(type(uint120).max - _obligationState.lossFactor, type(uint120).max - _lossFactor)
                 )
                 : 0;
         }
@@ -777,9 +777,9 @@ contract Midnight is IMidnight {
     {
         Position storage _position = position[id][user];
         uint128 credit = _position.credit;
-        uint128 _lastLossFactor = _position.lastLossFactor;
-        uint256 postSlashCredit = _lastLossFactor < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - obligationState[id].lossFactor, type(uint128).max - _lastLossFactor)
+        uint120 _lastLossFactor = _position.lastLossFactor;
+        uint256 postSlashCredit = _lastLossFactor < type(uint120).max
+            ? credit.mulDivDown(type(uint120).max - obligationState[id].lossFactor, type(uint120).max - _lastLossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPending = credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
@@ -831,7 +831,7 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
+    function lastLossFactor(bytes32 id, address user) external view returns (uint120) {
         return position[id][user].lastLossFactor;
     }
 
@@ -867,7 +867,7 @@ contract Midnight is IMidnight {
         return obligationState[id].totalUnits;
     }
 
-    function lossFactor(bytes32 id) external view returns (uint128) {
+    function lossFactor(bytes32 id) external view returns (uint120) {
         return obligationState[id].lossFactor;
     }
 

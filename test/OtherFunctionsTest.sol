@@ -657,7 +657,7 @@ contract OtherFunctionsTest is BaseTest {
 
         (
             uint128 totalUnits,
-            uint128 _lossFactor,
+            uint120 _lossFactor,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
             uint256 _claimableTradingFee,

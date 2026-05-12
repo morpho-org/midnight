@@ -297,7 +297,12 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
+        assertApproxEqAbs(
+            midnight.creditOf(id, lender),
+            units - expectedBadDebt,
+            units / type(uint120).max + 1,
+            "lender units after slashing"
+        );
     }
 
     function testLiquidateEmitsLossFactor(uint256 units) public {
@@ -311,8 +316,8 @@ contract LiquidationTest is BaseTest {
         uint256 previousLossFactor = midnight.lossFactor(id);
         uint256 expectedLossFactor = expectedBadDebt == 0
             ? previousLossFactor
-            : type(uint128).max
-                - (type(uint128).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+            : type(uint120).max
+                - (type(uint120).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -339,7 +344,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(obligation, 0, 0, 0, borrower, address(this), address(0), "");
 
         uint256 lossFactor = midnight.lossFactor(id);
-        uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossFactor, type(uint128).max);
+        uint256 expectedCredit = units.mulDivDown(type(uint120).max - lossFactor, type(uint120).max);
 
         vm.expectEmit(true, true, false, true);
         emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
@@ -364,7 +369,12 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
+        assertApproxEqAbs(
+            midnight.creditOf(id, lender),
+            debtAfterBadDebt,
+            units / type(uint120).max + 1,
+            "lender units after slashing"
+        );
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -386,7 +396,12 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
         assertEq(midnight.creditOf(id, lender), units, "lender units");
         midnight.updatePosition(obligation, lender);
-        assertApproxEqAbs(midnight.creditOf(id, lender), debtAfterBadDebt, 1, "lender units after slashing");
+        assertApproxEqAbs(
+            midnight.creditOf(id, lender),
+            debtAfterBadDebt,
+            units / type(uint120).max + 1,
+            "lender units after slashing"
+        );
     }
 
     // Check that if there is bad debt it is possible to seize almost all collateral.
@@ -762,7 +777,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        uint128 oblLossFactor = midnight.lossFactor(id);
+        uint120 oblLossFactor = midnight.lossFactor(id);
         assertGt(oblLossFactor, midnight.lastLossFactor(id, borrower), "last loss factor stale before");
 
         midnight.updatePosition(obligation, borrower);
@@ -783,7 +798,7 @@ contract LiquidationTest is BaseTest {
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
         midnight.updatePosition(obligation, lender);
         uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
-        uint128 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
+        uint120 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
         assertLt(creditAfterFirstSlash, creditBeforeSlash, "first slash reduced credit");
 
         midnight.updatePosition(obligation, lender);
@@ -804,8 +819,8 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        uint128 _lossFactor = midnight.lossFactor(id);
-        assertEq(_lossFactor, type(uint128).max, "loss factor");
+        uint120 _lossFactor = midnight.lossFactor(id);
+        assertEq(_lossFactor, type(uint120).max, "loss factor");
         midnight.updatePosition(obligation, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
 
