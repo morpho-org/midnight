@@ -2,30 +2,13 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
-import {
-    COLLATERAL_PARAMS_TYPE,
-    COLLATERAL_PARAMS_TYPEHASH,
-    OBLIGATION_TYPE,
-    OBLIGATION_TYPEHASH,
-    OFFER_TYPE,
-    OFFER_TYPEHASH
-} from "./ConstantsLib.sol";
-
 library UtilsLib {
     error CastOverflow();
 
-    /// @dev Returns true if at most one of `x` and `y` is nonzero.
+    /// @dev Returns true if at most one of x and y is nonzero.
     function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
         assembly {
             z := or(iszero(x), iszero(y))
-        }
-    }
-
-    /// @dev Returns true if at most one of `x`, `y`, and `z` is nonzero.
-    function atMostOneNonZero(uint256 x, uint256 y, uint256 z) internal pure returns (bool r) {
-        assembly {
-            r := gt(add(add(iszero(x), iszero(y)), iszero(z)), 1)
         }
     }
 
@@ -42,106 +25,14 @@ library UtilsLib {
         }
     }
 
-    /// @dev Returns (`x` * `y`) / `d` rounded down.
+    /// @dev Returns (x * y) / d rounded down.
     function mulDivDown(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y) / d;
     }
 
-    /// @dev Returns (`x` * `y`) / `d` rounded up.
+    /// @dev Returns (x * y) / d rounded up.
     function mulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y + (d - 1)) / d;
-    }
-
-    function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
-        bytes memory offerTreeType = "OfferTree(Offer";
-        for (uint256 i = 0; i < height; i++) {
-            offerTreeType = bytes.concat(offerTreeType, "[2]");
-        }
-        offerTreeType = bytes.concat(offerTreeType, " offerTree)");
-        return keccak256(bytes.concat(offerTreeType, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, OFFER_TYPE));
-    }
-
-    /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
-    /// @dev Hash sorts the inputs lexicographically.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
-        bytes32 currentHash = leafHash;
-        for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = commutativeHash(currentHash, proof[i]);
-        }
-        return currentHash == root;
-    }
-
-    /// @dev Returns the keccak256 hash of the sorted concatenation of `a` and `b`.
-    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
-        if (a > b) (a, b) = (b, a);
-        assembly ("memory-safe") {
-            mstore(0x00, a)
-            mstore(0x20, b)
-            value := keccak256(0x00, 0x40)
-        }
-    }
-
-    /// @dev Computes the EIP-712 hash struct of a CollateralParams.
-    function hashCollateralParams(CollateralParams memory collateralParams) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                COLLATERAL_PARAMS_TYPEHASH,
-                collateralParams.token,
-                collateralParams.lltv,
-                collateralParams.maxLif,
-                collateralParams.oracle
-            )
-        );
-    }
-
-    /// @dev Computes the EIP-712 hash struct of an Obligation.
-    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
-        bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
-        for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
-            collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
-        }
-
-        return keccak256(
-            abi.encode(
-                OBLIGATION_TYPEHASH,
-                obligation.loanToken,
-                keccak256(abi.encodePacked(collateralParamsHashes)),
-                obligation.maturity,
-                obligation.rcfThreshold,
-                obligation.enterGate,
-                obligation.liquidatorGate
-            )
-        );
-    }
-
-    /// @dev Computes the EIP-712 hash struct of an Offer.
-    /// @dev Split into two `abi.encode`s to avoid stack-too-deep under via-ir without optimizer.
-    function hashOffer(Offer memory offer) internal pure returns (bytes32) {
-        return keccak256(
-            bytes.concat(
-                abi.encode(
-                    OFFER_TYPEHASH,
-                    hashObligation(offer.obligation),
-                    offer.buy,
-                    offer.maker,
-                    offer.start,
-                    offer.expiry,
-                    offer.tick,
-                    offer.group,
-                    offer.session
-                ),
-                abi.encode(
-                    offer.callback,
-                    keccak256(offer.callbackData),
-                    offer.receiverIfMakerIsSeller,
-                    offer.ratifier,
-                    offer.reduceOnly,
-                    offer.maxUnits,
-                    offer.maxSellerAssets,
-                    offer.maxBuyerAssets
-                )
-            )
-        );
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
@@ -159,26 +50,26 @@ library UtilsLib {
         }
     }
 
-    /// @dev Assumes `bitmap` is not zero.
+    /// @dev Assumes bitmap is not zero.
     function msb(uint128 bitmap) internal pure returns (uint256 res) {
         assembly {
             res := sub(255, clz(bitmap))
         }
     }
 
-    /// @dev Assumes `bit` is less than 128.
+    /// @dev Assumes bit is less than 128.
     function setBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast) as bit < 128
         return uint128(bitmap | (1 << bit));
     }
 
-    /// @dev Assumes `bit` is less than 128.
+    /// @dev Assumes bit is less than 128.
     function clearBit(uint128 bitmap, uint256 bit) internal pure returns (uint128) {
         // forge-lint: disable-next-item(unsafe-typecast)
         return uint128(bitmap & ~(1 << bit));
     }
 
-    /// @dev Sets a boolean in transient storage keyed by a `(bytes32, address)` pair.
+    /// @dev Sets a boolean in transient storage keyed by a (bytes32, address) pair.
     /// @dev Returns the previous value at the written slot.
     function tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool previous) {
         uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
@@ -188,7 +79,7 @@ library UtilsLib {
         }
     }
 
-    /// @dev Gets a boolean from transient storage keyed by a `(bytes32, address)` pair.
+    /// @dev Gets a boolean from transient storage keyed by a (bytes32, address) pair.
     function tGet(uint256 baseSlot, bytes32 key1, address key2) internal view returns (bool value) {
         uint256 slot = uint256(keccak256(abi.encode(key1, key2, baseSlot)));
         assembly ("memory-safe") {

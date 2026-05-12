@@ -6,6 +6,7 @@ import {IRatifier} from "../../interfaces/IRatifier.sol";
 
 interface ISetterRatifier is IRatifier {
     /// ERRORS ///
+    error InvalidProof();
     error Unauthorized();
     error NotMidnight();
     error NotRatified();
@@ -18,5 +19,5 @@ interface ISetterRatifier is IRatifier {
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
-    function isRatified(address maker, bytes32 root) external view returns (bool);
+    function isRootRatified(address maker, bytes32 root) external view returns (bool);
 }

@@ -4,7 +4,7 @@
 //
 // All other Solidity divisions in the codebase use non-zero denominators:
 // - tradingFee: divides by (end - start), always a positive constant from the breakpoint table.
-// - setObligationTradingFee / setDefaultTradingFee: divide by FEE_STEP (1e12).
+// - setObligationTradingFee / setDefaultTradingFee: divide by CBP (1e12).
 // - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
@@ -21,9 +21,7 @@ methods {
     // Summary for deterministic toId for the global obligation.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
 
-    // Those functions are checked manually to not cause a division by zero.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    // This function is checked manually to not cause a division by zero.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     // Hook on mulDivDown and mulDivUp to check that the denominator is not zero, and add the necessary lemmas.
@@ -59,14 +57,9 @@ persistent ghost bytes32 globalId;
 
 /// HOOKS ///
 
-// lossIndex < max: the protocol stop behaving correctly if this happens (documented).
-hook Sload uint128 value obligationState[KEY bytes32 id].lossIndex {
-    require value < max_uint128;
-}
-
-// Follows from userLossIndexLeqObligationLossIndex in Midnight.spec and the hook above.
-hook Sload uint128 value position[KEY bytes32 id][KEY address user].lossIndex {
-    require value < max_uint128;
+// Follows from lastLossFactorLeqObligationLossFactor in Midnight.spec.
+hook Sload uint128 value position[KEY bytes32 id][KEY address user].lastLossFactor {
+    require value <= currentContract.obligationState[id].lossFactor;
 }
 
 /// SUMMARIES ///
