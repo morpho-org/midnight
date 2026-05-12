@@ -238,9 +238,9 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
-        uint16[7] memory fees = midnight.tradingFees(_id);
+        uint16[7] memory fees = midnight.tradingFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {
-            assertEq(fees[i], midnight.defaultTradingFees(_obligation.loanToken, i), "fees");
+            assertEq(fees[i], midnight.defaultTradingFeeCbp(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
         }
         assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
@@ -673,13 +673,13 @@ contract OtherFunctionsTest is BaseTest {
             uint128 _lossFactor,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
-            uint16 tradingFee0,
-            uint16 tradingFee1,
-            uint16 tradingFee2,
-            uint16 tradingFee3,
-            uint16 tradingFee4,
-            uint16 tradingFee5,
-            uint16 tradingFee6,
+            uint16 tradingFeeCbp0,
+            uint16 tradingFeeCbp1,
+            uint16 tradingFeeCbp2,
+            uint16 tradingFeeCbp3,
+            uint16 tradingFeeCbp4,
+            uint16 tradingFeeCbp5,
+            uint16 tradingFeeCbp6,
             uint32 _continuousFee,
             bool created
         ) = midnight.obligationState(_id);
@@ -690,13 +690,13 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_withdrawable, 0, "withdrawable");
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
-        assertEq(tradingFee0, midnight.defaultTradingFees(_obligation.loanToken, 0), "tradingFee0");
-        assertEq(tradingFee1, midnight.defaultTradingFees(_obligation.loanToken, 1), "tradingFee1");
-        assertEq(tradingFee2, midnight.defaultTradingFees(_obligation.loanToken, 2), "tradingFee2");
-        assertEq(tradingFee3, midnight.defaultTradingFees(_obligation.loanToken, 3), "tradingFee3");
-        assertEq(tradingFee4, midnight.defaultTradingFees(_obligation.loanToken, 4), "tradingFee4");
-        assertEq(tradingFee5, midnight.defaultTradingFees(_obligation.loanToken, 5), "tradingFee5");
-        assertEq(tradingFee6, midnight.defaultTradingFees(_obligation.loanToken, 6), "tradingFee6");
+        assertEq(tradingFeeCbp0, midnight.defaultTradingFeeCbp(_obligation.loanToken, 0), "tradingFeeCbp0");
+        assertEq(tradingFeeCbp1, midnight.defaultTradingFeeCbp(_obligation.loanToken, 1), "tradingFeeCbp1");
+        assertEq(tradingFeeCbp2, midnight.defaultTradingFeeCbp(_obligation.loanToken, 2), "tradingFeeCbp2");
+        assertEq(tradingFeeCbp3, midnight.defaultTradingFeeCbp(_obligation.loanToken, 3), "tradingFeeCbp3");
+        assertEq(tradingFeeCbp4, midnight.defaultTradingFeeCbp(_obligation.loanToken, 4), "tradingFeeCbp4");
+        assertEq(tradingFeeCbp5, midnight.defaultTradingFeeCbp(_obligation.loanToken, 5), "tradingFeeCbp5");
+        assertEq(tradingFeeCbp6, midnight.defaultTradingFeeCbp(_obligation.loanToken, 6), "tradingFeeCbp6");
     }
 
     function testObligationStateAfterTrade() public {

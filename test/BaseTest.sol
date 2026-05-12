@@ -12,7 +12,6 @@ import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
-import {MerkleLib} from "../src/ratifiers/MerkleLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -242,7 +241,7 @@ abstract contract BaseTest is Test {
     function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = HashLib.hashOffer(offers[1]);
-        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _path;
     }
 
@@ -250,7 +249,7 @@ abstract contract BaseTest is Test {
     function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = HashLib.hashOffer(offers[0]);
-        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _path;
     }
 
@@ -258,7 +257,7 @@ abstract contract BaseTest is Test {
     function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = HashLib.hashOffer(offers[3]);
-        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _path;
     }
 
@@ -266,7 +265,7 @@ abstract contract BaseTest is Test {
     function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _path = new bytes32[](2);
         _path[0] = HashLib.hashOffer(offers[2]);
-        _path[1] = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _path;
     }
 
@@ -279,13 +278,13 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
     }
 
     function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = MerkleLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        bytes32 right = MerkleLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return MerkleLib.commutativeHash(left, right);
+        bytes32 left = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        bytes32 right = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return HashLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -297,7 +296,7 @@ abstract contract BaseTest is Test {
         view
         returns (Signature memory)
     {
-        bytes32 structHash = keccak256(abi.encode(MerkleLib.offerTreeTypeHash(height), _root));
+        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
         Signature memory _signature;
         (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
