@@ -238,7 +238,7 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchObligation(_obligation);
         assertEq(midnight.obligationCreated(_id), true, "obligation created");
-        uint16[7] memory fees = midnight.tradingFeeCbp(_id);
+        uint16[7] memory fees = midnight.tradingFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {
             assertEq(fees[i], midnight.defaultTradingFeeCbp(_obligation.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");

@@ -171,7 +171,7 @@ interface IMidnight {
     function lossFactor(bytes32 id) external view returns (uint128);
     function obligationCreated(bytes32 id) external view returns (bool);
     function withdrawable(bytes32 id) external view returns (uint256);
-    function tradingFeeCbp(bytes32 id) external view returns (uint16[7] memory);
+    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
     function continuousFeeCredit(bytes32 id) external view returns (uint256);
     function pendingFee(bytes32 id, address user) external view returns (uint128);

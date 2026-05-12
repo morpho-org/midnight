@@ -880,7 +880,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev The trading fee cbp values are 0 until the obligation is created, then set to the default value.
-    function tradingFeeCbp(bytes32 id) external view returns (uint16[7] memory) {
+    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
         return [
             obligationState[id].tradingFeeCbp0,
             obligationState[id].tradingFeeCbp1,
