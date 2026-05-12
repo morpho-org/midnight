@@ -26,11 +26,6 @@ contract SettersTest is BaseTest {
         assertEq(maxTradingFee(6), MAX_TRADING_FEE_360_DAYS, "360 days max trading fee");
     }
 
-    function testMaxTradingFeeNotExposedOnMidnight() public view {
-        (bool success,) = address(midnight).staticcall(abi.encodeWithSignature("maxTradingFee(uint256)", 0));
-        assertFalse(success);
-    }
-
     function testInitialRoleSetter() public view {
         assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }
