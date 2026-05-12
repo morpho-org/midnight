@@ -33,7 +33,7 @@ struct Offer {
     address ratifier;
     bool reduceOnly;
     uint256 maxUnits;
-    uint256 maxAssets;
+    uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
 }
 
 /// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
