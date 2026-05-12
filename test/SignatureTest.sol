@@ -30,14 +30,16 @@ contract SignatureTest is BaseTest {
         Offer memory offer;
         offer.maker = maker;
         bytes32 root = HashLib.hashOffer(offer);
+        bytes32 _session = midnight.session(maker);
 
-        Signature memory signature = signature(root, privateKey, address(ecrecoverRatifier), 0);
+        Signature memory signature = signature(root, privateKey, address(ecrecoverRatifier), 0, _session);
 
         vm.prank(maker);
         midnight.setIsAuthorized(maker, address(ecrecoverRatifier), true);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offer, abi.encode(signature, uint256(0), root, new bytes32[](0)));
+        bytes32 result =
+            ecrecoverRatifier.isRatified(offer, abi.encode(signature, uint256(0), root, new bytes32[](0), _session));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -47,9 +49,10 @@ contract SignatureTest is BaseTest {
         bytes32 root = HashLib.hashOffer(offer);
 
         Signature memory badSig;
+        bytes32 _session = midnight.session(borrower);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
-        ecrecoverRatifier.isRatified(offer, abi.encode(badSig, uint256(0), root, new bytes32[](0)));
+        ecrecoverRatifier.isRatified(offer, abi.encode(badSig, uint256(0), root, new bytes32[](0), _session));
     }
 }

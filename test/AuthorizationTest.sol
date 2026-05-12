@@ -212,9 +212,10 @@ contract AuthorizationTest is BaseTest {
 
         // Attacker tries to take on behalf of taker
         address attacker = makeAddr("attacker");
+        bytes memory ratifierData = merkleRatifierData([offer]);
         vm.prank(attacker);
         vm.expectRevert(IMidnight.TakerUnauthorized.selector);
-        midnight.take(units, taker, address(0), hex"", address(0), offer, merkleRatifierData([offer]));
+        midnight.take(units, taker, address(0), hex"", address(0), offer, ratifierData);
     }
 
     function testTakeAuthorized() public {
@@ -239,8 +240,9 @@ contract AuthorizationTest is BaseTest {
         midnight.setIsAuthorized(taker, operator, true);
 
         // Operator can take on behalf of taker
+        bytes memory ratifierData = merkleRatifierData([offer]);
         vm.prank(operator);
-        midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        midnight.take(units, taker, address(0), hex"", taker, offer, ratifierData);
 
         assertEq(midnight.debtOf(id, taker), units);
     }

@@ -11,7 +11,7 @@ import {HashLib} from "./HashLib.sol";
 /// no longer valid.
 /// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers.
 /// To that end, it expects the ratifier data to contain the signature, the height of the offer in the tree,
-/// the root of the tree, and the proof of the offer in the tree.
+/// the root of the tree, the proof of the offer in the tree, and the maker session signed with the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
 /// @dev the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
@@ -25,10 +25,11 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
 
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
-        (Signature memory sig, uint256 height, bytes32 root, bytes32[] memory proof) =
-            abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[]));
+        (Signature memory sig, uint256 height, bytes32 root, bytes32[] memory proof, bytes32 _session) =
+            abi.decode(ratifierData, (Signature, uint256, bytes32, bytes32[], bytes32));
+        require(_session == IMidnight(MIDNIGHT).session(offer.maker), InvalidSession());
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), proof), InvalidProof());
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), root));
+        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeWithSessionTypeHash(height), _session, root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);

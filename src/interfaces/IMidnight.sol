@@ -26,7 +26,6 @@ struct Offer {
     uint256 expiry;
     uint256 tick;
     bytes32 group;
-    bytes32 session;
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
@@ -81,7 +80,6 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
-    error InvalidSession();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();

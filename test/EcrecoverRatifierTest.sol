@@ -10,8 +10,12 @@ import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverRatifierTest is BaseTest {
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
-        Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
-        return abi.encode(sig, uint256(0), _root, new bytes32[](0));
+        return buildRatifierData(_root, _signer, bytes32(0));
+    }
+
+    function buildRatifierData(bytes32 _root, address _signer, bytes32 _session) internal view returns (bytes memory) {
+        Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0, _session);
+        return abi.encode(sig, uint256(0), _root, new bytes32[](0), _session);
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -67,7 +71,11 @@ contract EcrecoverRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), uint256(0), _root, new bytes32[](0)
+            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}),
+            uint256(0),
+            _root,
+            new bytes32[](0),
+            midnight.session(lender)
         );
 
         vm.prank(address(midnight));
@@ -82,6 +90,33 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
+    }
+
+    function testIsRatifiedCurrentSessionAfterShuffle() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+
+        vm.prank(lender);
+        midnight.shuffleSession(lender);
+
+        bytes memory ratifierData = buildRatifierData(_root, lender, midnight.session(lender));
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
+        assertEq(result, CALLBACK_SUCCESS);
+    }
+
+    function testIsRatifiedStaleSessionReverts() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+        bytes memory ratifierData = buildRatifierData(_root, lender, midnight.session(lender));
+
+        vm.prank(lender);
+        midnight.shuffleSession(lender);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IEcrecoverRatifier.InvalidSession.selector);
         ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 

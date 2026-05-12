@@ -25,7 +25,6 @@ contract HashLibTest is Test {
                 offer.expiry,
                 offer.tick,
                 offer.group,
-                offer.session,
                 offer.callback,
                 keccak256(offer.callbackData),
                 offer.receiverIfMakerIsSeller,
@@ -109,10 +108,35 @@ contract HashLibTest is Test {
         }
     }
 
+    function testOfferTreeWithSessionTypeHashes() public pure {
+        for (uint256 height = 0; height <= 20; height++) {
+            assertEq(
+                HashLib.offerTreeWithSessionTypeHash(height),
+                keccak256(
+                    bytes.concat(
+                        "OfferTree(bytes32 session,Offer",
+                        bytes(repeat("[2]", height)),
+                        " offerTree)",
+                        COLLATERAL_PARAMS_TYPE,
+                        OBLIGATION_TYPE,
+                        OFFER_TYPE
+                    )
+                )
+            );
+        }
+    }
+
     /// forge-config: default.allow_internal_expect_revert = true
     function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
         height = bound(height, 21, type(uint256).max);
         vm.expectRevert(HashLib.TreeTooHigh.selector);
         HashLib.offerTreeTypeHash(height);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testOfferTreeWithSessionTypeHashInvalidHeight(uint256 height) public {
+        height = bound(height, 21, type(uint256).max);
+        vm.expectRevert(HashLib.TreeTooHigh.selector);
+        HashLib.offerTreeWithSessionTypeHash(height);
     }
 }
