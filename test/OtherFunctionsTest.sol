@@ -422,6 +422,19 @@ contract OtherFunctionsTest is BaseTest {
         midnight.touchObligation(_obligation);
     }
 
+    function testExactMaxCollaterals() public {
+        Obligation memory _obligation = _createMultiCollateralObligation(MAX_COLLATERALS);
+
+        bytes32 _id = midnight.touchObligation(_obligation);
+        address sstore2Address = address(uint160(uint256(_id)));
+        Obligation memory obligationFromId = midnight.toObligation(_id);
+
+        assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        assertEq(sstore2Address.code.length, abi.encode(_obligation).length, "stored obligation code size");
+        assertLt(sstore2Address.code.length, 24_576, "stored obligation code size below EIP-170 limit");
+        assertEq(obligationFromId.collateralParams.length, MAX_COLLATERALS, "collateralParams length");
+    }
+
     function testCollateralsNotSorted() public {
         Obligation memory _obligation;
         _obligation.loanToken = address(loanToken);
