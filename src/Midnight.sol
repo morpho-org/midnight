@@ -14,7 +14,7 @@ import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from "./interfaces/IMidnight.sol";
 
-/// OBLIGATIONS
+/// MARKETS
 /// @dev The maximum time to maturity is 100 years.
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
