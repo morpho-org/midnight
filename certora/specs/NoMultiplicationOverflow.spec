@@ -140,12 +140,7 @@ function resetOraclePriceAssumption() {
 
 // Normal calls intentionally scope this proof to non-reverting executions.
 // Exclude liquidate (dedicated input bound) and view functions with arbitrary ids.
-rule noMultiplicationOverflow(method f, env e, calldataarg args)
-filtered {
-    f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
-        && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector
-        && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector
-} {
+rule noMultiplicationOverflow(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector } {
     resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
     f(e, args);
