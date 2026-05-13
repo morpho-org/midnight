@@ -86,7 +86,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-
+///
 /// OFFER CAPS
 /// @dev Offers can only cap units or assets, not both.
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
