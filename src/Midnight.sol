@@ -26,7 +26,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 ///
 /// MULTI-COLLATERAL MARKETS
-/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
+/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
 /// particular, the borrowers of multicollat markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
 /// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
