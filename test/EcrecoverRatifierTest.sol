@@ -85,6 +85,65 @@ contract EcrecoverRatifierTest is BaseTest {
         ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
+    function testCancelRootMaker() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+        bytes memory ratifierData = buildRatifierData(_root, lender);
+
+        vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
+        emit IEcrecoverRatifier.CancelRoot(lender, _root);
+        vm.prank(lender);
+        ecrecoverRatifier.cancelRoot(lender, _root);
+
+        assertTrue(ecrecoverRatifier.isRootCanceled(lender, _root));
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IEcrecoverRatifier.RootCanceled.selector);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
+    }
+
+    function testCancelRootAuthorizedOnBehalf() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+        bytes memory ratifierData = buildRatifierData(_root, lender);
+
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, borrower, true);
+
+        vm.prank(borrower);
+        ecrecoverRatifier.cancelRoot(lender, _root);
+
+        assertTrue(ecrecoverRatifier.isRootCanceled(lender, _root));
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IEcrecoverRatifier.RootCanceled.selector);
+        ecrecoverRatifier.isRatified(offer, ratifierData);
+    }
+
+    function testCancelRootUnauthorizedOnBehalf() public {
+        bytes32 _root = keccak256("root");
+
+        vm.prank(borrower);
+        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
+        ecrecoverRatifier.cancelRoot(lender, _root);
+    }
+
+    function testCancelRootForAnotherMakerDoesNotInvalidate() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+        bytes memory ratifierData = buildRatifierData(_root, lender);
+
+        vm.prank(borrower);
+        ecrecoverRatifier.cancelRoot(borrower, _root);
+
+        assertFalse(ecrecoverRatifier.isRootCanceled(lender, _root));
+        assertTrue(ecrecoverRatifier.isRootCanceled(borrower, _root));
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
+        assertEq(result, CALLBACK_SUCCESS);
+    }
+
     function testIsRatifiedRevokeAuthorizationInvalidates() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
