@@ -287,22 +287,6 @@ contract AuthorizationTest is BaseTest {
         assertEq(midnight.consumed(user, bytes32(0)), 100);
     }
 
-    function testShuffleSessionAuthorization(address user, address authorized) public {
-        vm.assume(user != authorized);
-
-        vm.prank(authorized);
-        vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.shuffleSession(user);
-
-        vm.prank(user);
-        midnight.setIsAuthorized(user, authorized, true);
-
-        vm.prank(authorized);
-        midnight.shuffleSession(user);
-
-        assertEq(midnight.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))));
-    }
-
     function testSetIsAuthorizedAuthorization(address user, address authorized, address newAuthorized) public {
         vm.assume(user != authorized);
 

@@ -26,7 +26,6 @@ struct Offer {
     uint256 expiry;
     uint256 tick;
     bytes32 group;
-    bytes32 session;
     address callback;
     bytes callbackData;
     address receiverIfMakerIsSeller;
@@ -81,7 +80,6 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
-    error InvalidSession();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
@@ -117,7 +115,6 @@ interface IMidnight {
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
     function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeeCbp0, uint16 tradingFeeCbp1, uint16 tradingFeeCbp2, uint16 tradingFeeCbp3, uint16 tradingFeeCbp4, uint16 tradingFeeCbp5, uint16 tradingFeeCbp6, uint32 continuousFee, bool created);
     function consumed(address user, bytes32 group) external view returns (uint256);
-    function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
     function defaultTradingFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
@@ -148,7 +145,6 @@ interface IMidnight {
     function withdrawCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
     function liquidate(Obligation memory obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
-    function shuffleSession(address onBehalf) external;
     function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
     function touchObligation(Obligation memory obligation) external returns (bytes32);

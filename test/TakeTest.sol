@@ -718,14 +718,6 @@ contract TakeTest is BaseTest {
         take(units, borrower, lenderOffer);
     }
 
-    function testSession() public {
-        vm.prank(lender);
-        midnight.shuffleSession(lender);
-
-        vm.expectRevert(IMidnight.InvalidSession.selector);
-        take(100, borrower, lenderOffer);
-    }
-
     function testTakeOfferNotStarted(uint256 start) public {
         start = bound(start, block.timestamp + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
