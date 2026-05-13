@@ -17,6 +17,7 @@ import {IPermit2} from "./interfaces/IPermit2.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
+import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
 contract MidnightBundles is IMidnightBundles {
@@ -60,13 +61,11 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
-            uint256 consumable = takes[i].offer.maxAssets > 0
-                ? TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
-                )
-                : takes[i].offer.maxUnits.zeroFloorSub(consumed);
-            uint256 unitsToTake = _min(targetUnits - filledUnits, takes[i].units, consumable);
+            uint256 unitsToTake = _min(
+                targetUnits - filledUnits,
+                takes[i].units,
+                ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
+            );
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
                 uint256 resBuyerAssets, uint256, uint256 resUnits
@@ -137,13 +136,11 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
-            uint256 consumable = takes[i].offer.maxAssets > 0
-                ? TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
-                )
-                : takes[i].offer.maxUnits.zeroFloorSub(consumed);
-            uint256 unitsToTake = _min(targetUnits - filledUnits, takes[i].units, consumable);
+            uint256 unitsToTake = _min(
+                targetUnits - filledUnits,
+                takes[i].units,
+                ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
+            );
             try IMidnight(midnight)
                 .take(
                     unitsToTake, taker, address(0), "", address(this), takes[i].offer, takes[i].ratifierData
@@ -200,18 +197,12 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
-            uint256 consumable = takes[i].offer.maxAssets > 0
-                ? TakeAmountsLib.sellerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
-                )
-                : takes[i].offer.maxUnits.zeroFloorSub(consumed);
             uint256 unitsToTake = _min(
                 TakeAmountsLib.buyerAssetsToUnits(
                     midnight, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
                 ),
                 takes[i].units,
-                consumable
+                ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
             );
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
@@ -287,18 +278,12 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 consumed = IMidnight(midnight).consumed(takes[i].offer.maker, takes[i].offer.group);
-            uint256 consumable = takes[i].offer.maxAssets > 0
-                ? TakeAmountsLib.buyerAssetsToUnits(
-                    midnight, id, takes[i].offer, takes[i].offer.maxAssets.zeroFloorSub(consumed)
-                )
-                : takes[i].offer.maxUnits.zeroFloorSub(consumed);
             uint256 unitsToTake = _min(
                 TakeAmountsLib.sellerAssetsToUnits(
                     midnight, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets
                 ),
                 takes[i].units,
-                consumable
+                ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
             );
             try IMidnight(midnight)
                 .take(
