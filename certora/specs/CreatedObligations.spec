@@ -15,11 +15,11 @@ methods {
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
     function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
+    function Midnight.tickSpacing(bytes32) external returns (uint8) envfree;
     function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
-    function Utils.obligationCreated(address, bytes32) external returns (bool) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -46,7 +46,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 }
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
-    return Utils.obligationCreated(currentContract, summaryToId(obligation));
+    return Midnight.tickSpacing(summaryToId(obligation)) > 0;
 }
 
 // Show that a created obligation has at least one collateral.
@@ -67,9 +67,9 @@ strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligat
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
-    require Utils.obligationCreated(currentContract, id), "Assume that the obligation is created";
+    require Midnight.tickSpacing(id) > 0, "Assume that the obligation is created";
     f(e, args);
-    assert Utils.obligationCreated(currentContract, id);
+    assert Midnight.tickSpacing(id) > 0;
 }
 
 // Show that an obligation is created after an interaction.
@@ -120,50 +120,50 @@ filtered {
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
-    require !Utils.obligationCreated(currentContract, id), "Assume that the obligation is not created";
+    require Midnight.tickSpacing(id) == 0, "Assume that the obligation is not created";
     f(e, args);
-    assert !Utils.obligationCreated(currentContract, id);
+    assert Midnight.tickSpacing(id) == 0;
 }
 
 // Show that each obligation state field is empty if the obligation is not created.
 strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => Midnight.totalUnits(id) == 0;
+    Midnight.tickSpacing(id) == 0 => Midnight.totalUnits(id) == 0;
 
 strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => Midnight.withdrawable(id) == 0;
+    Midnight.tickSpacing(id) == 0 => Midnight.withdrawable(id) == 0;
 
 strong invariant obligationTradingFeesAreEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => noTradingFeesAreSet(id);
+    Midnight.tickSpacing(id) == 0 => noTradingFeesAreSet(id);
 
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => Midnight.continuousFee(id) == 0;
+    Midnight.tickSpacing(id) == 0 => Midnight.continuousFee(id) == 0;
 
 strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => currentContract.obligationState[id].continuousFeeCredit == 0;
+    Midnight.tickSpacing(id) == 0 => currentContract.obligationState[id].continuousFeeCredit == 0;
 
 strong invariant obligationLossFactorIsEmptyIfNotCreated(bytes32 id)
-    !Utils.obligationCreated(currentContract, id) => currentContract.obligationState[id].lossFactor == 0;
+    Midnight.tickSpacing(id) == 0 => currentContract.obligationState[id].lossFactor == 0;
 
 strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => Midnight.creditOf(id, user) == 0;
+    Midnight.tickSpacing(id) == 0 => Midnight.creditOf(id, user) == 0;
 
 strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => Midnight.debtOf(id, user) == 0;
+    Midnight.tickSpacing(id) == 0 => Midnight.debtOf(id, user) == 0;
 
 strong invariant obligationCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => userHasEmptyCollateralBitmap(id, user);
+    Midnight.tickSpacing(id) == 0 => userHasEmptyCollateralBitmap(id, user);
 
 strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => userHasNoRemainingContinuousFee(id, user);
+    Midnight.tickSpacing(id) == 0 => userHasNoRemainingContinuousFee(id, user);
 
 strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => userHasNoLastAccrual(id, user);
+    Midnight.tickSpacing(id) == 0 => userHasNoLastAccrual(id, user);
 
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
-    !Utils.obligationCreated(currentContract, id) => userHasNoCollateral(id, user, collateralIndex);
+    Midnight.tickSpacing(id) == 0 => userHasNoCollateral(id, user, collateralIndex);
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
-    !Utils.obligationCreated(currentContract, id) => currentContract.position[id][user].lastLossFactor == 0;
+    Midnight.tickSpacing(id) == 0 => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFeeCbps(id);

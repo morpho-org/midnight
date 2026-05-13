@@ -12,10 +12,10 @@ interface ISetterRatifier is IRatifier {
     error NotRatified();
 
     /// EVENTS ///
-    event SetIsRatified(address indexed maker, bytes32 indexed root, bool newApproval);
+    event SetIsRootRatified(address indexed maker, bytes32 indexed root, bool newIsRootRatified);
 
     /// FUNCTIONS ///
-    function setIsRatified(address maker, bytes32 root, bool newIsRatified) external;
+    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external;
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);

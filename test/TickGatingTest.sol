@@ -2,9 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 
@@ -57,7 +57,7 @@ contract TickGatingTest is BaseTest {
     // --- Default spacing applied at creation ---
 
     function testDefaultSpacingApplied() public view {
-        assertEq(midnight.spacing(id), 4, "obligation should inherit default spacing 4");
+        assertEq(midnight.tickSpacing(id), 4, "obligation should inherit default spacing 4");
     }
 
     // --- Tick gating in take() ---
@@ -87,7 +87,7 @@ contract TickGatingTest is BaseTest {
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
         // Refine to spacing 2.
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
 
         // Tick 2921 is not divisible by 2 → inaccessible at spacing 2.
         Offer memory offer = _makeOffer(2921);
@@ -117,51 +117,51 @@ contract TickGatingTest is BaseTest {
         midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
 
         // Refine to spacing 2.
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
 
         // Now should succeed.
         take(units, borrower, offer);
         assertEq(midnight.creditOf(id, lender), units);
     }
 
-    // --- setObligationSpacing governance ---
+    // --- setObligationTickSpacing governance ---
 
-    function testSetObligationSpacingOnlySpacingSetter() public {
+    function testSetObligationTickSpacingOnlyTickSpacingSetter() public {
         vm.prank(lender);
-        vm.expectRevert(IMidnight.OnlySpacingSetter.selector);
-        midnight.setObligationSpacing(id, 2);
+        vm.expectRevert(IMidnight.OnlyTickSpacingSetter.selector);
+        midnight.setObligationTickSpacing(id, 2);
     }
 
-    function testSetObligationSpacingInvalid() public {
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 3);
+    function testSetObligationTickSpacingInvalid() public {
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
+        midnight.setObligationTickSpacing(id, 3);
 
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 0);
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
+        midnight.setObligationTickSpacing(id, 0);
 
-        midnight.setObligationSpacing(id, 1);
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 1);
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
+        midnight.setObligationTickSpacing(id, 2);
     }
 
-    function testSetObligationSpacingRequiresCreated() public {
+    function testSetObligationTickSpacingRequiresCreated() public {
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.setObligationSpacing(bytes32(uint256(42)), 1);
+        midnight.setObligationTickSpacing(bytes32(uint256(42)), 1);
     }
 
-    // --- setSpacingSetter governance ---
+    // --- setTickSpacingSetter governance ---
 
-    function testSetSpacingSetterOnlyOwner() public {
+    function testSetTickSpacingSetterOnlyOwner() public {
         vm.prank(lender);
         vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
-        midnight.setSpacingSetter(lender);
+        midnight.setTickSpacingSetter(lender);
     }
 
     // --- Coarser ticks remain valid after refinement ---
 
-    function testCoarserTicksStillValidAfterRefinement() public {
-        // Tick 2924: accessible at spacing 4. Trade at spacing 4.
-        uint256 tick = 2924;
+    function testCoarserTicksStillValidAfterRefinement(uint256 tick) public {
+        // Pick any tick accessible at the default spacing.
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         Offer memory offer = _makeOffer(tick);
         uint256 units = 50;
         uint256 price = TickLib.tickToPrice(tick);
@@ -170,9 +170,9 @@ contract TickGatingTest is BaseTest {
         take(units, borrower, offer);
 
         // Refine to spacing 1 (every tick).
-        midnight.setObligationSpacing(id, 1);
+        midnight.setObligationTickSpacing(id, 1);
 
-        // Tick 2924 is still accessible at spacing 1.
+        // The same tick is still accessible at spacing 1.
         Offer memory offer2 = _makeOffer(tick);
         offer2.group = keccak256("second");
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));

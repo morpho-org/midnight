@@ -31,7 +31,7 @@ contract TickLibTest is BaseTest {
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
                 currentReturn.mulDivDown(1e18, previousReturn),
-                0.995024875621890547e18,
+                0.995e18,
                 0.005e18,
                 string.concat("tick ", vm.toString(i))
             );
@@ -65,12 +65,12 @@ contract TickLibTest is BaseTest {
     function testPriceToTickGreaterThanOne(uint256 price) public {
         price = bound(price, 1 ether + 1, type(uint256).max);
         vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
-        TickLib.priceToTick(price);
+        TickLib.priceToTick(price, 1);
     }
 
     function testPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
-        uint256 tick = TickLib.priceToTick(price);
+        uint256 tick = TickLib.priceToTick(price, 1);
         assertGe(TickLib.tickToPrice(tick), price);
         if (tick > 0) assertLe(TickLib.tickToPrice(tick - 1), price);
     }
@@ -78,7 +78,7 @@ contract TickLibTest is BaseTest {
     function testPriceToTickConsistency() public pure {
         for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 price = TickLib.tickToPrice(tick);
-            uint256 recoveredTick = TickLib.priceToTick(price);
+            uint256 recoveredTick = TickLib.priceToTick(price, 1);
             assertEq(TickLib.tickToPrice(recoveredTick), price);
             assertLe(recoveredTick, tick);
         }
@@ -86,7 +86,7 @@ contract TickLibTest is BaseTest {
 
     function testGasPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
-        TickLib.priceToTick(price);
+        TickLib.priceToTick(price, 1);
     }
 
     function loadExactPrices() internal view returns (uint256[] memory) {
@@ -113,7 +113,7 @@ contract TickLibTest is BaseTest {
             uint256 absErrorWad = absDiff(solPrice, exactPrice);
             maxAbsErrorWad = max(maxAbsErrorWad, absErrorWad);
             totalAbsErrorWad += absErrorWad;
-            uint256 relErrorWad = exactPrice > 0 ? absDiff(solPrice, exactPrice) * 1e18 / exactPrice : 0;
+            uint256 relErrorWad = absDiff(solPrice, exactPrice) * 1e18 / exactPrice;
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 

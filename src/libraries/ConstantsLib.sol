@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {UtilsLib} from "./UtilsLib.sol";
+
 // forgefmt: disable-start
 uint256 constant WAD = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
@@ -21,6 +23,7 @@ uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
 uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
 bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
+uint8 constant DEFAULT_TICK_SPACING = 4;
 
 /// @dev The allowed LLTV values, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
 uint256 constant LLTV_0 = 0.385e18;
@@ -41,5 +44,10 @@ function isLltvAllowed(uint256 lltv) pure returns (bool) {
 /// @dev Returns the max trading fee for the given index.
 function maxTradingFee(uint256 index) pure returns (uint256) {
     return [MAX_TRADING_FEE_0_DAYS, MAX_TRADING_FEE_1_DAY, MAX_TRADING_FEE_7_DAYS, MAX_TRADING_FEE_30_DAYS, MAX_TRADING_FEE_90_DAYS, MAX_TRADING_FEE_180_DAYS, MAX_TRADING_FEE_360_DAYS][index];
+}
+
+/// @dev Returns the max LIF for the given lltv and cursor.
+function maxLif(uint256 lltv, uint256 cursor) pure returns (uint256) {
+    return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
 }
 // forgefmt: disable-end
