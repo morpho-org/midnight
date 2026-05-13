@@ -47,6 +47,10 @@ contract FrontendSignatureTest is Test {
         bytes32 right = HashLib.commutativeHash(h2, h3);
         bytes32 _root = HashLib.commutativeHash(left, right);
 
+        require(uint256(h0) < uint256(h1), "h0 < h1");
+        require(uint256(h2) < uint256(h3), "h2 < h3");
+        require(uint256(left) < uint256(right), "left < right");
+
         bytes32[] memory proof0 = new bytes32[](2);
         proof0[0] = h1;
         proof0[1] = right;
