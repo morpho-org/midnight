@@ -128,7 +128,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
 /// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
 /// greater than type(uint128).max, then liquidate, isHealthy, withdrawCollateral when the borrower has debt, and take
-/// whenever the seller still has debt revert.
+/// whenever the seller still has debt could revert.
 /// @dev If enterGate.canIncreaseCredit reverts or returns false, take reverts if the buyer's credit increases.
 /// @dev If enterGate.canIncreaseDebt reverts or returns false, take reverts if the seller's debt increases.
 /// @dev If liquidatorGate.canLiquidate reverts or returns false, liquidate reverts.
