@@ -6,10 +6,6 @@
 // mulDivUp(x, y, d) computes (x * y + (d - 1)) / d with Solidity 0.8 checked arithmetic.
 // The multiplication x * y must not exceed type(uint256).max, or the transaction reverts.
 //
-// maxLif(uint256, uint256) is a free function in ConstantsLib (not a Midnight method), so it
-// is not reachable via parametric rules and requires no exclusion. Internal calls use WAD-scale
-// values where its intermediate multiplications (WAD * WAD = 1e36 and cursor * (WAD - lltv) <= WAD^2 = 1e36) cannot overflow uint256.
-//
 // The toId summary follows the approach from CreatedMarkets.spec and encodes
 // market field bounds (lltv, maxLif) proven in other specs, plus the realistic
 // timestamp range assumption used by this overflow-focused proof.
@@ -36,7 +32,8 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
 
     // Proven in ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
-    function Midnight.maxLif(uint256 lltv, uint256 cursor) internal returns (uint256) => maxLifSummary(lltv);
+    // Wildcard contract: maxLif is a free function and is called from both Midnight and Utils.
+    function _.maxLif(uint256 lltv, uint256 cursor) internal => maxLifSummary(lltv) expect(uint256);
 
     // Summarize mulDivDown and mulDivUp to track overflow.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
