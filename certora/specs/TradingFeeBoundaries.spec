@@ -7,9 +7,9 @@ methods {
 
     function tradingFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
+    function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function toId(Midnight.Obligation) external returns (bytes32) envfree;
     function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
-    function Utils.obligationCreated(address, bytes32) external returns (bool) envfree;
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
@@ -67,7 +67,7 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
 rule newObligationTradingFeesMatchDefault(env e, Midnight.Obligation obligation, uint256 index) {
     require index <= 6, "index out of bounds";
     bytes32 id = toId(e, obligation);
-    require !Utils.obligationCreated(currentContract, id), "obligation not yet created";
+    require tickSpacing(id) == 0, "obligation not yet created";
 
     uint256 expectedTradingFee = defaultTradingFee(obligation.loanToken, index);
 
@@ -88,7 +88,7 @@ rule onlyFeeSetterCanChangeDefaultTradingFees(method f, env e, address token, ui
 /// Once an obligation is created, only the fee setter can modify its trading fees.
 rule onlyFeeSetterCanChangeObligationTradingFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
-    require Utils.obligationCreated(currentContract, id), "assume that the obligation is created";
+    require tickSpacing(id) > 0, "assume that the obligation is created";
     uint256 obligationTradingFeeBefore = obligationTradingFee(id, index);
     calldataarg args;
     f(e, args);

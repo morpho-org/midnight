@@ -13,8 +13,8 @@ methods {
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
-    function Utils.obligationCreated(address, bytes32) external returns (bool) envfree;
 
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
     function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
@@ -44,7 +44,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 }
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
-    return Utils.obligationCreated(currentContract, summaryToId(obligation));
+    return tickSpacing(summaryToId(obligation)) > 0;
 }
 
 persistent ghost mapping(bytes32 => mathint) sumDebt {

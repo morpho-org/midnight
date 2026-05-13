@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IMidnight, Offer, Obligation} from "../../src/interfaces/IMidnight.sol";
+import {Offer, Obligation} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 import {
     CALLBACK_SUCCESS,
@@ -13,10 +13,6 @@ import {
 contract Utils {
     function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
         return keccak256(abi.encode(obligation));
-    }
-
-    function obligationCreated(IMidnight midnight, bytes32 id) external view returns (bool) {
-        return midnight.tickSpacing(id) > 0;
     }
 
     function getBit(uint128 bitmap, uint256 bit) external pure returns (bool) {

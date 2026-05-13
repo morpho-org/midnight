@@ -15,7 +15,6 @@ methods {
     function totalUnits(bytes32 id) external returns (uint256) envfree;
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
-    function Utils.obligationCreated(address, bytes32) external returns (bool) envfree;
 
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -125,7 +124,7 @@ rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint2
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
     bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % CBP() == 0;
-    bool obligationExists = Utils.obligationCreated(currentContract, id);
+    bool obligationExists = tickSpacing(id) > 0;
 
     setObligationTradingFee@withrevert(e, id, index, newTradingFee);
     bool reverted = lastReverted;
@@ -146,7 +145,7 @@ rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, u
 
 rule feeSetterCanSetObligationContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
     address feeSetterBefore = feeSetter();
-    bool obligationExists = Utils.obligationCreated(currentContract, id);
+    bool obligationExists = tickSpacing(id) > 0;
 
     setObligationContinuousFee@withrevert(e, id, newContinuousFee);
     bool reverted = lastReverted;
@@ -168,7 +167,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 
 /// Once an obligation is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require Utils.obligationCreated(currentContract, id), "obligation must exist";
+    require tickSpacing(id) > 0, "obligation must exist";
     uint32 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
 
@@ -190,7 +189,7 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 
 rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
     address tickSpacingSetterBefore = tickSpacingSetter();
-    bool obligationExists = Utils.obligationCreated(currentContract, id);
+    bool obligationExists = tickSpacing(id) > 0;
     uint8 tickSpacingBefore = tickSpacing(id);
     bool validNewTickSpacing = newTickSpacing > 0 && tickSpacingBefore % newTickSpacing == 0;
 
@@ -204,7 +203,7 @@ rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 new
 
 /// Once an obligation is created, only the tick spacing setter can modify its tick spacing.
 rule onlyTickSpacingSetterCanChangeObligationTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require Utils.obligationCreated(currentContract, id), "obligation must exist";
+    require tickSpacing(id) > 0, "obligation must exist";
     uint8 tickSpacingBefore = tickSpacing(id);
     address tickSpacingSetterBefore = tickSpacingSetter();
 
@@ -250,7 +249,7 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint
     require user != currentContract && user != receiver;
     bytes32 id = toId(e, obligation);
     address feeClaimerBefore = feeClaimer();
-    bool obligationExists = Utils.obligationCreated(currentContract, id);
+    bool obligationExists = tickSpacing(id) > 0;
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
     uint128 continuousFeeCreditBefore = currentContract.obligationState[id].continuousFeeCredit;
