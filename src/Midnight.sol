@@ -28,7 +28,8 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
 /// particular, the borrowers of multicollat obligations can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
-/// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in supplyCollateral.
+/// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
+/// supplyCollateral.
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
