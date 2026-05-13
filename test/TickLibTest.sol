@@ -12,8 +12,6 @@ contract TickLibTest is BaseTest {
 
     // Tick to price
 
-    /// @dev With `testTickMonotonicity`, `tickToPrice(1) > 0` implies tick 0 is the unique zero-price tick, and
-    /// `tickToPrice(MAX_TICK - 1) < 1e18` implies `MAX_TICK` is the unique par-price tick.
     function testTickToPriceMinMax() public pure {
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
         assertEq(TickLib.tickToPrice(1), 0.8e12, "first non-zero tick is at d (= 0.8e12)");
