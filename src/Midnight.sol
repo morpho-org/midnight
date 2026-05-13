@@ -7,8 +7,8 @@ import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
-import "./libraries/ConstantsLib.sol"; // forge-lint: disable-item(unaliased-plain-import)
-import "./interfaces/ICallbacks.sol"; // forge-lint: disable-item(unaliased-plain-import)
+import "./libraries/ConstantsLib.sol"; // forge-lint: disable-line(unaliased-plain-import)
+import "./interfaces/ICallbacks.sol"; // forge-lint: disable-line(unaliased-plain-import)
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
@@ -291,8 +291,8 @@ contract Midnight is IMidnight {
     /// be used to perform atomic price checks.
     /// @dev Taking buy offers with price < trading fee will revert.
     /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
-    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if
-    /// buyerPrice<=WAD.
+    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
+    /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
