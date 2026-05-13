@@ -147,7 +147,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// @dev Zero checks are not systematically performed.
 /// @dev NatSpec comments are included only when they bring clarity.
 /// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
-/// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
+/// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing obligation ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
 /// there can be some obligation id clashes.
