@@ -2,11 +2,30 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {
+    MAX_CONTINUOUS_FEE,
+    MAX_TRADING_FEE_0_DAYS,
+    MAX_TRADING_FEE_1_DAY,
+    MAX_TRADING_FEE_7_DAYS,
+    MAX_TRADING_FEE_30_DAYS,
+    MAX_TRADING_FEE_90_DAYS,
+    MAX_TRADING_FEE_180_DAYS,
+    MAX_TRADING_FEE_360_DAYS
+} from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
+    function testMaxTradingFeeConstants() public pure {
+        assertEq(maxTradingFee(0), MAX_TRADING_FEE_0_DAYS, "0 days max trading fee");
+        assertEq(maxTradingFee(1), MAX_TRADING_FEE_1_DAY, "1 day max trading fee");
+        assertEq(maxTradingFee(2), MAX_TRADING_FEE_7_DAYS, "7 days max trading fee");
+        assertEq(maxTradingFee(3), MAX_TRADING_FEE_30_DAYS, "30 days max trading fee");
+        assertEq(maxTradingFee(4), MAX_TRADING_FEE_90_DAYS, "90 days max trading fee");
+        assertEq(maxTradingFee(5), MAX_TRADING_FEE_180_DAYS, "180 days max trading fee");
+        assertEq(maxTradingFee(6), MAX_TRADING_FEE_360_DAYS, "360 days max trading fee");
+    }
+
     function testInitialRoleSetter() public view {
         assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }
@@ -45,19 +64,19 @@ contract SettersTest is BaseTest {
         uint256 oneEightyDaysFee,
         uint256 threeSixtyDaysFee
     ) public {
-        postMaturityFee = bound(postMaturityFee, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        oneDayFee = bound(oneDayFee, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        sevenDaysFee = bound(sevenDaysFee, 0, midnight.maxTradingFee(2)) / 1e12 * 1e12;
-        thirtyDaysFee = bound(thirtyDaysFee, 0, midnight.maxTradingFee(3)) / 1e12 * 1e12;
-        ninetyDaysFee = bound(ninetyDaysFee, 0, midnight.maxTradingFee(4)) / 1e12 * 1e12;
-        oneEightyDaysFee = bound(oneEightyDaysFee, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
-        threeSixtyDaysFee = bound(threeSixtyDaysFee, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        postMaturityFee = bound(postMaturityFee, 0, maxTradingFee(0)) / 1e12 * 1e12;
+        oneDayFee = bound(oneDayFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
+        sevenDaysFee = bound(sevenDaysFee, 0, maxTradingFee(2)) / 1e12 * 1e12;
+        thirtyDaysFee = bound(thirtyDaysFee, 0, maxTradingFee(3)) / 1e12 * 1e12;
+        ninetyDaysFee = bound(ninetyDaysFee, 0, maxTradingFee(4)) / 1e12 * 1e12;
+        oneEightyDaysFee = bound(oneEightyDaysFee, 0, maxTradingFee(5)) / 1e12 * 1e12;
+        threeSixtyDaysFee = bound(threeSixtyDaysFee, 0, maxTradingFee(6)) / 1e12 * 1e12;
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: loanToken,
             maturity: block.timestamp + 1 days,
             collateralParams: collateralParams,
@@ -65,16 +84,16 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        bytes32 id = toId(obligation);
-        midnight.touchObligation(obligation);
+        bytes32 id = toId(market);
+        midnight.touchMarket(market);
 
-        midnight.setObligationTradingFee(id, 0, postMaturityFee);
-        midnight.setObligationTradingFee(id, 1, oneDayFee);
-        midnight.setObligationTradingFee(id, 2, sevenDaysFee);
-        midnight.setObligationTradingFee(id, 3, thirtyDaysFee);
-        midnight.setObligationTradingFee(id, 4, ninetyDaysFee);
-        midnight.setObligationTradingFee(id, 5, oneEightyDaysFee);
-        midnight.setObligationTradingFee(id, 6, threeSixtyDaysFee);
+        midnight.setMarketTradingFee(id, 0, postMaturityFee);
+        midnight.setMarketTradingFee(id, 1, oneDayFee);
+        midnight.setMarketTradingFee(id, 2, sevenDaysFee);
+        midnight.setMarketTradingFee(id, 3, thirtyDaysFee);
+        midnight.setMarketTradingFee(id, 4, ninetyDaysFee);
+        midnight.setMarketTradingFee(id, 5, oneEightyDaysFee);
+        midnight.setMarketTradingFee(id, 6, threeSixtyDaysFee);
 
         assertEq(midnight.tradingFee(id, 0), postMaturityFee, "post maturity trading fee");
         assertEq(midnight.tradingFee(id, 1 days), oneDayFee, "one day trading fee");
@@ -89,7 +108,7 @@ contract SettersTest is BaseTest {
 
     function testSetTradingFeeInvalidIndex(bytes32 id) public {
         vm.expectRevert(IMidnight.InvalidFeeIndex.selector);
-        midnight.setObligationTradingFee(id, 7, 0);
+        midnight.setMarketTradingFee(id, 7, 0);
     }
 
     function testSetDefaultTradingFeeInvalidIndex(address loanToken) public {
@@ -97,45 +116,45 @@ contract SettersTest is BaseTest {
         midnight.setDefaultTradingFee(loanToken, 7, 0);
     }
 
-    function testSetObligationTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
+    function testSetMarketTradingFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
-        feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
+        feeTooHigh = bound(feeTooHigh, maxTradingFee(index) + 1, 1e18);
         vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
-        midnight.setObligationTradingFee(id, index, feeTooHigh);
+        midnight.setMarketTradingFee(id, index, feeTooHigh);
     }
 
-    function testSetTradingFeeNotMultipleOfFeeStep(bytes32 id, uint256 index, uint256 fee) public {
+    function testSetTradingFeeNotMultipleOfFeeCbp(bytes32 id, uint256 index, uint256 fee) public {
         index = bound(index, 0, 6);
-        fee = bound(fee, 1, midnight.maxTradingFee(index));
+        fee = bound(fee, 1, maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
-        midnight.setObligationTradingFee(id, index, fee);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeCbp.selector);
+        midnight.setMarketTradingFee(id, index, fee);
     }
 
-    function testSetDefaultTradingFeeNotMultipleOfFeeStep(address loanToken, uint256 index, uint256 fee) public {
+    function testSetDefaultTradingFeeNotMultipleOfFeeCbp(address loanToken, uint256 index, uint256 fee) public {
         index = bound(index, 0, 6);
-        fee = bound(fee, 1, midnight.maxTradingFee(index));
+        fee = bound(fee, 1, maxTradingFee(index));
         vm.assume(fee % 1e12 != 0);
-        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeStep.selector);
+        vm.expectRevert(IMidnight.FeeNotMultipleOfFeeCbp.selector);
         midnight.setDefaultTradingFee(loanToken, index, fee);
     }
 
-    function testSetObligationTradingFeeObligationNotCreated(bytes32 id) public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.setObligationTradingFee(id, 0, 0);
+    function testSetMarketTradingFeeMarketNotCreated(bytes32 id) public {
+        vm.expectRevert(IMidnight.MarketNotCreated.selector);
+        midnight.setMarketTradingFee(id, 0, 0);
     }
 
-    function testSetObligationContinuousFeeObligationNotCreated(bytes32 id, uint256 fee) public {
+    function testSetMarketContinuousFeeMarketNotCreated(bytes32 id, uint256 fee) public {
         fee = bound(fee, 0, MAX_CONTINUOUS_FEE);
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.setObligationContinuousFee(id, fee);
+        vm.expectRevert(IMidnight.MarketNotCreated.selector);
+        midnight.setMarketContinuousFee(id, fee);
     }
 
     function testSetTradingFeeOnlyFeeSetter(address rdm, bytes32 id) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
-        midnight.setObligationTradingFee(id, 0, 0);
+        midnight.setMarketTradingFee(id, 0, 0);
     }
 
     function testSetFeeClaimerSuccess(address feeClaimer) public {
@@ -153,7 +172,7 @@ contract SettersTest is BaseTest {
     // Default trading fee tests
 
     function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        vm.expectRevert(IMidnight.MarketNotCreated.selector);
         midnight.tradingFee(bytes32(0), 0);
     }
 
@@ -167,13 +186,13 @@ contract SettersTest is BaseTest {
         uint256 oneEightyDaysFee,
         uint256 threeSixtyDaysFee
     ) public {
-        postMaturityFee = bound(postMaturityFee, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        oneDayFee = bound(oneDayFee, postMaturityFee, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        sevenDaysFee = bound(sevenDaysFee, oneDayFee, midnight.maxTradingFee(2)) / 1e12 * 1e12;
-        thirtyDaysFee = bound(thirtyDaysFee, sevenDaysFee, midnight.maxTradingFee(3)) / 1e12 * 1e12;
-        ninetyDaysFee = bound(ninetyDaysFee, thirtyDaysFee, midnight.maxTradingFee(4)) / 1e12 * 1e12;
-        oneEightyDaysFee = bound(oneEightyDaysFee, ninetyDaysFee, midnight.maxTradingFee(5)) / 1e12 * 1e12;
-        threeSixtyDaysFee = bound(threeSixtyDaysFee, oneEightyDaysFee, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        postMaturityFee = bound(postMaturityFee, 0, maxTradingFee(0)) / 1e12 * 1e12;
+        oneDayFee = bound(oneDayFee, postMaturityFee, maxTradingFee(1)) / 1e12 * 1e12;
+        sevenDaysFee = bound(sevenDaysFee, oneDayFee, maxTradingFee(2)) / 1e12 * 1e12;
+        thirtyDaysFee = bound(thirtyDaysFee, sevenDaysFee, maxTradingFee(3)) / 1e12 * 1e12;
+        ninetyDaysFee = bound(ninetyDaysFee, thirtyDaysFee, maxTradingFee(4)) / 1e12 * 1e12;
+        oneEightyDaysFee = bound(oneEightyDaysFee, ninetyDaysFee, maxTradingFee(5)) / 1e12 * 1e12;
+        threeSixtyDaysFee = bound(threeSixtyDaysFee, oneEightyDaysFee, maxTradingFee(6)) / 1e12 * 1e12;
 
         midnight.setDefaultTradingFee(loanToken, 0, postMaturityFee);
         midnight.setDefaultTradingFee(loanToken, 1, oneDayFee);
@@ -183,12 +202,12 @@ contract SettersTest is BaseTest {
         midnight.setDefaultTradingFee(loanToken, 5, oneEightyDaysFee);
         midnight.setDefaultTradingFee(loanToken, 6, threeSixtyDaysFee);
 
-        // touch obligation with this loan token
+        // touch market with this loan token
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: loanToken,
             maturity: block.timestamp + 1 days,
             collateralParams: collateralParams,
@@ -196,8 +215,8 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        bytes32 id = toId(obligation);
-        midnight.touchObligation(obligation);
+        bytes32 id = toId(market);
+        midnight.touchMarket(market);
 
         assertEq(midnight.tradingFee(id, 0), postMaturityFee, "0 days default fee");
         assertEq(midnight.tradingFee(id, 1 days), oneDayFee, "1 day default fee");
@@ -219,7 +238,7 @@ contract SettersTest is BaseTest {
 
     function testSetDefaultTradingFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
-        feeTooHigh = bound(feeTooHigh, midnight.maxTradingFee(index) + 1, 1e18);
+        feeTooHigh = bound(feeTooHigh, maxTradingFee(index) + 1, 1e18);
         vm.expectRevert(IMidnight.TradingFeeTooHigh.selector);
         midnight.setDefaultTradingFee(loanToken, index, feeTooHigh);
     }
@@ -233,19 +252,19 @@ contract SettersTest is BaseTest {
         uint256 tradingFee5,
         uint256 tradingFee6
     ) public {
-        tradingFee0 = bound(tradingFee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        tradingFee1 = bound(tradingFee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
-        tradingFee2 = bound(tradingFee2, 0, midnight.maxTradingFee(2)) / 1e12 * 1e12;
-        tradingFee3 = bound(tradingFee3, 0, midnight.maxTradingFee(3)) / 1e12 * 1e12;
-        tradingFee4 = bound(tradingFee4, 0, midnight.maxTradingFee(4)) / 1e12 * 1e12;
-        tradingFee5 = bound(tradingFee5, 0, midnight.maxTradingFee(5)) / 1e12 * 1e12;
-        tradingFee6 = bound(tradingFee6, 0, midnight.maxTradingFee(6)) / 1e12 * 1e12;
+        tradingFee0 = bound(tradingFee0, 0, maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee1 = bound(tradingFee1, 0, maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee2 = bound(tradingFee2, 0, maxTradingFee(2)) / 1e12 * 1e12;
+        tradingFee3 = bound(tradingFee3, 0, maxTradingFee(3)) / 1e12 * 1e12;
+        tradingFee4 = bound(tradingFee4, 0, maxTradingFee(4)) / 1e12 * 1e12;
+        tradingFee5 = bound(tradingFee5, 0, maxTradingFee(5)) / 1e12 * 1e12;
+        tradingFee6 = bound(tradingFee6, 0, maxTradingFee(6)) / 1e12 * 1e12;
 
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: address(0),
             maturity: block.timestamp + 1 days,
             collateralParams: cols,
@@ -253,16 +272,16 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        bytes32 id = toId(obligation);
-        midnight.touchObligation(obligation);
+        bytes32 id = toId(market);
+        midnight.touchMarket(market);
 
-        midnight.setObligationTradingFee(id, 0, tradingFee0);
-        midnight.setObligationTradingFee(id, 1, tradingFee1);
-        midnight.setObligationTradingFee(id, 2, tradingFee2);
-        midnight.setObligationTradingFee(id, 3, tradingFee3);
-        midnight.setObligationTradingFee(id, 4, tradingFee4);
-        midnight.setObligationTradingFee(id, 5, tradingFee5);
-        midnight.setObligationTradingFee(id, 6, tradingFee6);
+        midnight.setMarketTradingFee(id, 0, tradingFee0);
+        midnight.setMarketTradingFee(id, 1, tradingFee1);
+        midnight.setMarketTradingFee(id, 2, tradingFee2);
+        midnight.setMarketTradingFee(id, 3, tradingFee3);
+        midnight.setMarketTradingFee(id, 4, tradingFee4);
+        midnight.setMarketTradingFee(id, 5, tradingFee5);
+        midnight.setMarketTradingFee(id, 6, tradingFee6);
 
         // Test exact breakpoints
         assertEq(midnight.tradingFee(id, 0), tradingFee0, "0 days");
@@ -298,7 +317,7 @@ contract SettersTest is BaseTest {
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
             collateralParams: collateralParams,
@@ -306,12 +325,12 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        midnight.touchObligation(obligation);
-        bytes32 id = toId(obligation);
+        midnight.touchMarket(market);
+        bytes32 id = toId(market);
 
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
-        midnight.setObligationContinuousFee(id, 100);
+        midnight.setMarketContinuousFee(id, 100);
 
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyFeeSetter.selector);
@@ -325,7 +344,7 @@ contract SettersTest is BaseTest {
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
             collateralParams: collateralParams,
@@ -333,11 +352,11 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        midnight.touchObligation(obligation);
-        bytes32 id = toId(obligation);
+        midnight.touchMarket(market);
+        bytes32 id = toId(market);
 
         vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
-        midnight.setObligationContinuousFee(id, fee);
+        midnight.setMarketContinuousFee(id, fee);
 
         vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
         midnight.setDefaultContinuousFee(address(loanToken), fee);
@@ -355,7 +374,7 @@ contract SettersTest is BaseTest {
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
-        Obligation memory obligation = Obligation({
+        Market memory market = Market({
             loanToken: address(loanToken),
             maturity: block.timestamp + 100 days,
             collateralParams: collateralParams,
@@ -363,11 +382,11 @@ contract SettersTest is BaseTest {
             enterGate: address(0),
             liquidatorGate: address(0)
         });
-        midnight.touchObligation(obligation);
-        bytes32 id = toId(obligation);
+        midnight.touchMarket(market);
+        bytes32 id = toId(market);
 
-        assertEq(midnight.continuousFee(id), fee, "obligation inherits default fee");
-        midnight.setObligationContinuousFee(id, fee2);
-        assertEq(midnight.continuousFee(id), fee2, "obligation fee updated");
+        assertEq(midnight.continuousFee(id), fee, "market inherits default fee");
+        midnight.setMarketContinuousFee(id, fee2);
+        assertEq(midnight.continuousFee(id), fee2, "market fee updated");
     }
 }
