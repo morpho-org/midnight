@@ -64,11 +64,11 @@ rule updatePositionSyncsLastLossFactor(env e, Midnight.Obligation obligation, ad
     assert lastLossFactor(id, user) == currentContract.obligationState[id].lossFactor;
 }
 
-/// Assuming that the obligation is created, the loss factor computation in updatePosition does not revert.
+/// Assuming that the obligation is touched, the loss factor computation in updatePosition does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Obligation obligation, address user) {
     bytes32 id = summaryToId(obligation);
 
-    require tickSpacing(id) > 0, "obligation must be created";
+    require tickSpacing(id) > 0, "obligation must be touched";
     require lastLossFactor(id, user) <= currentContract.obligationState[id].lossFactor, "lastLossFactor bounded by obligation lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
@@ -86,7 +86,7 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Obligation obligation, add
     bytes32 id = summaryToId(obligation);
 
     require data.length == 0, "no callback to avoid unrelated external call reverts";
-    require tickSpacing(id) > 0, "obligation must be created";
+    require tickSpacing(id) > 0, "obligation must be touched";
     require obligation.liquidatorGate == 0, "Assumption:no liquidator gate";
     require obligation.collateralParams.length > 0, "obligation has at least one collateral (enforced by touchObligation)";
     require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";

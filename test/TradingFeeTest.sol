@@ -167,7 +167,7 @@ contract TradingFeeTest is BaseTest {
         obligation.maturity = block.timestamp + 3 days;
 
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
-        // Must be set before touchObligation, which snapshots defaultFees at creation time.
+        // Must be set before touchObligation, which snapshots defaultFees at first touch.
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee1Day);
         midnight.setDefaultTradingFee(address(loanToken), 2, tradingFee7Days);
 

@@ -63,11 +63,11 @@ invariant obligationTradingFeePerIndexBound(bytes32 id, uint256 index)
         }
     }
 
-/// When an obligation is created, its trading fees are set to the default trading fees of its loan token.
-rule newObligationTradingFeesMatchDefault(env e, Midnight.Obligation obligation, uint256 index) {
+/// When an obligation is first touched, its trading fees are set to the default trading fees of its loan token.
+rule firstTouchedObligationTradingFeesMatchDefault(env e, Midnight.Obligation obligation, uint256 index) {
     require index <= 6, "index out of bounds";
     bytes32 id = toId(e, obligation);
-    require tickSpacing(id) == 0, "obligation not yet created";
+    require tickSpacing(id) == 0, "obligation not yet touched";
 
     uint256 expectedTradingFee = defaultTradingFee(obligation.loanToken, index);
 
@@ -85,10 +85,10 @@ rule onlyFeeSetterCanChangeDefaultTradingFees(method f, env e, address token, ui
     assert defaultTradingFee(token, index) != defaultTradingFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setDefaultTradingFee(address, uint256, uint256).selector;
 }
 
-/// Once an obligation is created, only the fee setter can modify its trading fees.
-rule onlyFeeSetterCanChangeObligationTradingFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
+/// Once an obligation is touched, only the fee setter can modify its trading fees.
+rule onlyFeeSetterCanChangeObligationTradingFeesAfterFirstTouch(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
-    require tickSpacing(id) > 0, "assume that the obligation is created";
+    require tickSpacing(id) > 0, "assume that the obligation is touched";
     uint256 obligationTradingFeeBefore = obligationTradingFee(id, index);
     calldataarg args;
     f(e, args);

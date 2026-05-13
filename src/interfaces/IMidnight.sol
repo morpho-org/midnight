@@ -35,7 +35,7 @@ struct Offer {
     uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
 }
 
-/// @dev Trading fee cbp values and the continuous fee are 0 until the obligation is created, then set to the default
+/// @dev Trading fee cbp values and the continuous fee are 0 until the obligation is touched, then set to the default
 /// values.
 struct ObligationState {
     uint128 totalUnits;
@@ -89,7 +89,7 @@ interface IMidnight {
     error NoCollateralParams();
     error NotLiquidatable();
     error ObligationLossFactorMaxedOut();
-    error ObligationNotCreated();
+    error ObligationNotTouched();
     error OfferExpired();
     error OfferNotStarted();
     error OnlyFeeClaimer();

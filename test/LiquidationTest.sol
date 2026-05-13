@@ -284,7 +284,7 @@ contract LiquidationTest is BaseTest {
     // Test bad debt.
 
     function testRealizeOnlyBadDebt(uint256 units, uint256 liquidationOraclePrice) public {
-        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
+        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt forms.
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);
@@ -350,7 +350,7 @@ contract LiquidationTest is BaseTest {
     }
 
     function testLiquidateWithBadDebtSeizedInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
-        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
+        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt forms.
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         seized = bound(seized, 0, midnight.collateral(id, borrower, 0));
@@ -368,7 +368,7 @@ contract LiquidationTest is BaseTest {
     }
 
     function testLiquidateWithBadDebtRepaidInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
-        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt is created.
+        units = bound(units, 10, MAX_UNITS); // if the amount is too small, no bad debt forms.
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, badDebtPriceDown(units));
         collateralize(obligation, borrower, units);
         setupObligation(obligation, units);

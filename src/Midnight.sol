@@ -89,7 +89,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the obligation's spacing.
-/// @dev Newly created obligations start at the global DEFAULT_TICK_SPACING.
+/// @dev First-touched obligations start at the global DEFAULT_TICK_SPACING.
 /// @dev The tickSpacingSetter can decrease the spacing to a divisor of the current spacing, unlocking new ticks only.
 ///
 /// AUTHORIZATIONS
@@ -236,7 +236,7 @@ contract Midnight is IMidnight {
     /// @dev Refines the tick spacing of an obligation. Can not increase (more ticks become accessible).
     function setObligationTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
-        require(obligationState[id].tickSpacing > 0, ObligationNotCreated());
+        require(obligationState[id].tickSpacing > 0, ObligationNotTouched());
         require(newTickSpacing > 0 && obligationState[id].tickSpacing % newTickSpacing == 0, InvalidTickSpacing());
         // forge-lint: disable-next-line(unsafe-typecast) as newTickSpacing <= DEFAULT_TICK_SPACING < type(uint8).max
         obligationState[id].tickSpacing = uint8(newTickSpacing);
@@ -249,7 +249,7 @@ contract Midnight is IMidnight {
         require(index <= 6, InvalidFeeIndex());
         require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
         require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
-        require(_obligationState.tickSpacing > 0, ObligationNotCreated());
+        require(_obligationState.tickSpacing > 0, ObligationNotTouched());
         // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
         uint16 newTradingFeeCbp = uint16(newTradingFee / CBP);
         if (index == 0) _obligationState.tradingFeeCbp0 = newTradingFeeCbp;
@@ -276,7 +276,7 @@ contract Midnight is IMidnight {
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
-        require(_obligationState.tickSpacing > 0, ObligationNotCreated());
+        require(_obligationState.tickSpacing > 0, ObligationNotTouched());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         _obligationState.continuousFee = uint32(newContinuousFee);
         emit EventsLib.SetObligationContinuousFee(id, newContinuousFee);
@@ -301,7 +301,7 @@ contract Midnight is IMidnight {
         bytes32 id = toId(obligation);
         ObligationState storage _obligationState = obligationState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        require(_obligationState.tickSpacing > 0, ObligationNotCreated());
+        require(_obligationState.tickSpacing > 0, ObligationNotTouched());
 
         _obligationState.continuousFeeCredit -= UtilsLib.toUint128(amount);
         _obligationState.totalUnits -= UtilsLib.toUint128(amount);
@@ -722,7 +722,7 @@ contract Midnight is IMidnight {
         }
     }
 
-    /// @dev Returns the obligation id and creates the obligation if it doesn't exist yet.
+    /// @dev Returns the obligation id and first-touches the obligation if it hasn't been touched yet.
     function touchObligation(Obligation memory obligation) public returns (bytes32) {
         bytes32 id = toId(obligation);
         if (obligationState[id].tickSpacing == 0) {
@@ -756,7 +756,7 @@ contract Midnight is IMidnight {
             _obligationState.continuousFee = defaultContinuousFee[obligation.loanToken];
             IdLib.storeInCode(obligation, INITIAL_CHAIN_ID);
 
-            emit EventsLib.ObligationCreated(id, obligation);
+            emit EventsLib.ObligationFirstTouched(id, obligation);
         }
         return id;
     }
@@ -793,7 +793,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePosition(Obligation memory obligation, address user) external returns (uint128, uint128, uint128) {
         bytes32 id = toId(obligation);
-        require(obligationState[id].tickSpacing > 0, ObligationNotCreated());
+        require(obligationState[id].tickSpacing > 0, ObligationNotTouched());
         return _updatePosition(obligation, id, user);
     }
 
@@ -846,7 +846,7 @@ contract Midnight is IMidnight {
     /// @dev Reverts if the id is not a valid id of a touched obligation.
     /// @dev Returns the obligation corresponding to the given id.
     function toObligation(bytes32 id) external view returns (Obligation memory) {
-        require(obligationState[id].tickSpacing > 0, ObligationNotCreated());
+        require(obligationState[id].tickSpacing > 0, ObligationNotTouched());
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Obligation));
     }
@@ -875,7 +875,7 @@ contract Midnight is IMidnight {
         return obligationState[id].withdrawable;
     }
 
-    /// @dev The trading fee cbp values are 0 until the obligation is created, then set to the default value.
+    /// @dev The trading fee cbp values are 0 until the obligation is touched, then set to the default value.
     function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
         return [
             obligationState[id].tradingFeeCbp0,
@@ -888,7 +888,7 @@ contract Midnight is IMidnight {
         ];
     }
 
-    /// @dev The continuous fee is 0 until the obligation is created, then set to the default value.
+    /// @dev The continuous fee is 0 until the obligation is touched, then set to the default value.
     function continuousFee(bytes32 id) external view returns (uint32) {
         return obligationState[id].continuousFee;
     }
@@ -933,7 +933,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
     function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         ObligationState storage _obligationState = obligationState[id];
-        require(_obligationState.tickSpacing > 0, ObligationNotCreated());
+        require(_obligationState.tickSpacing > 0, ObligationNotTouched());
 
         if (timeToMaturity >= 360 days) return _obligationState.tradingFeeCbp6 * CBP;
 

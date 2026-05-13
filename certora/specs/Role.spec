@@ -165,8 +165,8 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 /// FEE SETTER: ACCESS CONTROL ///
 /// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
-/// Once an obligation is created, only the fee setter can modify its continuous fees.
-rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+/// Once an obligation is touched, only the fee setter can modify its continuous fees.
+rule onlyFeeSetterCanChangeObligationContinuousFeeAfterFirstTouch(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require tickSpacing(id) > 0, "obligation must exist";
     uint32 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
@@ -201,8 +201,8 @@ rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 new
 
 /// TICK SPACING SETTER: ACCESS CONTROL ///
 
-/// Once an obligation is created, only the tick spacing setter can modify its tick spacing.
-rule onlyTickSpacingSetterCanChangeObligationTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+/// Once an obligation is touched, only the tick spacing setter can modify its tick spacing.
+rule onlyTickSpacingSetterCanChangeObligationTickSpacingAfterFirstTouch(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require tickSpacing(id) > 0, "obligation must exist";
     uint8 tickSpacingBefore = tickSpacing(id);
     address tickSpacingSetterBefore = tickSpacingSetter();

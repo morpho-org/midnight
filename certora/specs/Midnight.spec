@@ -43,7 +43,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
+function obligationIsTouched(Midnight.Obligation obligation) returns (bool) {
     return tickSpacing(summaryToId(obligation)) > 0;
 }
 

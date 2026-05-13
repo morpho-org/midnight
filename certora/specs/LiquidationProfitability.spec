@@ -18,7 +18,7 @@ methods {
     // Deterministic toId summary using a wrapper that extracts all scalar Obligation fields.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation);
 
-    // Skip obligation creation logic: removes the collateral-validation loop.
+    // Skip obligation first-touch logic: removes the collateral-validation loop.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Token transfers happen after return values are computed; irrelevant to the assertion.
