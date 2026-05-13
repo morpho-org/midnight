@@ -9,10 +9,10 @@ import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/HashLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
-uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0xddcb537c210632f65370d6191dd371ccbafa63c1825fc95f64017c928b671e07;
-bytes32 constant SIG_S = 0x42ca943e3eb8cf496f5814a4c133773865c303c2096a3a5a21d00049c28b4ebb;
+address constant ACCOUNT = 0x8278e0FdF6036DF01CF23307F0dC6E83d0279C1C;
+uint8 constant SIG_V = 27;
+bytes32 constant SIG_R = 0x8b31ed2dba1473ba38dab1ef6d0f40e5434ce3e6ecf5d45f8ed16de9d9d229d4;
+bytes32 constant SIG_S = 0x6f1809545d188f230375a077418ce4768f4f25f7186f4205711ba075a26cd432;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 uint256 constant HEIGHT = 2;
@@ -35,9 +35,9 @@ contract FrontendSignatureTest is Test {
     function testFrontendSignatureVerification() public view {
         Offer[4] memory offers;
         offers[0] = defaultOffer(2);
-        offers[1] = defaultOffer(1);
+        offers[1] = defaultOffer(4);
         offers[2] = defaultOffer(3);
-        offers[3] = defaultOffer(4);
+        offers[3] = defaultOffer(1);
 
         bytes32 h0 = HashLib.hashOffer(offers[0]);
         bytes32 h1 = HashLib.hashOffer(offers[1]);

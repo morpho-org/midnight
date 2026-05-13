@@ -47,7 +47,6 @@ function buildTypes(height: number) {
       { name: "expiry", type: "uint256" },
       { name: "tick", type: "uint256" },
       { name: "group", type: "bytes32" },
-      { name: "session", type: "bytes32" },
       { name: "callback", type: "address" },
       { name: "callbackData", type: "bytes" },
       { name: "receiverIfMakerIsSeller", type: "address" },
@@ -75,7 +74,6 @@ function defaultOffer(number: string) {
     expiry: 2**32,
     tick: "0",
     group: ZERO_B32,
-    session: ZERO_B32,
     callback: ZERO_ADDR,
     callbackData: "0x",
     receiverIfMakerIsSeller: ZERO_ADDR,
@@ -89,8 +87,8 @@ function defaultOffer(number: string) {
 // WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
 function buildOfferTree() {
   return [
-    [defaultOffer("2"), defaultOffer("1")],
-    [defaultOffer("3"), defaultOffer("4")],
+    [defaultOffer("2"), defaultOffer("4")],
+    [defaultOffer("3"), defaultOffer("1")],
   ];
 }
 

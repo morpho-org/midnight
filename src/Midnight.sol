@@ -86,14 +86,14 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of maxAssets or maxUnits can be nonzero per offer.
 ///
-/// SESSION
-/// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
-/// @dev Offers should have the current session to be valid.
+/// OFFER CAPS
+/// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
+/// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
+/// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 ///
 /// AUTHORIZATIONS
-/// @dev All functions that change the position, session, consumed and authorization are accessible to the user and to
+/// @dev All functions that change the position, consumed and authorization are accessible to the user and to
 /// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
 /// scoped behavior.
 /// @dev When authorizing a smart-contract, one should consider:
@@ -182,7 +182,6 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => ObligationState) public obligationState;
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
-    mapping(address user => bytes32) public session;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultTradingFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
@@ -349,7 +348,6 @@ contract Midnight is IMidnight {
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
-        require(offer.session == session[offer.maker], InvalidSession());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
@@ -708,14 +706,6 @@ contract Midnight is IMidnight {
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;
         emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
-    }
-
-    /// @dev TODO: is it safe enough?
-    function shuffleSession(address onBehalf) external {
-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
-        bytes32 newSession = keccak256(abi.encode(session[onBehalf], blockhash(block.number - 1)));
-        session[onBehalf] = newSession;
-        emit EventsLib.ShuffleSession(msg.sender, onBehalf, newSession);
     }
 
     /// @dev See Authorization section above.
