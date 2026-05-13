@@ -50,6 +50,9 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
+        if (dest == currentContract) {
+            CVL_claimableTradingFeeEnterContract(token, value);
+        }
     }
     return success;
 }
@@ -98,6 +101,26 @@ function CVL_flashLoanEnd(address token, uint256 amount) {
     flashloans[token] = flashloans[token] - amount;
 }
 
+// Claimable trading fees can be recorded before the matching token balance is pulled into the contract.
+// Track that temporary gap like flash loans so strong invariants can hold before external calls in-between.
+persistent ghost mapping(address => mathint) claimableTradingFeesNotInContract {
+    init_state axiom (forall address token. claimableTradingFeesNotInContract[token] == 0);
+}
+
+function CVL_claimableTradingFeeEnterContract(address token, uint256 amount) {
+    if (claimableTradingFeesNotInContract[token] <= amount) {
+        claimableTradingFeesNotInContract[token] = 0;
+    } else {
+        claimableTradingFeesNotInContract[token] = claimableTradingFeesNotInContract[token] - amount;
+    }
+}
+
+hook Sstore claimableTradingFee[KEY address token] uint256 newClaimableTradingFee (uint256 oldClaimableTradingFee) {
+    if (newClaimableTradingFee > oldClaimableTradingFee) {
+        claimableTradingFeesNotInContract[token] = claimableTradingFeesNotInContract[token] + newClaimableTradingFee - oldClaimableTradingFee;
+    }
+}
+
 // Define collateral sum and withdrawable sum.
 
 definition collateralSum(address token) returns mathint = usum bytes32 id, address owner. collateralMirror[id][owner][token];
@@ -134,10 +157,10 @@ hook Sstore obligationState[KEY bytes32 id].withdrawable uint128 newWithdrawable
 
 /// INVARIANTS AND RULES ///
 
-// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
+// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token, minus amounts temporarily outside the contract.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
+    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token] - claimableTradingFeesNotInContract[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
@@ -165,3 +188,17 @@ rule flashLoansPaidBack(method f, address token) {
 // With tokenBalanceCorrect, this proves that for any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token.
 weak invariant flashLoansZero(address token)
     flashloans[token] == 0;
+
+// For any token, the amount of claimable trading fees recorded before collection is unchanged by a completed call.
+// This rule is useful to prove that using a persistent ghost for claimableTradingFeesNotInContract is sound.
+rule claimableTradingFeesCollected(method f, address token) {
+    env e;
+    calldataarg args;
+    mathint oldClaimableTradingFeeNotInContract = claimableTradingFeesNotInContract[token];
+    f(e, args);
+    assert claimableTradingFeesNotInContract[token] == oldClaimableTradingFeeNotInContract, "claimable trading fee collected";
+}
+
+// For any token, no claimable trading fee remains outside the contract after a transaction.
+weak invariant claimableTradingFeesInContract(address token)
+    claimableTradingFeesNotInContract[token] == 0;

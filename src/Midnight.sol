@@ -327,6 +327,7 @@ contract Midnight is IMidnight {
         uint256 buyerPrice = sellerPrice + _tradingFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+        uint256 tradingFeeAssets = buyerAssets - sellerAssets;
 
         uint256 newConsumed;
         if (offer.maxAssets > 0) {
@@ -362,6 +363,7 @@ contract Midnight is IMidnight {
 
         _obligationState.totalUnits =
             UtilsLib.toUint128(_obligationState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+        claimableTradingFee[offer.obligation.loanToken] += tradingFeeAssets;
 
         if (offer.reduceOnly) {
             require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
@@ -412,8 +414,7 @@ contract Midnight is IMidnight {
             );
         }
 
-        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.obligation.loanToken] += buyerAssets - sellerAssets;
+        SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, address(this), tradingFeeAssets);
         SafeTransferLib.safeTransferFrom(offer.obligation.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
