@@ -5,8 +5,8 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {
     HashLib,
     COLLATERAL_PARAMS_TYPE,
-    OBLIGATION_TYPE,
-    OBLIGATION_TYPEHASH,
+    MARKET_TYPE,
+    MARKET_TYPEHASH,
     OFFER_TYPE
 } from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
@@ -19,7 +19,7 @@ contract HashLibTest is Test {
         }
         bytes32 expectedHash = keccak256(
             abi.encode(
-                OBLIGATION_TYPEHASH,
+                MARKET_TYPEHASH,
                 market.loanToken,
                 keccak256(abi.encodePacked(collateralParamsHashes)),
                 market.maturity,
@@ -75,7 +75,7 @@ contract HashLibTest is Test {
                         bytes(repeat("[2]", height)),
                         " offerTree)",
                         COLLATERAL_PARAMS_TYPE,
-                        OBLIGATION_TYPE,
+                        MARKET_TYPE,
                         OFFER_TYPE
                     )
                 )
