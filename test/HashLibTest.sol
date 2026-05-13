@@ -25,7 +25,6 @@ contract HashLibTest is Test {
                 offer.expiry,
                 offer.tick,
                 offer.group,
-                offer.session,
                 offer.callback,
                 keccak256(offer.callbackData),
                 offer.receiverIfMakerIsSeller,

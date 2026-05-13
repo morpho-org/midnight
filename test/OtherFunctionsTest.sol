@@ -318,12 +318,6 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
-    function testShuffleSession(address user) public {
-        vm.prank(user);
-        midnight.shuffleSession(user);
-        assertEq(midnight.session(user), keccak256(abi.encode(0, blockhash(block.number - 1))), "session");
-    }
-
     function testSupplyCollateralDoesNotCallOracle(uint256 collateral) public {
         collateral = bound(collateral, 0, MAX_TEST_AMOUNT);
         RevertingOracle revertingOracle = new RevertingOracle();

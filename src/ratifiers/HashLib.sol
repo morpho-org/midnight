@@ -12,9 +12,9 @@ bytes constant OBLIGATION_TYPE =
 /// @dev keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE))
 bytes32 constant OBLIGATION_TYPEHASH = 0xdcb3d766540d305590a1ee685cb2636a7271c1eea05949c19a23eb48c7492d24;
 bytes constant OFFER_TYPE =
-    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,bytes32 session,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
+    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE))
-bytes32 constant OFFER_TYPEHASH = 0x832d2325d9fdecb4919fae592db91c04ed32e757cf419102a9ca1b54187a02aa;
+bytes32 constant OFFER_TYPEHASH = 0xdf99c78ec0578533b0e52d329a9866adb5ef6bae6a0c56f9bb562ba6d9be867f;
 
 library HashLib {
     error TreeTooHigh();
@@ -25,28 +25,28 @@ library HashLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height < 11) {
-            if (height == 0) return 0xe44a06d7beccd42078013099c75f6bf15bbf7011b32f0fac5f0d1be11209fb45;
-            if (height == 1) return 0xe76957cbe055f833a3535c27c910d8b3ff551c57122cd7c144664dcaf6ef57c2;
-            if (height == 2) return 0x8ed636f96d015ec0b37331755bd1ed810b518651d1f608ef0da8faf8a716a9fa;
-            if (height == 3) return 0xed435d712423199e157e3b5a09dae057b80f4e24c66506fab90a532a281f119b;
-            if (height == 4) return 0xc0be3e3e3db20135f4e4b0e0ec303b2370bff3a6c6f1694e590688679d3c791d;
-            if (height == 5) return 0xa11a82bad74d349c4815e64b3d1c0e8b67996a416bed7de5be2a3f99c713f0ea;
-            if (height == 6) return 0x26b9fced7071170acdd2cccb33b167efab84a6e642da76eb114c28bfa65b64fa;
-            if (height == 7) return 0x8fe59ac3e9ed3d2b996863d15a70fc04e25d57b0c38a84a106f382d650a852d7;
-            if (height == 8) return 0xb5a57691ae822b37e31d9777d494a7c87678280f896cbad814b660390eea6b61;
-            if (height == 9) return 0xd87a4d4c8046ebabe9b990871cb18534f7f62534e5659e739c679aa6378d5519;
-            return 0x52d7e6cdfd06ffa64fec4914dd59d23b2a18610350763964ffe997412517b37a;
+            if (height == 0) return 0x9a4cffa064818006f9fa53857eafbd9974c971f009276be3fd30481edb617f49;
+            if (height == 1) return 0x73e25e0ecda983be4e607052c9c61b1f73c5812c7963412e271ba99e98f38c7c;
+            if (height == 2) return 0x9172b36c68635815d03f222ce2193bc103d476c9f2c84dedb041304ae7c22f75;
+            if (height == 3) return 0xec6af766c7d762b2855f250b9f13ded677c04c8d69c43f137072d241d2a489ae;
+            if (height == 4) return 0x073e69543318e08cf57881744e4374416351f0150b5d84a012da36fe123d80d0;
+            if (height == 5) return 0x456356eca104d2cf05e643ef7fd0e6bb65a1a5721159fc458d9804f1d40c770c;
+            if (height == 6) return 0x43a6840fbae6a9098ca657734227a6626feeb331dbefe5a8621ffcea16fbfee4;
+            if (height == 7) return 0x426ba4f3e501aeff3b12f2620e1b7278bd27254693b9d1be525e76d90ad81983;
+            if (height == 8) return 0x8c83e4332d4c4582e00472571210879c28961c85af403f7ca8cf1c588ed73fea;
+            if (height == 9) return 0x51e09d5a4a99b2f34b074afaf10f6090ee01d0d8dc881b2a33e0862efdea4389;
+            return 0x2bbf39e344c1df3e8d099b61e9fadcfff00366ed08390402298e7aff84f40b01;
         } else {
-            if (height == 11) return 0xfa83a2c65fb1461f15e882933fe76b1bdc109593e0290fc9e7b8b1cf563ab45b;
-            if (height == 12) return 0x48c3385bb136122d66812803a4900c7fe06ea36fcd4b1723a73d83e7ca0cc741;
-            if (height == 13) return 0x20e338378ffdffb282b5d15c84729a501620e94aee44ce9f79b51226dad53da3;
-            if (height == 14) return 0x1245eebd3b0c0d2eb646c2774d01ac8e25e5e15546e0c541da165f3fd323b4ea;
-            if (height == 15) return 0xdbe18915d349eb57a97c0c27074f78cdd7ef74c4bbb462f3c2af5f6309c7d333;
-            if (height == 16) return 0xfe68c4beb45b8b211183073f7ba722b88b74c83dd8106a32b99a67223773c1a3;
-            if (height == 17) return 0xf3d480585999f714d3c14b21dc8778a5b482ab9de408b58d1d9b2eda9e72c728;
-            if (height == 18) return 0x5ca45d9e6845331c5349cd07435d2a3f2b9fe342794a628f12067aca895432fe;
-            if (height == 19) return 0x27ab2cec644494459bf6cfbde6c271fdc8b089d0552aa014bef0c44965cbfa71;
-            if (height == 20) return 0xdb06b6765eb9ed46556b2d149c00a81e61a0f019925b5948d368a37c841ef7f9;
+            if (height == 11) return 0xe6e20c789f3afce3a3fe9de56059bedcfca0b6104ffbfd752491e49691267cdb;
+            if (height == 12) return 0x8ce2628ddc927bcfc3466ced668b48102af1bb61ff7f42c3b58c78cbd8f5fd01;
+            if (height == 13) return 0xe7f97c22e30d8b9e693dd81bf4f5794ef72413105d9b0858c12affcf16300523;
+            if (height == 14) return 0x4fe3f1f3a4921a4b2268ea7a7077dc7e95256b5b4e75ce221e94cf006263516c;
+            if (height == 15) return 0x0407c3a3ad36093fe23beb83a4b6e719a138d03fc7d36a85b10efc76713a1293;
+            if (height == 16) return 0xa1e429b3cef45d25743c2abee55b9a2dd7ff33512791e83ed8f45039419d5da3;
+            if (height == 17) return 0xa33a8f9b581ff5d305b36b96ba23dc5d3337288af80f8a3d60ba9b6ac3dd347c;
+            if (height == 18) return 0x2003b976fb1f6e95af69350f4b4244bcada74db4164041a7b3808a91206d334e;
+            if (height == 19) return 0x192d0bfd097f77eb5ad08f728288a1e7525ecfbe73bfdad7b311a21d8c4134ae;
+            if (height == 20) return 0xfbc96454b1a9e6406df6a70ee6acecc03f3b0a20a4253abddcbb695175b3bc11;
             revert TreeTooHigh();
         }
     }
@@ -116,7 +116,7 @@ library HashLib {
     /// @dev Computes the EIP-712 hash struct of an Offer.
     /// @dev Same as keccak256(abi.encode(OFFER_TYPEHASH, ...));
     function hashOffer(Offer memory offer) internal pure returns (bytes32) {
-        bytes32[16] memory w;
+        bytes32[15] memory w;
         w[0] = OFFER_TYPEHASH;
         w[1] = hashObligation(offer.obligation);
         w[2] = bytes32(uint256(offer.buy ? 1 : 0));
@@ -125,17 +125,16 @@ library HashLib {
         w[5] = bytes32(offer.expiry);
         w[6] = bytes32(offer.tick);
         w[7] = offer.group;
-        w[8] = offer.session;
-        w[9] = bytes32(uint256(uint160(offer.callback)));
-        w[10] = keccak256(offer.callbackData);
-        w[11] = bytes32(uint256(uint160(offer.receiverIfMakerIsSeller)));
-        w[12] = bytes32(uint256(uint160(offer.ratifier)));
-        w[13] = bytes32(uint256(offer.reduceOnly ? 1 : 0));
-        w[14] = bytes32(offer.maxUnits);
-        w[15] = bytes32(offer.maxAssets);
+        w[8] = bytes32(uint256(uint160(offer.callback)));
+        w[9] = keccak256(offer.callbackData);
+        w[10] = bytes32(uint256(uint160(offer.receiverIfMakerIsSeller)));
+        w[11] = bytes32(uint256(uint160(offer.ratifier)));
+        w[12] = bytes32(uint256(offer.reduceOnly ? 1 : 0));
+        w[13] = bytes32(offer.maxUnits);
+        w[14] = bytes32(offer.maxAssets);
         bytes32 result;
         assembly ("memory-safe") {
-            result := keccak256(w, 0x200)
+            result := keccak256(w, 0x1e0)
         }
         return result;
     }
