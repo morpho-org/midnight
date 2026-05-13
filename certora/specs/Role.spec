@@ -9,7 +9,7 @@ methods {
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
-    function spacing(bytes32 id) external returns (uint8) envfree;
+    function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
@@ -188,29 +188,29 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 
 /// TICK SPACING SETTER: LIVENESS ///
 
-rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 newSpacing) {
+rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
     address tickSpacingSetterBefore = tickSpacingSetter();
     bool obligationExists = Utils.obligationCreated(currentContract, id);
-    uint8 spacingBefore = spacing(id);
-    bool validNewSpacing = newSpacing > 0 && spacingBefore % newSpacing == 0;
+    uint8 tickSpacingBefore = tickSpacing(id);
+    bool validNewTickSpacing = newTickSpacing > 0 && tickSpacingBefore % newTickSpacing == 0;
 
-    setObligationTickSpacing@withrevert(e, id, newSpacing);
+    setObligationTickSpacing@withrevert(e, id, newTickSpacing);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && obligationExists && validNewSpacing;
-    assert !reverted => to_mathint(spacing(id)) == to_mathint(newSpacing);
+    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && obligationExists && validNewTickSpacing;
+    assert !reverted => to_mathint(tickSpacing(id)) == to_mathint(newTickSpacing);
 }
 
 /// TICK SPACING SETTER: ACCESS CONTROL ///
 
-/// Once an obligation is created, only the tick spacing setter can modify its spacing.
+/// Once an obligation is created, only the tick spacing setter can modify its tick spacing.
 rule onlyTickSpacingSetterCanChangeObligationTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require Utils.obligationCreated(currentContract, id), "obligation must exist";
-    uint8 spacingBefore = spacing(id);
+    uint8 tickSpacingBefore = tickSpacing(id);
     address tickSpacingSetterBefore = tickSpacingSetter();
 
     f(e, args);
 
-    assert spacing(id) != spacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setObligationTickSpacing(bytes32, uint256).selector;
+    assert tickSpacing(id) != tickSpacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setObligationTickSpacing(bytes32, uint256).selector;
 }
 
 /// FEE CLAIMER: ACCESS CONTROL ///

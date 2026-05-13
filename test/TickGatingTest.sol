@@ -2,9 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 
@@ -57,7 +57,7 @@ contract TickGatingTest is BaseTest {
     // --- Default spacing applied at creation ---
 
     function testDefaultSpacingApplied() public view {
-        assertEq(midnight.spacing(id), 4, "obligation should inherit default spacing 4");
+        assertEq(midnight.tickSpacing(id), 4, "obligation should inherit default spacing 4");
     }
 
     // --- Tick gating in take() ---
@@ -133,14 +133,14 @@ contract TickGatingTest is BaseTest {
     }
 
     function testSetObligationTickSpacingInvalid() public {
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
         midnight.setObligationTickSpacing(id, 3);
 
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
         midnight.setObligationTickSpacing(id, 0);
 
         midnight.setObligationTickSpacing(id, 1);
-        vm.expectRevert(IMidnight.InvalidSpacing.selector);
+        vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
         midnight.setObligationTickSpacing(id, 2);
     }
 
@@ -161,7 +161,7 @@ contract TickGatingTest is BaseTest {
 
     function testCoarserTicksStillValidAfterRefinement(uint256 tick) public {
         // Pick any tick accessible at the default spacing.
-        tick = bound(tick, 1, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         Offer memory offer = _makeOffer(tick);
         uint256 units = 50;
         uint256 price = TickLib.tickToPrice(tick);

@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 
@@ -93,7 +93,7 @@ contract TakeAmountsTest is BaseTest {
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
@@ -115,7 +115,7 @@ contract TakeAmountsTest is BaseTest {
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
@@ -139,7 +139,7 @@ contract TakeAmountsTest is BaseTest {
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         _createPosition(1e36);
 
@@ -162,7 +162,7 @@ contract TakeAmountsTest is BaseTest {
     ) public {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         _createPosition(1e36);
 

@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 5820;
-uint256 constant BASE_SPACING = 4;
 
 library TickLib {
     using TickLib for uint256;

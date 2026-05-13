@@ -12,7 +12,7 @@ contract Utils {
     }
 
     function obligationCreated(IMidnight midnight, bytes32 id) external view returns (bool) {
-        return midnight.spacing(id) > 0;
+        return midnight.tickSpacing(id) > 0;
     }
 
     function getBit(uint128 bitmap, uint256 bit) external pure returns (bool) {

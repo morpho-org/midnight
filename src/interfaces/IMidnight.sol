@@ -50,7 +50,7 @@ struct ObligationState {
     uint16 tradingFeeCbp5;
     uint16 tradingFeeCbp6;
     uint32 continuousFee;
-    uint8 spacing;
+    uint8 tickSpacing;
 }
 
 struct Position {
@@ -80,7 +80,7 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
-    error InvalidSpacing();
+    error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
@@ -116,7 +116,7 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeeCbp0, uint16 tradingFeeCbp1, uint16 tradingFeeCbp2, uint16 tradingFeeCbp3, uint16 tradingFeeCbp4, uint16 tradingFeeCbp5, uint16 tradingFeeCbp6, uint32 continuousFee, uint8 spacing);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeeCbp0, uint16 tradingFeeCbp1, uint16 tradingFeeCbp2, uint16 tradingFeeCbp3, uint16 tradingFeeCbp4, uint16 tradingFeeCbp5, uint16 tradingFeeCbp6, uint32 continuousFee, uint8 tickSpacing);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
     function defaultTradingFeeCbp(address loanToken, uint256 index) external view returns (uint16);
@@ -135,7 +135,7 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
-    function setObligationTickSpacing(bytes32 id, uint256 newSpacing) external;
+    function setObligationTickSpacing(bytes32 id, uint256 newTickSpacing) external;
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
@@ -169,7 +169,7 @@ interface IMidnight {
     function debtOf(bytes32 id, address user) external view returns (uint256);
     function totalUnits(bytes32 id) external view returns (uint256);
     function lossFactor(bytes32 id) external view returns (uint128);
-    function spacing(bytes32 id) external view returns (uint8);
+    function tickSpacing(bytes32 id) external view returns (uint8);
     function withdrawable(bytes32 id) external view returns (uint256);
     function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);

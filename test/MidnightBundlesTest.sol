@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib, MAX_TICK, BASE_SPACING} from "../src/libraries/TickLib.sol";
-import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {ERC20Permit} from "./erc20s/ERC20Permit.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -1200,7 +1200,7 @@ contract MidnightBundlesTest is BaseTest {
     // Average price.
 
     function testBuyUnitsTargetAveragePriceExceeded(uint256 tick) public {
-        tick = bound(tick, 1, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].buy = false;
@@ -1235,7 +1235,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testSellUnitsTargetAveragePriceTooLow(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].maxUnits = units;
@@ -1267,7 +1267,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testBuyBuyerAssetsTargetAveragePriceExceeded(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].buy = false;
@@ -1302,7 +1302,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testSellSellerAssetsTargetAveragePriceTooLow(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].maxUnits = units;
