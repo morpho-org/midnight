@@ -4,9 +4,6 @@ pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 5908;
-// Minimum representable price increment in WAD. Tick prices are rounded to multiples of this value. Chosen as a
-// divisor of 1e18 so par price is exactly on the grid, and small enough that MAX_TICK is the only tick mapping to
-// 1e18 (and tick 0 the only one mapping to 0) under standard half-down rounding.
 uint256 constant PRICE_ROUNDING_STEP = 0.8e12;
 
 library TickLib {
