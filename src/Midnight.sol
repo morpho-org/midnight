@@ -25,7 +25,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if an market has been touched, check if tickSpacing(marketId) > 0.
 ///
-/// MULTI-COLLATERAL OBLIGATIONS
+/// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
 /// particular, the borrowers of multicollat markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
