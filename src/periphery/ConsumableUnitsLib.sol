@@ -9,7 +9,7 @@ import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 library ConsumableUnitsLib {
     using UtilsLib for uint256;
 
-    /// @dev Returns the number of units that can still be consumed from the offer.
+    /// @dev Returns a number of units such that it fully consumes the offer.
     /// @dev Assumes that `id` matches `offer.obligation`.
     function consumableUnits(address midnight, bytes32 id, Offer memory offer) internal view returns (uint256) {
         uint256 consumed = IMidnight(midnight).consumed(offer.maker, offer.group);
