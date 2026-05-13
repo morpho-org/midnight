@@ -6,7 +6,7 @@ import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.s
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
 import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 

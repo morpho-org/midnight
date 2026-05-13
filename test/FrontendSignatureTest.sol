@@ -6,7 +6,7 @@ import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0x8278e0FdF6036DF01CF23307F0dC6E83d0279C1C;

@@ -7,7 +7,7 @@ import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcreco
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
