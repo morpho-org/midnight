@@ -14,7 +14,7 @@ import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
 import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from "./interfaces/IMidnight.sol";
 
-/// OBLIGATIONS
+/// MARKETS
 /// @dev The maximum time to maturity is 100 years.
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
@@ -25,7 +25,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 ///
-/// MULTI-COLLATERAL OBLIGATIONS
+/// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
 /// particular, the borrowers of multicollat markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
