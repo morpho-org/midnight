@@ -36,11 +36,11 @@ contract SetterRatifierTest is BaseTest {
         offer.tick = MAX_TICK;
     }
 
-    function testSetIsRatifiedMaker() public {
+    function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
         vm.prank(lender);
-        setterRatifier.setIsRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(lender, _root, true);
 
         assertTrue(setterRatifier.isRootRatified(lender, _root));
     }
@@ -53,7 +53,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        setterRatifier.setIsRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
         bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, new bytes32[](0)));
@@ -70,7 +70,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(lender, borrower, true);
 
         vm.prank(borrower);
-        setterRatifier.setIsRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
         midnight.take(0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, proof([offer])));
@@ -81,17 +81,17 @@ contract SetterRatifierTest is BaseTest {
         bytes32 _root = HashLib.hashOffer(offer);
 
         vm.prank(lender);
-        setterRatifier.setIsRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.expectRevert(ISetterRatifier.NotMidnight.selector);
         setterRatifier.isRatified(offer, abi.encode(_root, new bytes32[](0)));
     }
 
-    function testSetIsRatifiedUnauthorizedOnBehalf() public {
+    function testSetIsRootRatifiedUnauthorizedOnBehalf() public {
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
         vm.expectRevert(ISetterRatifier.Unauthorized.selector);
-        setterRatifier.setIsRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(lender, _root, true);
     }
 }
