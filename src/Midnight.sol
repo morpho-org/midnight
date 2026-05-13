@@ -39,7 +39,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
-/// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly. For 0d, 0.14 bps.
+/// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly (except for 0d, 0.14 bps).
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new obligations. Then, the fee setter can override it.
