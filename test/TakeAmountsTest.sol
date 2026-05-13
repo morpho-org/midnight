@@ -141,7 +141,7 @@ contract TakeAmountsTest is BaseTest {
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(1e36);
+        _createPosition(2e36);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -164,7 +164,7 @@ contract TakeAmountsTest is BaseTest {
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(1e36);
+        _createPosition(2e36);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -205,7 +205,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
-        _createPosition(1e36);
+        _createPosition(2e36);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
