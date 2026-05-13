@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 5908;
+// Minimum representable price increment in WAD (1e-6 WAD). Tick prices are rounded to multiples of this value.
 uint256 constant PRICE_ROUNDING_STEP = 0.8e12;
 
 library TickLib {
