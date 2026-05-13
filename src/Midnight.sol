@@ -88,7 +88,6 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
 /// @dev Only one of maxAssets or maxUnits can be nonzero per offer.
 ///
-///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, consumed and authorization are accessible to the user and to
 /// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
