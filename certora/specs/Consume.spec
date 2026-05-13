@@ -7,13 +7,13 @@ methods {
     function totalUnits(bytes32 id) external returns (uint256) envfree;
 
     // Summaries for complex internals irrelevant to consumed-mapping properties.
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 

@@ -5,26 +5,26 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function tradingFee(bytes32, uint256) external returns (uint256) envfree;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic TickLib.tickToPrice summary to be able to reference the price in the rules.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 
-    // Sound summary since toObligation is not used by the protocol.
-    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
+    // Sound summary since toMarket is not used by the protocol.
+    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
     // Over-approximate view functions for prover performance.
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy, because we need to know that the trading fee won't change in the onRatify callback. This allows to reference the trading fee in the rule tradingFeeSpreadBounds.
 }
 
-function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
-    return Utils.hashObligation(obligation);
+function summaryToId(Midnight.Market market) returns (bytes32) {
+    return Utils.hashMarket(market);
 }
 
 persistent ghost summaryTickToPrice(uint256) returns uint256;
@@ -48,9 +48,9 @@ rule makerFavorableRounding(env e, uint256 units, address taker, address takerCa
 
 // The spread between what the buyer pays and what the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
 rule tradingFeeSpreadBounds(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
-    uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
+    uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
-    bytes32 id = summaryToId(offer.obligation);
+    bytes32 id = summaryToId(offer.market);
     uint256 fee = tradingFee(id, timeToMaturity);
 
     uint256 buyerAssets;

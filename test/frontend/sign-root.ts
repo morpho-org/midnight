@@ -31,7 +31,7 @@ function buildTypes(height: number) {
       { name: "maxLif", type: "uint256" },
       { name: "oracle", type: "address" },
     ],
-    Obligation: [
+    Market: [
       { name: "loanToken", type: "address" },
       { name: "collateralParams", type: "CollateralParams[]" },
       { name: "maturity", type: "uint256" },
@@ -40,7 +40,7 @@ function buildTypes(height: number) {
       { name: "liquidatorGate", type: "address" },
     ],
     Offer: [
-      { name: "obligation", type: "Obligation" },
+      { name: "market", type: "Market" },
       { name: "buy", type: "bool" },
       { name: "maker", type: "address" },
       { name: "start", type: "uint256" },
@@ -60,7 +60,7 @@ function buildTypes(height: number) {
 
 function defaultOffer(number: string) {
   return {
-    obligation: {
+    market: {
       loanToken: "0x" + number.repeat(40),
       collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: ZERO_ADDR}],
       maturity: "0",
@@ -87,8 +87,8 @@ function defaultOffer(number: string) {
 // WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
 function buildOfferTree() {
   return [
-    [defaultOffer("2"), defaultOffer("4")],
-    [defaultOffer("3"), defaultOffer("1")],
+    [defaultOffer("1"), defaultOffer("2")],
+    [defaultOffer("3"), defaultOffer("4")],
   ];
 }
 

@@ -1,25 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Midnight as Midnight;
+using Utils as Utils;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
-    function Midnight.maxLif(uint256, uint256) external returns (uint256) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
 
 rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 cursor) {
-    require lltv <= WAD(), "see rule createdObligationsHaveLltvLessThanOrEqualToOne";
+    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
     require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
-    assert lltv * maxLif(lltv, cursor) <= WAD() * WAD();
+    assert lltv * Utils.maxLif(lltv, cursor) <= WAD() * WAD();
 }
 
 /// @dev maxLif >= WAD. Used in NoDivisionByZero.spec to prove that the nested mulDivDown divisor in maxLif is positive, without assuming it.
 /// Proof: maxLif = WAD^2 / (WAD - cursor*(WAD-lltv)/WAD) and the denominator is less than WAD because the subtractions are checked to not underflow in solidity.
 rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
-    assert maxLif(lltv, cursor) >= WAD();
+    assert Utils.maxLif(lltv, cursor) >= WAD();
 }
 
 /// @dev maxLif <= 2*WAD for valid cursor values. Used in NoMultiplicationOverflow.spec.
@@ -36,5 +34,5 @@ rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 cursor) {
 /// WAD - ceil(lif * lltv / WAD) is positive.
 rule lifTimesLltvStrictBound(uint256 lltv, uint256 cursor) {
     require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
-    assert lltv < WAD() => lltv * maxLif(lltv, cursor) <= WAD() * (WAD() - 1);
+    assert lltv < WAD() => lltv * Utils.maxLif(lltv, cursor) <= WAD() * (WAD() - 1);
 }

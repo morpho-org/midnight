@@ -2,14 +2,17 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer} from "../../src/interfaces/IMidnight.sol";
-import {Obligation} from "../../src/interfaces/IMidnight.sol";
+import {Offer, Market} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {CALLBACK_SUCCESS, maxTradingFee as _maxTradingFee} from "../../src/libraries/ConstantsLib.sol";
+import {
+    CALLBACK_SUCCESS,
+    maxTradingFee as _maxTradingFee,
+    maxLif as _maxLif
+} from "../../src/libraries/ConstantsLib.sol";
 
 contract Utils {
-    function hashObligation(Obligation memory obligation) external pure returns (bytes32) {
-        return keccak256(abi.encode(obligation));
+    function hashMarket(Market memory market) external pure returns (bytes32) {
+        return keccak256(abi.encode(market));
     }
 
     function getBit(uint128 bitmap, uint256 bit) external pure returns (bool) {
@@ -43,5 +46,9 @@ contract Utils {
 
     function maxTradingFee(uint256 index) external pure returns (uint256) {
         return _maxTradingFee(index);
+    }
+
+    function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {
+        return _maxLif(lltv, cursor);
     }
 }
