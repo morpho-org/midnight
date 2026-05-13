@@ -114,6 +114,21 @@ contract GateTest is BaseTest {
         take(units, borrower, lenderOffer);
     }
 
+    function testTakeChecksSellerHealthBeforeBuyerEnterGate(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        take(units, lender, borrowerOffer);
+    }
+
+    function testTakeChecksSellerHealthBeforeSellerEnterGate(uint256 units) public {
+        units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
+        gate.setWhitelisted(lender, true);
+
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        take(units, lender, borrowerOffer);
+    }
+
     function testEnterGateAllowsWhitelistedUsers(uint256 units) public {
         units = bound(units, 1, MAX_TEST_AMOUNT * 3 / 4);
         collateralize(gatedObligation, borrower, units);

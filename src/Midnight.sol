@@ -393,17 +393,6 @@ contract Midnight is IMidnight {
             require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
         }
 
-        require(
-            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
-            BuyerGatedFromIncreasingCredit()
-        );
-        require(
-            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
-            SellerGatedFromIncreasingDebt()
-        );
-
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
         address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
@@ -456,6 +445,16 @@ contract Midnight is IMidnight {
             position[id][seller].debt == 0 || liquidationLocked(id, seller)
                 || (block.timestamp <= offer.obligation.maturity && isHealthy(offer.obligation, id, seller)),
             SellerIsLiquidatable()
+        );
+        require(
+            offer.obligation.enterGate == address(0) || buyerCreditIncrease == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseCredit(buyer),
+            BuyerGatedFromIncreasingCredit()
+        );
+        require(
+            offer.obligation.enterGate == address(0) || sellerDebtIncrease == 0
+                || IEnterGate(offer.obligation.enterGate).canIncreaseDebt(seller),
+            SellerGatedFromIncreasingDebt()
         );
 
         return (buyerAssets, sellerAssets);
