@@ -97,7 +97,6 @@ rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args
     assert consumedAfter == consumedBefore || userIsAuthorized;
 }
 
-
 /// AUTHORIZATION CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's isAuthorized mapping.
