@@ -83,11 +83,13 @@ contract TradingFeeTest is BaseTest {
 
     function testBuyUnits(uint256 tradingFee, uint256 sellerTick, uint256 units) public {
         units = bound(units, 0, MAX_DEBT);
-        sellerTick = bound(sellerTick, 0, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        sellerTick = bound(sellerTick, 0, MAX_TICK);
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         tradingFee = bound(tradingFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
+        midnight.touchObligation(obligation);
+        midnight.setObligationSpacing(id, 1);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;

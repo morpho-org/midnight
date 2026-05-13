@@ -95,7 +95,7 @@ interface IMidnight {
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
     error OnlyRoleSetter();
-    error OnlySpacingSetter();
+    error OnlyTickSpacingSetter();
     error RatifierFail();
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
@@ -125,7 +125,7 @@ interface IMidnight {
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
-    function spacingSetter() external view returns (address);
+    function tickSpacingSetter() external view returns (address);
 
     /// MULTICALL ///
     function multicall(bytes[] memory calls) external;
@@ -134,7 +134,7 @@ interface IMidnight {
     function setRoleSetter(address newRoleSetter) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
-    function setSpacingSetter(address newSpacingSetter) external;
+    function setTickSpacingSetter(address newTickSpacingSetter) external;
     function setObligationSpacing(bytes32 id, uint256 newSpacing) external;
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;

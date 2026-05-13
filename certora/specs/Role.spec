@@ -8,6 +8,8 @@ methods {
     function roleSetter() external returns (address) envfree;
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
+    function tickSpacingSetter() external returns (address) envfree;
+    function spacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
@@ -72,6 +74,14 @@ rule roleSetterCanChangeFeeClaimer(env e, address newFeeClaimer) {
     assert !lastReverted => feeClaimer() == newFeeClaimer;
 }
 
+rule roleSetterCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
+    address roleSetterBefore = roleSetter();
+
+    setTickSpacingSetter@withrevert(e, newTickSpacingSetter);
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
+}
+
 /// ROLE SETTER: ACCESS CONTROL ///
 
 rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
@@ -98,6 +108,15 @@ rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filter
     f(e, args);
 
     assert feeClaimer() != feeClaimerBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeClaimer(address).selector;
+}
+
+rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+    address tickSpacingSetterBefore = tickSpacingSetter();
+    address roleSetterBefore = roleSetter();
+
+    f(e, args);
+
+    assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
 
 /// FEE SETTER: LIVENESS ///
@@ -165,6 +184,33 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
     f(e, args);
 
     assert currentContract.defaultContinuousFee[loanToken] != defaultContinuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setDefaultContinuousFee(address, uint256).selector;
+}
+
+/// TICK SPACING SETTER: LIVENESS ///
+
+rule tickSpacingSetterCanSetObligationSpacing(env e, bytes32 id, uint256 newSpacing) {
+    address tickSpacingSetterBefore = tickSpacingSetter();
+    bool obligationExists = Utils.obligationCreated(currentContract, id);
+    uint8 spacingBefore = spacing(id);
+    bool validNewSpacing = newSpacing > 0 && spacingBefore % newSpacing == 0;
+
+    setObligationSpacing@withrevert(e, id, newSpacing);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && obligationExists && validNewSpacing;
+    assert !reverted => to_mathint(spacing(id)) == to_mathint(newSpacing);
+}
+
+/// TICK SPACING SETTER: ACCESS CONTROL ///
+
+/// Once an obligation is created, only the tick spacing setter can modify its spacing.
+rule onlyTickSpacingSetterCanChangeObligationSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+    require Utils.obligationCreated(currentContract, id), "obligation must exist";
+    uint8 spacingBefore = spacing(id);
+    address tickSpacingSetterBefore = tickSpacingSetter();
+
+    f(e, args);
+
+    assert spacing(id) != spacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setObligationSpacing(bytes32, uint256).selector;
 }
 
 /// FEE CLAIMER: ACCESS CONTROL ///

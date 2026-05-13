@@ -92,6 +92,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 ///
+/// TICK SPACING
+/// @dev Offers can only be placed at ticks that are multiples of the obligation's spacing.
+/// @dev Newly created obligations start at the global BASE_SPACING.
+/// @dev The tickSpacingSetter can decrease the spacing to a divisor of the current spacing, unlocking new ticks only.
+///
 /// AUTHORIZATIONS
 /// @dev All functions that change the position, consumed and authorization are accessible to the user and to
 /// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
@@ -146,10 +151,11 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// revert.
 ///
 /// ROLES
-/// @dev The role setter can set the role setter, fee setter, and fee claimer.
+/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter.
 /// @dev The fee setter can set the default and per-obligation trading fee and continuous fee.
 /// @dev The fee claimer can claim the trading fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
+/// @dev The tick spacing setter can decrease the tick spacing of an obligation.
 ///
 /// MISC
 /// @dev To check if an obligation has been touched, check if spacing(obligationId) > 0.
@@ -190,7 +196,7 @@ contract Midnight is IMidnight {
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
-    address public spacingSetter;
+    address public tickSpacingSetter;
 
     /// CONSTRUCTOR ///
 
@@ -233,15 +239,15 @@ contract Midnight is IMidnight {
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
-    function setSpacingSetter(address newSpacingSetter) external {
+    function setTickSpacingSetter(address newTickSpacingSetter) external {
         require(msg.sender == roleSetter, OnlyRoleSetter());
-        spacingSetter = newSpacingSetter;
-        emit EventsLib.SetSpacingSetter(newSpacingSetter);
+        tickSpacingSetter = newTickSpacingSetter;
+        emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
     /// @dev Refines the tick spacing of an obligation. Can not increase (more ticks become accessible).
     function setObligationSpacing(bytes32 id, uint256 newSpacing) external {
-        require(msg.sender == spacingSetter, OnlySpacingSetter());
+        require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(obligationState[id].spacing > 0, ObligationNotCreated());
         require(newSpacing > 0 && obligationState[id].spacing % newSpacing == 0, InvalidSpacing());
         // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max

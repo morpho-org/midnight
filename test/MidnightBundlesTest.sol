@@ -1200,7 +1200,7 @@ contract MidnightBundlesTest is BaseTest {
     // Average price.
 
     function testBuyUnitsTargetAveragePriceExceeded(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / BASE_SPACING) * BASE_SPACING;
+        tick = bound(tick, 1, MAX_TICK / BASE_SPACING) * BASE_SPACING;
         uint256 units = 100e18;
 
         offers[0].buy = false;

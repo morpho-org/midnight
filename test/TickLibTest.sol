@@ -31,7 +31,7 @@ contract TickLibTest is BaseTest {
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
                 currentReturn.mulDivDown(1e18, previousReturn),
-                0.995024875621890547e18,
+                0.995e18,
                 0.005e18,
                 string.concat("tick ", vm.toString(i))
             );
@@ -113,7 +113,7 @@ contract TickLibTest is BaseTest {
             uint256 absErrorWad = absDiff(solPrice, exactPrice);
             maxAbsErrorWad = max(maxAbsErrorWad, absErrorWad);
             totalAbsErrorWad += absErrorWad;
-            uint256 relErrorWad = exactPrice > 0 ? absDiff(solPrice, exactPrice) * 1e18 / exactPrice : 0;
+            uint256 relErrorWad = absDiff(solPrice, exactPrice) * 1e18 / exactPrice;
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
