@@ -30,9 +30,9 @@ definition CBP() returns uint256 = 10 ^ 12;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
-definition obligationTradingFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.obligationState[id].tradingFeeCbp0 : index == 1 ? currentContract.obligationState[id].tradingFeeCbp1 : index == 2 ? currentContract.obligationState[id].tradingFeeCbp2 : index == 3 ? currentContract.obligationState[id].tradingFeeCbp3 : index == 4 ? currentContract.obligationState[id].tradingFeeCbp4 : index == 5 ? currentContract.obligationState[id].tradingFeeCbp5 : currentContract.obligationState[id].tradingFeeCbp6;
+definition marketTradingFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].tradingFeeCbp0 : index == 1 ? currentContract.marketState[id].tradingFeeCbp1 : index == 2 ? currentContract.marketState[id].tradingFeeCbp2 : index == 3 ? currentContract.marketState[id].tradingFeeCbp3 : index == 4 ? currentContract.marketState[id].tradingFeeCbp4 : index == 5 ? currentContract.marketState[id].tradingFeeCbp5 : currentContract.marketState[id].tradingFeeCbp6;
 
-definition obligationTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(obligationTradingFeeCbp(id, index) * CBP());
+definition marketTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketTradingFeeCbp(id, index) * CBP());
 
 definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFeeCbp[loanToken][index] * CBP());
 
@@ -120,16 +120,16 @@ rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args)
 
 /// FEE SETTER: LIVENESS ///
 
-rule feeSetterCanSetObligationTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
+rule feeSetterCanSetMarketTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
     bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % CBP() == 0;
-    bool obligationExists = tickSpacing(id) > 0;
+    bool marketExists = tickSpacing(id) > 0;
 
-    setObligationTradingFee@withrevert(e, id, index, newTradingFee);
+    setMarketTradingFee@withrevert(e, id, index, newTradingFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && obligationExists;
-    assert !reverted => obligationTradingFee(id, index) == newTradingFee;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && marketExists;
+    assert !reverted => marketTradingFee(id, index) == newTradingFee;
 }
 
 rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, uint256 newTradingFee) {
@@ -143,13 +143,13 @@ rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, u
     assert !reverted => defaultTradingFee(loanToken, index) == newTradingFee;
 }
 
-rule feeSetterCanSetObligationContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
+rule feeSetterCanSetMarketContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
     address feeSetterBefore = feeSetter();
-    bool obligationExists = tickSpacing(id) > 0;
+    bool marketExists = tickSpacing(id) > 0;
 
-    setObligationContinuousFee@withrevert(e, id, newContinuousFee);
+    setMarketContinuousFee@withrevert(e, id, newContinuousFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && obligationExists;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && marketExists;
     assert !reverted => continuousFee(id) == newContinuousFee;
 }
 
@@ -165,15 +165,15 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 /// FEE SETTER: ACCESS CONTROL ///
 /// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
-/// Once an obligation is created, only the fee setter can modify its continuous fees.
-rule onlyFeeSetterCanChangeObligationContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require tickSpacing(id) > 0, "obligation must exist";
+/// Once an market is created, only the fee setter can modify its continuous fees.
+rule onlyFeeSetterCanChangeMarketContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+    require tickSpacing(id) > 0, "market must exist";
     uint32 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
 
     f(e, args);
 
-    assert continuousFee(id) != continuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setObligationContinuousFee(bytes32, uint256).selector;
+    assert continuousFee(id) != continuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setMarketContinuousFee(bytes32, uint256).selector;
 }
 
 rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg args, address loanToken) filtered { f -> !f.isView } {
@@ -187,29 +187,29 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 
 /// TICK SPACING SETTER: LIVENESS ///
 
-rule tickSpacingSetterCanSetObligationTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
+rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
     address tickSpacingSetterBefore = tickSpacingSetter();
-    bool obligationExists = tickSpacing(id) > 0;
+    bool marketExists = tickSpacing(id) > 0;
     uint8 tickSpacingBefore = tickSpacing(id);
     bool validNewTickSpacing = newTickSpacing > 0 && tickSpacingBefore % newTickSpacing == 0;
 
-    setObligationTickSpacing@withrevert(e, id, newTickSpacing);
+    setMarketTickSpacing@withrevert(e, id, newTickSpacing);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && obligationExists && validNewTickSpacing;
+    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && marketExists && validNewTickSpacing;
     assert !reverted => to_mathint(tickSpacing(id)) == to_mathint(newTickSpacing);
 }
 
 /// TICK SPACING SETTER: ACCESS CONTROL ///
 
-/// Once an obligation is created, only the tick spacing setter can modify its tick spacing.
-rule onlyTickSpacingSetterCanChangeObligationTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require tickSpacing(id) > 0, "obligation must exist";
+/// Once an market is created, only the tick spacing setter can modify its tick spacing.
+rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+    require tickSpacing(id) > 0, "market must exist";
     uint8 tickSpacingBefore = tickSpacing(id);
     address tickSpacingSetterBefore = tickSpacingSetter();
 
     f(e, args);
 
-    assert tickSpacing(id) != tickSpacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setObligationTickSpacing(bytes32, uint256).selector;
+    assert tickSpacing(id) != tickSpacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setMarketTickSpacing(bytes32, uint256).selector;
 }
 
 /// FEE CLAIMER: ACCESS CONTROL ///
@@ -221,8 +221,8 @@ rule onlyFeeClaimerCanClaimTradingFee(env e, address token, uint256 amount, addr
 }
 
 /// Only the fee claimer can successfully call claimContinuousFee.
-rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver) {
-    claimContinuousFee(e, obligation, amount, receiver);
+rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver) {
+    claimContinuousFee(e, market, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
@@ -245,25 +245,25 @@ rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address 
     assert !reverted => tokenBalance[token][user] == userBalanceBefore;
 }
 
-rule feeClaimerCanClaimContinuousFee(env e, Midnight.Obligation obligation, uint256 amount, address receiver, address user) {
+rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
     require user != currentContract && user != receiver;
-    bytes32 id = toId(e, obligation);
+    bytes32 id = toId(e, market);
     address feeClaimerBefore = feeClaimer();
-    bool obligationExists = tickSpacing(id) > 0;
+    bool marketExists = tickSpacing(id) > 0;
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
-    uint128 continuousFeeCreditBefore = currentContract.obligationState[id].continuousFeeCredit;
-    mathint midnightBalanceBefore = tokenBalance[obligation.loanToken][currentContract];
-    mathint receiverBalanceBefore = tokenBalance[obligation.loanToken][receiver];
-    mathint userBalanceBefore = tokenBalance[obligation.loanToken][user];
+    uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
+    mathint midnightBalanceBefore = tokenBalance[market.loanToken][currentContract];
+    mathint receiverBalanceBefore = tokenBalance[market.loanToken][receiver];
+    mathint userBalanceBefore = tokenBalance[market.loanToken][user];
 
-    claimContinuousFee@withrevert(e, obligation, amount, receiver);
+    claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && obligationExists && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketExists && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
-    assert !reverted => currentContract.obligationState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
-    assert !reverted => tokenBalance[obligation.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[obligation.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[obligation.loanToken][user] == userBalanceBefore;
+    assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
+    assert !reverted => tokenBalance[market.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
+    assert !reverted => tokenBalance[market.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
+    assert !reverted => tokenBalance[market.loanToken][user] == userBalanceBefore;
 }

@@ -2,17 +2,17 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer, Obligation, CollateralParams} from "../../interfaces/IMidnight.sol";
+import {Offer, Market, CollateralParams} from "../../interfaces/IMidnight.sol";
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 /// @dev keccak256(COLLATERAL_PARAMS_TYPE)
 bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
 bytes constant OBLIGATION_TYPE =
-    "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
+    "Market(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 /// @dev keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE))
 bytes32 constant OBLIGATION_TYPEHASH = 0xdcb3d766540d305590a1ee685cb2636a7271c1eea05949c19a23eb48c7492d24;
 bytes constant OFFER_TYPE =
-    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
+    "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE))
 bytes32 constant OFFER_TYPEHASH = 0xdf99c78ec0578533b0e52d329a9866adb5ef6bae6a0c56f9bb562ba6d9be867f;
 
@@ -84,11 +84,11 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of an Obligation.
-    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
-        bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
-        for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
-            collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
+    /// @dev Computes the EIP-712 hash struct of an Market.
+    function hashMarket(Market memory market) internal pure returns (bytes32) {
+        bytes32[] memory collateralParamsHashes = new bytes32[](market.collateralParams.length);
+        for (uint256 i = 0; i < market.collateralParams.length; i++) {
+            collateralParamsHashes[i] = hashCollateralParams(market.collateralParams[i]);
         }
 
         bytes32 collateralParamsHash;
@@ -103,12 +103,12 @@ library HashLib {
         return keccak256(
             abi.encode(
                 OBLIGATION_TYPEHASH,
-                obligation.loanToken,
+                market.loanToken,
                 collateralParamsHash,
-                obligation.maturity,
-                obligation.rcfThreshold,
-                obligation.enterGate,
-                obligation.liquidatorGate
+                market.maturity,
+                market.rcfThreshold,
+                market.enterGate,
+                market.liquidatorGate
             )
         );
     }
@@ -118,7 +118,7 @@ library HashLib {
         return keccak256(
             abi.encode(
                 OFFER_TYPEHASH,
-                hashObligation(offer.obligation),
+                hashMarket(offer.market),
                 offer.buy,
                 offer.maker,
                 offer.start,

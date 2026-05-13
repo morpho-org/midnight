@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -12,16 +12,16 @@ import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
 
-    Obligation internal obligation;
+    Market internal market;
     bytes32 internal id;
     Offer internal offer;
 
     function setUp() public override {
         super.setUp();
 
-        obligation.loanToken = address(loanToken);
-        obligation.maturity = block.timestamp + 100;
-        obligation.collateralParams
+        market.loanToken = address(loanToken);
+        market.maturity = block.timestamp + 100;
+        market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
@@ -30,7 +30,7 @@ contract TakeAmountsTest is BaseTest {
                     oracle: address(oracle1)
                 })
             );
-        obligation.collateralParams
+        market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
@@ -39,28 +39,28 @@ contract TakeAmountsTest is BaseTest {
                     oracle: address(oracle2)
                 })
             );
-        obligation.collateralParams = sortCollateralParams(obligation.collateralParams);
-        obligation.rcfThreshold = 0;
+        market.collateralParams = sortCollateralParams(market.collateralParams);
+        market.rcfThreshold = 0;
 
-        id = toId(obligation);
+        id = toId(market);
 
         offer.buy = false;
         offer.maxUnits = type(uint256).max;
-        offer.obligation = obligation;
+        offer.market = market;
         offer.ratifier = address(ecrecoverRatifier);
         offer.expiry = block.timestamp + 200;
         offer.tick = MAX_TICK;
 
-        createBadDebt(obligation); // to create non trivial lossFactor.
+        createBadDebt(market); // to create non trivial lossFactor.
     }
 
     function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {
         tradingFee0 = bound(tradingFee0, 0, maxTradingFee(0)) / 1e12 * 1e12;
         tradingFee1 = bound(tradingFee1, 0, maxTradingFee(1)) / 1e12 * 1e12;
-        midnight.touchObligation(obligation);
-        midnight.setObligationTradingFee(id, 0, tradingFee0);
-        midnight.setObligationTradingFee(id, 1, tradingFee1);
-        tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        midnight.touchMarket(market);
+        midnight.setMarketTradingFee(id, 0, tradingFee0);
+        midnight.setMarketTradingFee(id, 1, tradingFee1);
+        tradingFee = midnight.tradingFee(id, market.maturity - block.timestamp);
     }
 
     /// @dev Returns the highest tick such that tickToPrice(tick) + tradingFee <= WAD.
@@ -73,7 +73,7 @@ contract TakeAmountsTest is BaseTest {
     /// @dev Creates an initial borrowing position so borrower has debt and lender has units.
     function _createPosition(uint256 positionUnits) internal {
         deal(address(loanToken), lender, type(uint128).max);
-        collateralize(obligation, borrower, positionUnits);
+        collateralize(market, borrower, positionUnits);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
         offer.tick = 896; // Low tick with a small positive price.
@@ -98,7 +98,7 @@ contract TakeAmountsTest is BaseTest {
         offer.tick = tick;
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
         deal(address(loanToken), lender, type(uint256).max);
-        collateralize(obligation, borrower, units);
+        collateralize(market, borrower, units);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
@@ -120,7 +120,7 @@ contract TakeAmountsTest is BaseTest {
         offer.tick = tick;
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
         deal(address(loanToken), lender, type(uint256).max);
-        collateralize(obligation, borrower, units);
+        collateralize(market, borrower, units);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
@@ -189,7 +189,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
 
         deal(address(loanToken), lender, type(uint256).max);
-        collateralize(obligation, borrower, targetUnits);
+        collateralize(market, borrower, targetUnits);
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
         offer.tick = MAX_TICK;

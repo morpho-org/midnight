@@ -26,8 +26,8 @@ contract FrontendSignatureTest is Test {
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        offer.obligation.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
-        offer.obligation.collateralParams = collateralParams;
+        offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
+        offer.market.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
         offer.ratifier = RATIFIER;
     }

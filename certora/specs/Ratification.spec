@@ -6,8 +6,8 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     function _.isRatified(Midnight.Offer, bytes) external => DISPATCHER(true);
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function HashLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
@@ -15,13 +15,13 @@ methods {
     function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     // Summaries for internals irrelevant to ratification properties.
-    function IdLib.toId(Midnight.Obligation memory, uint256, address) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function Midnight.isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function Midnight.isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 

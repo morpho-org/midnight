@@ -9,22 +9,22 @@ methods {
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
 
-    // Summarize toId, this adds no assumption but allows to retrieve the loan token from the obligation id.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(obligation, chainId, midnight);
+    // Summarize toId, this adds no assumption but allows to retrieve the loan token from the market id.
+    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(market, chainId, midnight);
 
     // Summaries for complex internals irrelevant to token balance tracking.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(bytes32 id, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
-    function _.onRepay(bytes32 id, Midnight.Obligation obligation, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
+    function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
@@ -62,22 +62,22 @@ ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 
 // IdLib summaries.
 
-// Mapping from obligation id to its loan token.
+// Mapping from market id to its loan token.
 ghost mapping(bytes32 => address) loantoken;
 
-// Mapping from obligation id and collateral index to the corresponding collateral token.
+// Mapping from market id and collateral index to the corresponding collateral token.
 ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
 ghost hash(address, uint256, uint256, address) returns bytes32;
 
-function CVL_toId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
-    // Deterministically derive the obligation id.
-    bytes32 id = hash(obligation.loanToken, obligation.maturity, chainId, midnight);
+function CVL_toId(Midnight.Market market, uint256 chainId, address midnight) returns bytes32 {
+    // Deterministically derive the market id.
+    bytes32 id = hash(market.loanToken, market.maturity, chainId, midnight);
 
-    // Assume the obligation id already maps to this loan token.
+    // Assume the market id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
-    require(loantoken[id] == obligation.loanToken), "remember the loan token of the obligation";
-    require(forall uint128 collateralIndex. collateralIndex < obligation.collateralParams.length => collateralToken[id][collateralIndex] == obligation.collateralParams[collateralIndex].token), "remember the collateral tokens of the obligation";
+    require(loantoken[id] == market.loanToken), "remember the loan token of the market";
+    require(forall uint128 collateralIndex. collateralIndex < market.collateralParams.length => collateralToken[id][collateralIndex] == market.collateralParams[collateralIndex].token), "remember the collateral tokens of the market";
     return id;
 }
 
@@ -107,12 +107,12 @@ ghost mapping(bytes32 => mapping(address => mapping(address => mathint))) collat
     init_state axiom (forall address token. collateralSum(token) == 0);
 }
 
-// Safe require as obligations limit the number of collateralParams.
+// Safe require as markets limit the number of collateralParams.
 hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] {
     require value == collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]], "ghost mirror";
 }
 
-// Safe require as obligations limit the number of collateralParams.
+// Safe require as markets limit the number of collateralParams.
 hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
     collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
 }
@@ -124,11 +124,11 @@ ghost mapping(bytes32 => mapping(address => mathint)) withdrawableMirror {
     init_state axiom (forall address token. withdrawableSum(token) == 0);
 }
 
-hook Sload uint128 value obligationState[KEY bytes32 id].withdrawable {
+hook Sload uint128 value marketState[KEY bytes32 id].withdrawable {
     require value == withdrawableMirror[id][loantoken[id]], "ghost mirror";
 }
 
-hook Sstore obligationState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
+hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 

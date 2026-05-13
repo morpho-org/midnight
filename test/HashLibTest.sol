@@ -9,26 +9,26 @@ import {
     OBLIGATION_TYPEHASH,
     OFFER_TYPE
 } from "../src/ratifiers/libraries/HashLib.sol";
-import {Obligation} from "../src/interfaces/IMidnight.sol";
+import {Market} from "../src/interfaces/IMidnight.sol";
 
 contract HashLibTest is Test {
-    function testHashObligationMatchesReference(Obligation memory obligation) public pure {
-        bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
-        for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
-            collateralParamsHashes[i] = HashLib.hashCollateralParams(obligation.collateralParams[i]);
+    function testHashMarketMatchesReference(Market memory market) public pure {
+        bytes32[] memory collateralParamsHashes = new bytes32[](market.collateralParams.length);
+        for (uint256 i = 0; i < market.collateralParams.length; i++) {
+            collateralParamsHashes[i] = HashLib.hashCollateralParams(market.collateralParams[i]);
         }
         bytes32 expectedHash = keccak256(
             abi.encode(
                 OBLIGATION_TYPEHASH,
-                obligation.loanToken,
+                market.loanToken,
                 keccak256(abi.encodePacked(collateralParamsHashes)),
-                obligation.maturity,
-                obligation.rcfThreshold,
-                obligation.enterGate,
-                obligation.liquidatorGate
+                market.maturity,
+                market.rcfThreshold,
+                market.enterGate,
+                market.liquidatorGate
             )
         );
-        assertEq(HashLib.hashObligation(obligation), expectedHash);
+        assertEq(HashLib.hashMarket(market), expectedHash);
     }
 
     function testIsLeafSingle(bytes32 x) public pure {

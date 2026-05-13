@@ -10,7 +10,7 @@ library ConsumableUnitsLib {
     using UtilsLib for uint256;
 
     /// @dev Returns a number of units such that it fully consumes the offer.
-    /// @dev Assumes that `id` matches `offer.obligation`.
+    /// @dev Assumes that `id` matches `offer.market`.
     function consumableUnits(address midnight, bytes32 id, Offer memory offer) internal view returns (uint256) {
         uint256 consumed = IMidnight(midnight).consumed(offer.maker, offer.group);
         if (offer.maxUnits > 0) {

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {CollateralParams, Obligation, Offer} from "../src/interfaces/IMidnight.sol";
+import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
 import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
@@ -19,15 +19,15 @@ contract SetterRatifierTest is BaseTest {
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
-        Obligation memory obligation;
-        obligation.loanToken = address(loanToken);
-        obligation.maturity = block.timestamp + 100;
-        obligation.collateralParams = new CollateralParams[](1);
-        obligation.collateralParams[0] = CollateralParams({
+        Market memory market;
+        market.loanToken = address(loanToken);
+        market.maturity = block.timestamp + 100;
+        market.collateralParams = new CollateralParams[](1);
+        market.collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
 
-        offer.obligation = obligation;
+        offer.market = market;
         offer.buy = true;
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);
