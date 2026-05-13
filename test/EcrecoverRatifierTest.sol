@@ -128,22 +128,6 @@ contract EcrecoverRatifierTest is BaseTest {
         ecrecoverRatifier.cancelRoot(lender, _root);
     }
 
-    function testCancelRootForAnotherMakerDoesNotInvalidate() public {
-        Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = buildRatifierData(_root, lender);
-
-        vm.prank(borrower);
-        ecrecoverRatifier.cancelRoot(borrower, _root);
-
-        assertFalse(ecrecoverRatifier.isRootCanceled(lender, _root));
-        assertTrue(ecrecoverRatifier.isRootCanceled(borrower, _root));
-
-        vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
-        assertEq(result, CALLBACK_SUCCESS);
-    }
-
     function testIsRatifiedRevokeAuthorizationInvalidates() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);

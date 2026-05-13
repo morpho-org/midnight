@@ -102,7 +102,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
-        (uint256 buyerAssets,,) = take(units, lender, offer);
+        (uint256 buyerAssets,) = take(units, lender, offer);
 
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
@@ -124,7 +124,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
-        (, uint256 sellerAssets,) = take(units, lender, offer);
+        (, uint256 sellerAssets) = take(units, lender, offer);
 
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
@@ -149,7 +149,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
-        (uint256 buyerAssets,,) = take(units, borrower, offer);
+        (uint256 buyerAssets,) = take(units, borrower, offer);
 
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
@@ -172,7 +172,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
-        (, uint256 sellerAssets,) = take(units, borrower, offer);
+        (, uint256 sellerAssets) = take(units, borrower, offer);
 
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
@@ -194,7 +194,7 @@ contract TakeAmountsTest is BaseTest {
         offer.receiverIfMakerIsSeller = borrower;
         offer.tick = MAX_TICK;
 
-        (uint256 buyerAssets,,) = take(targetUnits, lender, offer);
+        (uint256 buyerAssets,) = take(targetUnits, lender, offer);
 
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }
@@ -214,7 +214,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = lender;
         offer.tick = MAX_TICK;
 
-        (uint256 buyerAssets,,) = take(targetUnits, borrower, offer);
+        (uint256 buyerAssets,) = take(targetUnits, borrower, offer);
 
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }

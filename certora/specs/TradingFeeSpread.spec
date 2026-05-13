@@ -40,7 +40,7 @@ rule makerFavorableRounding(env e, uint256 units, address taker, address takerCa
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _ = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    buyerAssets, sellerAssets = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
     assert offer.buy => buyerAssets * WAD() <= units * offerPrice;
     assert !offer.buy => sellerAssets * WAD() >= units * offerPrice;
@@ -55,7 +55,7 @@ rule tradingFeeSpreadBounds(env e, uint256 units, address taker, address takerCa
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _ = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    buyerAssets, sellerAssets = take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
     assert buyerAssets - sellerAssets >= (units * fee) / WAD();
     assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
