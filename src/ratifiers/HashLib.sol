@@ -24,7 +24,7 @@ library HashLib {
     /// OBLIGATION_TYPE, OFFER_TYPE)).
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
-        if (height < 11) {
+        if (height <= 10) {
             if (height == 0) return 0x9a4cffa064818006f9fa53857eafbd9974c971f009276be3fd30481edb617f49;
             if (height == 1) return 0x73e25e0ecda983be4e607052c9c61b1f73c5812c7963412e271ba99e98f38c7c;
             if (height == 2) return 0x9172b36c68635815d03f222ce2193bc103d476c9f2c84dedb041304ae7c22f75;
