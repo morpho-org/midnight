@@ -483,8 +483,8 @@ contract Midnight is IMidnight {
         );
 
         // MVP limits.
-        require(buyerAssets <= maxTakeableAssets[offer.obligation.loanToken], MaxTakeableAssetsExceeded());
-        require(_obligationState.totalUnits <= maxTotalUnits[offer.obligation.loanToken], MaxTotalUnitsExceeded());
+        require(buyerAssets <= maxTakeableAssets[offer.market.loanToken], MaxTakeableAssetsExceeded());
+        require(_marketState.totalUnits <= maxTotalUnits[offer.market.loanToken], MaxTotalUnitsExceeded());
 
         return (buyerAssets, sellerAssets);
     }
