@@ -31,10 +31,6 @@ methods {
     // Deterministic toId: links call-site obligations to validated state from touchObligation.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // Hash/proof helpers are irrelevant to the multiplication-overflow property.
-    function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-
     // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
 
