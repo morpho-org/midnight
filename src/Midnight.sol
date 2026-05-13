@@ -98,7 +98,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
 /// for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
-/// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a realization.
+/// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a bad debt realization.
 /// @dev If an obligation loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
 /// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
 /// obligation doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
