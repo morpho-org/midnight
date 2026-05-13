@@ -90,7 +90,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// OFFER CAPS
 /// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
-/// @dev If maxAssets is zero, maxUnits caps the units. If maxUnits is zero, maxAssets caps the assets.
+/// @dev If only maxAssets is zero, this does not cap the assets. If only maxUnits is zero, this does not cap the units.
 /// @dev To create an uncapped offer, use type(uint256).max for maxAssets or maxUnits.
 ///
 /// SESSION
