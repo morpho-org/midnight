@@ -72,7 +72,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
 ///
 /// SLASHING
-/// @dev When some bad debt is realized on a given obligation, it is socialized among lenders in this obligation.
+/// @dev When a borrower's bad debt is realized on a given obligation, it is socialized among lenders in this obligation.
 /// @dev At each lender's next interaction, their credit is slashed proportionally.
 ///
 /// GROUPS
