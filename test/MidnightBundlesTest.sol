@@ -1332,4 +1332,169 @@ contract MidnightBundlesTest is BaseTest {
             address(0)
         );
     }
+
+    // Partially consumed offers: _availableUnits caps the units forwarded to take().
+
+    function testSellUnitsTargetPartiallyConsumed() public {
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+
+        collateralize(obligation, borrower, 100);
+
+        // Pre-consume 30 of offer 0 (offer.buy=true → maker=lender).
+        vm.prank(lender);
+        midnight.setConsumed(offers[0].group, 30, lender);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
+
+        // Offer 0 has 70 available; bundler caps and fills 30 from offer 1.
+        vm.prank(borrower);
+        midnightBundles.supplyCollateralAndSellWithUnitsTarget(
+            address(midnight), 100, 0, borrower, borrower, new CollateralSupply[](0), takes, 0, address(0)
+        );
+
+        assertEq(midnight.consumed(offers[0].maker, offers[0].group), 100, "consumed offer 0");
+        assertEq(midnight.consumed(offers[1].maker, offers[1].group), 30, "consumed offer 1");
+        assertEq(midnight.debtOf(id, borrower), 100, "debt");
+    }
+
+    function testSellSellerAssetsTargetPartiallyConsumed() public {
+        offers[0].maxUnits = 100;
+        offers[1].maxUnits = 100;
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        midnight.touchObligation(obligation);
+        uint256 _tradingFee = midnight.tradingFee(id, obligation.maturity - block.timestamp);
+        uint256 sellerPrice = price - _tradingFee;
+        uint256 targetSellerAssets = uint256(100).mulDivDown(sellerPrice, WAD);
+
+        // Extra collateral headroom for the potential extra unit of debt.
+        collateralize(obligation, borrower, 101);
+
+        // Pre-consume 30 of offer 0.
+        vm.prank(lender);
+        midnight.setConsumed(offers[0].group, 30, lender);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
+
+        vm.prank(borrower);
+        midnightBundles.supplyCollateralAndSellWithAssetsTarget(
+            address(midnight),
+            targetSellerAssets,
+            type(uint256).max,
+            borrower,
+            borrower,
+            new CollateralSupply[](0),
+            takes,
+            0,
+            address(0)
+        );
+
+        uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+        uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+        // Offer 0 should hit its cap (consumed 30 + filled up to 70).
+        assertEq(consumed0, 100, "consumed offer 0");
+        // Total newly filled units equal the borrower's debt.
+        assertEq(consumed0 - 30 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+        assertEq(loanToken.balanceOf(borrower), targetSellerAssets, "borrower balance");
+    }
+
+    function testBuyUnitsTargetPartiallyConsumed() public {
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = 100;
+        offers[1].buy = false;
+        offers[1].maker = borrower;
+        offers[1].receiverIfMakerIsSeller = borrower;
+        offers[1].maxUnits = 100;
+
+        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        collateralize(obligation, borrower, 100);
+
+        // Pre-consume 30 of offer 0 (offer.buy=false → maker=borrower).
+        vm.prank(borrower);
+        midnight.setConsumed(offers[0].group, 30, borrower);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 maxBuyerAssets = uint256(100).mulDivUp(price, WAD);
+
+        vm.prank(lender);
+        midnightBundles.buyWithUnitsTargetAndWithdrawCollateral(
+            address(midnight),
+            100,
+            maxBuyerAssets,
+            lender,
+            _noPermit(),
+            takes,
+            new CollateralWithdrawal[](0),
+            address(0),
+            0,
+            address(0)
+        );
+
+        assertEq(midnight.consumed(offers[0].maker, offers[0].group), 100, "consumed offer 0");
+        assertEq(midnight.consumed(offers[1].maker, offers[1].group), 30, "consumed offer 1");
+        assertEq(midnight.debtOf(id, borrower), 100, "debt");
+    }
+
+    function testBuyBuyerAssetsTargetPartiallyConsumed() public {
+        offers[0].buy = false;
+        offers[0].maker = borrower;
+        offers[0].receiverIfMakerIsSeller = borrower;
+        offers[0].maxUnits = 100;
+        offers[1].buy = false;
+        offers[1].maker = borrower;
+        offers[1].receiverIfMakerIsSeller = borrower;
+        offers[1].maxUnits = 100;
+
+        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        for (uint256 i; i <= 6; i++) {
+            midnight.setObligationTradingFee(id, i, 0);
+        }
+
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 targetBuyerAssets = uint256(100).mulDivDown(price, WAD);
+
+        collateralize(obligation, borrower, 100);
+
+        // Pre-consume 30 of offer 0.
+        vm.prank(borrower);
+        midnight.setConsumed(offers[0].group, 30, borrower);
+
+        Take[] memory takes = new Take[](2);
+        takes[0] = Take({offer: offers[0], units: 100, ratifierData: merkleRatifierData([offers[0]])});
+        takes[1] = Take({offer: offers[1], units: 100, ratifierData: merkleRatifierData([offers[1]])});
+
+        vm.prank(lender);
+        midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
+            address(midnight),
+            targetBuyerAssets,
+            0,
+            lender,
+            _noPermit(),
+            takes,
+            new CollateralWithdrawal[](0),
+            address(0),
+            0,
+            address(0)
+        );
+
+        uint256 consumed0 = midnight.consumed(offers[0].maker, offers[0].group);
+        uint256 consumed1 = midnight.consumed(offers[1].maker, offers[1].group);
+        assertEq(consumed0, 100, "consumed offer 0");
+        assertEq(consumed0 - 30 + consumed1, midnight.debtOf(id, borrower), "total consumed");
+    }
 }
