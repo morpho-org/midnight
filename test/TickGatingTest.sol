@@ -132,22 +132,16 @@ contract TickGatingTest is BaseTest {
         midnight.setObligationSpacing(id, 2);
     }
 
-    function testSetObligationSpacingCanOnlyDecrease() public {
-        midnight.setObligationSpacing(id, 1);
-
-        vm.expectRevert(IMidnight.SpacingNotDecreasing.selector);
-        midnight.setObligationSpacing(id, 1);
-
-        vm.expectRevert(IMidnight.SpacingNotDecreasing.selector);
-        midnight.setObligationSpacing(id, 2);
-    }
-
     function testSetObligationSpacingInvalid() public {
         vm.expectRevert(IMidnight.InvalidSpacing.selector);
         midnight.setObligationSpacing(id, 3);
 
         vm.expectRevert(IMidnight.InvalidSpacing.selector);
         midnight.setObligationSpacing(id, 0);
+
+        midnight.setObligationSpacing(id, 1);
+        vm.expectRevert(IMidnight.InvalidSpacing.selector);
+        midnight.setObligationSpacing(id, 2);
     }
 
     function testSetObligationSpacingRequiresCreated() public {

@@ -237,7 +237,7 @@ contract OtherFunctionsTest is BaseTest {
         }
 
         bytes32 _id = midnight.touchObligation(_obligation);
-        assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        assertEq(midnight.spacing(_id) > 0, true, "obligation created");
         uint16[7] memory fees = midnight.tradingFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {
             assertEq(fees[i], midnight.defaultTradingFeeCbp(_obligation.loanToken, i), "fees");
@@ -423,7 +423,7 @@ contract OtherFunctionsTest is BaseTest {
         address sstore2Address = address(uint160(uint256(_id)));
         Obligation memory obligationFromId = midnight.toObligation(_id);
 
-        assertEq(midnight.obligationCreated(_id), true, "obligation created");
+        assertEq(midnight.spacing(_id) > 0, true, "obligation created");
         assertEq(sstore2Address.code.length, abi.encode(_obligation).length, "stored obligation code size");
         assertLt(sstore2Address.code.length, 24_576, "stored obligation code size below EIP-170 limit");
         assertEq(obligationFromId.collateralParams.length, MAX_COLLATERALS, "collateralParams length");
@@ -622,7 +622,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.collateralParams = collateralParams;
 
         midnight.touchObligation(_obligation);
-        assertEq(midnight.obligationCreated(toId(_obligation)), true, "obligation created with cursor 0.25");
+        assertEq(midnight.spacing(toId(_obligation)) > 0, true, "obligation created with cursor 0.25");
     }
 
     function testValidLifCursor05() public {
@@ -637,7 +637,7 @@ contract OtherFunctionsTest is BaseTest {
         _obligation.collateralParams = collateralParams;
 
         midnight.touchObligation(_obligation);
-        assertEq(midnight.obligationCreated(toId(_obligation)), true, "obligation created with cursor 0.5");
+        assertEq(midnight.spacing(toId(_obligation)) > 0, true, "obligation created with cursor 0.5");
     }
 
     function testMaxLifDirect(uint256 seed) public view {

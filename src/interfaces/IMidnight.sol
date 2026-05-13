@@ -102,7 +102,6 @@ interface IMidnight {
     error SelfTake();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
-    error SpacingNotDecreasing();
     error TakerUnauthorized();
     error TickNotAccessible();
     error TooManyActivatedCollaterals();
@@ -126,6 +125,7 @@ interface IMidnight {
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
+    function spacingSetter() external view returns (address);
 
     /// MULTICALL ///
     function multicall(bytes[] memory calls) external;
@@ -134,6 +134,8 @@ interface IMidnight {
     function setRoleSetter(address newRoleSetter) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
+    function setSpacingSetter(address newSpacingSetter) external;
+    function setObligationSpacing(bytes32 id, uint256 newSpacing) external;
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;
@@ -167,7 +169,7 @@ interface IMidnight {
     function debtOf(bytes32 id, address user) external view returns (uint256);
     function totalUnits(bytes32 id) external view returns (uint256);
     function lossFactor(bytes32 id) external view returns (uint128);
-    function obligationCreated(bytes32 id) external view returns (bool);
+    function spacing(bytes32 id) external view returns (uint8);
     function withdrawable(bytes32 id) external view returns (uint256);
     function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
