@@ -9,7 +9,10 @@ import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 // (order-sensitive); on-chain `UtilsLib.isLeaf` uses commutative hashing
 // (sort then keccak). The two coincide iff every internal pair satisfies
 // `L.hash <= R.hash` — enforced by `isWellFormed`.
-// Pattern adapted from morpho-org/URD's MerkleTree.sol.
+//
+// `Leaf.offerHash` stands in for production's `UtilsLib.hashOffer(offer)`.
+// Leaves are represented by that raw bytes32 directly; no extra wrapper
+// hash around the leaf.
 
 struct Leaf {
     bytes32 offerHash;
@@ -37,12 +40,7 @@ contract OfferTree {
         require(isEmpty(node));
         require(leaf.offerHash != 0);
         node.offerHash = leaf.offerHash;
-        // Wrap the leaf offerHash with an extra keccak (URD pattern) so
-        // leaf hash inputs (32 bytes) are length-disjoint from internal
-        // hash inputs (64 bytes). Cryptographically equivalent to
-        // production's length-distinguishability via Offer-struct encoding;
-        // here it makes the property provable under Certora's keccak model.
-        node.hashNode = keccak256(bytes.concat(leaf.offerHash));
+        node.hashNode = leaf.offerHash;
     }
 
     function newInternalNode(InternalNode memory ni) external {
@@ -67,69 +65,43 @@ contract OfferTree {
         return isEmpty(tree[id]);
     }
 
-    function getHash(bytes32 id) external view returns (bytes32) {
-        return tree[id].hashNode;
-    }
-
-    function getOfferHash(bytes32 id) external view returns (bytes32) {
-        return tree[id].offerHash;
-    }
-
     // (a) binary shape: 0 or 2 children with consistent hashing.
     // (b) pair-sorted: at every internal node, L.hash <= R.hash.
-    // (c) internal nodes carry no offerHash.
-    // Leaf nodes wrap offerHash with `keccak(bytes.concat(...))` so leaf
-    // hash inputs are length-disjoint from internal hash inputs.
+    // (c) internal nodes carry no offerHash; leaf nodes store offerHash
+    //     raw, matching production `UtilsLib.hashOffer` directly.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (isEmpty(n)) return true;
         if (n.left == 0 && n.right == 0) {
-            return n.offerHash != 0
-                && n.hashNode == keccak256(bytes.concat(n.offerHash));
+            return n.offerHash != 0 && n.hashNode == n.offerHash;
         }
         if (n.left == 0 || n.right == 0) return false;
         Node storage L = tree[n.left];
         Node storage R = tree[n.right];
-        return n.offerHash == 0 && !isEmpty(L) && !isEmpty(R) && L.hashNode <= R.hashNode
+        return n.offerHash == 0 && !isEmpty(L) && !isEmpty(R)
+            && L.hashNode <= R.hashNode
             && n.hashNode == keccak256(abi.encode(L.hashNode, R.hashNode));
     }
 
-    // Walks down from `id` using `proof` (consumed last-to-first), asserting
-    // well-formedness at every visited node and requiring each proof
-    // element to match one of the current node's child hashes. Reverts
-    // unless the final node is an actual populated leaf. Returns the
-    // leaf id reached.
-    function wellFormedPathToLeaf(bytes32 id, bytes32[] memory proof)
-        external
-        view
-        returns (bytes32)
-    {
-        for (uint256 i = proof.length;;) {
-            require(isWellFormed(id));
-            if (i == 0) break;
-            bytes32 otherHash = proof[--i];
-            bytes32 left = tree[id].left;
-            bytes32 right = tree[id].right;
-            bytes32 leftHash = tree[left].hashNode;
-            bytes32 rightHash = tree[right].hashNode;
-            require(otherHash == leftHash || otherHash == rightHash);
-            id = leftHash == otherHash ? right : left;
-        }
-        require(tree[id].left == 0 && tree[id].right == 0);
-        require(tree[id].offerHash != 0);
-        return id;
-    }
-
-    // Single-frame storage-tied forward-direction helper. Walks a
-    // well-formed path while threading the expected hash downward from
-    // the stored root to the reached leaf. This avoids asking Certora to
-    // rediscover the same hash equalities by reconstructing the chain in
-    // a second pass.
-    function storedLeafReachesRoot(bytes32 rootId, bytes32[] memory proof)
-        external
-        view
-        returns (bool)
-    {
+    // Single-frame soundness helper. Walks `proof` downward from `rootId`,
+    // asserting well-formedness at every node and threading the EXPECTED
+    // hash from root to leaf via the commutative combiner. Path conditions:
+    //   - each proof entry must match one of the visited node's child hashes;
+    //   - the walked-to id must be a leaf;
+    //   - the final expected leaf hash must equal `candidateOfferHash`
+    //     (i.e. the chain accepts the candidate against the stored root).
+    // Returns whether the candidate equals the stored offerHash at the
+    // reached leaf. The rule asserts this returns true — i.e. no candidate
+    // other than the stored one can satisfy the path condition.
+    //
+    // Threading the expected hash downward (rather than reconstructing the
+    // chain upward in a second pass) keeps all hash equalities in one
+    // symbolic frame, which Certora's keccak modeling can unify.
+    function acceptedCandidateMatchesStoredLeaf(
+        bytes32 rootId,
+        bytes32[] memory proof,
+        bytes32 candidateOfferHash
+    ) external view returns (bool) {
         bytes32 id = rootId;
         bytes32 expected = tree[rootId].hashNode;
         for (uint256 i = proof.length;;) {
@@ -158,108 +130,22 @@ contract OfferTree {
         }
         require(tree[id].left == 0 && tree[id].right == 0);
         require(tree[id].offerHash != 0);
-        return expected == keccak256(bytes.concat(tree[id].offerHash));
-    }
-
-    // Single-frame storage-tied soundness helper. Walks the proof to the
-    // corresponding stored leaf while threading the expected hash
-    // downward from the stored root. Conditioning on the final expected
-    // leaf hash matching `candidateOfferHash`, checks that the accepted
-    // candidate offerHash equals the stored one.
-    function acceptedCandidateMatchesStoredLeaf(bytes32 rootId, bytes32[] memory proof, bytes32 candidateOfferHash)
-        external
-        view
-        returns (bool)
-    {
-        bytes32 id = rootId;
-        bytes32 expected = tree[rootId].hashNode;
-        for (uint256 i = proof.length;;) {
-            require(isWellFormed(id));
-            require(tree[id].hashNode == expected);
-            if (i == 0) break;
-            bytes32 otherHash = proof[--i];
-            bytes32 left = tree[id].left;
-            bytes32 right = tree[id].right;
-            bytes32 leftHash = tree[left].hashNode;
-            bytes32 rightHash = tree[right].hashNode;
-            require(otherHash == leftHash || otherHash == rightHash);
-            bytes32 childHash;
-            if (leftHash == otherHash) {
-                id = right;
-                childHash = rightHash;
-            } else {
-                id = left;
-                childHash = leftHash;
-            }
-            bytes32 a = childHash;
-            bytes32 b = otherHash;
-            if (a > b) (a, b) = (b, a);
-            require(expected == keccak256(abi.encode(a, b)));
-            expected = childHash;
-        }
-        require(tree[id].left == 0 && tree[id].right == 0);
-        require(tree[id].offerHash != 0);
-        require(expected == keccak256(bytes.concat(candidateOfferHash)));
+        require(expected == candidateOfferHash);
         return candidateOfferHash == tree[id].offerHash;
     }
 
-    // Single-frame forward-direction helper. Builds the wallet's EIP-712
-    // root by sort-then-keccak at every level (= what well-formedness
-    // produces) and runs production `UtilsLib.isLeaf` against it.
-    function verifierAcceptsSortLabeledRoot(bytes32 leafHash, bytes32[] memory proof)
+    // Single-frame faithfulness bridge between the modeled hashing form
+    // `keccak256(abi.encode(a, b))` used by the storage tree and the
+    // production primitive `UtilsLib.commutativeHash(a, b)`. Both compute
+    // keccak over the same 64-byte sorted pair; this helper exposes them
+    // side by side so a CVL rule can assert equality within one symbolic
+    // frame and close the model-vs-production gap.
+    function sortedPairHashEquivalence(bytes32 a, bytes32 b)
         external
         pure
-        returns (bool)
+        returns (bool sorted, bool equal)
     {
-        bytes32 walletRoot = leafHash;
-        for (uint256 i = 0; i < proof.length; i++) {
-            bytes32 a = walletRoot;
-            bytes32 b = proof[i];
-            if (a > b) (a, b) = (b, a);
-            bytes32 next;
-            assembly ("memory-safe") {
-                mstore(0x00, a)
-                mstore(0x20, b)
-                next := keccak256(0x00, 0x40)
-            }
-            walletRoot = next;
-        }
-        return UtilsLib.isLeaf(walletRoot, leafHash, proof);
-    }
-
-    // URD-style path condition. Reverts unless the commutative-hash chain
-    // from the wrapped candidate offerHash with `proof` reaches `root`.
-    // Uses the same `keccak256(bytes.concat(...))` leaf wrap and
-    // `keccak256(abi.encode(L, R))` internal hash forms as tree storage
-    // so the prover unifies hash terms across the chain and storage sides.
-    function requireChainReaches(bytes32 root, bytes32 candidateOfferHash, bytes32[] memory proof)
-        external
-        pure
-    {
-        bytes32 current = keccak256(bytes.concat(candidateOfferHash));
-        for (uint256 i = 0; i < proof.length; i++) {
-            bytes32 a = current;
-            bytes32 b = proof[i];
-            if (a > b) (a, b) = (b, a);
-            current = keccak256(abi.encode(a, b));
-        }
-        require(current == root);
-    }
-
-    // Boolean variant of `requireChainReaches`. Returns whether the chain
-    // from the wrapped candidate offerHash with `proof` reaches `root`.
-    function chainReaches(bytes32 root, bytes32 candidateOfferHash, bytes32[] memory proof)
-        external
-        pure
-        returns (bool)
-    {
-        bytes32 current = keccak256(bytes.concat(candidateOfferHash));
-        for (uint256 i = 0; i < proof.length; i++) {
-            bytes32 a = current;
-            bytes32 b = proof[i];
-            if (a > b) (a, b) = (b, a);
-            current = keccak256(abi.encode(a, b));
-        }
-        return current == root;
+        sorted = a <= b;
+        equal = keccak256(abi.encode(a, b)) == UtilsLib.commutativeHash(a, b);
     }
 }

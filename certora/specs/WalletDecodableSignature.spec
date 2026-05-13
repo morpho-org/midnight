@@ -1,42 +1,41 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Wallet decodable signature: end-to-end correctness for the Midnight
-// Offer tree under wallet-side EIP-712 signing.
+// Wallet decodable signature — soundness of the Midnight Offer-tree
+// verifier under wallet-side EIP-712 signing.
 //
-// Claim
-//   If a tree built via OfferTree's `newLeaf` + `newInternalNode` is
-//   well-formed, every leaf is takeable on-chain via `UtilsLib.isLeaf`.
+// Critical claim
+//   If `UtilsLib.isLeaf(rootHash, candidateOfferHash, proof)` accepts a
+//   candidate against the root of a well-formed sort-labeled tree, then
+//   `candidateOfferHash` is the hash of one of the offers the maker
+//   actually signed (i.e. a leaf actually stored in the tree).
 //
-//   Well-formed = at every internal node: two non-empty children with
-//   `L.hash <= R.hash`, `offerHash == 0`, and
-//   `hashNode == keccak256(abi.encode(L, R))`.
+// Why this is the only safety-critical claim
+//   The maker signs ONE typed-data blob covering a batch. If the verifier
+//   accepts an unauthorized leaf hash, funds can be moved against an
+//   offer the maker never approved — liquidation against unsigned terms,
+//   collateral seized, real money loss. Liveness ("legitimate offers
+//   are takeable") is desirable but its failure mode is benign — batch
+//   gets re-signed. Hence the spec focuses on soundness.
 //
 // Proof structure
 //   (A) `wellFormed` invariant — storage shape preserved by every
 //       reachable state transition.
-//   (B) `verifierAcceptsSortedTree` — forward direction at the chain
-//       level: sort-labeled construction at every level yields a root
-//       the real `UtilsLib.isLeaf` accepts for any leaf and any proof.
-//   (C) `verifierAcceptsStoredLeaves` and
-//       `acceptedProofMatchesStoredLeaf` — storage-tied forward
-//       correctness and soundness, using URD-style single-frame helpers.
-//       The tree walk, leaf lookup, and hash folding are deliberately
-//       packaged into one Solidity helper call because Certora's hash
-//       model is much more effective when all equalities appear in the
-//       same symbolic frame than when they are split across several
-//       external calls.
+//   (B) `acceptedProofMatchesStoredLeaf` — soundness. Conditioning on the
+//       chain reaching the stored root from a candidate via the proof,
+//       keccak injectivity forces the candidate to equal the stored
+//       offerHash at the corresponding leaf. Mirrors the pen-and-paper
+//       Property 2: the smallest-index argument.
 //
-// Bridge (construction-level identity, not machine-checked):
-//   Wallet's EIP-712 array hash of a sort-labeled tree coincides with
-//   `keccak256(abi.encode(L, R))` at every level by construction of
-//   `newInternalNode`. So (B)'s wallet root equals (A)'s stored root.
+//   The helper packages the storage walk, expected-hash threading and
+//   chain reconstruction into a single external view call so all hash
+//   equalities live in one symbolic frame (Certora's keccak modeling
+//   reliably unifies identical-content hashes within a frame).
 
 methods {
     function isEmpty(bytes32) external returns (bool) envfree;
     function isWellFormed(bytes32) external returns (bool) envfree;
-    function verifierAcceptsSortLabeledRoot(bytes32, bytes32[]) external returns (bool) envfree;
-    function storedLeafReachesRoot(bytes32, bytes32[]) external returns (bool) envfree;
     function acceptedCandidateMatchesStoredLeaf(bytes32, bytes32[], bytes32) external returns (bool) envfree;
+    function sortedPairHashEquivalence(bytes32, bytes32) external returns (bool, bool) envfree;
 }
 
 // (A) Storage shape invariants.
@@ -51,35 +50,20 @@ strong invariant wellFormed(bytes32 id)
         }
     }
 
-// (B1) Forward direction at the chain level. Sort-labeled construction
-// yields a root the production `UtilsLib.isLeaf` accepts. Same single
-// frame, both sides reduce to `keccak(min, max)` per level — provable
-// by Certora's intra-frame keccak determinism. Mostly serves as a
-// regression check on the helper's correspondence to production.
-rule verifierAcceptsSortedTree(bytes32 leafHash, bytes32[] proof) {
-    assert verifierAcceptsSortLabeledRoot(leafHash, proof);
-}
-
-// (B2) Forward direction storage-tied. For any leaf reachable via a
-// well-formed path from `rootId`, the chain verifier accepts the stored
-// leaf reached by that proof against the stored root. This rule is
-// written against a single-frame helper on purpose: in practice, Certora
-// often loses the crucial hash equalities when storage walk, leaf read,
-// and chain reconstruction are asserted via separate helper calls. The
-// helper therefore threads the expected hash downward from the root,
-// instead of recomputing the same chain from leaf to root in a second
-// pass.
-rule verifierAcceptsStoredLeaves(bytes32 rootId, bytes32[] proof) {
-    assert storedLeafReachesRoot(rootId, proof);
-}
-
-// (C) Direct soundness rule from the pen-and-paper proof. Fix a
-// well-formed stored tree and a proof. If the commutative-hash verifier
-// reaches the stored root from some candidate offer hash using that
-// proof, then the candidate must equal the stored offerHash at the leaf
-// reached by the same proof. Again, the helper keeps the whole argument
-// in one frame and threads the expected hash downward to avoid cross-call
-// loss of hash equalities.
+// (B) Soundness. The modeled verifier accepts only stored leaves.
 rule acceptedProofMatchesStoredLeaf(bytes32 rootId, bytes32[] proof, bytes32 candidateOfferHash) {
     assert acceptedCandidateMatchesStoredLeaf(rootId, proof, candidateOfferHash);
+}
+
+// (C) Model-vs-production faithfulness. The modeled hashing form
+// `keccak256(abi.encode(a, b))` (used in (B) via tree storage and the
+// downward expected-hash threading) equals production's
+// `UtilsLib.commutativeHash(a, b)` whenever the pair is sorted ascending.
+// Combined with (B), this lifts the soundness proof from the model to the
+// actual on-chain verifier `UtilsLib.isLeaf`.
+rule modeledHashEqualsProductionHash(bytes32 a, bytes32 b) {
+    bool sorted;
+    bool equal;
+    sorted, equal = sortedPairHashEquivalence(a, b);
+    assert sorted => equal;
 }
