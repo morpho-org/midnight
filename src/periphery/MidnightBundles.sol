@@ -61,7 +61,7 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = _min(
+            uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
                 ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
@@ -136,7 +136,7 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = _min(
+            uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
                 ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
@@ -183,9 +183,9 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(midnight).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
-
         // touchObligation to have the correct trading fees.
         bytes32 id = IMidnight(midnight).touchObligation(takes[0].offer.obligation);
+
         _forceApproveMax(takes[0].offer.obligation.loanToken, midnight);
         _pullToken(takes[0].offer.obligation.loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
 
@@ -197,7 +197,7 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = _min(
+            uint256 unitsToTake = min(
                 TakeAmountsLib.buyerAssetsToUnits(
                     midnight, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
                 ),
@@ -278,7 +278,7 @@ contract MidnightBundles is IMidnightBundles {
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(midnight).toId(takes[i].offer.obligation) == id, InconsistentObligation());
-            uint256 unitsToTake = _min(
+            uint256 unitsToTake = min(
                 TakeAmountsLib.sellerAssetsToUnits(
                     midnight, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets
                 ),
@@ -345,7 +345,7 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev Returns min(x, y, w).
-    function _min(uint256 x, uint256 y, uint256 w) internal pure returns (uint256) {
+    function min(uint256 x, uint256 y, uint256 w) internal pure returns (uint256) {
         return UtilsLib.min(UtilsLib.min(x, y), w);
     }
 
