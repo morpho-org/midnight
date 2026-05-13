@@ -318,7 +318,7 @@ contract Midnight is IMidnight {
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
-    /// @dev Returns buyerAssets, sellerAssets, units.
+    /// @dev Returns buyerAssets and sellerAssets.
     function take(
         uint256 units,
         address taker,
@@ -327,7 +327,7 @@ contract Midnight is IMidnight {
         address receiverIfTakerIsSeller,
         Offer memory offer,
         bytes memory ratifierData
-    ) external returns (uint256, uint256, uint256) {
+    ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchObligation(offer.obligation);
         ObligationState storage _obligationState = obligationState[id];
@@ -454,7 +454,7 @@ contract Midnight is IMidnight {
             SellerIsLiquidatable()
         );
 
-        return (buyerAssets, sellerAssets, units);
+        return (buyerAssets, sellerAssets);
     }
 
     /// @dev Will revert if there are no withdrawable funds.

@@ -143,7 +143,7 @@ abstract contract BaseTest is Test {
     }
 
     // hardcodes the right root, signature, proof, and callback (no callback)
-    function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256, uint256) {
+    function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);

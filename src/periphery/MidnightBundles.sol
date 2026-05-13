@@ -62,9 +62,9 @@ contract MidnightBundles is IMidnightBundles {
             uint256 unitsToTake = UtilsLib.min(targetUnits - filledUnits, takes[i].units);
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
-                uint256 resBuyerAssets, uint256, uint256 resUnits
+                uint256 resBuyerAssets, uint256
             ) {
-                filledUnits += resUnits;
+                filledUnits += unitsToTake;
                 filledBuyerAssets += resBuyerAssets;
             } catch {}
         }
@@ -134,9 +134,9 @@ contract MidnightBundles is IMidnightBundles {
                 .take(
                     unitsToTake, taker, address(0), "", address(this), takes[i].offer, takes[i].ratifierData
                 ) returns (
-                uint256, uint256 resSellerAssets, uint256 resUnits
+                uint256, uint256 resSellerAssets
             ) {
-                filledUnits += resUnits;
+                filledUnits += unitsToTake;
                 filledSellerAssets += resSellerAssets;
             } catch {}
         }
@@ -194,10 +194,10 @@ contract MidnightBundles is IMidnightBundles {
             );
             try IMidnight(midnight)
                 .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
-                uint256 resBuyerAssets, uint256, uint256 resUnits
+                uint256 resBuyerAssets, uint256
             ) {
                 filledBuyerAssets += resBuyerAssets;
-                filledUnits += resUnits;
+                filledUnits += unitsToTake;
             } catch {}
         }
 
@@ -276,10 +276,10 @@ contract MidnightBundles is IMidnightBundles {
                 .take(
                     unitsToTake, taker, address(0), "", address(this), takes[i].offer, takes[i].ratifierData
                 ) returns (
-                uint256, uint256 resSellerAssets, uint256 resUnits
+                uint256, uint256 resSellerAssets
             ) {
                 filledSellerAssets += resSellerAssets;
-                filledUnits += resUnits;
+                filledUnits += unitsToTake;
             } catch {}
         }
 
