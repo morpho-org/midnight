@@ -23,6 +23,7 @@ uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
 uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
 uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
 bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
+uint8 constant DEFAULT_TICK_SPACING = 4;
 
 /// @dev The allowed LLTV values, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
 uint256 constant LLTV_0 = 0.385e18;

@@ -12,20 +12,20 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivUp(a, b, denominator);
 
     // IdLib summary: remember the last id returned by toId.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
-    function isHealthy(Midnight.Obligation, bytes32, address) external returns (bool) envfree;
+    function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
 }
 
 /// HELPERS ///
 
 persistent ghost bytes32 liqId;
 
-function summaryToId(Midnight.Obligation obligation, uint256 chainId, address midnight) returns bytes32 {
+function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns bytes32 {
     bytes32 id;
     liqId = id;
     return id;
@@ -44,18 +44,18 @@ ghost summaryPrice(address) returns uint256;
 /// Credit does not change on liquidate. Debt and collateral of a user can only change via liquidate if the position is liquidatable and user is borrower.
 /// Furthermore, liquidate can only decrease the borrower's debt and collateral (w.r.t the collateralIndex passed in liquidate).
 /// Also show that liquidate can only be called on liquidatable positions.
-rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Obligation obligation, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, address receiver, address callback, bytes data) {
+rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Market market, uint256 liqIndex, uint256 seizedAssets, uint256 repaidUnits, address liqUser, address receiver, address callback, bytes data) {
     bytes32 id;
     address user;
     uint256 collateralIndex;
 
-    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > obligation.maturity || !isHealthy(obligation, id, liqUser));
+    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > market.maturity || !isHealthy(market, id, liqUser));
 
     uint256 creditBefore = creditOf(id, user);
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
-    liquidate(e, obligation, liqIndex, seizedAssets, repaidUnits, liqUser, receiver, callback, data);
+    liquidate(e, market, liqIndex, seizedAssets, repaidUnits, liqUser, receiver, callback, data);
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);

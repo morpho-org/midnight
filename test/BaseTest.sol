@@ -31,7 +31,7 @@ import {
     maxTradingFee as _maxTradingFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
@@ -65,6 +65,7 @@ abstract contract BaseTest is Test {
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
 
         midnight.setFeeSetter(address(this));
+        midnight.setTickSpacingSetter(address(this));
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -141,16 +142,16 @@ abstract contract BaseTest is Test {
 
     // helpers.
 
-    function collateralize(Obligation memory obligation, address _borrower, uint256 debt) internal {
-        uint256 oraclePrice = Oracle(obligation.collateralParams[0].oracle).price();
+    function collateralize(Market memory market, address _borrower, uint256 debt) internal {
+        uint256 oraclePrice = Oracle(market.collateralParams[0].oracle).price();
         uint256 collateral =
-            debt.mulDivUp(WAD, obligation.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
-        deal(address(obligation.collateralParams[0].token), _borrower, collateral);
+            debt.mulDivUp(WAD, market.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        deal(address(market.collateralParams[0].token), _borrower, collateral);
 
         vm.startPrank(_borrower);
-        ERC20(obligation.collateralParams[0].token).approve(address(midnight), 0);
-        ERC20(obligation.collateralParams[0].token).approve(address(midnight), collateral);
-        midnight.supplyCollateral(obligation, 0, collateral, _borrower);
+        ERC20(market.collateralParams[0].token).approve(address(midnight), 0);
+        ERC20(market.collateralParams[0].token).approve(address(midnight), collateral);
+        midnight.supplyCollateral(market, 0, collateral, _borrower);
         vm.stopPrank();
     }
 
@@ -162,13 +163,13 @@ abstract contract BaseTest is Test {
         return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
     }
 
-    function setupOtherUsers(Obligation memory obligation, uint256 units) internal {
+    function setupOtherUsers(Market memory market, uint256 units) internal {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         deal(address(loanToken), otherLender, assets);
 
         Offer memory lenderOffer;
-        lenderOffer.obligation = obligation;
+        lenderOffer.market = market;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
@@ -177,18 +178,18 @@ abstract contract BaseTest is Test {
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
-        collateralize(obligation, otherBorrower, units);
+        collateralize(market, otherBorrower, units);
         take(units, otherBorrower, lenderOffer);
     }
 
-    function createBadDebt(Obligation memory obligation) internal {
+    function createBadDebt(Market memory market) internal {
         (address badBorrower, uint256 badBorrowerPrivateKey) = makeAddrAndKey("badBorrower");
         privateKey[badBorrower] = badBorrowerPrivateKey;
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
         loanToken.approve(address(midnight), type(uint256).max);
         Offer memory badBorrowerOffer;
-        badBorrowerOffer.obligation = obligation;
+        badBorrowerOffer.market = market;
         badBorrowerOffer.buy = false;
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
@@ -204,8 +205,8 @@ abstract contract BaseTest is Test {
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
 
-        deal(obligation.collateralParams[0].token, address(this), 135);
-        midnight.supplyCollateral(obligation, 0, 135, badBorrower);
+        deal(market.collateralParams[0].token, address(this), 135);
+        midnight.supplyCollateral(market, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), false);
@@ -214,22 +215,22 @@ abstract contract BaseTest is Test {
 
         take(100, unluckyLender, badBorrowerOffer);
 
-        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(obligation, 0, 0, 0, badBorrower, address(this), address(0), "");
+        Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
+        midnight.liquidate(market, 0, 0, 0, badBorrower, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
-        deal(address(loanToken), address(this), midnight.debtOf(toId(obligation), badBorrower));
-        midnight.repay(obligation, midnight.debtOf(toId(obligation), badBorrower), badBorrower, address(0), hex"");
-        assertEq(midnight.debtOf(toId(obligation), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
+        midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
+        assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
 
         // reset the price.
-        Oracle(obligation.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+        Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Obligation memory obligation) internal view returns (bytes32) {
-        return IdLib.toId(obligation, block.chainid, address(midnight));
+    function toId(Market memory market) internal view returns (bytes32) {
+        return IdLib.toId(market, block.chainid, address(midnight));
     }
 
     function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
@@ -371,41 +372,37 @@ abstract contract BaseTest is Test {
         return tiers[seed % 9];
     }
 
-    /// @dev Returns an obligation with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
-    function validObligation(Obligation memory obligation) internal view returns (Obligation memory) {
+    /// @dev Returns a market with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
+    function validMarket(Market memory market) internal view returns (Market memory) {
         uint256 len =
-            obligation.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : obligation.collateralParams.length;
+            market.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : market.collateralParams.length;
         vm.assume(len > 0);
         CollateralParams[] memory collateralParams = new CollateralParams[](len);
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
-                address(uint160(uint256(keccak256(abi.encode(obligation.collateralParams[i].token, i)))));
-            uint256 lltv = allowedLltv(obligation.collateralParams[i].lltv);
+                address(uint160(uint256(keccak256(abi.encode(market.collateralParams[i].token, i)))));
+            uint256 lltv = allowedLltv(market.collateralParams[i].lltv);
             collateralParams[i].lltv = lltv;
             collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
         collateralParams = sortCollateralParams(collateralParams);
-        obligation.collateralParams = collateralParams;
-        obligation.maturity = bound(obligation.maturity, 0, block.timestamp + 100 * 365 days);
-        return obligation;
+        market.collateralParams = collateralParams;
+        market.maturity = bound(market.maturity, 0, block.timestamp + 100 * 365 days);
+        return market;
     }
 
-    function setupObligation(Obligation memory obligation, uint256 units) internal {
+    function setupMarket(Market memory market, uint256 units) internal {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
-        Offer memory borrowerOffer = _setupObligationOffer(obligation, units);
+        Offer memory borrowerOffer = _setupMarketOffer(market, units);
         bytes memory rd = merkleRatifierData([borrowerOffer]);
 
         vm.prank(lender);
         midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
     }
 
-    function _setupObligationOffer(Obligation memory obligation, uint256 units)
-        private
-        view
-        returns (Offer memory borrowerOffer)
-    {
-        borrowerOffer.obligation = obligation;
+    function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {
+        borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;

@@ -2,51 +2,51 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer, Obligation, CollateralParams} from "../../interfaces/IMidnight.sol";
+import {Offer, Market, CollateralParams} from "../../interfaces/IMidnight.sol";
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 /// @dev keccak256(COLLATERAL_PARAMS_TYPE)
 bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
-bytes constant OBLIGATION_TYPE =
-    "Obligation(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
-/// @dev keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE))
-bytes32 constant OBLIGATION_TYPEHASH = 0xdcb3d766540d305590a1ee685cb2636a7271c1eea05949c19a23eb48c7492d24;
+bytes constant MARKET_TYPE =
+    "Market(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
+/// @dev keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE))
+bytes32 constant MARKET_TYPEHASH = 0x358117e98511cc3df97175dca58053b06675b43ad090b0553f8a1eff008b6e2e;
 bytes constant OFFER_TYPE =
-    "Offer(Obligation obligation,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
-/// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE))
-bytes32 constant OFFER_TYPEHASH = 0xdf99c78ec0578533b0e52d329a9866adb5ef6bae6a0c56f9bb562ba6d9be867f;
+    "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
+/// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE))
+bytes32 constant OFFER_TYPEHASH = 0x980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c;
 
 library HashLib {
     error TreeTooHigh();
 
     /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
     /// @dev Same as keccak256(bytes.concat("OfferTree(Offer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE,
-    /// OBLIGATION_TYPE, OFFER_TYPE)).
+    /// MARKET_TYPE, OFFER_TYPE)).
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0x9a4cffa064818006f9fa53857eafbd9974c971f009276be3fd30481edb617f49;
-            if (height == 1) return 0x73e25e0ecda983be4e607052c9c61b1f73c5812c7963412e271ba99e98f38c7c;
-            if (height == 2) return 0x9172b36c68635815d03f222ce2193bc103d476c9f2c84dedb041304ae7c22f75;
-            if (height == 3) return 0xec6af766c7d762b2855f250b9f13ded677c04c8d69c43f137072d241d2a489ae;
-            if (height == 4) return 0x073e69543318e08cf57881744e4374416351f0150b5d84a012da36fe123d80d0;
-            if (height == 5) return 0x456356eca104d2cf05e643ef7fd0e6bb65a1a5721159fc458d9804f1d40c770c;
-            if (height == 6) return 0x43a6840fbae6a9098ca657734227a6626feeb331dbefe5a8621ffcea16fbfee4;
-            if (height == 7) return 0x426ba4f3e501aeff3b12f2620e1b7278bd27254693b9d1be525e76d90ad81983;
-            if (height == 8) return 0x8c83e4332d4c4582e00472571210879c28961c85af403f7ca8cf1c588ed73fea;
-            if (height == 9) return 0x51e09d5a4a99b2f34b074afaf10f6090ee01d0d8dc881b2a33e0862efdea4389;
-            return 0x2bbf39e344c1df3e8d099b61e9fadcfff00366ed08390402298e7aff84f40b01;
+            if (height == 0) return 0x2b9ee710e1977dfc5778fe18c905ccc1d9e144baf3ba83be732d4da65ecb73e3;
+            if (height == 1) return 0x3cc16189b92a85898f1d5c6e87282c8ded7c1c93b2323d5e85ae10c5f4b2b220;
+            if (height == 2) return 0x6de37d3e570afa293a8107d4b6b1d9547616c04f42164d009c89194787b2ffa6;
+            if (height == 3) return 0xba3ea2ddfbf40a906fcd1b9506dbd344c062e8dcba8b5c902ceb13339f45a358;
+            if (height == 4) return 0xe5faa865e93bc1b7b8fdf91980f54682d649683b014edd6c54b642f5a0c96977;
+            if (height == 5) return 0xeda50f61dd2a827c6ff9fbfcd54335628dcaa78aaa4f2d118c60886219cdce2b;
+            if (height == 6) return 0x54e2c9cc40cdc0e9ad530cf2be298f952f57af2b18b02f88274a9bbab359d23a;
+            if (height == 7) return 0xc9d81859d60d6b21c688f4be93ca83e3be222728bb156ef5f4cf497f879f1e29;
+            if (height == 8) return 0xd59b0c4544e0c60c8611eab0aaa402575f14ee784d22289c5d57f48c422a62d6;
+            if (height == 9) return 0xccad21701f34f08bb8398a3dbc77e20e4c9c424930f3a8b31485bf059e2bdb20;
+            return 0x8a42dfb49807647bfc49c906aef322aa0239d40e4cb675761e141bc7bfa530da;
         } else {
-            if (height == 11) return 0xe6e20c789f3afce3a3fe9de56059bedcfca0b6104ffbfd752491e49691267cdb;
-            if (height == 12) return 0x8ce2628ddc927bcfc3466ced668b48102af1bb61ff7f42c3b58c78cbd8f5fd01;
-            if (height == 13) return 0xe7f97c22e30d8b9e693dd81bf4f5794ef72413105d9b0858c12affcf16300523;
-            if (height == 14) return 0x4fe3f1f3a4921a4b2268ea7a7077dc7e95256b5b4e75ce221e94cf006263516c;
-            if (height == 15) return 0x0407c3a3ad36093fe23beb83a4b6e719a138d03fc7d36a85b10efc76713a1293;
-            if (height == 16) return 0xa1e429b3cef45d25743c2abee55b9a2dd7ff33512791e83ed8f45039419d5da3;
-            if (height == 17) return 0xa33a8f9b581ff5d305b36b96ba23dc5d3337288af80f8a3d60ba9b6ac3dd347c;
-            if (height == 18) return 0x2003b976fb1f6e95af69350f4b4244bcada74db4164041a7b3808a91206d334e;
-            if (height == 19) return 0x192d0bfd097f77eb5ad08f728288a1e7525ecfbe73bfdad7b311a21d8c4134ae;
-            if (height == 20) return 0xfbc96454b1a9e6406df6a70ee6acecc03f3b0a20a4253abddcbb695175b3bc11;
+            if (height == 11) return 0x2adc0d948b2e3ecb642661590d2eec36d4e71e9acf382deb6574371800caf198;
+            if (height == 12) return 0xf5845dfaed016de272342f346346a49d4b1694f622144d420558a38e46ac9dad;
+            if (height == 13) return 0x3d7df854e6294bf433b64bbb8d0a82fa875a87b45b0016db27fc5752e54126ad;
+            if (height == 14) return 0x72a991a101708716ff427c524404ab44f4d4d1f4e7e76c0ae8b967222164b348;
+            if (height == 15) return 0x762c88fc52cf78a54401d247790f1bdb619d51d3458d1415c20d1422197cecc4;
+            if (height == 16) return 0x8ede2209e94c8d5f8379d733dc8712b71a3888c1c4b70f3d6b22285f70bf4286;
+            if (height == 17) return 0x425b18f07b3ac2f641977d2c294590565dd40b5d8414610568dca64628399975;
+            if (height == 18) return 0x7e7d98718c0180e882e5963b9bd49810096912c273dfa38d8afdd6d39fde86ec;
+            if (height == 19) return 0x8d35d491a29d846489e19688efff3c4cc7dbd54458058d49b30294074539f0b9;
+            if (height == 20) return 0x824e385eea1953bcbc783bf900b18aa6fba129b6908765e986cf0968b491ec4f;
             revert TreeTooHigh();
         }
     }
@@ -84,11 +84,11 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of an Obligation.
-    function hashObligation(Obligation memory obligation) internal pure returns (bytes32) {
-        bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
-        for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
-            collateralParamsHashes[i] = hashCollateralParams(obligation.collateralParams[i]);
+    /// @dev Computes the EIP-712 hash struct of a Market.
+    function hashMarket(Market memory market) internal pure returns (bytes32) {
+        bytes32[] memory collateralParamsHashes = new bytes32[](market.collateralParams.length);
+        for (uint256 i = 0; i < market.collateralParams.length; i++) {
+            collateralParamsHashes[i] = hashCollateralParams(market.collateralParams[i]);
         }
 
         bytes32 collateralParamsHash;
@@ -102,13 +102,13 @@ library HashLib {
 
         return keccak256(
             abi.encode(
-                OBLIGATION_TYPEHASH,
-                obligation.loanToken,
+                MARKET_TYPEHASH,
+                market.loanToken,
                 collateralParamsHash,
-                obligation.maturity,
-                obligation.rcfThreshold,
-                obligation.enterGate,
-                obligation.liquidatorGate
+                market.maturity,
+                market.rcfThreshold,
+                market.enterGate,
+                market.liquidatorGate
             )
         );
     }
@@ -118,7 +118,7 @@ library HashLib {
         return keccak256(
             abi.encode(
                 OFFER_TYPEHASH,
-                hashObligation(offer.obligation),
+                hashMarket(offer.market),
                 offer.buy,
                 offer.maker,
                 offer.start,
