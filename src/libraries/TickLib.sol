@@ -49,7 +49,7 @@ library TickLib {
         }
     }
 
-    /// @dev Returns the lowest tick with a higher price that is also a multiple of spacing.
+    /// @dev Among the ticks than are multiples of spacing, returns the lowest one with a price higher or equal.
     /// @dev spacing should divide MAX_TICK.
     function priceToTick(uint256 price, uint256 spacing) internal pure returns (uint256) {
         require(price <= 1e18, PriceGreaterThanOne());
