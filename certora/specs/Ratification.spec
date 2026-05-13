@@ -10,8 +10,8 @@ methods {
     function _.onSell(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
-    function MerkleLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function MerkleLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
+    function HashLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function HashLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
     function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
     // Summaries for internals irrelevant to ratification properties.
