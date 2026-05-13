@@ -1235,7 +1235,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testSellUnitsTargetAveragePriceTooLow(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].maxUnits = units;
@@ -1267,7 +1267,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testBuyBuyerAssetsTargetAveragePriceExceeded(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].buy = false;
@@ -1302,7 +1302,7 @@ contract MidnightBundlesTest is BaseTest {
     }
 
     function testSellSellerAssetsTargetAveragePriceTooLow(uint256 tick) public {
-        tick = bound(tick, 4, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 1, MAX_TICK / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
         uint256 units = 100e18;
 
         offers[0].maxUnits = units;

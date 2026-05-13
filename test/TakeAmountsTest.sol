@@ -66,7 +66,7 @@ contract TakeAmountsTest is BaseTest {
     /// @dev Returns the highest tick such that tickToPrice(tick) + tradingFee <= WAD.
     function _maxTick(uint256 tradingFee) internal pure returns (uint256) {
         uint256 maxPrice = WAD - tradingFee;
-        uint256 t = TickLib.priceToTick(maxPrice);
+        uint256 t = TickLib.priceToTick(maxPrice, 1);
         return TickLib.tickToPrice(t) > maxPrice ? t - 1 : t;
     }
 
