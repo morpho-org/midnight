@@ -35,7 +35,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new obligations. Then, the fee setter can override it.
-/// @dev The trading fee is computed using piecewise linear interpolation between breakpoints.
+/// @dev The trading fee is computed using piecewise linear interpolation on the TTM between breakpoints.
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM (time to maturity) > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
