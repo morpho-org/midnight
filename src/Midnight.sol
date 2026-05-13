@@ -17,7 +17,7 @@ import {IMidnight, Obligation, Offer, CollateralParams, ObligationState, Positio
 /// OBLIGATIONS
 /// @dev The maximum time to maturity is 100 years.
 /// @dev Obligations have at most 128 collaterals.
-/// @dev Collaterals must be listed by collateral address (ascending, no duplicates).
+/// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
 /// @dev Within an obligation, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
