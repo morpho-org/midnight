@@ -33,23 +33,23 @@ struct Offer {
     address ratifier;
     bool reduceOnly;
     uint256 maxUnits;
-    uint256 maxSellerAssets;
-    uint256 maxBuyerAssets;
+    uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
 }
 
-/// @dev Trading fees and the continuous fee are 0 until the obligation is created, then set to the default values.
+/// @dev Trading fee cbp values and the continuous fee are 0 until the obligation is created, then set to the default
+/// values.
 struct ObligationState {
     uint128 totalUnits;
     uint128 lossFactor;
     uint128 withdrawable;
     uint128 continuousFeeCredit;
-    uint16 tradingFee0;
-    uint16 tradingFee1;
-    uint16 tradingFee2;
-    uint16 tradingFee3;
-    uint16 tradingFee4;
-    uint16 tradingFee5;
-    uint16 tradingFee6;
+    uint16 tradingFeeCbp0;
+    uint16 tradingFeeCbp1;
+    uint16 tradingFeeCbp2;
+    uint16 tradingFeeCbp3;
+    uint16 tradingFeeCbp4;
+    uint16 tradingFeeCbp5;
+    uint16 tradingFeeCbp6;
     uint32 continuousFee;
     uint8 spacing;
 }
@@ -69,11 +69,10 @@ interface IMidnight {
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
     error CollateralParamsNotSorted();
-    error ConsumedBuyerAssets();
-    error ConsumedSellerAssets();
+    error ConsumedAssets();
     error ConsumedUnits();
     error ContinuousFeeTooHigh();
-    error FeeNotMultipleOfFeeStep();
+    error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
     error WrongBuyCallbackReturnValue();
     error WrongSellCallbackReturnValue();
@@ -120,11 +119,11 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFee0, uint16 tradingFee1, uint16 tradingFee2, uint16 tradingFee3, uint16 tradingFee4, uint16 tradingFee5, uint16 tradingFee6, uint32 continuousFee, uint8 spacing);
+    function obligationState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeeCbp0, uint16 tradingFeeCbp1, uint16 tradingFeeCbp2, uint16 tradingFeeCbp3, uint16 tradingFeeCbp4, uint16 tradingFeeCbp5, uint16 tradingFeeCbp6, uint32 continuousFee, uint8 spacing);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function session(address user) external view returns (bytes32);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
-    function defaultTradingFees(address loanToken, uint256 index) external view returns (uint16);
+    function defaultTradingFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableTradingFee(address token) external view returns (uint256);
     function roleSetter() external view returns (address);
@@ -146,7 +145,7 @@ interface IMidnight {
     function claimContinuousFee(Obligation memory obligation, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData) external returns (uint256, uint256, uint256);
+    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData) external returns (uint256, uint256);
     function withdraw(Obligation memory obligation, uint256 units, address onBehalf, address receiver) external;
     function repay(Obligation memory obligation, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Obligation memory obligation, uint256 collateralIndex, uint256 assets, address onBehalf) external;
@@ -174,7 +173,7 @@ interface IMidnight {
     function lossFactor(bytes32 id) external view returns (uint128);
     function obligationCreated(bytes32 id) external view returns (bool);
     function withdrawable(bytes32 id) external view returns (uint256);
-    function tradingFees(bytes32 id) external view returns (uint16[7] memory);
+    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
     function continuousFeeCredit(bytes32 id) external view returns (uint256);
     function pendingFee(bytes32 id, address user) external view returns (uint128);
@@ -182,7 +181,6 @@ interface IMidnight {
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256);
-    function maxTradingFee(uint256 index) external pure returns (uint256);
     function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
     // forgefmt: disable-end
 }

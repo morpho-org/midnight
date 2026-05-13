@@ -8,7 +8,7 @@ methods {
 
     function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
-    function Midnight.tradingFees(bytes32) external returns (uint16[7]) envfree;
+    function Midnight.tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
     function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.toObligation(bytes32) external returns (Midnight.Obligation memory) envfree;
@@ -166,7 +166,7 @@ strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address u
     !Midnight.obligationCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
-    uint16[7] fees = Midnight.tradingFees(id);
+    uint16[7] fees = Midnight.tradingFeeCbps(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 

@@ -55,8 +55,8 @@ contract TakeAmountsTest is BaseTest {
     }
 
     function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {
-        tradingFee0 = bound(tradingFee0, 0, midnight.maxTradingFee(0)) / 1e12 * 1e12;
-        tradingFee1 = bound(tradingFee1, 0, midnight.maxTradingFee(1)) / 1e12 * 1e12;
+        tradingFee0 = bound(tradingFee0, 0, maxTradingFee(0)) / 1e12 * 1e12;
+        tradingFee1 = bound(tradingFee1, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.touchObligation(obligation);
         midnight.setObligationTradingFee(id, 0, tradingFee0);
         midnight.setObligationTradingFee(id, 1, tradingFee1);
@@ -102,7 +102,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
-        (uint256 buyerAssets,,) = take(units, lender, offer);
+        (uint256 buyerAssets,) = take(units, lender, offer);
 
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
@@ -124,7 +124,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = borrower;
         offer.receiverIfMakerIsSeller = borrower;
 
-        (, uint256 sellerAssets,) = take(units, lender, offer);
+        (, uint256 sellerAssets) = take(units, lender, offer);
 
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
@@ -149,7 +149,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
-        (uint256 buyerAssets,,) = take(units, borrower, offer);
+        (uint256 buyerAssets,) = take(units, borrower, offer);
 
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
@@ -172,7 +172,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
         deal(address(loanToken), borrower, type(uint256).max);
 
-        (, uint256 sellerAssets,) = take(units, borrower, offer);
+        (, uint256 sellerAssets) = take(units, borrower, offer);
 
         assertEq(sellerAssets, targetSellerAssets, "e2e sellerAssets");
     }
@@ -194,7 +194,7 @@ contract TakeAmountsTest is BaseTest {
         offer.receiverIfMakerIsSeller = borrower;
         offer.tick = MAX_TICK;
 
-        (uint256 buyerAssets,,) = take(targetUnits, lender, offer);
+        (uint256 buyerAssets,) = take(targetUnits, lender, offer);
 
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }
@@ -214,7 +214,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maker = lender;
         offer.tick = MAX_TICK;
 
-        (uint256 buyerAssets,,) = take(targetUnits, borrower, offer);
+        (uint256 buyerAssets,) = take(targetUnits, borrower, offer);
 
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }
