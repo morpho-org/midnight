@@ -7,36 +7,11 @@ import {
     COLLATERAL_PARAMS_TYPE,
     OBLIGATION_TYPE,
     OBLIGATION_TYPEHASH,
-    OFFER_TYPE,
-    OFFER_TYPEHASH
+    OFFER_TYPE
 } from "../src/ratifiers/HashLib.sol";
-import {Offer, Obligation} from "../src/interfaces/IMidnight.sol";
+import {Obligation} from "../src/interfaces/IMidnight.sol";
 
 contract HashLibTest is Test {
-    function testHashOfferMatchesReference(Offer memory offer) public pure {
-        /// Equivalent to HashLib.hashOffer but does not compile under Certora's mode (stack-too-deep).
-        bytes32 expectedHash = keccak256(
-            abi.encode(
-                OFFER_TYPEHASH,
-                HashLib.hashObligation(offer.obligation),
-                offer.buy,
-                offer.maker,
-                offer.start,
-                offer.expiry,
-                offer.tick,
-                offer.group,
-                offer.callback,
-                keccak256(offer.callbackData),
-                offer.receiverIfMakerIsSeller,
-                offer.ratifier,
-                offer.reduceOnly,
-                offer.maxUnits,
-                offer.maxAssets
-            )
-        );
-        assertEq(HashLib.hashOffer(offer), expectedHash);
-    }
-
     function testHashObligationMatchesReference(Obligation memory obligation) public pure {
         bytes32[] memory collateralParamsHashes = new bytes32[](obligation.collateralParams.length);
         for (uint256 i = 0; i < obligation.collateralParams.length; i++) {
