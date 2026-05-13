@@ -84,7 +84,7 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a market.
+    /// @dev Computes the EIP-712 hash struct of a Market.
     function hashMarket(Market memory market) internal pure returns (bytes32) {
         bytes32[] memory collateralParamsHashes = new bytes32[](market.collateralParams.length);
         for (uint256 i = 0; i < market.collateralParams.length; i++) {
