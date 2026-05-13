@@ -7,8 +7,8 @@ import {IdLib} from "./libraries/IdLib.sol";
 import {TickLib} from "./libraries/TickLib.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 import {EventsLib} from "./libraries/EventsLib.sol";
-import "./libraries/ConstantsLib.sol"; // forge-lint: disable-item(unaliased-plain-import)
-import "./interfaces/ICallbacks.sol"; // forge-lint: disable-item(unaliased-plain-import)
+import "./libraries/ConstantsLib.sol"; // forge-lint: disable-line(unaliased-plain-import)
+import "./interfaces/ICallbacks.sol"; // forge-lint: disable-line(unaliased-plain-import)
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IRatifier} from "./interfaces/IRatifier.sol";
 import {IEnterGate, ILiquidatorGate} from "./interfaces/IGate.sol";
