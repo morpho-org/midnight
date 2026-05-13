@@ -640,16 +640,6 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.obligationCreated(toId(_obligation)), true, "obligation created with cursor 0.5");
     }
 
-    function testMaxLifDirect(uint256 seed) public view {
-        uint256 lltv = allowedLltv(seed);
-        uint256 expectedLow = maxLif(lltv, 0.25e18);
-        assertEq(midnight.maxLif(lltv, 0.25e18), expectedLow, "maxLif low cursor");
-
-        uint256 expectedHigh = maxLif(lltv, 0.5e18);
-        assertEq(midnight.maxLif(lltv, 0.5e18), expectedHigh, "maxLif high cursor");
-        assertTrue(expectedHigh >= expectedLow, "higher cursor gives higher or equal maxLif");
-    }
-
     function testObligationStateGetter(Obligation memory _obligation, uint256 _defaultContinuousFee) public {
         vm.assume(_obligation.collateralParams.length > 0);
         _obligation = validObligation(_obligation);

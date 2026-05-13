@@ -106,8 +106,7 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 /// RULES ///
 
 // The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
-// The maxLif function is excluded: it is a pure function callable with arbitrary inputs.
-rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:maxLif(uint256, uint256).selector && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
+rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector } {
     f(e, args);
     assert true;
 }

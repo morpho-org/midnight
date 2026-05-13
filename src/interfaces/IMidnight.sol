@@ -172,7 +172,6 @@ interface IMidnight {
     function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
     function isHealthy(Obligation memory obligation, bytes32 id, address borrower) external view returns (bool);
-    function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256);
     function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
     // forgefmt: disable-end
 }
