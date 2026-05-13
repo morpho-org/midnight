@@ -23,7 +23,6 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
-    /// @dev Canonical Permit2 deployment.
     address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
