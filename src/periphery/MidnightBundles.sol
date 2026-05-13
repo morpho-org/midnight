@@ -30,7 +30,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same obligation for all takes.
     /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib reverts.
+    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
@@ -98,7 +98,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same obligation for all takes.
     /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib reverts.
+    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.
@@ -164,7 +164,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same obligation for all takes.
     /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib reverts.
+    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total cost is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
@@ -236,7 +236,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same obligation for all takes.
     /// @dev The collateral transfers always use the first offer's obligation.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib reverts.
+    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total receipt is targetSellerAssets.
