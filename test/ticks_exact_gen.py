@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 
-MAX_TICK = 5820
+MAX_TICK = 5908
 
 def exact_price(tick):
     """Reference tick to price implementation."""

@@ -13,10 +13,10 @@ contract TickLibTest is BaseTest {
     // Tick to price
 
     function testTickToPriceMinMax() public pure {
-        assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(2), 1e12, "first non-zero tick");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 1e12, "tick max - 2 just below par");
-        assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
+        assertEq(TickLib.tickToPrice(0), 0, "tick 0 is the only zero tick");
+        assertEq(TickLib.tickToPrice(1), 0.8e12, "first non-zero tick");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 1e18 - 0.8e12, "tick max - 1 just below par");
+        assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max is the only par tick");
     }
 
     function testTickMonotonicity() public pure {
