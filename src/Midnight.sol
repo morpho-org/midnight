@@ -86,7 +86,12 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("OCO").
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
-/// @dev Only one of maxAssets or maxUnits can be nonzero per offer.
+
+/// OFFER CAPS
+/// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
+/// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
+/// @dev If maxAssets is zero, maxUnits caps the units. If maxUnits is zero, maxAssets caps the assets.
+/// @dev To create an uncapped offer, use type(uint128).max for maxAssets or maxUnits.
 ///
 /// SESSION
 /// @dev The session can be shuffled by the user to cancel all current offers easily and efficiently.
