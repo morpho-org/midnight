@@ -87,7 +87,7 @@ contract TickGatingTest is BaseTest {
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
         // Refine to spacing 2.
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
 
         // Tick 2921 is not divisible by 2 → inaccessible at spacing 2.
         Offer memory offer = _makeOffer(2921);
@@ -117,36 +117,36 @@ contract TickGatingTest is BaseTest {
         midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
 
         // Refine to spacing 2.
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
 
         // Now should succeed.
         take(units, borrower, offer);
         assertEq(midnight.creditOf(id, lender), units);
     }
 
-    // --- setObligationSpacing governance ---
+    // --- setObligationTickSpacing governance ---
 
-    function testSetObligationSpacingOnlyTickSpacingSetter() public {
+    function testSetObligationTickSpacingOnlyTickSpacingSetter() public {
         vm.prank(lender);
         vm.expectRevert(IMidnight.OnlyTickSpacingSetter.selector);
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
     }
 
-    function testSetObligationSpacingInvalid() public {
+    function testSetObligationTickSpacingInvalid() public {
         vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 3);
+        midnight.setObligationTickSpacing(id, 3);
 
         vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 0);
+        midnight.setObligationTickSpacing(id, 0);
 
-        midnight.setObligationSpacing(id, 1);
+        midnight.setObligationTickSpacing(id, 1);
         vm.expectRevert(IMidnight.InvalidSpacing.selector);
-        midnight.setObligationSpacing(id, 2);
+        midnight.setObligationTickSpacing(id, 2);
     }
 
-    function testSetObligationSpacingRequiresCreated() public {
+    function testSetObligationTickSpacingRequiresCreated() public {
         vm.expectRevert(IMidnight.ObligationNotCreated.selector);
-        midnight.setObligationSpacing(bytes32(uint256(42)), 1);
+        midnight.setObligationTickSpacing(bytes32(uint256(42)), 1);
     }
 
     // --- setTickSpacingSetter governance ---
@@ -170,7 +170,7 @@ contract TickGatingTest is BaseTest {
         take(units, borrower, offer);
 
         // Refine to spacing 1 (every tick).
-        midnight.setObligationSpacing(id, 1);
+        midnight.setObligationTickSpacing(id, 1);
 
         // The same tick is still accessible at spacing 1.
         Offer memory offer2 = _makeOffer(tick);

@@ -135,7 +135,7 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
-    function setObligationSpacing(bytes32 id, uint256 newSpacing) external;
+    function setObligationTickSpacing(bytes32 id, uint256 newSpacing) external;
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
     function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
     function setObligationContinuousFee(bytes32 id, uint256 newContinuousFee) external;

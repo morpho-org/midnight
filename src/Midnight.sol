@@ -246,13 +246,13 @@ contract Midnight is IMidnight {
     }
 
     /// @dev Refines the tick spacing of an obligation. Can not increase (more ticks become accessible).
-    function setObligationSpacing(bytes32 id, uint256 newSpacing) external {
+    function setObligationTickSpacing(bytes32 id, uint256 newSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(obligationState[id].spacing > 0, ObligationNotCreated());
         require(newSpacing > 0 && obligationState[id].spacing % newSpacing == 0, InvalidSpacing());
         // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
         obligationState[id].spacing = uint8(newSpacing);
-        emit EventsLib.SetObligationSpacing(id, newSpacing);
+        emit EventsLib.SetObligationTickSpacing(id, newSpacing);
     }
 
     function setObligationTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {

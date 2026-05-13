@@ -89,7 +89,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee = bound(tradingFee, 0, maxTradingFee(1)) / 1e12 * 1e12;
         midnight.setDefaultTradingFee(address(loanToken), 1, tradingFee);
         midnight.touchObligation(obligation);
-        midnight.setObligationSpacing(id, 1);
+        midnight.setObligationTickSpacing(id, 1);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + tradingFee;
