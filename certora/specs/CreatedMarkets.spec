@@ -72,7 +72,7 @@ rule marketCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
     assert Midnight.tickSpacing(id) > 0;
 }
 
-// Show that an market is created after an interaction.
+// Show that a market is created after an interaction.
 
 rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
     Midnight.touchMarket(e, market);

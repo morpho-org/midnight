@@ -361,7 +361,7 @@ abstract contract BaseTest is Test {
         return tiers[seed % 9];
     }
 
-    /// @dev Returns an market with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
+    /// @dev Returns a market with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
     function validMarket(Market memory market) internal view returns (Market memory) {
         uint256 len =
             market.collateralParams.length > MAX_COLLATERALS ? MAX_COLLATERALS : market.collateralParams.length;

@@ -63,7 +63,7 @@ invariant marketTradingFeePerIndexBound(bytes32 id, uint256 index)
         }
     }
 
-/// When an market is created, its trading fees are set to the default trading fees of its loan token.
+/// When a market is created, its trading fees are set to the default trading fees of its loan token.
 rule newMarketTradingFeesMatchDefault(env e, Midnight.Market market, uint256 index) {
     require index <= 6, "index out of bounds";
     bytes32 id = toId(e, market);
@@ -85,7 +85,7 @@ rule onlyFeeSetterCanChangeDefaultTradingFees(method f, env e, address token, ui
     assert defaultTradingFee(token, index) != defaultTradingFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setDefaultTradingFee(address, uint256, uint256).selector;
 }
 
-/// Once an market is created, only the fee setter can modify its trading fees.
+/// Once a market is created, only the fee setter can modify its trading fees.
 rule onlyFeeSetterCanChangeMarketTradingFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
     require tickSpacing(id) > 0, "assume that the market is created";

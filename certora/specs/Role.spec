@@ -165,7 +165,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 /// FEE SETTER: ACCESS CONTROL ///
 /// Trading fee access control is covered in TradingFeeBoundaries.spec.
 
-/// Once an market is created, only the fee setter can modify its continuous fees.
+/// Once a market is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeMarketContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require tickSpacing(id) > 0, "market must exist";
     uint32 continuousFeeBefore = continuousFee(id);
@@ -201,7 +201,7 @@ rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTick
 
 /// TICK SPACING SETTER: ACCESS CONTROL ///
 
-/// Once an market is created, only the tick spacing setter can modify its tick spacing.
+/// Once a market is created, only the tick spacing setter can modify its tick spacing.
 rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require tickSpacing(id) > 0, "market must exist";
     uint8 tickSpacingBefore = tickSpacing(id);

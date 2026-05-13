@@ -122,7 +122,7 @@ persistent ghost bytes32 globalId;
 
 persistent ghost address globalBorrower;
 
-// helper function to check if one of the collateralParams of an market matches the global variables.
+// helper function to check if one of the collateralParams of a market matches the global variables.
 // It checks for the length and also returns true if the index is out of bounds. This allows us to require this for every index.
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
 

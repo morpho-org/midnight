@@ -18,12 +18,12 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The maximum time to maturity is 100 years.
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
-/// @dev Within an market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
+/// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
-/// @dev To check if an market has been touched, check if tickSpacing(marketId) > 0.
+/// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 ///
 /// MULTI-COLLATERAL OBLIGATIONS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to an health check on withdrawal. In
@@ -108,7 +108,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a bad debt realization.
-/// @dev If an market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
+/// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
 /// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
 /// market doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
 ///
@@ -150,7 +150,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The fee setter can set the default and per-market trading fee and continuous fee.
 /// @dev The fee claimer can claim the trading fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
-/// @dev The tick spacing setter can decrease the tick spacing of an market.
+/// @dev The tick spacing setter can decrease the tick spacing of a market.
 ///
 /// MISC
 /// @dev No-ops are allowed.
@@ -233,7 +233,7 @@ contract Midnight is IMidnight {
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
-    /// @dev Refines the tick spacing of an market. Can not increase (more ticks become accessible).
+    /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(marketState[id].tickSpacing > 0, MarketNotCreated());
