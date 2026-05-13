@@ -13,12 +13,12 @@ library ConsumableUnitsLib {
     /// @dev Assumes that `id` matches `offer.obligation`.
     function consumableUnits(address midnight, bytes32 id, Offer memory offer) internal view returns (uint256) {
         uint256 consumed = IMidnight(midnight).consumed(offer.maker, offer.group);
-        if (offer.maxAssets > 0) {
-            return offer.buy
-                ? TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, offer.maxAssets.zeroFloorSub(consumed))
-                : TakeAmountsLib.sellerAssetsToUnits(midnight, id, offer, offer.maxAssets.zeroFloorSub(consumed));
-        } else {
+        if (offer.maxUnits > 0) {
             return offer.maxUnits.zeroFloorSub(consumed);
+        } else if (offer.buy) {
+            return TakeAmountsLib.buyerAssetsToUnits(midnight, id, offer, offer.maxAssets.zeroFloorSub(consumed));
+        } else {
+            return TakeAmountsLib.sellerAssetsToUnits(midnight, id, offer, offer.maxAssets.zeroFloorSub(consumed));
         }
     }
 }
