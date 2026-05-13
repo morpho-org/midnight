@@ -10,7 +10,6 @@ methods {
     function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
     function Midnight.tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
-    function Midnight.obligationCreated(bytes32) external returns (bool) envfree;
     function Midnight.toObligation(bytes32) external returns (Midnight.Obligation memory) envfree;
     function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
     function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
@@ -20,6 +19,7 @@ methods {
     function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function Utils.obligationCreated(address, bytes32) external returns (bool) envfree;
 
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -46,7 +46,7 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 }
 
 function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
-    return Midnight.obligationCreated(summaryToId(obligation));
+    return Utils.obligationCreated(currentContract, summaryToId(obligation));
 }
 
 // Show that a created obligation has at least one collateral.
@@ -67,9 +67,9 @@ strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligat
 
 // Show that a created obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
-    require Midnight.obligationCreated(id), "Assume that the obligation is created";
+    require Utils.obligationCreated(currentContract, id), "Assume that the obligation is created";
     f(e, args);
-    assert Midnight.obligationCreated(id);
+    assert Utils.obligationCreated(currentContract, id);
 }
 
 // Show that an obligation is created after an interaction.
@@ -120,50 +120,50 @@ filtered {
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
-    require !Midnight.obligationCreated(id), "Assume that the obligation is not created";
+    require !Utils.obligationCreated(currentContract, id), "Assume that the obligation is not created";
     f(e, args);
-    assert !Midnight.obligationCreated(id);
+    assert !Utils.obligationCreated(currentContract, id);
 }
 
 // Show that each obligation state field is empty if the obligation is not created.
 strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => Midnight.totalUnits(id) == 0;
+    !Utils.obligationCreated(currentContract, id) => Midnight.totalUnits(id) == 0;
 
 strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => Midnight.withdrawable(id) == 0;
+    !Utils.obligationCreated(currentContract, id) => Midnight.withdrawable(id) == 0;
 
 strong invariant obligationTradingFeesAreEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => noTradingFeesAreSet(id);
+    !Utils.obligationCreated(currentContract, id) => noTradingFeesAreSet(id);
 
 strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => Midnight.continuousFee(id) == 0;
+    !Utils.obligationCreated(currentContract, id) => Midnight.continuousFee(id) == 0;
 
 strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => currentContract.obligationState[id].continuousFeeCredit == 0;
+    !Utils.obligationCreated(currentContract, id) => currentContract.obligationState[id].continuousFeeCredit == 0;
 
 strong invariant obligationLossFactorIsEmptyIfNotCreated(bytes32 id)
-    !Midnight.obligationCreated(id) => currentContract.obligationState[id].lossFactor == 0;
+    !Utils.obligationCreated(currentContract, id) => currentContract.obligationState[id].lossFactor == 0;
 
 strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => Midnight.creditOf(id, user) == 0;
+    !Utils.obligationCreated(currentContract, id) => Midnight.creditOf(id, user) == 0;
 
 strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => Midnight.debtOf(id, user) == 0;
+    !Utils.obligationCreated(currentContract, id) => Midnight.debtOf(id, user) == 0;
 
 strong invariant obligationCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => userHasEmptyCollateralBitmap(id, user);
+    !Utils.obligationCreated(currentContract, id) => userHasEmptyCollateralBitmap(id, user);
 
 strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => userHasNoRemainingContinuousFee(id, user);
+    !Utils.obligationCreated(currentContract, id) => userHasNoRemainingContinuousFee(id, user);
 
 strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => userHasNoLastAccrual(id, user);
+    !Utils.obligationCreated(currentContract, id) => userHasNoLastAccrual(id, user);
 
 strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
-    !Midnight.obligationCreated(id) => userHasNoCollateral(id, user, collateralIndex);
+    !Utils.obligationCreated(currentContract, id) => userHasNoCollateral(id, user, collateralIndex);
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
-    !Midnight.obligationCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+    !Utils.obligationCreated(currentContract, id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFeeCbps(id);

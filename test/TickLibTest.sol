@@ -14,8 +14,8 @@ contract TickLibTest is BaseTest {
 
     function testTickToPriceMinMax() public pure {
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(14), 1e12, "first non-zero tick");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 1e18, "tick max - 1 near par");
+        assertEq(TickLib.tickToPrice(2), 1e12, "first non-zero tick");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 1e12, "tick max - 2 just below par");
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
@@ -26,16 +26,13 @@ contract TickLibTest is BaseTest {
     }
 
     function testReturnJumps() public pure {
-        // The rounding step (1e12) in tickToPrice introduces quantization noise that is non-negligible
-        // relative to the 0.5% geometric step, especially for small prices. A 3% relative tolerance
-        // accommodates this while still verifying the geometric structure holds.
         for (uint256 i = 1400; i <= 4600; i++) {
             uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
                 currentReturn.mulDivDown(1e18, previousReturn),
-                1.005e18,
-                0.03e18,
+                0.995024875621890547e18,
+                0.005e18,
                 string.concat("tick ", vm.toString(i))
             );
         }
@@ -108,10 +105,8 @@ contract TickLibTest is BaseTest {
         uint256 maxRelErrorWad;
         uint256 totalAbsErrorWad;
         uint256 totalRelErrorWad;
-        uint256 count;
 
-        // Sample every 10th tick to stay within memory limits.
-        for (uint256 tick = 0; tick <= MAX_TICK; tick += 10) {
+        for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 solPrice = TickLib.tickToPrice(tick);
             uint256 exactPrice = exactPrices[tick];
 
@@ -128,22 +123,25 @@ contract TickLibTest is BaseTest {
                 assertLe(relErrorWad, 0.0015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.15%"));
             }
 
-            // Check exact price is bracketed by adjacent sol prices (only where the rounding step
-            // is small relative to the 0.1% geometric step).
+            // Check exact price is bracketed by adjacent sol prices in the bulk of the range,
+            // away from the rounding-dominated tails.
             if (solPrice > 0.01e18 && solPrice < 0.99e18) {
-                uint256 prevSolPrice = TickLib.tickToPrice(tick - 1);
-                uint256 nextSolPrice = TickLib.tickToPrice(tick + 1);
-                if (prevSolPrice < solPrice && solPrice < nextSolPrice) {
-                    assertGe(exactPrice, prevSolPrice, string.concat("Tick ", vm.toString(tick), " exact < prev sol"));
-                    assertLe(exactPrice, nextSolPrice, string.concat("Tick ", vm.toString(tick), " exact > next sol"));
-                }
+                assertGe(
+                    exactPrice,
+                    TickLib.tickToPrice(tick - 1),
+                    string.concat("Tick ", vm.toString(tick), " exact < prev sol")
+                );
+                assertLe(
+                    exactPrice,
+                    TickLib.tickToPrice(tick + 1),
+                    string.concat("Tick ", vm.toString(tick), " exact > next sol")
+                );
             }
-            count++;
         }
 
         console.log("Max absolute error (wad):", maxAbsErrorWad);
-        console.log("Avg absolute error (wad):", totalAbsErrorWad / count);
+        console.log("Avg absolute error (wad):", totalAbsErrorWad / (MAX_TICK + 1));
         console.log("Max relative error (wad):", maxRelErrorWad);
-        console.log("Avg relative error (wad):", totalRelErrorWad / count);
+        console.log("Avg relative error (wad):", totalRelErrorWad / (MAX_TICK + 1));
     }
 }

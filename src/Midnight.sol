@@ -152,6 +152,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 ///
 /// MISC
+/// @dev To check if an obligation has been touched, check if spacing(obligationId) > 0.
 /// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
 /// @dev The max amount of totalUnits, collateral, credit, and debt is type(uint128).max (~1e38).
 /// @dev Zero checks are not systematically performed.
@@ -238,12 +239,11 @@ contract Midnight is IMidnight {
         emit EventsLib.SetSpacingSetter(newSpacingSetter);
     }
 
-    /// @dev Refines the tick spacing of a specific obligation. Can only decrease (more ticks become accessible).
+    /// @dev Refines the tick spacing of an obligation. Can not increase (more ticks become accessible).
     function setObligationSpacing(bytes32 id, uint256 newSpacing) external {
         require(msg.sender == spacingSetter, OnlySpacingSetter());
-        require(newSpacing > 0 && BASE_SPACING % newSpacing == 0, InvalidSpacing());
         require(obligationState[id].spacing > 0, ObligationNotCreated());
-        require(newSpacing < obligationState[id].spacing, SpacingNotDecreasing());
+        require(newSpacing > 0 && obligationState[id].spacing % newSpacing == 0, InvalidSpacing());
         // forge-lint: disable-next-line(unsafe-typecast) as newSpacing <= BASE_SPACING < type(uint8).max
         obligationState[id].spacing = uint8(newSpacing);
         emit EventsLib.SetObligationSpacing(id, newSpacing);
@@ -351,9 +351,9 @@ contract Midnight is IMidnight {
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
-        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
-
         require(offer.tick % _obligationState.spacing == 0, TickNotAccessible());
+
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
@@ -875,10 +875,6 @@ contract Midnight is IMidnight {
 
     function lossFactor(bytes32 id) external view returns (uint128) {
         return obligationState[id].lossFactor;
-    }
-
-    function obligationCreated(bytes32 id) external view returns (bool) {
-        return obligationState[id].spacing > 0;
     }
 
     function spacing(bytes32 id) external view returns (uint8) {
