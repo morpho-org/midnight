@@ -6,11 +6,12 @@
 // mulDivUp(x, y, d) computes (x * y + (d - 1)) / d with Solidity 0.8 checked arithmetic.
 // The multiplication x * y must not exceed type(uint256).max, or the transaction reverts.
 //
-// maxLif(uint256, uint256) is excluded: it is a pure function callable with arbitrary inputs.
-// Internal calls use WAD-scale values where its intermediate multiplications (WAD * WAD = 1e36 and cursor * (WAD - lltv) <= WAD^2 = 1e36) cannot overflow uint256.
+// maxLif(uint256, uint256) is a free function in ConstantsLib (not a Midnight method), so it
+// is not reachable via parametric rules and requires no exclusion. Internal calls use WAD-scale
+// values where its intermediate multiplications (WAD * WAD = 1e36 and cursor * (WAD - lltv) <= WAD^2 = 1e36) cannot overflow uint256.
 //
-// The toId summary follows the approach from CreatedObligations.spec and encodes
-// obligation field bounds (lltv, maxLif) proven in other specs, plus the realistic
+// The toId summary follows the approach from CreatedMarkets.spec and encodes
+// market field bounds (lltv, maxLif) proven in other specs, plus the realistic
 // timestamp range assumption used by this overflow-focused proof.
 //
 // Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
@@ -23,13 +24,13 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Oracle integration assumption: see header.
     function _.price() external => boundedPrice(calledContract) expect(uint256);
 
-    // Deterministic toId: links call-site obligations to validated state from touchObligation.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+    // Deterministic toId: links call-site markets to validated state from touchMarket.
+    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
     // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
@@ -60,14 +61,14 @@ definition WAD() returns uint256 = 1000000000000000000;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 1000000000000000000000000000000000000;
 
-// Proven in CreatedObligations.spec (createdObligationsHaveLltvLessThanOrEqualToOne)
+// Proven in CreatedMarkets.spec (createdMarketsHaveLltvLessThanOrEqualToOne)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
-function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
-    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedObligations.spec";
-    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD() && obligation.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
-    require obligation.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
-    return Utils.hashObligation(obligation);
+function summaryToId(Midnight.Market market) returns (bytes32) {
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedMarkets.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
+    require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
+    return Utils.hashMarket(market);
 }
 
 // Bound every storage collateral (uint128) * oracle price product.
@@ -123,10 +124,10 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 }
 
 // See summaryToId for full justification of each bound.
-function requireObligationBounds(Midnight.Obligation obligation) {
-    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedObligations.spec";
-    require forall uint256 i. i < obligation.collateralParams.length => obligation.collateralParams[i].maxLif >= WAD() && obligation.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
-    require obligation.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
+function requireMarketBounds(Midnight.Market market) {
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedMarkets.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
+    require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
 }
 
 // Reset oracle-related ghosts so non-liquidate rules don't carry over the extra product bound.
@@ -138,13 +139,12 @@ function resetOraclePriceAssumption() {
 /// RULES ///
 
 // Normal calls intentionally scope this proof to non-reverting executions.
-// Exclude maxLif (see header), liquidate (dedicated input bound), and view functions with arbitrary ids.
+// Exclude liquidate (dedicated input bound) and view functions with arbitrary ids.
 rule noMultiplicationOverflow(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector != sig:maxLif(uint256, uint256).selector
-        && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
-        && f.selector != sig:isHealthy(Midnight.Obligation, bytes32, address).selector
-        && f.selector != sig:updatePositionView(Midnight.Obligation, bytes32, address).selector
+    f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector
+        && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector
 } {
     resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
@@ -155,19 +155,19 @@ filtered {
 // View functions take id as a separate parameter (not derived from the obligation),
 // so summaryToId bounds don't apply. Explicit obligation bounds are needed.
 
-rule noMultiplicationOverflowIsHealthy(env e, Midnight.Obligation obligation, bytes32 id, address borrower) {
+rule noMultiplicationOverflowIsHealthy(env e, Midnight.Market market, bytes32 id, address borrower) {
     resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
-    requireObligationBounds(obligation);
-    isHealthy(e, obligation, id, borrower);
+    requireMarketBounds(market);
+    isHealthy(e, market, id, borrower);
     assert !mulOverflow;
 }
 
-rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Obligation obligation, bytes32 id, address user) {
+rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Market market, bytes32 id, address user) {
     resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
-    requireObligationBounds(obligation);
-    updatePositionView(e, obligation, id, user);
+    requireMarketBounds(market);
+    updatePositionView(e, market, id, user);
     assert !mulOverflow;
 }
 
@@ -175,12 +175,12 @@ rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Obligation oblig
 // already covered by boundedPrice). Set liquidateAmount to their max and liquidatedOracle to
 // the oracle of collateralIndex so boundedPrice extends the same (amount * price) bound only
 // to that oracle's price (the one actually multiplied with the function inputs).
-rule noMultiplicationOverflowLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule noMultiplicationOverflowLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     resetOraclePriceAssumption();
     liquidateAmount = seizedAssets > repaidUnits ? seizedAssets : repaidUnits;
-    liquidatedOracle = obligation.collateralParams[collateralIndex].oracle;
+    liquidatedOracle = market.collateralParams[collateralIndex].oracle;
     require !mulOverflow, "prestate: assume no overflow before liquidate";
-    requireObligationBounds(obligation);
-    liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    requireMarketBounds(market);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert !mulOverflow;
 }
