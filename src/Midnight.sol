@@ -350,7 +350,6 @@ contract Midnight is IMidnight {
         require(offer.maker != taker, SelfTake());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
-
         require(offer.tick % _obligationState.spacing == 0, TickNotAccessible());
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
