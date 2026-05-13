@@ -11,7 +11,7 @@ import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -28,7 +28,8 @@ import {
     LLTV_6,
     LLTV_7,
     LLTV_8,
-    maxTradingFee as _maxTradingFee
+    maxTradingFee as _maxTradingFee,
+    maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
 import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
@@ -417,7 +418,7 @@ abstract contract BaseTest is Test {
     }
 
     function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
-        return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+        return _maxLif(lltv, cursor);
     }
 
     function maxTradingFee(uint256 index) internal pure returns (uint256) {

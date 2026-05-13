@@ -5,7 +5,7 @@ pragma solidity 0.8.34;
 import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IEcrecoverRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {HashLib} from "./HashLib.sol";
+import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.

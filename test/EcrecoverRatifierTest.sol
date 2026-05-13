@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
