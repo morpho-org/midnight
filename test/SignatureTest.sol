@@ -9,7 +9,7 @@ import {
     Signature,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract SignatureTest is BaseTest {

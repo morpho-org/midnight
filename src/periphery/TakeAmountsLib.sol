@@ -13,7 +13,7 @@ library TakeAmountsLib {
     /// @dev Assumes that id and offer.obligation match.
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Reverts if offerPrice < tradingFee in case of a buy offer (midnight reverts too).
-    /// @dev Returns the number of units to take to get the target buyer assets.
+    /// @dev Returns a number of units to take to get the target buyer assets.
     function buyerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
         view
@@ -32,7 +32,7 @@ library TakeAmountsLib {
     /// @dev Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
     /// @dev Assumes that id and offer.obligation match.
     /// @dev Reverts if offerPrice < tradingFee in case of a buy offer (midnight reverts too).
-    /// @dev Returns the number of units to take to get the target seller assets.
+    /// @dev Returns a number of units to take to get the target seller assets.
     function sellerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
         internal
         view

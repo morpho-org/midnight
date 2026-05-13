@@ -8,7 +8,7 @@ import {
     OBLIGATION_TYPE,
     OBLIGATION_TYPEHASH,
     OFFER_TYPE
-} from "../src/ratifiers/HashLib.sol";
+} from "../src/ratifiers/libraries/HashLib.sol";
 import {Obligation} from "../src/interfaces/IMidnight.sol";
 
 contract HashLibTest is Test {

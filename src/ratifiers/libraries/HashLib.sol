@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer, Obligation, CollateralParams} from "../interfaces/IMidnight.sol";
+import {Offer, Obligation, CollateralParams} from "../../interfaces/IMidnight.sol";
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 /// @dev keccak256(COLLATERAL_PARAMS_TYPE)
