@@ -3,8 +3,6 @@
 using Utils as Utils;
 
 methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
     function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 }
 
