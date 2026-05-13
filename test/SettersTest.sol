@@ -139,14 +139,14 @@ contract SettersTest is BaseTest {
         midnight.setDefaultTradingFee(loanToken, index, fee);
     }
 
-    function testSetObligationTradingFeeObligationNotCreated(bytes32 id) public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+    function testSetObligationTradingFeeObligationNotTouched(bytes32 id) public {
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.setObligationTradingFee(id, 0, 0);
     }
 
-    function testSetObligationContinuousFeeObligationNotCreated(bytes32 id, uint256 fee) public {
+    function testSetObligationContinuousFeeObligationNotTouched(bytes32 id, uint256 fee) public {
         fee = bound(fee, 0, MAX_CONTINUOUS_FEE);
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.setObligationContinuousFee(id, fee);
     }
 
@@ -171,8 +171,8 @@ contract SettersTest is BaseTest {
 
     // Default trading fee tests
 
-    function testTradingFeeRevertsWhenNotCreated() public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+    function testTradingFeeRevertsWhenNotTouched() public {
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.tradingFee(bytes32(0), 0);
     }
 

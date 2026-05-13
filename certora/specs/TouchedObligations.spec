@@ -45,71 +45,71 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
     return Utils.hashObligation(obligation);
 }
 
-function obligationIsCreated(Midnight.Obligation obligation) returns (bool) {
+function obligationIsTouched(Midnight.Obligation obligation) returns (bool) {
     return Midnight.tickSpacing(summaryToId(obligation)) > 0;
 }
 
-// Show that a created obligation has at least one collateral.
-strong invariant createdObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
-    obligationIsCreated(obligation) => obligation.collateralParams.length > 0;
+// Show that a touched obligation has at least one collateral.
+strong invariant touchedObligationsHaveNonEmptyCollaterals(Midnight.Obligation obligation)
+    obligationIsTouched(obligation) => obligation.collateralParams.length > 0;
 
-// Show that a created obligation has sorted collateralParams.
-strong invariant createdObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
-    obligationIsCreated(obligation) => i < j => j < obligation.collateralParams.length => obligation.collateralParams[i].token < obligation.collateralParams[j].token;
+// Show that a touched obligation has sorted collateralParams.
+strong invariant touchedObligationsHaveSortedCollaterals(Midnight.Obligation obligation, uint256 i, uint256 j)
+    obligationIsTouched(obligation) => i < j => j < obligation.collateralParams.length => obligation.collateralParams[i].token < obligation.collateralParams[j].token;
 
-// Show that a created obligation do not have address(0) collateralParams.
-strong invariant createdObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].token != 0;
+// Show that a touched obligation do not have address(0) collateralParams.
+strong invariant touchedObligationsHaveNonZeroCollaterals(Midnight.Obligation obligation, uint256 i)
+    obligationIsTouched(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].token != 0;
 
-// Show that a created obligation has lltv <= WAD.
-strong invariant createdObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD();
+// Show that a touched obligation has lltv <= WAD.
+strong invariant touchedObligationsHaveLltvLessThanOrEqualToOne(Midnight.Obligation obligation, uint256 i)
+    obligationIsTouched(obligation) => i < obligation.collateralParams.length => obligation.collateralParams[i].lltv <= WAD();
 
-// Show that a created obligation cannot be deleted.
+// Show that a touched obligation cannot be deleted.
 rule obligationCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
-    require Midnight.tickSpacing(id) > 0, "Assume that the obligation is created";
+    require Midnight.tickSpacing(id) > 0, "Assume that the obligation is touched";
     f(e, args);
     assert Midnight.tickSpacing(id) > 0;
 }
 
-// Show that an obligation is created after an interaction.
+// Show that an obligation is touched after an interaction.
 
-rule obligationIsCreatedAfterTouchObligation(env e, Midnight.Obligation obligation) {
+rule obligationIsTouchedAfterTouchObligation(env e, Midnight.Obligation obligation) {
     Midnight.touchObligation(e, obligation);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-rule obligationIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+rule obligationIsTouchedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
     Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
-    assert obligationIsCreated(offer.obligation);
+    assert obligationIsTouched(offer.obligation);
 }
 
-rule obligationIsCreatedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
+rule obligationIsTouchedAfterWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
     Midnight.withdraw(e, obligation, units, onBehalf, receiver);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-rule obligationIsCreatedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
+rule obligationIsTouchedAfterRepay(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address callback, bytes data) {
     Midnight.repay(e, obligation, units, onBehalf, callback, data);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-rule obligationIsCreatedAfterSupplyCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf) {
+rule obligationIsTouchedAfterSupplyCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf) {
     Midnight.supplyCollateral(e, obligation, collateralIndex, assets, onBehalf);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-rule obligationIsCreatedAfterWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+rule obligationIsTouchedAfterWithdrawCollateral(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     Midnight.withdrawCollateral(e, obligation, collateralIndex, assets, onBehalf, receiver);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-rule obligationIsCreatedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule obligationIsTouchedAfterLiquidate(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
     Midnight.liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
-    assert obligationIsCreated(obligation);
+    assert obligationIsTouched(obligation);
 }
 
-// Obligations can only be created by: touchObligation, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
+// Obligations can only be touched by: touchObligation, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
 rule onlyTouchObligationCreatesObligation(env e, method f, calldataarg args, bytes32 id)
 filtered {
     f -> f.selector != sig:touchObligation(Midnight.Obligation).selector
@@ -120,49 +120,49 @@ filtered {
         && f.selector != sig:withdrawCollateral(Midnight.Obligation, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
-    require Midnight.tickSpacing(id) == 0, "Assume that the obligation is not created";
+    require Midnight.tickSpacing(id) == 0, "Assume that the obligation is not touched";
     f(e, args);
     assert Midnight.tickSpacing(id) == 0;
 }
 
-// Show that each obligation state field is empty if the obligation is not created.
-strong invariant obligationTotalUnitsIsEmptyIfNotCreated(bytes32 id)
+// Show that each obligation state field is empty if the obligation is not touched.
+strong invariant obligationTotalUnitsIsEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => Midnight.totalUnits(id) == 0;
 
-strong invariant obligationWithdrawableIsEmptyIfNotCreated(bytes32 id)
+strong invariant obligationWithdrawableIsEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => Midnight.withdrawable(id) == 0;
 
-strong invariant obligationTradingFeesAreEmptyIfNotCreated(bytes32 id)
+strong invariant obligationTradingFeesAreEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => noTradingFeesAreSet(id);
 
-strong invariant obligationContinuousFeeIsEmptyIfNotCreated(bytes32 id)
+strong invariant obligationContinuousFeeIsEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => Midnight.continuousFee(id) == 0;
 
-strong invariant obligationContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
+strong invariant obligationContinuousFeeCreditIsEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => currentContract.obligationState[id].continuousFeeCredit == 0;
 
-strong invariant obligationLossFactorIsEmptyIfNotCreated(bytes32 id)
+strong invariant obligationLossFactorIsEmptyIfNotTouched(bytes32 id)
     Midnight.tickSpacing(id) == 0 => currentContract.obligationState[id].lossFactor == 0;
 
-strong invariant obligationCreditIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationCreditIsEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => Midnight.creditOf(id, user) == 0;
 
-strong invariant obligationDebtIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationDebtIsEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => Midnight.debtOf(id, user) == 0;
 
-strong invariant obligationCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationCollateralBitmapAreEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => userHasEmptyCollateralBitmap(id, user);
 
-strong invariant obligationPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationPendingFeeIsEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => userHasNoRemainingContinuousFee(id, user);
 
-strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant obligationLastContinuousFeeAccrualIsEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => userHasNoLastAccrual(id, user);
 
-strong invariant obligationCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
+strong invariant obligationCollateralIsEmptyIfNotTouched(bytes32 id, address user, uint256 collateralIndex)
     Midnight.tickSpacing(id) == 0 => userHasNoCollateral(id, user, collateralIndex);
 
-strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+strong invariant positionLastLossFactorIsEmptyIfNotTouched(bytes32 id, address user)
     Midnight.tickSpacing(id) == 0 => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
@@ -180,6 +180,6 @@ definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex
 
 definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 
-// Show that a created obligation only has allowed LLTV tiers.
-strong invariant createdObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
-    obligationIsCreated(obligation) => i < obligation.collateralParams.length => isLltvAllowed(obligation.collateralParams[i].lltv);
+// Show that a touched obligation only has allowed LLTV tiers.
+strong invariant touchedObligationsHaveAllowedLltv(Midnight.Obligation obligation, uint256 i)
+    obligationIsTouched(obligation) => i < obligation.collateralParams.length => isLltvAllowed(obligation.collateralParams[i].lltv);

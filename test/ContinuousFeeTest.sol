@@ -522,14 +522,14 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.continuousFeeCredit(id), expectedContinuousFeeCredit, "continuousFeeCredit");
     }
 
-    function testUpdatePositionRevertsIfObligationNotCreated() public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+    function testUpdatePositionRevertsIfObligationNotTouched() public {
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.updatePosition(obligation, borrower);
     }
 
-    function testClaimContinuousFeeRevertsIfObligationNotCreated() public {
+    function testClaimContinuousFeeRevertsIfObligationNotTouched() public {
         vm.prank(feeClaimer);
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.claimContinuousFee(obligation, 0, feeClaimer);
     }
 

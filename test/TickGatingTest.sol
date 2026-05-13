@@ -144,8 +144,8 @@ contract TickGatingTest is BaseTest {
         midnight.setObligationTickSpacing(id, 2);
     }
 
-    function testSetObligationTickSpacingRequiresCreated() public {
-        vm.expectRevert(IMidnight.ObligationNotCreated.selector);
+    function testSetObligationTickSpacingRequiresTouched() public {
+        vm.expectRevert(IMidnight.ObligationNotTouched.selector);
         midnight.setObligationTickSpacing(bytes32(uint256(42)), 1);
     }
 
