@@ -88,7 +88,7 @@ import {EventsLib} from "./libraries/EventsLib.sol";
 /// @dev To work as expected, all offers in the same group should have the same max values and loan token.
 ///
 /// OFFER CAPS
-/// @dev Only one of maxAssets or maxUnits can be nonzero per offer.
+/// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 ///
