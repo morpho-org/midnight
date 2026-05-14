@@ -16,6 +16,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev If the offers are well-sorted (such that for all nodes, hash(left) <= hash(right)) when given to the wallet,
 /// @dev the EIP-712 digest will match the root of the tree. This allows to have clear signing of the tree, credits to
 /// Seaport for this mechanism.
+/// @dev If offers are not well-sorted, another root is signed where potentially only a subset of the offers have a
+/// Merkle proof.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
