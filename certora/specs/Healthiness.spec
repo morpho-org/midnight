@@ -29,9 +29,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;
 
-    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
-    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => transferCallback();
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => transferCallback();
@@ -82,7 +80,7 @@ definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a 
 definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
 
 /* function selectors for take/liquidate/withdrawCollateral */
-definition isTake(method f) returns bool = (f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes, bytes32, bytes32[]).selector);
+definition isTake(method f) returns bool = (f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector);
 
 definition isLiquidate(method f) returns bool = (f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector);
 

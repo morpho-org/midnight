@@ -30,4 +30,11 @@ contract MidnightWrapper is Midnight {
         }
         return maxDebt >= debt;
     }
+
+    /// @dev Mirrors the liquidatability condition from Midnight.liquidate().
+    function isLiquidatable(Market memory market, bytes32 id, address borrower) public view returns (bool) {
+        Position storage _position = position[id][borrower];
+        return _position.debt > 0 && !liquidationLocked(id, borrower)
+            && (block.timestamp > market.maturity || !isHealthy(market, id, borrower));
+    }
 }
