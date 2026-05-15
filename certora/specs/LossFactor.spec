@@ -31,7 +31,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
-    return Midnight.tickSpacing(summaryToId(market)) > 0;
+    return tickSpacing(summaryToId(market)) > 0;
 }
 
 /// The market's lossFactor is only modified by liquidate.
