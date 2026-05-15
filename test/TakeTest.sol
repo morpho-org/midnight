@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, uint256(0), root([lenderOffer]), uint256(0), new bytes32[](0))
+            abi.encode(_sig, 0, root([lenderOffer]), 0, new bytes32[](0))
         );
     }
 

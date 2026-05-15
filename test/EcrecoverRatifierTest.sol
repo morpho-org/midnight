@@ -11,7 +11,7 @@ import {BaseTest} from "./BaseTest.sol";
 contract EcrecoverRatifierTest is BaseTest {
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
         Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
-        return abi.encode(sig, uint256(0), _root, uint256(0), new bytes32[](0));
+        return abi.encode(sig, 0, _root, 0, new bytes32[](0));
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -67,11 +67,7 @@ contract EcrecoverRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}),
-            uint256(0),
-            _root,
-            uint256(0),
-            new bytes32[](0)
+            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), 0, _root, 0, new bytes32[](0)
         );
 
         vm.prank(address(midnight));

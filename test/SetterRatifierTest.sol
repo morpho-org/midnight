@@ -56,7 +56,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, uint256(0), new bytes32[](0)));
+        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -73,7 +73,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, uint256(0), proof([offer])));
+        midnight.take(0, borrower, address(0), hex"", borrower, offer, abi.encode(_root, 0, proof([offer])));
     }
 
     function testIsRatifiedUsesLeafIndex() public {
@@ -89,7 +89,11 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, uint256(1), proof));
+        vm.expectRevert(ISetterRatifier.InvalidProof.selector);
+        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof));
+
+        vm.prank(address(midnight));
+        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -101,7 +105,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.expectRevert(ISetterRatifier.NotMidnight.selector);
-        setterRatifier.isRatified(offer, abi.encode(_root, uint256(0), new bytes32[](0)));
+        setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
     }
 
     function testSetIsRootRatifiedUnauthorizedOnBehalf() public {
