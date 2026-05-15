@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, invalidRoot, new bytes32[](0), 0)
+            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0))
         );
     }
 
@@ -971,7 +971,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), _proof, 0)
+            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof)
         );
     }
 
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _proof, 1)
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof)
         );
     }
 
@@ -1052,7 +1052,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer1,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofSecondLeaf([offer0, offer1, offer2, offer3]), 1)
+            merkleRatifierData([offer0, offer1, offer2, offer3], 1, proofSecondLeaf([offer0, offer1, offer2, offer3]))
         );
 
         vm.revertToState(snapshot);
@@ -1064,7 +1064,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer2,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofThirdLeaf([offer0, offer1, offer2, offer3]), 2)
+            merkleRatifierData([offer0, offer1, offer2, offer3], 2, proofThirdLeaf([offer0, offer1, offer2, offer3]))
         );
 
         vm.revertToState(snapshot);
@@ -1076,7 +1076,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer3,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofFourthLeaf([offer0, offer1, offer2, offer3]), 3)
+            merkleRatifierData([offer0, offer1, offer2, offer3], 3, proofFourthLeaf([offer0, offer1, offer2, offer3]))
         );
     }
 

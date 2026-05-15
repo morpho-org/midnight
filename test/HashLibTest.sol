@@ -38,8 +38,8 @@ contract HashLibTest is Test {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftLeaf;
 
-        assertTrue(HashLib.isLeaf(orderedRoot, rightLeaf, proof, 1));
-        assertFalse(HashLib.isLeaf(orderedRoot, rightLeaf, proof, 0));
+        assertTrue(HashLib.isLeaf(orderedRoot, rightLeaf, 1, proof));
+        assertFalse(HashLib.isLeaf(orderedRoot, rightLeaf, 0, proof));
     }
 
     function testIsLeaf4Leaves() public pure {
@@ -55,17 +55,17 @@ contract HashLibTest is Test {
 
         proof[0] = leaf1;
         proof[1] = rightNode;
-        assertTrue(HashLib.isLeaf(orderedRoot, leaf0, proof, 0));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf0, 0, proof));
 
         proof[0] = leaf0;
-        assertTrue(HashLib.isLeaf(orderedRoot, leaf1, proof, 1));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf1, 1, proof));
 
         proof[0] = leaf3;
         proof[1] = leftNode;
-        assertTrue(HashLib.isLeaf(orderedRoot, leaf2, proof, 2));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf2, 2, proof));
 
         proof[0] = leaf2;
-        assertTrue(HashLib.isLeaf(orderedRoot, leaf3, proof, 3));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf3, 3, proof));
     }
 
     function repeat(string memory str, uint256 n) internal pure returns (string memory) {

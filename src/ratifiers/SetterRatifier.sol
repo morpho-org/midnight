@@ -12,6 +12,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// The leaf index determines each sibling's left/right position, so proofs are checked against the ordered tree.
+/// This allows clear signing of the tree, credits to Seaport for this mechanism.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
@@ -31,7 +32,7 @@ contract SetterRatifier is ISetterRatifier {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[]));
-        require(HashLib.isLeaf(root, HashLib.hashOffer(offer), proof, leafIndex), InvalidProof());
+        require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
         require(isRootRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
     }

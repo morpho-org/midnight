@@ -322,10 +322,10 @@ abstract contract BaseTest is Test {
     }
 
     function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        return merkleRatifierData(offers, _proof, 0);
+        return merkleRatifierData(offers, 0, _proof);
     }
 
-    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof, uint256 _leafIndex)
+    function merkleRatifierData(Offer[2] memory offers, uint256 _leafIndex, bytes32[] memory _proof)
         internal
         view
         returns (bytes memory)
@@ -336,10 +336,10 @@ abstract contract BaseTest is Test {
     }
 
     function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        return merkleRatifierData(offers, _proof, 0);
+        return merkleRatifierData(offers, 0, _proof);
     }
 
-    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof, uint256 _leafIndex)
+    function merkleRatifierData(Offer[4] memory offers, uint256 _leafIndex, bytes32[] memory _proof)
         internal
         view
         returns (bytes memory)
@@ -351,21 +351,21 @@ abstract contract BaseTest is Test {
 
     /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
     /// the signed root or the proof is intentionally inconsistent with the offer.
-    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
+    function merkleRatifierData(Offer memory offer, bytes32 _root, uint256 _height, bytes32[] memory _proof)
         internal
         view
         returns (bytes memory)
     {
-        return merkleRatifierData(offer, _root, _proof, _height, 0);
+        return merkleRatifierData(offer, _root, _height, 0, _proof);
     }
 
     /// @dev Builds merkle ratifier data with explicit root, proof, signer, and leaf index.
     function merkleRatifierData(
         Offer memory offer,
         bytes32 _root,
-        bytes32[] memory _proof,
         uint256 _height,
-        uint256 _leafIndex
+        uint256 _leafIndex,
+        bytes32[] memory _proof
     ) internal view returns (bytes memory) {
         Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
         return _encodeMerkleRatifierData(_sig, _height, _root, _leafIndex, _proof);

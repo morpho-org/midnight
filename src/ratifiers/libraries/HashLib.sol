@@ -52,7 +52,7 @@ library HashLib {
     }
 
     /// @dev Returns the ordered Merkle proof verification result for a leaf at `leafIndex`.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof, uint256 leafIndex)
+    function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure
         returns (bool)
@@ -73,12 +73,6 @@ library HashLib {
             mstore(0x20, right)
             value := keccak256(0x00, 0x40)
         }
-    }
-
-    /// @dev Returns the keccak256 hash of the sorted concatenation of a and b.
-    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
-        if (a > b) (a, b) = (b, a);
-        value = orderedHash(a, b);
     }
 
     /// @dev Computes the EIP-712 hash struct of a CollateralParams.
