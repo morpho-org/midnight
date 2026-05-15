@@ -975,7 +975,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory _proof) public {
+    function testTakeInvalidProof2LeavesWrongLeafHash(Offer memory otherOffer, bytes32[] memory _proof) public {
         vm.assume(_proof.length >= 1);
         vm.assume(_proof[0] != HashLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
@@ -988,6 +988,20 @@ contract TakeTest is BaseTest {
             borrower,
             lenderOffer,
             merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, _proof)
+        );
+    }
+
+    function testTakeInvalidProof2LeavesWrongLeafIndex(Offer memory otherOffer, bytes32[] memory _proof) public {
+        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
+        vm.prank(borrower);
+        midnight.take(
+            100,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            lenderOffer,
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 1, _proof)
         );
     }
 
