@@ -1,6 +1,10 @@
 # Midnight
 
-Midnight is a fixed-rate lending protocol based on zero-coupon obligations.
+Midnight is a noncustodial fixed-rate lending protocol for the Ethereum Virtual Machine*, organized around isolated, immutable, fixed-maturity markets.
+Credit and debt within each market are fungible and behave like zero-coupon instruments, settling at face value at maturity.
+Trading happens through signed executable offers that do not lock capital, so makers can quote across many markets at once, making it viable to support bespoke or long-tail markets.
+Markets can range from single-collateral to portfolio-margined configurations, and optional access-control gates let regulated and permissionless markets coexist on the same protocol instance.
+Price discovery, risk management, and routing remain outside the protocol core, leaving them to external layers built on top.
 
 ## Whitepaper
 
