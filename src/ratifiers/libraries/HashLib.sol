@@ -51,18 +51,8 @@ library HashLib {
         }
     }
 
-    /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
-    /// @dev Hash sorts the inputs lexicographically.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
-        bytes32 currentHash = leafHash;
-        for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = commutativeHash(currentHash, proof[i]);
-        }
-        return currentHash == root;
-    }
-
     /// @dev Returns the ordered Merkle proof verification result for a leaf at `leafIndex`.
-    function isLeafAtIndex(bytes32 root, bytes32 leafHash, bytes32[] memory proof, uint256 leafIndex)
+    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof, uint256 leafIndex)
         internal
         pure
         returns (bool)

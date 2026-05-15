@@ -31,44 +31,18 @@ contract HashLibTest is Test {
         assertEq(HashLib.hashMarket(market), expectedHash);
     }
 
-    function testIsLeafSingle(bytes32 x) public pure {
-        assertTrue(HashLib.isLeaf(x, x, new bytes32[](0)));
-    }
-
-    function testIsLeaf2Leaves(bytes32 x, bytes32 y) public pure {
-        bytes32 root = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = y;
-        assertTrue(HashLib.isLeaf(root, x, proof));
-    }
-
-    function testIsLeaf4Leaves(bytes32 x, bytes32 y, bytes32 z, bytes32 w) public pure {
-        x = bytes32(bound(uint256(x), 0, type(uint256).max - 3));
-        y = bytes32(bound(uint256(y), uint256(x), type(uint256).max - 2));
-        z = bytes32(bound(uint256(z), uint256(y), type(uint256).max - 1));
-        w = bytes32(bound(uint256(w), uint256(z), type(uint256).max));
-        bytes32 leftNode = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32 rightNode = keccak256(z < w ? abi.encode(z, w) : abi.encode(w, z));
-        bytes32 root =
-            keccak256(leftNode < rightNode ? abi.encode(leftNode, rightNode) : abi.encode(rightNode, leftNode));
-        bytes32[] memory proof = new bytes32[](2);
-        proof[0] = y;
-        proof[1] = rightNode;
-        assertTrue(HashLib.isLeaf(root, x, proof));
-    }
-
-    function testIsLeafAtIndexPreservesSiblingOrder() public pure {
+    function testIsLeafPreservesSiblingOrder() public pure {
         bytes32 leftLeaf = bytes32(uint256(2));
         bytes32 rightLeaf = bytes32(uint256(1));
         bytes32 orderedRoot = HashLib.orderedHash(leftLeaf, rightLeaf);
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftLeaf;
 
-        assertTrue(HashLib.isLeafAtIndex(orderedRoot, rightLeaf, proof, 1));
-        assertFalse(HashLib.isLeafAtIndex(orderedRoot, rightLeaf, proof, 0));
+        assertTrue(HashLib.isLeaf(orderedRoot, rightLeaf, proof, 1));
+        assertFalse(HashLib.isLeaf(orderedRoot, rightLeaf, proof, 0));
     }
 
-    function testIsLeafAtIndex4Leaves() public pure {
+    function testIsLeaf4Leaves() public pure {
         bytes32 leaf0 = bytes32(uint256(1));
         bytes32 leaf1 = bytes32(uint256(2));
         bytes32 leaf2 = bytes32(uint256(3));
@@ -81,17 +55,17 @@ contract HashLibTest is Test {
 
         proof[0] = leaf1;
         proof[1] = rightNode;
-        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf0, proof, 0));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf0, proof, 0));
 
         proof[0] = leaf0;
-        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf1, proof, 1));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf1, proof, 1));
 
         proof[0] = leaf3;
         proof[1] = leftNode;
-        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf2, proof, 2));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf2, proof, 2));
 
         proof[0] = leaf2;
-        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf3, proof, 3));
+        assertTrue(HashLib.isLeaf(orderedRoot, leaf3, proof, 3));
     }
 
     function repeat(string memory str, uint256 n) internal pure returns (string memory) {

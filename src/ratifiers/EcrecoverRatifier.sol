@@ -35,7 +35,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         (Signature memory sig, uint256 height, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, uint256, bytes32, uint256, bytes32[]));
         require(proof.length == height, InvalidProof());
-        require(HashLib.isLeafAtIndex(root, HashLib.hashOffer(offer), proof, leafIndex), InvalidProof());
+        require(HashLib.isLeaf(root, HashLib.hashOffer(offer), proof, leafIndex), InvalidProof());
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
