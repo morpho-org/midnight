@@ -222,12 +222,6 @@ abstract contract BaseTest is Test {
         return IdLib.toId(market, block.chainid, address(midnight));
     }
 
-    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, 0, proof(offers));
-    }
-
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
         return new bytes32[](0);
     }
@@ -305,32 +299,28 @@ abstract contract BaseTest is Test {
         return _signature;
     }
 
-    function _encodeMerkleRatifierData(
-        Signature memory _sig,
-        uint256 _height,
-        bytes32 _root,
-        uint256 _leafIndex,
-        bytes32[] memory _proof
-    ) internal pure returns (bytes memory) {
-        return abi.encode(_sig, _height, _root, _leafIndex, _proof);
+    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
+        return abi.encode(_sig, 0, _root, 0, proof(offers));
     }
 
     function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, 0, proof(offers));
+        return abi.encode(_sig, 0, _root, 0, proof(offers));
     }
 
     /// @dev Builds merkle ratifier data with explicit root, height, leaf index, and proof.
     function merkleRatifierData(
         Offer memory offer,
-        bytes32 _root,
         uint256 _height,
+        bytes32 _root,
         uint256 _leafIndex,
         bytes32[] memory _proof
     ) internal view returns (bytes memory) {
         Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
-        return _encodeMerkleRatifierData(_sig, _height, _root, _leafIndex, _proof);
+        return abi.encode(_sig, _height, _root, _leafIndex, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {

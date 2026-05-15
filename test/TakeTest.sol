@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, invalidRoot, 0, 0, new bytes32[](0))
+            merkleRatifierData(lenderOffer, 0, invalidRoot, 0, new bytes32[](0))
         );
     }
 
@@ -971,7 +971,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, 0, _proof)
+            merkleRatifierData(lenderOffer, 0, root([lenderOffer]), 0, _proof)
         );
     }
 
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, 0, _proof)
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, _proof)
         );
     }
 
@@ -1006,7 +1006,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, 0, proof([lenderOffer, otherOffer]))
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
         );
     }
 
@@ -1041,7 +1041,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer0,
             merkleRatifierData(
-                offer0, root([offer0, offer1, offer2, offer3]), 2, 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
+                offer0, 2, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1055,7 +1055,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer1,
             merkleRatifierData(
-                offer1, root([offer0, offer1, offer2, offer3]), 2, 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
+                offer1, 2, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1069,7 +1069,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer2,
             merkleRatifierData(
-                offer2, root([offer0, offer1, offer2, offer3]), 2, 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
+                offer2, 2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1083,7 +1083,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer3,
             merkleRatifierData(
-                offer3, root([offer0, offer1, offer2, offer3]), 2, 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
+                offer3, 2, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
             )
         );
     }
