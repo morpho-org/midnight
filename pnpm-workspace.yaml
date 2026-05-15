@@ -1,0 +1,5 @@
+packages:
+  - "test/frontend"
+minimumReleaseAge: 10080
+allowBuilds:
+  "esbuild": true
