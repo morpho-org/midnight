@@ -61,14 +61,34 @@ library HashLib {
         return currentHash == root;
     }
 
+    /// @dev Returns the ordered Merkle proof verification result for a leaf at `leafIndex`.
+    function isLeafAtIndex(bytes32 root, bytes32 leafHash, bytes32[] memory proof, uint256 leafIndex)
+        internal
+        pure
+        returns (bool)
+    {
+        bytes32 currentHash = leafHash;
+        for (uint256 i = 0; i < proof.length; i++) {
+            if ((leafIndex & 1) == 0) currentHash = orderedHash(currentHash, proof[i]);
+            else currentHash = orderedHash(proof[i], currentHash);
+            leafIndex >>= 1;
+        }
+        return currentHash == root && leafIndex == 0;
+    }
+
+    /// @dev Returns the keccak256 hash of the concatenation of left and right.
+    function orderedHash(bytes32 left, bytes32 right) internal pure returns (bytes32 value) {
+        assembly ("memory-safe") {
+            mstore(0x00, left)
+            mstore(0x20, right)
+            value := keccak256(0x00, 0x40)
+        }
+    }
+
     /// @dev Returns the keccak256 hash of the sorted concatenation of a and b.
     function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
         if (a > b) (a, b) = (b, a);
-        assembly ("memory-safe") {
-            mstore(0x00, a)
-            mstore(0x20, b)
-            value := keccak256(0x00, 0x40)
-        }
+        value = orderedHash(a, b);
     }
 
     /// @dev Computes the EIP-712 hash struct of a CollateralParams.

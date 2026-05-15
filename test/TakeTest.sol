@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, uint256(0), root([lenderOffer]), new bytes32[](0))
+            abi.encode(_sig, uint256(0), root([lenderOffer]), uint256(0), new bytes32[](0))
         );
     }
 
@@ -960,8 +960,8 @@ contract TakeTest is BaseTest {
         midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData);
     }
 
-    function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
+    function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
@@ -971,13 +971,13 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), _path, 0)
+            merkleRatifierData(lenderOffer, root([lenderOffer]), _proof, 0)
         );
     }
 
-    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
-        vm.assume(_path[0] != HashLib.hashOffer(otherOffer));
+    function testTakeInvalidProofTwoLeaves(Offer memory otherOffer, bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
+        vm.assume(_proof[0] != HashLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _path, 1)
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _proof, 1)
         );
     }
 
@@ -1010,7 +1010,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    // Adding salt to the expiry to test different ordering (see commutativeHash).
+    // Adding salt to the expiry to test different leaf hashes.
     function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
         public
     {
@@ -1052,7 +1052,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer1,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofSecondLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofSecondLeaf([offer0, offer1, offer2, offer3]), 1)
         );
 
         vm.revertToState(snapshot);
@@ -1064,7 +1064,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer2,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofThirdLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofThirdLeaf([offer0, offer1, offer2, offer3]), 2)
         );
 
         vm.revertToState(snapshot);
@@ -1076,7 +1076,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer3,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofFourthLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData([offer0, offer1, offer2, offer3], proofFourthLeaf([offer0, offer1, offer2, offer3]), 3)
         );
     }
 

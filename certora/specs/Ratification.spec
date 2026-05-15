@@ -11,6 +11,7 @@ methods {
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function HashLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function HashLib.isLeafAtIndex(bytes32, bytes32, bytes32[] memory, uint256) internal returns (bool) => NONDET;
     function HashLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
     function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 

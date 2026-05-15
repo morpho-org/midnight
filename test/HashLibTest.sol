@@ -57,6 +57,43 @@ contract HashLibTest is Test {
         assertTrue(HashLib.isLeaf(root, x, proof));
     }
 
+    function testIsLeafAtIndexPreservesSiblingOrder() public pure {
+        bytes32 leftLeaf = bytes32(uint256(2));
+        bytes32 rightLeaf = bytes32(uint256(1));
+        bytes32 orderedRoot = HashLib.orderedHash(leftLeaf, rightLeaf);
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = leftLeaf;
+
+        assertTrue(HashLib.isLeafAtIndex(orderedRoot, rightLeaf, proof, 1));
+        assertFalse(HashLib.isLeafAtIndex(orderedRoot, rightLeaf, proof, 0));
+    }
+
+    function testIsLeafAtIndex4Leaves() public pure {
+        bytes32 leaf0 = bytes32(uint256(1));
+        bytes32 leaf1 = bytes32(uint256(2));
+        bytes32 leaf2 = bytes32(uint256(3));
+        bytes32 leaf3 = bytes32(uint256(4));
+        bytes32 leftNode = HashLib.orderedHash(leaf0, leaf1);
+        bytes32 rightNode = HashLib.orderedHash(leaf2, leaf3);
+        bytes32 orderedRoot = HashLib.orderedHash(leftNode, rightNode);
+
+        bytes32[] memory proof = new bytes32[](2);
+
+        proof[0] = leaf1;
+        proof[1] = rightNode;
+        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf0, proof, 0));
+
+        proof[0] = leaf0;
+        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf1, proof, 1));
+
+        proof[0] = leaf3;
+        proof[1] = leftNode;
+        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf2, proof, 2));
+
+        proof[0] = leaf2;
+        assertTrue(HashLib.isLeafAtIndex(orderedRoot, leaf3, proof, 3));
+    }
+
     function repeat(string memory str, uint256 n) internal pure returns (string memory) {
         bytes memory result;
         for (uint256 i = 0; i < n; i++) {

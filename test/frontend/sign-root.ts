@@ -84,7 +84,7 @@ function defaultOffer(number: string) {
   };
 }
 
-// WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
+// The ratifier uses the leaf index to verify Merkle proofs against this ordered tree.
 function buildOfferTree() {
   return [
     [defaultOffer("1"), defaultOffer("2")],
