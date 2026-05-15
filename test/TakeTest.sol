@@ -991,7 +991,9 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testTakeInvalidProof2LeavesWrongLeafIndex(Offer memory otherOffer, bytes32[] memory _proof) public {
+    function testTakeInvalidProof2LeavesWrongLeafIndex(Offer memory otherOffer) public {
+        bytes32[] memory _proof = new bytes32[](1);
+        _proof[0] = HashLib.hashOffer(otherOffer);
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
