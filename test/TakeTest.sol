@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0))
+            merkleRatifierData(lenderOffer, invalidRoot, 0, 0, new bytes32[](0))
         );
     }
 
@@ -971,7 +971,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof)
+            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, 0, _proof)
         );
     }
 
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof)
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, 0, _proof)
         );
     }
 
@@ -1006,7 +1006,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData([lenderOffer, otherOffer], proof([lenderOffer, otherOffer]))
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, 0, proof([lenderOffer, otherOffer]))
         );
     }
 
@@ -1040,7 +1040,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer0,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofFirstLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer0, root([offer0, offer1, offer2, offer3]), 2, 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1052,7 +1054,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer1,
-            merkleRatifierData([offer0, offer1, offer2, offer3], 1, proofSecondLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer1, root([offer0, offer1, offer2, offer3]), 2, 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1064,7 +1068,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer2,
-            merkleRatifierData([offer0, offer1, offer2, offer3], 2, proofThirdLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer2, root([offer0, offer1, offer2, offer3]), 2, 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1076,7 +1082,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer3,
-            merkleRatifierData([offer0, offer1, offer2, offer3], 3, proofFourthLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer3, root([offer0, offer1, offer2, offer3]), 2, 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
+            )
         );
     }
 

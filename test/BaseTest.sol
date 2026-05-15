@@ -321,45 +321,7 @@ abstract contract BaseTest is Test {
         return _encodeMerkleRatifierData(_sig, 0, _root, 0, proof(offers));
     }
 
-    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        return merkleRatifierData(offers, 0, _proof);
-    }
-
-    function merkleRatifierData(Offer[2] memory offers, uint256 _leafIndex, bytes32[] memory _proof)
-        internal
-        view
-        returns (bytes memory)
-    {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[_leafIndex].maker], offers[_leafIndex].ratifier, 1);
-        return _encodeMerkleRatifierData(_sig, 1, _root, _leafIndex, _proof);
-    }
-
-    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        return merkleRatifierData(offers, 0, _proof);
-    }
-
-    function merkleRatifierData(Offer[4] memory offers, uint256 _leafIndex, bytes32[] memory _proof)
-        internal
-        view
-        returns (bytes memory)
-    {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[_leafIndex].maker], offers[_leafIndex].ratifier, 2);
-        return _encodeMerkleRatifierData(_sig, 2, _root, _leafIndex, _proof);
-    }
-
-    /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
-    /// the signed root or the proof is intentionally inconsistent with the offer.
-    function merkleRatifierData(Offer memory offer, bytes32 _root, uint256 _height, bytes32[] memory _proof)
-        internal
-        view
-        returns (bytes memory)
-    {
-        return merkleRatifierData(offer, _root, _height, 0, _proof);
-    }
-
-    /// @dev Builds merkle ratifier data with explicit root, proof, signer, and leaf index.
+    /// @dev Builds merkle ratifier data with explicit root, height, leaf index, and proof.
     function merkleRatifierData(
         Offer memory offer,
         bytes32 _root,
