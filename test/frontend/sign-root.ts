@@ -84,7 +84,6 @@ function defaultOffer(number: string) {
   };
 }
 
-// The ratifier uses the leaf index to verify Merkle proofs against this ordered tree.
 function buildOfferTree() {
   return [
     [defaultOffer("1"), defaultOffer("2")],

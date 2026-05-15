@@ -243,7 +243,7 @@ abstract contract BaseTest is Test {
     function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _proof = new bytes32[](2);
         _proof[0] = HashLib.hashOffer(offers[1]);
-        _proof[1] = HashLib.orderedHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _proof;
     }
 
@@ -251,7 +251,7 @@ abstract contract BaseTest is Test {
     function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _proof = new bytes32[](2);
         _proof[0] = HashLib.hashOffer(offers[0]);
-        _proof[1] = HashLib.orderedHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
         return _proof;
     }
 
@@ -259,7 +259,7 @@ abstract contract BaseTest is Test {
     function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _proof = new bytes32[](2);
         _proof[0] = HashLib.hashOffer(offers[3]);
-        _proof[1] = HashLib.orderedHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _proof;
     }
 
@@ -267,7 +267,7 @@ abstract contract BaseTest is Test {
     function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
         bytes32[] memory _proof = new bytes32[](2);
         _proof[0] = HashLib.hashOffer(offers[2]);
-        _proof[1] = HashLib.orderedHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
         return _proof;
     }
 
@@ -280,13 +280,13 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return HashLib.orderedHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
     }
 
     function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = HashLib.orderedHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        bytes32 right = HashLib.orderedHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return HashLib.orderedHash(left, right);
+        bytes32 left = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        bytes32 right = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return HashLib.hashNode(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {

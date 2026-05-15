@@ -97,11 +97,11 @@ contract EcrecoverRatifierTest is BaseTest {
             (leftHash, rightHash) = (rightHash, leftHash);
         }
 
-        bytes32 orderedRoot = HashLib.orderedHash(leftHash, rightHash);
+        bytes32 root = HashLib.hashNode(leftHash, rightHash);
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftHash;
-        Signature memory sig = signature(orderedRoot, privateKey[lender], address(ecrecoverRatifier), 1);
-        bytes memory ratifierData = abi.encode(sig, 1, orderedRoot, 1, proof);
+        Signature memory sig = signature(root, privateKey[lender], address(ecrecoverRatifier), 1);
+        bytes memory ratifierData = abi.encode(sig, 1, root, 1, proof);
 
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData);

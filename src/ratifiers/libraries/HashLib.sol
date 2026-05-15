@@ -57,18 +57,17 @@ library HashLib {
         pure
         returns (bool)
     {
-        require(leafIndex < 2 ** proof.length, "leafIndex out of bounds");
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
-            if (leafIndex % 2 == 0) currentHash = orderedHash(currentHash, proof[i]);
-            else currentHash = orderedHash(proof[i], currentHash);
+            if (leafIndex % 2 == 0) currentHash = hashNode(currentHash, proof[i]);
+            else currentHash = hashNode(proof[i], currentHash);
             leafIndex /= 2;
         }
-        return currentHash == root && leafIndex == 0;
+        return currentHash == root;
     }
 
     /// @dev Returns the keccak256 hash of the concatenation of left and right.
-    function orderedHash(bytes32 left, bytes32 right) internal pure returns (bytes32 value) {
+    function hashNode(bytes32 left, bytes32 right) internal pure returns (bytes32 value) {
         assembly ("memory-safe") {
             mstore(0x00, left)
             mstore(0x20, right)

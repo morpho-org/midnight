@@ -43,9 +43,9 @@ contract FrontendSignatureTest is Test {
         bytes32 h1 = HashLib.hashOffer(offers[1]);
         bytes32 h2 = HashLib.hashOffer(offers[2]);
         bytes32 h3 = HashLib.hashOffer(offers[3]);
-        bytes32 left = HashLib.orderedHash(h0, h1);
-        bytes32 right = HashLib.orderedHash(h2, h3);
-        bytes32 _root = HashLib.orderedHash(left, right);
+        bytes32 left = HashLib.hashNode(h0, h1);
+        bytes32 right = HashLib.hashNode(h2, h3);
+        bytes32 _root = HashLib.hashNode(left, right);
 
         bytes32[] memory proof0 = new bytes32[](2);
         proof0[0] = h1;
