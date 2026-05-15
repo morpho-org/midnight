@@ -11,8 +11,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// To that end, it expects the ratifier data to contain the root of the tree, the leaf index of the offer, and the
 /// proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// The leaf index determines each sibling's left/right position, so proofs are checked against the ordered tree.
-/// This allows clear signing of the tree, credits to Seaport for this mechanism.
+/// @dev The leaf index determines each sibling's left/right position.
+/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 

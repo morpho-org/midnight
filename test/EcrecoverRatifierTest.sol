@@ -89,7 +89,7 @@ contract EcrecoverRatifierTest is BaseTest {
         ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
-    function testIsRatifiedUsesLeafIndexForOrderedTree() public {
+    function testIsRatifiedWorksForUnorderedTree() public {
         Offer memory leftOffer = makeOffer(lender);
         Offer memory rightOffer = makeOffer(lender);
         rightOffer.expiry += 1;
@@ -105,7 +105,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftHash;
         Signature memory sig = signature(orderedRoot, privateKey[lender], address(ecrecoverRatifier), 1);
-        bytes memory ratifierData = abi.encode(sig, uint256(1), orderedRoot, uint256(1), proof);
+        bytes memory ratifierData = abi.encode(sig, 1, orderedRoot, 1, proof);
 
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData);

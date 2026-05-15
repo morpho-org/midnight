@@ -67,8 +67,7 @@ contract FrontendSignatureTest is Test {
         proof3[1] = left;
         assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
-        bytes memory ratifierData =
-            abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, uint256(0), proof0);
+        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, 0, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }

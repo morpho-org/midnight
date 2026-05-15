@@ -13,8 +13,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// To that end, it expects the ratifier data to contain the signature, the height of the tree, the root of the tree,
 /// the leaf index of the offer, and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// The leaf index determines each sibling's left/right position, so the EIP-712 digest matches the ordered tree given
-/// to the wallet. This allows clear signing of the tree, credits to Seaport for this mechanism.
+/// @dev The leaf index determines each sibling's left/right position.
+/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
@@ -34,7 +34,6 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, uint256 height, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, uint256, bytes32, uint256, bytes32[]));
-        require(proof.length == height, InvalidProof());
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), root));

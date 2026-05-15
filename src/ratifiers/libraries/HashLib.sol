@@ -51,17 +51,18 @@ library HashLib {
         }
     }
 
-    /// @dev Returns the ordered Merkle proof verification result for a leaf at `leafIndex`.
+    /// @dev Verifies a Merkle proof for a leaf at a given index.
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure
         returns (bool)
     {
+        require(leafIndex < 2 ** proof.length, "leafIndex out of bounds");
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
-            if ((leafIndex & 1) == 0) currentHash = orderedHash(currentHash, proof[i]);
+            if (leafIndex % 2 == 0) currentHash = orderedHash(currentHash, proof[i]);
             else currentHash = orderedHash(proof[i], currentHash);
-            leafIndex >>= 1;
+            leafIndex /= 2;
         }
         return currentHash == root && leafIndex == 0;
     }
