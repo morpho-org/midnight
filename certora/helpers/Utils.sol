@@ -9,6 +9,7 @@ import {
     maxTradingFee as _maxTradingFee,
     maxLif as _maxLif
 } from "../../src/libraries/ConstantsLib.sol";
+import {TickLib} from "../../src/libraries/TickLib.sol";
 
 contract Utils {
     function hashMarket(Market memory market) external pure returns (bytes32) {
@@ -50,5 +51,13 @@ contract Utils {
 
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {
         return _maxLif(lltv, cursor);
+    }
+
+    function tickToPrice(uint256 tick) external pure returns (uint256) {
+        return TickLib.tickToPrice(tick);
+    }
+
+    function priceToTick(uint256 price, uint256 spacing) external pure returns (uint256) {
+        return TickLib.priceToTick(price, spacing);
     }
 }
