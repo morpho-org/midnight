@@ -52,6 +52,7 @@ library HashLib {
     }
 
     /// @dev Verifies a Merkle proof for a leaf at a given index.
+    /// @dev Works for proofs up to 256 elements long, which is enough for a Merkle tree of height at most 20.
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure
