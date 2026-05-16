@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation} from "../../src/interfaces/IMidnight.sol";
+import {Market} from "../../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 interface IHavoc {
@@ -20,28 +20,28 @@ contract FlashLiquidateCallback {
 
     function onLiquidate(
         bytes32,
-        Obligation memory obligation,
+        Market memory market,
         uint256,
         uint256,
         uint256 repaidUnits,
         address,
         bytes memory data
     ) external returns (bytes32) {
-        startFlashloan(obligation.loanToken, repaidUnits);
+        startFlashloan(market.loanToken, repaidUnits);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(obligation.loanToken, repaidUnits);
+        endFlashloan(market.loanToken, repaidUnits);
         return CALLBACK_SUCCESS;
     }
 
-    function onRepay(bytes32, Obligation memory obligation, uint256 units, address, bytes memory data)
+    function onRepay(bytes32, Market memory market, uint256 units, address, bytes memory data)
         external
         returns (bytes32)
     {
-        startFlashloan(obligation.loanToken, units);
+        startFlashloan(market.loanToken, units);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(obligation.loanToken, units);
+        endFlashloan(market.loanToken, units);
         return CALLBACK_SUCCESS;
     }
 
