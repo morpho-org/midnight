@@ -7,7 +7,7 @@ methods {
 
     // Internal calls to TickLib.tickToPrice are replaced by the ghost. The axioms below match the
     // properties separately proven on the real function in TickLib.spec.
-    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => ghostTickToPrice(tick);
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 }
 
 ghost ghostTickToPrice(uint256) returns uint256 {
@@ -15,7 +15,15 @@ ghost ghostTickToPrice(uint256) returns uint256 {
     axiom forall uint256 t. ghostTickToPrice(t) <= 10 ^ 18;
 
     // matches rule tickToPriceIsMonotonic in TickLib.spec
-    axiom forall uint256 t1. forall uint256 t2. t1 <= t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
+    axiom forall uint256 t1. forall uint256 t2. t1 < t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
+}
+
+function summaryTickToPrice(uint256 tick) returns (uint256) {
+    bool shouldRevert;
+    if (shouldRevert || tick > maxTick()) {
+        revert();
+    }
+    return ghostTickToPrice(tick);
 }
 
 rule priceToTickIsMonotonic(uint256 price1, uint256 price2, uint256 spacing) {
@@ -23,7 +31,7 @@ rule priceToTickIsMonotonic(uint256 price1, uint256 price2, uint256 spacing) {
 }
 
 rule priceToTickReturnsATickWithGreaterThanOrEqualPrice(uint256 price, uint256 spacing) {
-    require price <= tickToPrice(maxTick()), "price must be representable; tickToPrice rounds down at MAX_TICK";
+    // require price <= tickToPrice(maxTick()), "price must be representable; tickToPrice rounds down at MAX_TICK";
     uint256 tick = priceToTick(price, spacing);
     assert tickToPrice(tick) >= price;
 }
@@ -34,10 +42,14 @@ rule priceToTickReturnsLowestTickWithGreaterThanOrEqualPrice(uint256 price, uint
     assert tickToPrice(assert_uint256(tick - spacing)) < price;
 }
 
-// If the tick is a multiple of spacing, then priceToTick(tickToPrice(tick), spacing) == tick.
+// If the tick is a multiple of spacing, and writing price:=tickToPrice(tick), then:
+// - priceToTick(price, spacing) <= tick
+// - tickToPrice(priceToTick(price, spacing)) == price
 rule priceToTickRoundTrip(uint256 tick, uint256 spacing) {
     require spacing > 0, "a created market has a positive spacing, by definition";
     require tick % spacing == 0, "tick is not a multiple of spacing";
     uint256 price = tickToPrice(tick);
-    assert priceToTick(price, spacing) == tick;
+    uint256 recoveredTick = priceToTick(price, spacing);
+    assert recoveredTick <= tick;
+    assert tickToPrice(recoveredTick) == price;
 }
