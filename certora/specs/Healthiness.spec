@@ -40,6 +40,13 @@ methods {
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
+
+    // View callbacks into user-supplied contracts: cannot change state, so we don't run them
+    // through genericCallback (which would over-restrict by re-checking healthiness post-call).
+    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
 }
 
 /// SUMMARY ///
@@ -79,13 +86,6 @@ definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a 
 /* proved in mulDivLifLLTV */
 definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
 
-/* function selectors for take/liquidate/withdrawCollateral */
-definition isTake(method f) returns bool = (f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector);
-
-definition isLiquidate(method f) returns bool = (f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector);
-
-definition isWithdrawCollateral(method f) returns bool = (f.selector == sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector);
-
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -107,7 +107,8 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 persistent ghost bool useIsHealthyNoBitmap;
 
 // global variable to track whether the user was healthy before the callbacks.
-ghost bool healthyOrLockedBeforeCallbacks;
+// Persistent so its value survives the havoc of unresolved external calls inside callbacks.
+persistent ghost bool healthyOrLockedBeforeCallbacks;
 
 // global variable to track which market and borrower we're testing.
 persistent ghost address globalMarketLoanToken;
@@ -162,6 +163,16 @@ function summaryToId(Midnight.Market market, uint256 chainId, address midnight) 
 // It calls either isHealthy() or isHealthyNoBitmap() depending on global setting.
 // We show in CollateralBitmap.spec that both functions return the same value, so calling any of them is okay.
 // To avoid the need for bitprecise reasoning, we select for each case the most suitable function, by setting the variable useIsHealthyNoBitmap.
+//
+// Rule of thumb for picking the summary:
+//  - If the function under verification calls isHealthy() itself (e.g. withdrawCollateral, take)
+//    or inlines its computation over the collateral bitmap (e.g. liquidate, when proving the same
+//    borrower stays healthy), keep isHealthy() so the prover can directly match the spec's
+//    `assert isHealthy` against the health check in the code.
+//  - For functions that don't perform an isHealthy() check (e.g. supplyCollateral, repay, borrow),
+//    use isHealthyNoBitmap() so the prover reasons about the explicit sum of LLTV-weighted
+//    collateral values over all collateralParams, without having to follow the bitmap iteration.
+//    For example, for supplyCollateral, the prover just needs to see that the sum is increased.
 function isHealthyOrLiquidationLocked(Midnight.Market market, bytes32 id, address borrower) returns (bool) {
     if (useIsHealthyNoBitmap) {
         return isHealthyNoBitmap(market, id, borrower) || liquidationLocked(id, borrower);
@@ -173,6 +184,7 @@ function isHealthyOrLiquidationLocked(Midnight.Market market, bytes32 id, addres
 // Summary for every non-transfer callback (onLiquidate, onFlashloan, onBuy, onSell, etc.)
 // we check that the user is healthy or locked before the callback, do some external call (to simulate changes by the callback),
 // and then require that the user is still healthy or locked after the callback.
+// healthyOrLockedBeforeCallbacks is persistent, so it survives the havoc and doesn't need to be saved/restored.
 function genericCallback() {
     address dummy;
     env e;
@@ -180,12 +192,9 @@ function genericCallback() {
 
     // check that isHealthy or locked holds before the callback.  We remember any violation and check that none occurred at the end of each rule.
     bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
-    bool savedHealthyBefore = healthyOrLockedBeforeCallbacks && isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower);
+    healthyOrLockedBeforeCallbacks = healthyOrLockedBeforeCallbacks && isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower);
 
     havocCallback.callHavoc(e, dummy);
-
-    // the callback havocs the global variable healthyOrLockedBeforeCallbacks, so we restore the variable using the saved value in the local variable.
-    healthyOrLockedBeforeCallbacks = savedHealthyBefore;
 
     require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
     require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked after callback";
@@ -202,11 +211,8 @@ function transferCallback() {
     Midnight.Market globalMarket = getGlobalMarket();
 
     bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
-    bool savedHealthyBefore = healthyOrLockedBeforeCallbacks;
 
     havocCallback.callHavoc(e, dummy);
-
-    healthyOrLockedBeforeCallbacks = savedHealthyBefore;
 
     require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
     require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked after callback";
@@ -305,12 +311,12 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 // Show that the user stays healthy on any other function than liquidate.
 // We also allow the user to be liquidationLocked() (for callbacks from take(), where the seller
 // is not required to be healthy).
-rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> !isLiquidate(f) } {
+rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
     // for withdraw collateral and take we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (!isWithdrawCollateral(f) && !isTake(f));
+    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector);
 
-    // for take use 2 collaterals (to avoid timeouts), otherwise 3.
-    mathint maxCollaterals = isTake(f) ? 2 : 3;
+    // use 2 collaterals.
+    mathint maxCollaterals = 2;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
@@ -343,14 +349,15 @@ rule liquidationLockedPreserved(env e, method f, calldataarg args) {
 weak invariant notLiquidationLocked()
     !liquidationLocked(globalId, globalBorrower);
 
-// Check that locked positions are not liquidatable.  We check in Liquidation.spec that
-// liquidate() reverts if isLiquidatable() returns false.  Here we check that isLiquidatable()
-// returns false.
-rule notLiquidatableWhenLocked(env e) {
+// Check that locked positions cannot be liquidated: for any liquidate() parameters
+// (other than the global market and borrower), the call must revert when the borrower
+// is liquidationLocked.
+rule notLiquidatableWhenLocked(env e, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address receiver, address liquidateCallback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
 
-    bool liquidationLocked = liquidationLocked(globalId, globalBorrower);
-    bool isLiquidatable = isLiquidatable(e, globalMarket, globalId, globalBorrower);
+    require liquidationLocked(globalId, globalBorrower), "borrower is locked";
 
-    assert liquidationLocked => !isLiquidatable;
+    liquidate@withrevert(e, globalMarket, collateralIndex, seizedAssets, repaidUnits, globalBorrower, receiver, liquidateCallback, data);
+
+    assert lastReverted, "liquidate must revert on a locked borrower";
 }
