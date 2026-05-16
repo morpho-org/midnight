@@ -27,6 +27,8 @@ methods {
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 }
 
+/// HELPERS ///
+
 definition WAD() returns uint256 = 10 ^ 18;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
@@ -41,6 +43,7 @@ definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000
 
 definition isMaxLifAllowed(uint256 lltv, uint256 maxLif) returns bool = maxLif == Utils.maxLif(lltv, Utils.liquidationCursorLow()) || maxLif == Utils.maxLif(lltv, Utils.liquidationCursorHigh());
 
+/// RULES ///
 
 // Show that a created market has at least one collateral.
 strong invariant createdMarketsHaveNonEmptyCollaterals(Midnight.Market market)

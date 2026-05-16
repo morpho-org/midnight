@@ -25,7 +25,7 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 }
 
-// HELPERS ///
+/// HELPERS ///
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
@@ -48,7 +48,7 @@ definition userHasNoLastAccrual(bytes32 id, address user) returns bool = lastAcc
 
 definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
 
-/// INVARIANTS ///
+/// RULES ///
 
 // Show that each market state field is empty if the market is not created.
 strong invariant marketTotalUnitsIsEmptyIfNotCreated(bytes32 id)
