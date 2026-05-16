@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
-using Midnight as Midnight;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function Midnight.totalUnits(bytes32) external returns (uint256) envfree;
-    function Midnight.withdrawable(bytes32) external returns (uint256) envfree;
-    function Midnight.tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
-    function Midnight.continuousFee(bytes32) external returns (uint32) envfree;
-    function Midnight.toMarket(bytes32) external returns (Midnight.Market memory) envfree;
-    function Midnight.creditOf(bytes32, address) external returns (uint256) envfree;
-    function Midnight.debtOf(bytes32, address) external returns (uint256) envfree;
-    function Midnight.pendingFee(bytes32, address) external returns (uint128) envfree;
-    function Midnight.lastAccrual(bytes32, address) external returns (uint128) envfree;
-    function Midnight.tickSpacing(bytes32) external returns (uint8) envfree;
-    function Midnight.isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function totalUnits(bytes32) external returns (uint256) envfree;
+    function withdrawable(bytes32) external returns (uint256) envfree;
+    function tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
+    function continuousFee(bytes32) external returns (uint32) envfree;
+    function toMarket(bytes32) external returns (Midnight.Market memory) envfree;
+    function creditOf(bytes32, address) external returns (uint256) envfree;
+    function debtOf(bytes32, address) external returns (uint256) envfree;
+    function pendingFee(bytes32, address) external returns (uint128) envfree;
+    function lastAccrual(bytes32, address) external returns (uint128) envfree;
+    function tickSpacing(bytes32) external returns (uint8) envfree;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
@@ -50,7 +49,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 }
 
 function marketCreated(bytes32 id) returns (bool) {
-    return Midnight.tickSpacing(id) > 0;
+    return tickSpacing(id) > 0;
 }
 
 // Show that a created market has at least one collateral.
