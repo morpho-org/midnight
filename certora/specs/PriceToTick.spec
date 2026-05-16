@@ -1,8 +1,12 @@
-// Internal calls to TickLib.tickToPrice are replaced by the ghost. The axioms below match the
-// properties separately proven on the real function in TickLib.spec.
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 methods {
+    function maxTick() external returns (uint256) envfree;
     function tickToPrice(uint256 tick) external returns (uint256) envfree;
     function priceToTick(uint256 price, uint256 spacing) external returns (uint256) envfree;
+
+    // Internal calls to TickLib.tickToPrice are replaced by the ghost. The axioms below match the
+    // properties separately proven on the real function in TickLib.spec.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => ghostTickToPrice(tick);
 }
 
@@ -19,7 +23,7 @@ rule priceToTickIsMonotonic(uint256 price1, uint256 price2, uint256 spacing) {
 }
 
 rule priceToTickReturnsATickWithGreaterThanOrEqualPrice(uint256 price, uint256 spacing) {
-    require price <= tickToPrice(5820), "price must be representable; tickToPrice rounds down at MAX_TICK";
+    require price <= tickToPrice(maxTick()), "price must be representable; tickToPrice rounds down at MAX_TICK";
     uint256 tick = priceToTick(price, spacing);
     assert tickToPrice(tick) >= price;
 }
