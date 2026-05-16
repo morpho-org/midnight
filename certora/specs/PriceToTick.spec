@@ -42,9 +42,9 @@ rule priceToTickReturnsLowestTickWithGreaterThanOrEqualPrice(uint256 price, uint
     assert tickToPrice(assert_uint256(tick - spacing)) < price;
 }
 
-// If the tick is a multiple of spacing, and writing price:=tickToPrice(tick), then:
-// - priceToTick(price, spacing) <= tick
-// - tickToPrice(priceToTick(price, spacing)) == price
+// If tick is a multiple of spacing, then the recovered tick from priceToTick verifies:
+// recoveredTick <= tick, and
+// tickToPrice(recoveredTick) == tickToPrice(tick)
 rule priceToTickRoundTrip(uint256 tick, uint256 spacing) {
     require spacing > 0, "a created market has a positive spacing, by definition";
     require tick % spacing == 0, "tick is not a multiple of spacing";
