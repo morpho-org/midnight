@@ -5,21 +5,14 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function totalUnits(bytes32) external returns (uint256) envfree;
-    function withdrawable(bytes32) external returns (uint256) envfree;
-    function tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
-    function continuousFee(bytes32) external returns (uint32) envfree;
-    function toMarket(bytes32) external returns (Midnight.Market memory) envfree;
-    function creditOf(bytes32, address) external returns (uint256) envfree;
-    function debtOf(bytes32, address) external returns (uint256) envfree;
-    function pendingFee(bytes32, address) external returns (uint128) envfree;
-    function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
-    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
-
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
+    function Utils.liquidationCursorLow() external returns (uint256) envfree;
+    function Utils.liquidationCursorHigh() external returns (uint256) envfree;
 
+    // Over-approximate view functions for prover performance.
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -30,12 +23,8 @@ methods {
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
-    // Summarize CREATE2 opcode used by IdLib.storeInCode.
+    // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-
-    // Tokens are assumed to not reenter.
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -45,12 +34,13 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
-    return marketCreated(summaryToId(market));
+    return tickSpacing(summaryToId(market)) > 0;
 }
 
-function marketCreated(bytes32 id) returns (bool) {
-    return tickSpacing(id) > 0;
-}
+definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
+
+definition isMaxLifAllowed(uint256 lltv, uint256 maxLif) returns bool = maxLif == Utils.maxLif(lltv, Utils.liquidationCursorLow()) || maxLif == Utils.maxLif(lltv, Utils.liquidationCursorHigh());
+
 
 // Show that a created market has at least one collateral.
 strong invariant createdMarketsHaveNonEmptyCollaterals(Midnight.Market market)
@@ -68,15 +58,70 @@ strong invariant createdMarketsHaveNonZeroCollaterals(Midnight.Market market, ui
 strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD();
 
-// Show that a created market cannot be deleted.
-rule marketCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
-    require marketCreated(id), "Assume that the market is created";
-    f(e, args);
-    assert marketCreated(id);
-}
-
-definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
-
 // Show that a created market only has allowed LLTV tiers.
 strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => isLltvAllowed(market.collateralParams[i].lltv);
+
+// Show that a created market has maxLif allowed.
+strong invariant createdMarketsHaveAllowedMaxLif(Midnight.Market market, uint256 i)
+    marketIsCreated(market) => i < market.collateralParams.length => isMaxLifAllowed(market.collateralParams[i].lltv, market.collateralParams[i].maxLif);
+
+// Show that a created market cannot be deleted.
+rule marketCannotBeDeleted(env e, method f, calldataarg args, Midnight.Market market) {
+    require marketIsCreated(market), "Assume that the market is created";
+    f(e, args);
+    assert marketIsCreated(market);
+}
+
+// Show that a market is created after an interaction.
+
+rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
+    touchMarket(e, market);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    assert marketIsCreated(offer.market);
+}
+
+rule marketIsCreatedAfterWithdraw(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
+    withdraw(e, market, units, onBehalf, receiver);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterRepay(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
+    repay(e, market, units, onBehalf, callback, data);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterSupplyCollateral(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf) {
+    supplyCollateral(e, market, collateralIndex, assets, onBehalf);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterWithdrawCollateral(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+    withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    assert marketIsCreated(market);
+}
+
+// Markets can only be created by: touchMarket, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
+rule onlyTouchMarketCreatesMarket(env e, method f, calldataarg args, Midnight.Market market)
+filtered {
+    f -> f.selector != sig:touchMarket(Midnight.Market).selector
+        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+        && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
+        && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
+        && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
+        && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+} {
+    require !marketIsCreated(market), "Assume that the market is not created";
+    f(e, args);
+    assert !marketIsCreated(market);
+}
