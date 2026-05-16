@@ -53,6 +53,43 @@ function marketCreated(bytes32 id) returns (bool) {
     return Midnight.tickSpacing(id) > 0;
 }
 
+// Show that a market is created after an interaction.
+
+rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
+    Midnight.touchMarket(e, market);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+    Midnight.take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    assert marketIsCreated(offer.market);
+}
+
+rule marketIsCreatedAfterWithdraw(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
+    Midnight.withdraw(e, market, units, onBehalf, receiver);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterRepay(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
+    Midnight.repay(e, market, units, onBehalf, callback, data);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterSupplyCollateral(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf) {
+    Midnight.supplyCollateral(e, market, collateralIndex, assets, onBehalf);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterWithdrawCollateral(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+    Midnight.withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    Midnight.liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    assert marketIsCreated(market);
+}
+
 // Markets can only be created by: touchMarket, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
 rule onlyTouchMarketCreatesMarket(env e, method f, calldataarg args, bytes32 id)
 filtered {
