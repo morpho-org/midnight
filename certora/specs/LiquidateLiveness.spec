@@ -36,9 +36,13 @@ methods {
 /// CONSTANTS ///
 
 definition WAD() returns uint256 = 10 ^ 18;
+
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
+
 definition MAX_UINT128() returns mathint = (1 << 128) - 1;
+
 definition MAX_TIMESTAMP() returns mathint = 1 << 64;
+
 /// Mirrors TIME_TO_MAX_LIF from src/libraries/ConstantsLib.sol.
 definition TIME_TO_MAX_LIF() returns uint256 = 15 * 60;
 
@@ -54,20 +58,15 @@ persistent ghost summaryPrice(address) returns uint256;
 // The monotonicity axiom is derivable from the tight bound but kept explicit so the solver
 // doesn't have to divide by `d` (NIA pain point) when bounding `maxDebt += .mulDivDown(lltv, WAD)`.
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
 }
 
 // Tight bounds proven in MulDiv.spec (mulDivUpRoundsUp, mulDivUpTightBound).
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d.
-        d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
 }
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -138,13 +137,10 @@ function feasibleLossAccounting(bytes32 id, address borrower) {
 ///  - the borrower is healthy and at least TIME_TO_MAX_LIF past maturity (the min-clamp picks `_maxLif`).
 /// This excludes the [maturity, maturity + TIME_TO_MAX_LIF) window for *still-healthy* borrowers.
 function pinLifToMaxLif(env e, Midnight.Market market, bool healthy) {
-    require !healthy
-        || to_mathint(e.block.timestamp) >= to_mathint(market.maturity) + to_mathint(TIME_TO_MAX_LIF()),
-        "lif = maxLif: unhealthy, or post-maturity by at least TIME_TO_MAX_LIF";
+    require !healthy || to_mathint(e.block.timestamp) >= to_mathint(market.maturity) + to_mathint(TIME_TO_MAX_LIF()), "lif = maxLif: unhealthy, or post-maturity by at least TIME_TO_MAX_LIF";
 }
 
-
-/// Replicates the contract's `repaidUnits = seizedAssets * P / SCALE * WAD / lif` 
+/// Replicates the contract's `repaidUnits = seizedAssets * P / SCALE * WAD / lif`
 /// for Strategy A (seizedAssets = collat) when `lif = maxLif` (see pinLifToMaxLif).
 function strategyARepaidUnitsAtMaxLif(Midnight.Market market, uint128 collat) returns uint256 {
     address oracle = market.collateralParams[0].oracle;
@@ -191,9 +187,7 @@ rule liquidatableCanBeLiquidatedSeizeAll(env e, Midnight.Market market, address 
     require e.block.timestamp > market.maturity || !healthy, "expired or unhealthy";
 
     /// RCF bypass for the pre-maturity unhealthy regime (post-maturity has RCF deactivated).
-    require e.block.timestamp > market.maturity
-        || market.rcfThreshold == max_uint256
-        || market.collateralParams[0].lltv == WAD(), "RCF check bypassed (pre-maturity)";
+    require e.block.timestamp > market.maturity || market.rcfThreshold == max_uint256 || market.collateralParams[0].lltv == WAD(), "RCF check bypassed (pre-maturity)";
 
     pinLifToMaxLif(e, market, healthy);
 
@@ -224,9 +218,7 @@ rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address 
     bool healthy = isHealthy(market, id, borrower);
     require e.block.timestamp > market.maturity || !healthy, "expired or unhealthy";
 
-    require e.block.timestamp > market.maturity
-        || market.rcfThreshold == max_uint256
-        || market.collateralParams[0].lltv == WAD(), "RCF check bypassed (pre-maturity)";
+    require e.block.timestamp > market.maturity || market.rcfThreshold == max_uint256 || market.collateralParams[0].lltv == WAD(), "RCF check bypassed (pre-maturity)";
 
     pinLifToMaxLif(e, market, healthy);
 
