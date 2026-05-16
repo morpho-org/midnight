@@ -171,7 +171,7 @@ rule liquidateZeroZeroNoRevert(env e, Midnight.Market market, address borrower, 
 
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 0, borrower, receiver, 0, data);
-    assert !lastReverted, "liquidate(0, 0) on a liquidatable position must succeed";
+    assert !lastReverted;
 }
 
 rule liquidatableCanBeLiquidatedSeizeAll(env e, Midnight.Market market, address borrower, address receiver) {
@@ -205,7 +205,7 @@ rule liquidatableCanBeLiquidatedSeizeAll(env e, Midnight.Market market, address 
 
     bytes data;
     liquidate@withrevert(e, market, 0, collat, 0, borrower, receiver, 0, data);
-    assert !lastReverted, "seize-all must succeed when computed repaid <= debt";
+    assert !lastReverted;
 }
 
 rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address borrower, address receiver) {
@@ -238,15 +238,13 @@ rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address 
 
     bytes data;
     liquidate@withrevert(e, market, 0, 0, debt, borrower, receiver, 0, data);
-    assert !lastReverted, "repay-all must succeed when seize-all would over-repay";
+    assert !lastReverted;
 }
 
 /// Witness for "some debt can be repaid": pass `repaidUnits = 1` (the minimum positive amount).
 /// Covers the regimes uncovered by the seize-all/repay-all rules:
 ///  - pre-maturity unhealthy with finite rcfThreshold and lltv < WAD (RCF caps the per-call repay),
 ///  - post-maturity healthy in [maturity, maturity + TIME_TO_MAX_LIF) (ramped lif).
-/// Does NOT pin lif and does NOT bypass RCF: works for any lif in [WAD, maxLif].
-/// LIVENESS limit: requires collat 0 large enough to absorb the worst-case 1-unit seizure.
 rule liquidatableCanBeLiquidatedOneUnit(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
 
@@ -265,11 +263,9 @@ rule liquidatableCanBeLiquidatedOneUnit(env e, Midnight.Market market, address b
     address oracle = market.collateralParams[0].oracle;
     uint128 collat = collateral(id, borrower, 0);
     uint256 maxLif = market.collateralParams[0].maxLif;
-    require to_mathint(maxLif) * to_mathint(ORACLE_PRICE_SCALE())
-        <= to_mathint(collat) * to_mathint(WAD()) * to_mathint(summaryPrice(oracle)),
-        "LIVENESS: collat 0 absorbs the 1-unit seizure at maxLif";
+    require to_mathint(maxLif) * to_mathint(ORACLE_PRICE_SCALE()) <= to_mathint(collat) * to_mathint(WAD()) * to_mathint(summaryPrice(oracle)), "LIVENESS: collat 0 absorbs the 1-unit seizure at maxLif";
 
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 1, borrower, receiver, 0, data);
-    assert !lastReverted, "repaying 1 unit must succeed on any liquidatable position (via collateral 0)";
+    assert !lastReverted;
 }
