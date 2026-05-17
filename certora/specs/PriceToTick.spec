@@ -6,15 +6,15 @@ methods {
     function priceToTick(uint256 price, uint256 spacing) external returns (uint256) envfree;
 
     // Internal calls to TickLib.tickToPrice are replaced by the ghost. The axioms below match the
-    // properties separately proven on the real function in TickLib.spec.
+    // properties separately proven on the real function in TickToPrice.spec.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 }
 
 ghost ghostTickToPrice(uint256) returns uint256 {
-    // matches rule tickToPriceAtMostWad in TickLib.spec
+    // matches rule tickToPriceAtMostWad in TickToPrice.spec
     axiom forall uint256 t. ghostTickToPrice(t) <= 10 ^ 18;
 
-    // matches rule tickToPriceIsMonotonic in TickLib.spec
+    // matches rule tickToPriceIsMonotonic in TickToPrice.spec
     axiom forall uint256 t1. forall uint256 t2. t1 < t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
 }
 
