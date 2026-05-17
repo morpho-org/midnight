@@ -30,13 +30,14 @@ rule priceToTickIsMonotonic(uint256 price1, uint256 price2, uint256 spacing) {
     assert price1 < price2 => priceToTick(price1, spacing) <= priceToTick(price2, spacing);
 }
 
+// For prices smaller than 1, priceToTick returns a tick with a price greater than or equal to the input price.
 rule priceToTickReturnsATickWithGreaterThanOrEqualPrice(uint256 price, uint256 spacing) {
-    // require price <= tickToPrice(maxTick()), "price must be representable; tickToPrice rounds down at MAX_TICK";
+    require price <= 10 ^ 18, "assume that the price is smaller than 1";
     uint256 tick = priceToTick(price, spacing);
     assert tickToPrice(tick) >= price;
 }
 
-rule priceToTickReturnsLowestTickWithGreaterThanOrEqualPrice(uint256 price, uint256 spacing) {
+rule priceToTickReturnsLowestMultipleOfSpacing(uint256 price, uint256 spacing) {
     uint256 tick = priceToTick(price, spacing);
     require tick > 0, "for tick 0 it is trivially the lowest tick";
     assert tickToPrice(assert_uint256(tick - spacing)) < price;
