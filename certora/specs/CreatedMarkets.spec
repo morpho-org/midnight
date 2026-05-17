@@ -14,7 +14,7 @@ methods {
     // Over-approximate view functions for prover performance.
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => ghostMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
@@ -35,6 +35,8 @@ methods {
 /// HELPERS ///
 
 definition WAD() returns uint256 = 10 ^ 18;
+
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
