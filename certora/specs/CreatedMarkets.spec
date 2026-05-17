@@ -12,6 +12,7 @@ methods {
     function Utils.liquidationCursorHigh() external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
