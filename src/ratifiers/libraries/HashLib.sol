@@ -52,7 +52,8 @@ library HashLib {
     }
 
     /// @dev Verifies a Merkle proof using the leaf index to determine the left/right position of each sibling.
-    /// @dev Works for proofs up to 256 elements long, which is enough for a Merkle tree of height at most 20.
+    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex. In practice the height is capped at 20
+    /// by offerTreeTypeHash.
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure
@@ -64,7 +65,7 @@ library HashLib {
             else currentHash = hashNode(proof[i], currentHash);
             leafIndex /= 2;
         }
-        return currentHash == root;
+        return currentHash == root && leafIndex == 0;
     }
 
     /// @dev Returns the keccak256 hash of the concatenation of left and right.
