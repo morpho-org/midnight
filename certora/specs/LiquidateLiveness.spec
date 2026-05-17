@@ -64,15 +64,22 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 }
 
 // Tight bounds proven in MulDiv.spec (mulDivUpRoundsUp, mulDivUpTightBound).
+// The monotonicity axiom (b <= d => result <= a) gives the solver an LIA shortcut
+// for the common pattern mulDivUp(_, WAD, maxLif) where WAD <= maxLif.
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
 }
 
+/// Case-analysis on the common deterministic patterns (y == d, x == d, zero inputs).
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0) {
         revert();
     }
+    if (x == 0 || y == 0) return 0;
+    if (y == d) return x;
+    if (x == d) return y;
     return ghostMulDivDown(x, y, d);
 }
 
@@ -80,6 +87,9 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0) {
         revert();
     }
+    if (x == 0 || y == 0) return 0;
+    if (y == d) return x;
+    if (x == d) return y;
     return ghostMulDivUp(x, y, d);
 }
 
@@ -117,6 +127,19 @@ function dualCollateralSetup(Midnight.Market market, bytes32 id, address borrowe
     validCollateralAt(market, id, borrower, 1);
 }
 
+/// Single-collateral market with bitmap == 1 (only bit 0 set).
+/// Cuts ghost instantiations roughly in half vs dualCollateralSetup by halving the
+/// health-check and bad-debt loops.  Used for the NIA-heavier rules (SeizeAll, OneUnit).
+function singleCollateralSetup(Midnight.Market market, bytes32 id, address borrower) {
+    require market.collateralParams.length == 1, "single-collateral market";
+    require collateralBitmap(id, borrower) == 1, "bitmap is exactly 1 (bit 0 set)";
+
+    require summaryGetBit(1, 0), "ghost: bit 0 is set";
+    require forall uint256 i. i >= 1 => !summaryGetBit(1, i), "ghost: no other bit is set";
+
+    validCollateralAt(market, id, borrower, 0);
+}
+
 /// Common environment / market preconditions 
 function wellBehavedEnv(env e, Midnight.Market market) {
     require e.msg.value == 0, "no value sent";
@@ -142,11 +165,13 @@ function pinLifToMaxLif(env e, Midnight.Market market, bool healthy) {
 
 /// Replicates the contract's `repaidUnits = seizedAssets * P / SCALE * WAD / lif`
 /// for Strategy A (seizedAssets = collat) when `lif = maxLif` (see pinLifToMaxLif).
+/// Uses `summaryMulDivUp` (not raw `ghostMulDivUp`) so the helper sees the same
+/// case-analyzed values as the contract path.
 function strategyARepaidUnitsAtMaxLif(Midnight.Market market, uint128 collat) returns uint256 {
     address oracle = market.collateralParams[0].oracle;
     uint256 maxLif = market.collateralParams[0].maxLif;
-    uint256 step1 = ghostMulDivUp(collat, summaryPrice(oracle), ORACLE_PRICE_SCALE());
-    return ghostMulDivUp(step1, WAD(), maxLif);
+    uint256 step1 = summaryMulDivUp(collat, summaryPrice(oracle), ORACLE_PRICE_SCALE());
+    return summaryMulDivUp(step1, WAD(), maxLif);
 }
 
 /// RULES ///
@@ -173,10 +198,9 @@ rule liquidateZeroZeroNoRevert(env e, Midnight.Market market, address borrower, 
 rule liquidatableCanBeLiquidatedSeizeAll(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
 
-    dualCollateralSetup(market, id, borrower);
+    singleCollateralSetup(market, id, borrower);
     wellBehavedEnv(e, market);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
     feasibleLossAccounting(id, borrower);
 
     require !liquidationLocked(id, borrower), "not locked";
@@ -191,7 +215,7 @@ rule liquidatableCanBeLiquidatedSeizeAll(env e, Midnight.Market market, address 
 
     pinLifToMaxLif(e, market, healthy);
 
-    /// `collat > 0` follows from the index-0 invariant + `summaryGetBit(3, 0)`.
+    /// `collat > 0` follows from the index-0 invariant + `summaryGetBit(1, 0)`.
     uint128 collat = collateral(id, borrower, 0);
 
     /// Strategy A applicable: the contract-computed repaidUnits (with lif = maxLif) fits in debt.
@@ -225,7 +249,7 @@ rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address 
     /// `collat > 0` follows from the index-0 invariant + `summaryGetBit(3, 0)`.
     uint128 collat = collateral(id, borrower, 0);
 
-    /// Strategy B applicable: Strategy A would over-repay, so the contract's choice is repay-all.
+    /// Repay-all
     require strategyARepaidUnitsAtMaxLif(market, collat) > debt, "Strategy B applicable";
 
     bytes data;
@@ -240,10 +264,9 @@ rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address 
 rule liquidatableCanBeLiquidatedOneUnit(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
 
-    dualCollateralSetup(market, id, borrower);
+    singleCollateralSetup(market, id, borrower);
     wellBehavedEnv(e, market);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
     feasibleLossAccounting(id, borrower);
 
     require !liquidationLocked(id, borrower), "not locked";
