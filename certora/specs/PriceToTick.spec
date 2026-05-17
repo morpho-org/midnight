@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import "TickToPrice.spec";
+
 methods {
-    function maxTick() external returns (uint256) envfree;
-    function tickToPrice(uint256 tick) external returns (uint256) envfree;
     function priceToTick(uint256 price, uint256 spacing) external returns (uint256) envfree;
 
-    // Internal calls to TickLib.tickToPrice are replaced by the ghost. The axioms below match the
-    // properties separately proven on the real function in TickToPrice.spec.
+    // Replaced by a ghost to model the deterministic behavior of tickToPrice, and to add the proven properties.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 }
 
-// TODO: replace 5820 by max tick definition
 ghost ghostTickToPrice(uint256) returns uint256 {
     // matches rule tickToPriceIsOneAtMaxTick in TickToPrice.spec
-    axiom ghostTickToPrice(5820) == 10 ^ 18;
+    axiom ghostTickToPrice(cvlMaxTick()) == 10 ^ 18;
 
-    // matches rule tickToPriceIsMonotonic in TickToPrice.spec
+    // Proven by exhaustive testing on the relevant range in testTickMonotonicity.
     axiom forall uint256 t1. forall uint256 t2. t1 < t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
 }
 

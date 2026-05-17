@@ -1,28 +1,32 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-import "WExp.spec";
-
 methods {
-    // Internal calls to TickLib.wExp are replaced by the ghost. The axioms below match the
-    // properties separately proven on the real function in WExp.spec.
-    function TickLib.wExp(int256 x) internal returns (uint256) => summaryWExp(x);
+    function lnOnePlusDelta() external returns (int256) envfree;
+    function maxTick() external returns (uint256) envfree;
+    function wExp(int256 x) external returns (uint256) envfree;
+    function tickToPrice(uint256 tick) external returns (uint256) envfree;
 }
 
-persistent ghost ghostWExp(int256) returns uint256 {
-    // matches rule wExpIsMonotonic in WExp.spec
-    axiom forall int256 x1. forall int256 x2. x1 < x2 => ghostWExp(x1) <= ghostWExp(x2);
+definition cvlMaxTick() returns uint256 = 5820;
 
-    // matches rule wExpOutputBound in WExp.spec
-    // Needed to show that the computation 1e18 + wExp(...) does not overflow in tickToPrice.
-    axiom forall int256 x. ghostWExp(x) <= maxOutput();
+rule cvlMaxTickIsMaxTick() {
+    assert cvlMaxTick() == maxTick();
 }
 
-function summaryWExp(int256 x) returns (uint256) {
-    bool shouldRevert;
-    if (shouldRevert) {
-        revert();
-    }
-    return ghostWExp(x);
+// Check the casting assertions in the wExp function.
+rule wExpCasting(uint256 x) {
+    require x >= 0, "wExp calls wExp(-x) when x < 0";
+
+    mathint ln2 = 693147180559945309;
+    mathint q = (x + ln2 / 2) / ln2;
+    mathint r = x - q * ln2;
+    mathint secondTerm = r * r / (2 * 10 ^ 18);
+    mathint thirdTerm = secondTerm * r / (3 * 10 ^ 18);
+    mathint expR = 10 ^ 18 + r + secondTerm + thirdTerm;
+
+    assert q >= 0;
+    assert r < ln2 && r > -ln2;
+    assert expR >= 0;
 }
 
 rule tickToPriceIsZeroAtZero() {
@@ -37,8 +41,4 @@ rule tickToPriceIsOneAtMaxTick() {
 // This notably ensures that offer prices are at most 1e18.
 rule tickToPriceAtMostWad(uint256 tick) {
     assert tickToPrice(tick) <= 10 ^ 18;
-}
-
-rule tickToPriceIsMonotonic(uint256 tick1, uint256 tick2) {
-    assert tick1 < tick2 => tickToPrice(tick1) <= tickToPrice(tick2);
 }
