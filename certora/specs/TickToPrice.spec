@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 methods {
-    function lnOnePlusDelta() external returns (int256) envfree;
     function maxTick() external returns (uint256) envfree;
     function wExp(int256 x) external returns (uint256) envfree;
     function tickToPrice(uint256 tick) external returns (uint256) envfree;
