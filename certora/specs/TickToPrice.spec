@@ -29,6 +29,10 @@ rule tickToPriceIsZeroAtZero() {
     assert tickToPrice(0) == 0;
 }
 
+rule tickToPriceIsOneAtMaxTick() {
+    assert tickToPrice(maxTick()) == 10 ^ 18;
+}
+
 // Tick to price is at most 1e18.
 // This notably ensures that offer prices are at most 1e18.
 rule tickToPriceAtMostWad(uint256 tick) {

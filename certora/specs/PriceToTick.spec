@@ -10,9 +10,10 @@ methods {
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 }
 
+// TODO: replace 5820 by max tick definition
 ghost ghostTickToPrice(uint256) returns uint256 {
-    // matches rule tickToPriceAtMostWad in TickToPrice.spec
-    axiom forall uint256 t. ghostTickToPrice(t) <= 10 ^ 18;
+    // matches rule tickToPriceIsOneAtMaxTick in TickToPrice.spec
+    axiom ghostTickToPrice(5820) == 10 ^ 18;
 
     // matches rule tickToPriceIsMonotonic in TickToPrice.spec
     axiom forall uint256 t1. forall uint256 t2. t1 < t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
