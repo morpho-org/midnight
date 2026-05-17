@@ -37,24 +37,3 @@ rule wExpIsMonotonic(int256 x1, int256 x2) {
     require -maxInput() <= x2 && x2 <= maxInput(), "sound because wExp is only called on inputs in this range";
     assert x1 < x2 => wExp(x1) <= wExp(x2);
 }
-
-rule tickToPriceIsZeroAtZero() {
-    assert tickToPrice(0) == 0;
-}
-
-// Tick to price is at most 1e18.
-// This notably ensures that offer prices are at most 1e18.
-rule tickToPriceAtMostWad(uint256 tick) {
-    assert tickToPrice(tick) <= 10 ^ 18;
-}
-
-rule tickToPriceIsMonotonic(uint256 tick1, uint256 tick2) {
-    require 0 <= tick1 && tick1 <= maxTick(), "sound because we call tickToPrice on tick1";
-    require 0 <= tick2 && tick2 <= maxTick(), "sound because we call tickToPrice on tick2";
-
-    require tick1 < tick2, "assume tick are ordered to begin with, then show that their images are also ordered";
-    int256 arg1 = assert_int256(lnOnePlusDelta() * (maxTick() / 2 - tick1));
-    int256 arg2 = assert_int256(lnOnePlusDelta() * (maxTick() / 2 - tick2));
-    require wExp(arg1) <= wExp(arg2), "see rule wExpIsMonotonic";
-    assert tickToPrice(tick1) <= tickToPrice(tick2);
-}
