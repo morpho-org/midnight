@@ -20,7 +20,7 @@ methods {
     // Checks every token pull against the current explicit-payer allowlist.
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
 
-    function _._() external => HAVOC_ALL ALL;
+    function _._() external => HAVOC_ALL;
 
     // Over-approximation for view functions: we are not looking at reverts and they cannot call callbacks.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -106,6 +106,9 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
     makerAllowed = offer.buy && buyerCallback == 0;
 
     buyCallbackAllowed = true;
+    liquidateCallbackAllowed = false;
+    repayCallbackAllowed = false;
+    flashLoanCallbackAllowed = false;
     badPullSeen = false;
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
