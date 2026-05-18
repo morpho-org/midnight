@@ -5,8 +5,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function isHealthy(Midnight.Obligation obligation, bytes32 id, address borrower) external returns (bool) envfree;
-    function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
+    function isHealthy(Midnight.Market market, bytes32 id, address borrower) external returns (bool) envfree;
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
@@ -15,11 +15,11 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    // Deterministic toId summary using a wrapper that extracts all scalar Obligation fields.
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(obligation);
+    // Deterministic toId summary using a wrapper that extracts all scalar Market fields.
+    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market);
 
-    // Skip obligation creation logic: removes the collateral-validation loop.
-    function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
+    // Skip market creation logic: removes the collateral-validation loop.
+    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -48,8 +48,8 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
 }
 
-function summaryToId(Midnight.Obligation obligation) returns bytes32 {
-    return Utils.hashObligation(obligation);
+function summaryToId(Midnight.Market market) returns bytes32 {
+    return Utils.hashMarket(market);
 }
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -69,18 +69,18 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 /// LIF CHARACTERIZATION ///
 
 /// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
-rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    uint256 maxLif = obligation.collateralParams[collateralIndex].maxLif;
+rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
-    bytes32 id = toId(e, obligation);
-    bool maxLifReached = !isHealthy(obligation, id, borrower) || e.block.timestamp >= require_uint256(obligation.maturity + TIME_TO_MAX_LIF());
+    bytes32 id = toId(e, market);
+    bool maxLifReached = !isHealthy(market, id, borrower) || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, 0, repaidUnits, borrower, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, receiver, callback, data);
 
-    mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit floor rounding on seizedAssets) at the oracle price.
     assert (seizedResult + 1) * price >= repaidResult * ORACLE_PRICE_SCALE();
@@ -90,18 +90,18 @@ rule liquidationLifRepaidUnits(env e, Midnight.Obligation obligation, uint256 co
 }
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
-rule liquidationLifSeizedAssets(env e, Midnight.Obligation obligation, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
-    uint256 maxLif = obligation.collateralParams[collateralIndex].maxLif;
+rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
+    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
-    bytes32 id = toId(e, obligation);
-    bool maxLifReached = !isHealthy(obligation, id, borrower) || e.block.timestamp >= require_uint256(obligation.maturity + TIME_TO_MAX_LIF());
+    bytes32 id = toId(e, market);
+    bool maxLifReached = !isHealthy(market, id, borrower) || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, obligation, collateralIndex, seizedAssets, 0, borrower, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, receiver, callback, data);
 
-    mathint price = summaryPrice(obligation.collateralParams[collateralIndex].oracle);
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits) at the oracle price.
     assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();

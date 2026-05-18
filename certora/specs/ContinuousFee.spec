@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => CVL_toId(obligation);
+    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => CVL_toId(market);
 
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -11,7 +11,7 @@ methods {
     function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function IdLib.storeInCode(Midnight.Obligation memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
@@ -28,7 +28,7 @@ methods {
 
 persistent ghost bytes32 lastId;
 
-function CVL_toId(Midnight.Obligation obligation) returns bytes32 {
+function CVL_toId(Midnight.Market market) returns bytes32 {
     // non-deterministic id
     bytes32 id;
     lastId = id;
@@ -45,16 +45,16 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, buyer);
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.market, id, buyer);
 
     require pendingFee(id, buyer) <= creditOf(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
-    require id == lastId, "id should be derived from obligation";
+    require id == lastId, "id should be derived from market";
 
     uint256 contFee = continuousFee(id);
-    uint256 timeToMaturity = e.block.timestamp <= offer.obligation.maturity ? assert_uint256(offer.obligation.maturity - e.block.timestamp) : 0;
+    uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
     mathint creditDelta = creditOf(id, buyer) - postUpdateCredit;
 
@@ -69,13 +69,13 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.obligation, id, seller);
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.market, id, seller);
 
     require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
-    require id == lastId, "id should be derived from obligation";
+    require id == lastId, "id should be derived from market";
 
     uint256 creditAfter = creditOf(id, seller);
     uint256 pendingFeeAfter = pendingFee(id, seller);
@@ -90,16 +90,16 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
 }
 
 // When credit decreases via withdraw, pendingFee decreases by ceil(pendingFee * units / postUpdateCredit).
-rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Obligation obligation, uint256 units, address onBehalf, address receiver) {
+rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
     bytes32 id;
     uint128 postUpdateCredit;
     uint128 postUpdatePendingFee;
 
-    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, obligation, id, onBehalf);
+    postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, market, id, onBehalf);
 
-    withdraw(e, obligation, units, onBehalf, receiver);
+    withdraw(e, market, units, onBehalf, receiver);
 
-    require id == lastId, "id should be derived from obligation";
+    require id == lastId, "id should be derived from market";
 
     // When postUpdateCredit == 0, pendingFee(id, onBehalf) is unchanged on withdraw.
     assert postUpdateCredit == 0 ? pendingFee(id, onBehalf) == postUpdatePendingFee : pendingFee(id, onBehalf) == postUpdatePendingFee - (postUpdatePendingFee * units + postUpdateCredit - 1) / postUpdateCredit;
@@ -114,14 +114,14 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
     uint128 buyerAccruedFee;
     uint128 sellerAccruedFee;
 
-    _, _, buyerAccruedFee = updatePositionView(e, offer.obligation, id, buyer);
-    _, _, sellerAccruedFee = updatePositionView(e, offer.obligation, id, seller);
+    _, _, buyerAccruedFee = updatePositionView(e, offer.market, id, buyer);
+    _, _, sellerAccruedFee = updatePositionView(e, offer.market, id, seller);
 
     uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
-    require id == lastId, "id should be derived from obligation";
+    require id == lastId, "id should be derived from market";
 
     assert continuousFeeCredit(id) == continuousFeeCreditBefore + buyerAccruedFee + sellerAccruedFee;
 }
@@ -137,16 +137,16 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
     uint256 postUpdateCreditBefore;
     uint256 postUpdatePendingFeeBefore;
     uint256 userAccruedFeeBefore;
-    postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.obligation, id, user);
+    postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.market, id, user);
 
     take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
 
-    require id == lastId, "id should be derived from obligation";
+    require id == lastId, "id should be derived from market";
 
     uint256 postUpdateCreditAfter;
     uint256 postUpdatePendingFeeAfter;
     uint256 userAccruedFeeAfter;
-    postUpdateCreditAfter, postUpdatePendingFeeAfter, userAccruedFeeAfter = updatePositionView(e, offer.obligation, id, user);
+    postUpdateCreditAfter, postUpdatePendingFeeAfter, userAccruedFeeAfter = updatePositionView(e, offer.market, id, user);
 
     assert postUpdateCreditBefore == postUpdateCreditAfter;
     assert postUpdatePendingFeeBefore == postUpdatePendingFeeAfter;

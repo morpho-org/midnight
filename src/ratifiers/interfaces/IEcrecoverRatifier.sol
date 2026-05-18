@@ -17,8 +17,16 @@ interface IEcrecoverRatifier is IRatifier {
     error InvalidProof();
     error InvalidSignature();
     error NotMidnight();
+    error RootCanceled();
     error Unauthorized();
+
+    /// EVENTS ///
+    event CancelRoot(address indexed maker, bytes32 indexed root);
+
+    /// FUNCTIONS ///
+    function cancelRoot(address maker, bytes32 root) external;
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
+    function isRootCanceled(address maker, bytes32 root) external view returns (bool);
 }

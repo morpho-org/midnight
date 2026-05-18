@@ -14,8 +14,8 @@ contract TickLibTest is BaseTest {
 
     function testTickToPriceMinMax() public pure {
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(1), 5e12, "tick 1");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 0.999995e18, "tick max - 1");
+        assertEq(TickLib.tickToPrice(2), 1e12, "first non-zero tick");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 1e12, "tick max - 2 just below par");
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
@@ -26,12 +26,12 @@ contract TickLibTest is BaseTest {
     }
 
     function testReturnJumps() public pure {
-        for (uint256 i = 250; i <= 800; i++) {
+        for (uint256 i = 1400; i <= 4600; i++) {
             uint256 previousReturn = _return(TickLib.tickToPrice(i - 1));
             uint256 currentReturn = _return(TickLib.tickToPrice(i));
             assertApproxEqRel(
                 currentReturn.mulDivDown(1e18, previousReturn),
-                0.975e18,
+                0.995e18,
                 0.005e18,
                 string.concat("tick ", vm.toString(i))
             );
@@ -65,12 +65,12 @@ contract TickLibTest is BaseTest {
     function testPriceToTickGreaterThanOne(uint256 price) public {
         price = bound(price, 1 ether + 1, type(uint256).max);
         vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
-        TickLib.priceToTick(price);
+        TickLib.priceToTick(price, 1);
     }
 
     function testPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
-        uint256 tick = TickLib.priceToTick(price);
+        uint256 tick = TickLib.priceToTick(price, 1);
         assertGe(TickLib.tickToPrice(tick), price);
         if (tick > 0) assertLe(TickLib.tickToPrice(tick - 1), price);
     }
@@ -78,7 +78,7 @@ contract TickLibTest is BaseTest {
     function testPriceToTickConsistency() public pure {
         for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 price = TickLib.tickToPrice(tick);
-            uint256 recoveredTick = TickLib.priceToTick(price);
+            uint256 recoveredTick = TickLib.priceToTick(price, 1);
             assertEq(TickLib.tickToPrice(recoveredTick), price);
             assertLe(recoveredTick, tick);
         }
@@ -86,7 +86,7 @@ contract TickLibTest is BaseTest {
 
     function testGasPriceToTick(uint256 price) public pure {
         price = bound(price, 0, 1 ether);
-        TickLib.priceToTick(price);
+        TickLib.priceToTick(price, 1);
     }
 
     function loadExactPrices() internal view returns (uint256[] memory) {
@@ -117,25 +117,31 @@ contract TickLibTest is BaseTest {
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
-            assertLe(absErrorWad, 0.00015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 1.5 bps"));
+            // 3-term Taylor in wExp yields max ~1.7 bps absolute error; 2 bps threshold leaves headroom.
+            assertLe(absErrorWad, 0.0002e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
             if (solPrice > 0.01e18) {
-                assertLe(relErrorWad, 0.001e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.1%"));
+                assertLe(relErrorWad, 0.0015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.15%"));
             }
 
-            // Check exact price is bracketed by adjacent sol prices (only where prices vary per-tick)
-            if (tick > 0 && tick < MAX_TICK) {
-                uint256 prevSolPrice = TickLib.tickToPrice(tick - 1);
-                uint256 nextSolPrice = TickLib.tickToPrice(tick + 1);
-                if (prevSolPrice < solPrice && solPrice < nextSolPrice) {
-                    assertGe(exactPrice, prevSolPrice, string.concat("Tick ", vm.toString(tick), " exact < prev sol"));
-                    assertLe(exactPrice, nextSolPrice, string.concat("Tick ", vm.toString(tick), " exact > next sol"));
-                }
+            // Check exact price is bracketed by adjacent sol prices in the bulk of the range,
+            // away from the rounding-dominated tails.
+            if (solPrice > 0.01e18 && solPrice < 0.99e18) {
+                assertGe(
+                    exactPrice,
+                    TickLib.tickToPrice(tick - 1),
+                    string.concat("Tick ", vm.toString(tick), " exact < prev sol")
+                );
+                assertLe(
+                    exactPrice,
+                    TickLib.tickToPrice(tick + 1),
+                    string.concat("Tick ", vm.toString(tick), " exact > next sol")
+                );
             }
         }
 
         console.log("Max absolute error (wad):", maxAbsErrorWad);
-        console.log("Avg absolute error (wad):", totalAbsErrorWad / MAX_TICK);
+        console.log("Avg absolute error (wad):", totalAbsErrorWad / (MAX_TICK + 1));
         console.log("Max relative error (wad):", maxRelErrorWad);
-        console.log("Avg relative error (wad):", totalRelErrorWad / MAX_TICK);
+        console.log("Avg relative error (wad):", totalRelErrorWad / (MAX_TICK + 1));
     }
 }
