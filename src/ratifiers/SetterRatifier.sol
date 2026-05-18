@@ -8,10 +8,10 @@ import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
-/// To that end, it expects the ratifier data to contain the root of the tree, the leaf index of the offer, and the
+/// To that end, it expects the ratifier data to contain the root of the tree, the leaf index of the offer in the tree, and the
 /// proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// @dev The leaf index determines each sibling's left/right position.
+/// @dev The leaf index determines each hash order during merkle proof verification.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
