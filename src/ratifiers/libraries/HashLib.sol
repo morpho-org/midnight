@@ -62,7 +62,7 @@ library HashLib {
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
             currentHash = leafIndex % 2 == 0 ? hashNode(currentHash, proof[i]) : hashNode(proof[i], currentHash);
-            leafIndex /= 2;
+            leafIndex = leafIndex / 2;
         }
         // leafIndex == 0 is checked to have unicity of the leafIndex.
         return currentHash == root && leafIndex == 0;
