@@ -42,10 +42,6 @@ contract Utils {
         return offer;
     }
 
-    function callbackSuccess() external pure returns (bytes32) {
-        return CALLBACK_SUCCESS;
-    }
-
     function maxTradingFee(uint256 index) external pure returns (uint256) {
         return _maxTradingFee(index);
     }
