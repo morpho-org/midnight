@@ -22,7 +22,7 @@ methods {
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 
-    // Assume that callbacks do not reenter: this is justified as we verify properties about the function's bodies.
+    // Assume that tokens and callbacks do not reenter: this is justified as we verify properties about the function's bodies.
     function Havoc.callHavoc(address) external => HAVOC_ECF;
 }
 
