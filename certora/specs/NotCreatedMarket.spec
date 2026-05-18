@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -14,7 +12,6 @@ methods {
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
-    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
@@ -26,10 +23,6 @@ methods {
 }
 
 /// HELPERS ///
-
-function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
-}
 
 function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
