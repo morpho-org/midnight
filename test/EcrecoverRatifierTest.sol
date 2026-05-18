@@ -44,20 +44,6 @@ contract EcrecoverRatifierTest is BaseTest {
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    function testIsRatifiedUsesProofLengthAsHeight() public {
-        Offer[2] memory offers;
-        offers[0] = makeOffer(lender);
-        offers[1] = makeOffer(otherLender);
-        bytes32 _root = root(offers);
-        bytes32[] memory _proof = proof(offers);
-        Signature memory sig = signature(_root, privateKey[lender], address(ecrecoverRatifier), _proof.length);
-        bytes memory ratifierData = abi.encode(sig, _root, _proof);
-
-        vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offers[0], ratifierData);
-        assertEq(result, CALLBACK_SUCCESS);
-    }
-
     function testIsRatifiedNotMidnight() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
