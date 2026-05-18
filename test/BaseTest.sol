@@ -316,8 +316,9 @@ abstract contract BaseTest is Test {
 
     function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
+        bytes32[] memory _proof = proof(offers);
         Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, _proof.length);
-        return _encodeMerkleRatifierData(_sig, _root, proof(offers));
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
