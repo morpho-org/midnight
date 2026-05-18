@@ -22,7 +22,6 @@ methods {
 
     function _._ external => HAVOC_ALL ALL;
 
-
     // Over-approximation for view functions: we are not looking at reverts and they cannot call callbacks.
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
