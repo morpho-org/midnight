@@ -21,7 +21,7 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Deterministic summary of mulDivDown, which is sound because mulDivDown is deterministic.
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => ghostMulDivDown(x, y, d);
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
@@ -37,6 +37,8 @@ methods {
 /// HELPERS ///
 
 definition WAD() returns uint256 = 10 ^ 18;
+
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
