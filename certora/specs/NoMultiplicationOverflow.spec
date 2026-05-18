@@ -12,8 +12,6 @@
 //
 // Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
 // Storage collateral is uint128, so boundedPrice enforces the product bound against max_uint128.
-// Liquidate also applies it to seizedAssets/repaidUnits via liquidateAmount. This is an
-// integration assumption: arbitrary oracle contracts can still return unconstrained uint256 values.
 
 using Utils as Utils;
 
@@ -44,17 +42,11 @@ methods {
 
 persistent ghost bool mulOverflow;
 
-// Set by noMultiplicationOverflowLiquidate to max(seizedAssets, repaidUnits).
-// 0 elsewhere makes the extra product bound vacuous.
-persistent ghost uint256 liquidateAmount;
-
-// Oracle for collateralIndex in noMultiplicationOverflowLiquidate.
-// Gates liquidateAmount * price to the liquidated collateral's oracle.
-persistent ghost address liquidatedOracle;
-
 /// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;
+
+definition validMaxLif(uint256 x) returns bool = x >= WAD() && x <= 2 * WAD();
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
@@ -63,32 +55,29 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {
     require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => validMaxLif(market.collateralParams[i].maxLif), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
     require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
     return Utils.hashMarket(market);
 }
 
 // Bound every storage collateral (uint128) * oracle price product.
-// For liquidate's uint256 inputs, apply the same bound only to the liquidated collateral's oracle.
 function boundedPrice(address oracle) returns uint256 {
     uint256 price;
     require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collateral (uint128) * price fits in uint256 with mulDivUp rounding headroom";
-    require oracle == liquidatedOracle => to_mathint(liquidateAmount) * price + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "liquidate's seizedAssets/repaidUnits (uint256) * liquidatedCollatPrice fits in uint256 with mulDivUp rounding headroom";
     return price;
 }
 
 // Sound: tickToPrice = 1e36 / (1e18 + wExp(...)) and wExp(x) >= 0, so result <= WAD.
 function boundedTickPrice() returns uint256 {
     uint256 price;
-    require price <= WAD();
+    require price <= WAD(), "Proven in TickToPrice.spec";
     return price;
 }
 
 // Proven in ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
 function maxLifSummary(uint256 lltv) returns uint256 {
     uint256 result;
-    require result >= WAD();
-    require result <= 2 * WAD();
+    require validMaxLif(result), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
     return result;
 }
 
@@ -99,9 +88,9 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     }
 
     uint256 result;
-    require d > 0 => result * d <= product;
-    require d == 0 || y > d || result <= x;
-    require d == 0 || x > d || result <= y;
+    require d > 0 => result * d <= product, "proven in MulDiv.spec (mulDivDownRoundsDown)";
+    require d == 0 || y > d || result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d == 0 || x > d || result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
 
     return result;
 }
@@ -113,66 +102,33 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     }
 
     uint256 result;
-    require d > 0 => result * d <= product + d - 1;
-    require d == 0 || y > d || result <= x;
-    require d == 0 || x > d || result <= y;
+    require d > 0 => result * d <= product + d - 1, "proven in MulDiv.spec (mulDivUpUpperBound)";
+    require d == 0 || y > d || result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d == 0 || x > d || result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
 
     return result;
-}
-
-// See summaryToId for full justification of each bound.
-function requireMarketBounds(Midnight.Market market) {
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
-    require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
-}
-
-// Reset oracle-related ghosts so non-liquidate rules don't carry over the extra product bound.
-function resetOraclePriceAssumption() {
-    liquidateAmount = 0;
-    liquidatedOracle = 0;
 }
 
 /// RULES ///
 
 // Normal calls intentionally scope this proof to non-reverting executions.
-// The liquidate, updatePositionView and isHealthy have dedicated rules.
-rule noMultiplicationOverflow(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector } {
-    resetOraclePriceAssumption();
+// The updatePositionView and isHealthy have dedicated rules.
+rule noMultiplicationOverflow(method f, env e, calldataarg args) filtered { f -> f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector } {
     require !mulOverflow, "prestate: no overflow before call";
     f(e, args);
     assert !mulOverflow;
 }
 
-// View functions take id as a separate parameter (not derived from the obligation),
-// so summaryToId bounds don't apply. Explicit obligation bounds are needed.
-
 rule noMultiplicationOverflowIsHealthy(env e, Midnight.Market market, bytes32 id, address borrower) {
-    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
-    requireMarketBounds(market);
+    require id == summaryToId(market), "id corresponds to market";
     isHealthy(e, market, id, borrower);
     assert !mulOverflow;
 }
 
 rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Market market, bytes32 id, address user) {
-    resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
-    requireMarketBounds(market);
+    require id == summaryToId(market), "id corresponds to market";
     updatePositionView(e, market, id, user);
-    assert !mulOverflow;
-}
-
-// liquidate's seizedAssets/repaidUnits are uint256 function inputs (not the uint128 storage
-// already covered by boundedPrice). Set liquidateAmount to their max and liquidatedOracle to
-// the oracle of collateralIndex so boundedPrice extends the same (amount * price) bound only
-// to that oracle's price (the one actually multiplied with the function inputs).
-rule noMultiplicationOverflowLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    resetOraclePriceAssumption();
-    liquidateAmount = seizedAssets > repaidUnits ? seizedAssets : repaidUnits;
-    liquidatedOracle = market.collateralParams[collateralIndex].oracle;
-    require !mulOverflow, "prestate: assume no overflow before liquidate";
-    requireMarketBounds(market);
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
     assert !mulOverflow;
 }

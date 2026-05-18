@@ -26,7 +26,7 @@ rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
 rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 cursor) {
     require lltv <= WAD(), "see rule createdObligationsHaveLltvLessThanOrEqualToOne";
     require cursor <= WAD() / 2, "see LIQUIDATION_CURSOR_HIGH in ConstantsLib";
-    assert maxLif(lltv, cursor) <= 2 * WAD();
+    assert Utils.maxLif(lltv, cursor) <= 2 * WAD();
 }
 
 /// @dev Strict bound for lltv < WAD: maxLif * lltv <= WAD * (WAD - 1).
