@@ -12,9 +12,9 @@ methods {
     // themselves as payer. Callbacks are checked to only be called by their corresponding function,
     // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer, so we
     // model them with a plain HAVOC_ALL.
-    function _.onBuy(bytes32, Midnight.Obligation, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, allowBuyCallbackAsPayer) expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Obligation, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, allowLiquidateCallback) expect(bytes32);
-    function _.onRepay(bytes32, Midnight.Obligation, uint256, address, bytes) external => onCallBackSummary(calledContract, allowRepayCallbackAsPayer) expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, allowBuyCallbackAsPayer) expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, allowLiquidateCallback) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, allowRepayCallbackAsPayer) expect(bytes32);
     function _.onFlashLoan(address[], uint256[], bytes) external => onCallBackSummary(calledContract, allowFlashLoanCallbackAsPayer) expect(bytes32);
 
     // Checks every token pull against the current explicit-payer allowlist.
@@ -127,8 +127,8 @@ rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filte
     allowedMakerActive = false;
 
     allowBuyCallbackAsPayer = false;
-    allowLiquidateCallback = f.selector == sig:liquidate(Midnight.Obligation, uint256, uint256, uint256, address, address, address, bytes).selector;
-    allowRepayCallbackAsPayer = f.selector == sig:repay(Midnight.Obligation, uint256, address, address, bytes).selector;
+    allowLiquidateCallback = f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector;
+    allowRepayCallbackAsPayer = f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector;
     allowFlashLoanCallbackAsPayer = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
     badPullSeen = false;
 
