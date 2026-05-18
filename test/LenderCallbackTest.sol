@@ -11,6 +11,7 @@ import {ObligationLenderCallback} from "../src/periphery/ObligationLenderCallbac
 
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 
 // TODO: use real vault v2
 contract MockVault {
@@ -21,8 +22,7 @@ contract MockVault {
     }
 
     function withdraw(uint256 assets, address receiver, address) external returns (uint256) {
-        // forge-lint: disable-next-line(erc20-unchecked-transfer) test mock with controlled ERC20.
-        ERC20(asset).transfer(receiver, assets);
+        SafeTransferLib.safeTransfer(asset, receiver, assets);
         return assets;
     }
 }
