@@ -46,7 +46,11 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
-    return Midnight.tickSpacing(summaryToId(market)) > 0;
+    return marketCreated(summaryToId(market));
+}
+
+function marketCreated(bytes32 id) returns (bool) {
+    return Midnight.tickSpacing(id) > 0;
 }
 
 // Show that a created market has at least one collateral.
@@ -67,9 +71,9 @@ strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market mark
 
 // Show that a created market cannot be deleted.
 rule marketCannotBeDeleted(env e, method f, calldataarg args, bytes32 id) {
-    require Midnight.tickSpacing(id) > 0, "Assume that the market is created";
+    require marketCreated(id), "Assume that the market is created";
     f(e, args);
-    assert Midnight.tickSpacing(id) > 0;
+    assert marketCreated(id);
 }
 
 // Show that a market is created after an interaction.
@@ -120,50 +124,50 @@ filtered {
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
 } {
-    require Midnight.tickSpacing(id) == 0, "Assume that the market is not created";
+    require !marketCreated(id), "Assume that the market is not created";
     f(e, args);
-    assert Midnight.tickSpacing(id) == 0;
+    assert !marketCreated(id);
 }
 
 // Show that each market state field is empty if the market is not created.
 strong invariant marketTotalUnitsIsEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => Midnight.totalUnits(id) == 0;
+    !marketCreated(id) => Midnight.totalUnits(id) == 0;
 
 strong invariant marketWithdrawableIsEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => Midnight.withdrawable(id) == 0;
+    !marketCreated(id) => Midnight.withdrawable(id) == 0;
 
 strong invariant marketTradingFeesAreEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => noTradingFeesAreSet(id);
+    !marketCreated(id) => noTradingFeesAreSet(id);
 
 strong invariant marketContinuousFeeIsEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => Midnight.continuousFee(id) == 0;
+    !marketCreated(id) => Midnight.continuousFee(id) == 0;
 
 strong invariant marketContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => currentContract.marketState[id].continuousFeeCredit == 0;
+    !marketCreated(id) => currentContract.marketState[id].continuousFeeCredit == 0;
 
 strong invariant marketLossFactorIsEmptyIfNotCreated(bytes32 id)
-    Midnight.tickSpacing(id) == 0 => currentContract.marketState[id].lossFactor == 0;
+    !marketCreated(id) => currentContract.marketState[id].lossFactor == 0;
 
 strong invariant marketCreditIsEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => Midnight.creditOf(id, user) == 0;
+    !marketCreated(id) => Midnight.creditOf(id, user) == 0;
 
 strong invariant marketDebtIsEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => Midnight.debtOf(id, user) == 0;
+    !marketCreated(id) => Midnight.debtOf(id, user) == 0;
 
 strong invariant marketCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => userHasEmptyCollateralBitmap(id, user);
+    !marketCreated(id) => userHasEmptyCollateralBitmap(id, user);
 
 strong invariant marketPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => userHasNoRemainingContinuousFee(id, user);
+    !marketCreated(id) => userHasNoRemainingContinuousFee(id, user);
 
 strong invariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => userHasNoLastAccrual(id, user);
+    !marketCreated(id) => userHasNoLastAccrual(id, user);
 
 strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, uint256 collateralIndex)
-    Midnight.tickSpacing(id) == 0 => userHasNoCollateral(id, user, collateralIndex);
+    !marketCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
-    Midnight.tickSpacing(id) == 0 => currentContract.position[id][user].lastLossFactor == 0;
+    !marketCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
 function noTradingFeesAreSet(bytes32 id) returns (bool) {
     uint16[7] fees = Midnight.tradingFeeCbps(id);
