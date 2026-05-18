@@ -36,7 +36,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear 
+/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
 /// approximation between breakpoints.
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
@@ -56,7 +56,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at 
+/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
 /// maturity + TIME_TO_MAX_LIF.
 /// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
