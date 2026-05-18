@@ -11,7 +11,7 @@ import {BaseTest} from "./BaseTest.sol";
 contract EcrecoverRatifierTest is BaseTest {
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
         Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
-        return abi.encode(sig, uint256(0), _root, new bytes32[](0));
+        return abi.encode(sig, _root, new bytes32[](0));
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -44,6 +44,20 @@ contract EcrecoverRatifierTest is BaseTest {
         assertEq(result, CALLBACK_SUCCESS);
     }
 
+    function testIsRatifiedUsesProofLengthAsHeight() public {
+        Offer[2] memory offers;
+        offers[0] = makeOffer(lender);
+        offers[1] = makeOffer(otherLender);
+        bytes32 _root = root(offers);
+        bytes32[] memory _proof = proof(offers);
+        Signature memory sig = signature(_root, privateKey[lender], address(ecrecoverRatifier), _proof.length);
+        bytes memory ratifierData = abi.encode(sig, _root, _proof);
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(offers[0], ratifierData);
+        assertEq(result, CALLBACK_SUCCESS);
+    }
+
     function testIsRatifiedNotMidnight() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
@@ -66,9 +80,8 @@ contract EcrecoverRatifierTest is BaseTest {
     function testIsRatifiedInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), uint256(0), _root, new bytes32[](0)
-        );
+        bytes memory ratifierData =
+            abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), _root, new bytes32[](0));
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);

@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, invalidRoot, new bytes32[](0), 0)
+            merkleRatifierData(lenderOffer, invalidRoot, new bytes32[](0))
         );
     }
 
@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, uint256(0), root([lenderOffer]), new bytes32[](0))
+            abi.encode(_sig, root([lenderOffer]), new bytes32[](0))
         );
     }
 
@@ -971,7 +971,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), _path, 0)
+            abi.encode(Signature({v: 0, r: 0, s: 0}), root([lenderOffer]), _path)
         );
     }
 
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _path, 1)
+            abi.encode(Signature({v: 0, r: 0, s: 0}), root([lenderOffer, otherOffer]), _path)
         );
     }
 

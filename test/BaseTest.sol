@@ -224,8 +224,9 @@ abstract contract BaseTest is Test {
 
     function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
+        bytes32[] memory _proof = proof(offers);
+        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, _proof.length);
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
@@ -305,41 +306,42 @@ abstract contract BaseTest is Test {
         return _signature;
     }
 
-    function _encodeMerkleRatifierData(Signature memory _sig, uint256 _height, bytes32 _root, bytes32[] memory _proof)
+    function _encodeMerkleRatifierData(Signature memory _sig, bytes32 _root, bytes32[] memory _proof)
         internal
         pure
         returns (bytes memory)
     {
-        return abi.encode(_sig, _height, _root, _proof);
+        return abi.encode(_sig, _root, _proof);
     }
 
     function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
+        bytes32[] memory _proof = proof(offers);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, _proof.length);
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1);
-        return _encodeMerkleRatifierData(_sig, 1, _root, _proof);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, _proof.length);
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2);
-        return _encodeMerkleRatifierData(_sig, 2, _root, _proof);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, _proof.length);
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
     /// the signed root or the proof is intentionally inconsistent with the offer.
-    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
+    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof)
         internal
         view
         returns (bytes memory)
     {
-        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
-        return _encodeMerkleRatifierData(_sig, _height, _root, _proof);
+        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _proof.length);
+        return _encodeMerkleRatifierData(_sig, _root, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
