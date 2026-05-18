@@ -47,6 +47,10 @@ function cvlSafeTransferFrom(address token, address from, address to, uint256 am
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
 }
 
+function marketIsCreated(bytes32 id) returns (bool) {
+    return tickSpacing(id) > 0;
+}
+
 /// ROLE SETTER: LIVENESS ///
 
 rule roleSetterCanChangeRoleSetter(env e, address newRoleSetter) {
@@ -124,11 +128,11 @@ rule feeSetterCanSetMarketTradingFee(env e, bytes32 id, uint256 index, uint256 n
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
     bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % CBP() == 0;
-    bool marketExists = tickSpacing(id) > 0;
+    bool marketIsCreated = marketIsCreated(id);
 
     setMarketTradingFee@withrevert(e, id, index, newTradingFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && marketExists;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && marketIsCreated;
     assert !reverted => marketTradingFee(id, index) == newTradingFee;
 }
 
@@ -145,11 +149,11 @@ rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, u
 
 rule feeSetterCanSetMarketContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
     address feeSetterBefore = feeSetter();
-    bool marketExists = tickSpacing(id) > 0;
+    bool marketIsCreated = marketIsCreated(id);
 
     setMarketContinuousFee@withrevert(e, id, newContinuousFee);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && marketExists;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && newContinuousFee <= MAX_CONTINUOUS_FEE() && marketIsCreated;
     assert !reverted => continuousFee(id) == newContinuousFee;
 }
 
@@ -167,7 +171,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 
 /// Once a market is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeMarketContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require tickSpacing(id) > 0, "market must exist";
+    require marketIsCreated(id), "market must exist";
     uint32 continuousFeeBefore = continuousFee(id);
     address feeSetterBefore = feeSetter();
 
@@ -189,13 +193,13 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
 
 rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
     address tickSpacingSetterBefore = tickSpacingSetter();
-    bool marketExists = tickSpacing(id) > 0;
+    bool marketIsCreated = marketIsCreated(id);
     uint8 tickSpacingBefore = tickSpacing(id);
     bool validNewTickSpacing = newTickSpacing > 0 && tickSpacingBefore % newTickSpacing == 0;
 
     setMarketTickSpacing@withrevert(e, id, newTickSpacing);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && marketExists && validNewTickSpacing;
+    assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && marketIsCreated && validNewTickSpacing;
     assert !reverted => to_mathint(tickSpacing(id)) == to_mathint(newTickSpacing);
 }
 
@@ -203,7 +207,7 @@ rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTick
 
 /// Once a market is created, only the tick spacing setter can modify its tick spacing.
 rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
-    require tickSpacing(id) > 0, "market must exist";
+    require marketIsCreated(id), "market must exist";
     uint8 tickSpacingBefore = tickSpacing(id);
     address tickSpacingSetterBefore = tickSpacingSetter();
 
@@ -249,7 +253,7 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     require user != currentContract && user != receiver;
     bytes32 id = toId(e, market);
     address feeClaimerBefore = feeClaimer();
-    bool marketExists = tickSpacing(id) > 0;
+    bool marketIsCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
     uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
@@ -259,7 +263,7 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
 
     claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketExists && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketIsCreated && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
