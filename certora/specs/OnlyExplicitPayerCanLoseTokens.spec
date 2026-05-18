@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
-using Havoc as callback;
+using Havoc as callbackHavoc;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -12,10 +12,10 @@ methods {
     // themselves as payer. Callbacks are checked to only be called by their corresponding function,
     // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer, so we
     // model them with a plain HAVOC_ALL.
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, allowBuyCallbackAsPayer) expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, allowLiquidateCallback) expect(bytes32);
-    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, allowRepayCallbackAsPayer) expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => onCallBackSummary(calledContract, allowFlashLoanCallbackAsPayer) expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, buyCallbackAllowed) expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
+    function _.onFlashLoan(address[], uint256[], bytes) external => onCallBackSummary(calledContract, flashLoanCallbackAllowed) expect(bytes32);
 
     // Checks every token pull against the current explicit-payer allowlist.
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
@@ -27,43 +27,43 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 }
 
-persistent ghost address topLevelCaller;
+persistent ghost address msgSender;
 
-persistent ghost bool topLevelCallerAllowed;
+persistent ghost bool msgSenderAllowed;
 
-persistent ghost address allowedCallbackPayer;
+persistent ghost address callback;
 
-persistent ghost bool allowedCallbackPayerActive;
+persistent ghost bool callbackAllowed;
 
-persistent ghost bool allowBuyCallbackAsPayer;
+persistent ghost bool buyCallbackAllowed;
 
-persistent ghost bool allowLiquidateCallback;
+persistent ghost bool liquidateCallbackAllowed;
 
-persistent ghost bool allowRepayCallbackAsPayer;
+persistent ghost bool repayCallbackAllowed;
 
-persistent ghost bool allowFlashLoanCallbackAsPayer;
+persistent ghost bool flashLoanCallbackAllowed;
 
 /// Tracks the maker address from a validated offer.
-persistent ghost address allowedMaker;
+persistent ghost address maker;
 
-persistent ghost bool allowedMakerActive;
+persistent ghost bool makerAllowed;
 
 persistent ghost bool badPullSeen;
 
 function triggerHavocAll() {
     address dummy;
     env e;
-    callback.callHavoc(e, dummy);
+    callbackHavoc.callHavoc(e, dummy);
 }
 
 function onCallBackSummary(address callbackAddress, bool allowedCallback) returns (bytes32) {
     assert allowedCallback;
     bytes32 result;
     triggerHavocAll();
-    allowedCallbackPayer = callbackAddress;
+    callback = callbackAddress;
     if (result == Utils.callbackSuccess()) {
-        assert allowedCallbackPayerActive == false;
-        allowedCallbackPayerActive = true;
+        assert callbackAllowed == false;
+        callbackAllowed = true;
     }
     return result;
 }
@@ -76,13 +76,13 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 
     triggerHavocAll();
 
-    if (topLevelCallerAllowed && src == topLevelCaller) {
+    if (msgSenderAllowed && src == msgSender) {
         return true;
     }
-    if (allowedCallbackPayerActive && src == allowedCallbackPayer) {
+    if (callbackAllowed && src == callback) {
         return true;
     }
-    if (allowedMakerActive && src == allowedMaker) {
+    if (makerAllowed && src == maker) {
         return true;
     }
 
@@ -99,16 +99,13 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
 
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
 
-    topLevelCaller = e.msg.sender;
-    topLevelCallerAllowed = !offer.buy && buyerCallback == 0;
-    allowedCallbackPayerActive = false;
-    allowedMaker = offer.maker;
-    allowedMakerActive = offer.buy && buyerCallback == 0;
+    msgSender = e.msg.sender;
+    msgSenderAllowed = !offer.buy && buyerCallback == 0;
+    callbackAllowed = false;
+    maker = offer.maker;
+    makerAllowed = offer.buy && buyerCallback == 0;
 
-    allowBuyCallbackAsPayer = true;
-    allowLiquidateCallback = false;
-    allowRepayCallbackAsPayer = false;
-    allowFlashLoanCallbackAsPayer = false;
+    buyCallbackAllowed = true;
     badPullSeen = false;
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
@@ -121,15 +118,15 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
 rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector } {
     require e.msg.sender != currentContract, "only external calls";
 
-    topLevelCaller = e.msg.sender;
-    topLevelCallerAllowed = true;
-    allowedCallbackPayerActive = false;
-    allowedMakerActive = false;
+    msgSender = e.msg.sender;
+    msgSenderAllowed = true;
+    callbackAllowed = false;
+    makerAllowed = false;
 
-    allowBuyCallbackAsPayer = false;
-    allowLiquidateCallback = f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector;
-    allowRepayCallbackAsPayer = f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector;
-    allowFlashLoanCallbackAsPayer = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
+    buyCallbackAllowed = false;
+    liquidateCallbackAllowed = f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector;
+    repayCallbackAllowed = f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector;
+    flashLoanCallbackAllowed = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
     badPullSeen = false;
 
     f(e, args);
