@@ -54,9 +54,9 @@ persistent ghost address liquidatedOracle;
 
 /// SUMMARIES ///
 
-definition WAD() returns uint256 = 1000000000000000000;
+definition WAD() returns uint256 = 10 ^ 18;
 
-definition ORACLE_PRICE_SCALE() returns uint256 = 1000000000000000000000000000000000000;
+definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 // Proven in CreatedMarkets.spec (createdMarketsHaveLltvLessThanOrEqualToOne)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
@@ -73,7 +73,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 function boundedPrice(address oracle) returns uint256 {
     uint256 price;
     require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collateral (uint128) * price fits in uint256 with mulDivUp rounding headroom";
-    require oracle != liquidatedOracle || to_mathint(liquidateAmount) * price + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "liquidate's seizedAssets/repaidUnits (uint256) * liquidatedCollatPrice fits in uint256 with mulDivUp rounding headroom";
+    require oracle == liquidatedOracle => to_mathint(liquidateAmount) * price + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "liquidate's seizedAssets/repaidUnits (uint256) * liquidatedCollatPrice fits in uint256 with mulDivUp rounding headroom";
     return price;
 }
 
@@ -136,7 +136,7 @@ function resetOraclePriceAssumption() {
 /// RULES ///
 
 // Normal calls intentionally scope this proof to non-reverting executions.
-// Exclude liquidate (dedicated input bound) and view functions with arbitrary ids.
+// The liquidate, updatePositionView and isHealthy have dedicated rules.
 rule noMultiplicationOverflow(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector } {
     resetOraclePriceAssumption();
     require !mulOverflow, "prestate: no overflow before call";
