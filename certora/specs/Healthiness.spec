@@ -11,19 +11,15 @@ methods {
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
 
-    /* Assumption: price does not change during rules.
-     * Under this assumption we can prove that a healthy borrower cannot get unhealthy by
-     * any action on the contract.
-     */
+    // Assumption: price does not change during rules.
+    // Under this assumption we can prove that a healthy borrower cannot get unhealthy by any action on the contract.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
 
-    /* Summarize mulDivDown and mulDivUp to simplify the verification task.
-     * Use a ghost function that ensures mulDivDown/Up behaves deterministically and
-     * add only the axioms about mulDiv that are needed to prove the desired property.
-     * The axioms are proved in MulDiv.spec.
-     */
+    // Summarize mulDivDown and mulDivUp to simplify the verification task.
+    // Use a ghost function that ensures mulDivDown/Up behaves deterministically and add only the axioms about mulDiv that are needed to prove the desired property.
+    // The axioms are proved in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;

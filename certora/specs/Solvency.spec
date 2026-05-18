@@ -85,7 +85,7 @@ function CVL_toId(Midnight.Market market, uint256 chainId, address midnight) ret
 
 // Mapping from token to flashloan amount.
 // We use persistent ghost to ensure these values are not changed by the callback.
-// This is sound as we prove the rule flashLoansPaidBack which ensures that the flashloan amount after the callback is the same as before.
+// This is justified as we prove the rule flashloanspaidback which ensures that the flashloan amount after the callback is the same as before.
 persistent ghost mapping(address => mathint) flashloans {
     init_state axiom (forall address token. flashloans[token] == 0);
 }

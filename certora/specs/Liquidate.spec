@@ -3,6 +3,12 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
+    function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
+
     // Oracle summary: we assume the price does not change during the execution of a transaction.
     function _.price() external => PER_CALLEE_CONSTANT;
 
@@ -13,12 +19,6 @@ methods {
 
     // IdLib summary: remember the last id returned by toId.
     function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
-
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
-    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
-    function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
 }
 
 /// HELPERS ///

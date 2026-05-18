@@ -11,7 +11,7 @@ methods {
     function toId(Midnight.Market) external returns (bytes32) envfree;
     function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
 
-    // Over-approximate view functions for prover performance.
+    // Over-approximate view functions.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 

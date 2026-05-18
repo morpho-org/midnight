@@ -28,6 +28,7 @@ methods {
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
 
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
+    // This is justified because the properties we verify are about the effect of each function's own body on the state, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.isRatified(Midnight.Offer offer, bytes) external => CVL_isRatified(offer) expect(bytes32);

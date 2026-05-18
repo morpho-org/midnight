@@ -9,6 +9,7 @@ methods {
 
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
@@ -48,7 +49,6 @@ methods {
 
     // The function toMarket is not used by the protocol.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);

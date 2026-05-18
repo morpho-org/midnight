@@ -19,9 +19,11 @@ methods {
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
-    // Assumption: token transfers do not revert and do not re-enter Midnight.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
+
+    // Assume that callbacks do not reenter: this is justified as we verify properties about the function's bodies.
+    function Havoc.callHavoc(address) external => HAVOC_ECF;
 }
 
 /// HELPERS ///
@@ -43,8 +45,13 @@ function cvlSafeTransfer(address token, address receiver, uint256 amount) {
 }
 
 function cvlSafeTransferFrom(address token, address from, address to, uint256 amount) {
+    bool shouldRevert;
+    if (shouldRevert) {
+        revert();
+    }
     tokenBalance[token][from] = tokenBalance[token][from] - amount;
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
+    Havoc.callHavoc(currentContract);
 }
 
 function marketIsCreated(bytes32 id) returns (bool) {
