@@ -35,18 +35,27 @@ persistent ghost summaryPrice(address) returns uint256;
 persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
     /* proved in mulDivZero in MulDiv.spec */
     axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(0, b, d) == 0;
-    /* floor lower bound: mulDivDown(a, b, d) * d <= a * b */
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(a, b, d) * d <= a * b;
-    /* floor strictness: (mulDivDown(a, b, d) + 1) * d > a * b */
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
 }
 
-persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint {
-    /* ceil upper bound: mulDivUp(a, b, d) * d >= a * b */
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => summaryMulDivUpM(a, b, d) * d >= a * b;
-    /* ceil strictness: (mulDivUp(a, b, d) - 1) * d < a * b (when result > 0) */
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && summaryMulDivUpM(a, b, d) > 0 => (summaryMulDivUpM(a, b, d) - 1) * d < a * b;
-}
+persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint;
+
+/* Axioms exposed as definitions so each rule opts in via `require forall ... axiomX(...)`.
+ * Keeps quantifier instantiation scoped to the rules that need each axiom.
+ * Proved in MulDiv.spec.
+ */
+
+/* floor lower bound: mulDivDown(a, b, d) * d <= a * b */
+definition axiomDownLowerBound(mathint a, mathint b, mathint d) returns bool =
+    0 <= a && 0 <= b && 0 < d => summaryMulDivDownM(a, b, d) * d <= a * b;
+
+/* floor strictness: (mulDivDown(a, b, d) + 1) * d > a * b — pins the ghost to the
+ * actual floor of a*b/d. Without this the SMT can under-approximate and pick 0. */
+definition axiomDownStrictness(mathint a, mathint b, mathint d) returns bool =
+    0 <= a && 0 <= b && 0 < d => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
+
+/* ceil upper bound: mulDivUp(a, b, d) * d >= a * b */
+definition axiomUpUpperBound(mathint a, mathint b, mathint d) returns bool =
+    0 <= a && 0 <= b && 0 < d => summaryMulDivUpM(a, b, d) * d >= a * b;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -115,9 +124,62 @@ function summaryToId(Midnight.Market market, uint256 chainId, address midnight) 
 
 //// RULES //////
 
+// Concrete-market version of healthyAfterMaxRcfLiquidationSingleCollateral:
+// pins every globalMarket* ghost to a specific value so the obligation is fully
+// determined. Useful as a sanity check and as a faster-to-verify variant.
+rule concreteHealthyAfterMaxRcfLiquidationSingleCollateral(env e, uint256 seizedAssets, uint256 repaidUnits, address receiver, address callbackAddr, bytes data) {
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownLowerBound(a, b, d), "floor lower bound on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownStrictness(a, b, d), "floor strictness on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomUpUpperBound(a, b, d), "ceil upper bound on mulDivUp";
+
+    // Pin the market to concrete values via the globalMarket* ghosts; equalsGlobalMarket
+    // then matches a Market with these fields, and summaryToId returns globalId.
+    require globalMarketLoanToken == 0x0000000000000000000000000000000000001001;
+    require globalMarketCollateralLength == 1;
+    require globalMarketCollateralOracle[0] == 0x0000000000000000000000000000000000001003;
+    require globalMarketCollateralToken[0] == 0x0000000000000000000000000000000000001002;
+    require globalMarketCollateralLLTV[0] == 770000000000000000;          // 0.77 * WAD
+    require globalMarketCollateralMaxLif[0] == 1061007957559681697;       // ~1.061 * WAD
+    require globalMarketMaturity == 2000000000;
+    require globalMarketRcfThreshold == 0;
+    require globalMarketEnterGate == 0;
+    require globalMarketLiquidatorGate == 0;
+
+    Midnight.Market globalMarket = getGlobalMarket();
+
+    uint256 lltv = globalMarketCollateralLLTV[0];
+    uint256 maxLif = globalMarketCollateralMaxLif[0];
+    uint256 lifTimesLltv = summaryMulDivUp(maxLif, lltv, WAD());
+    require lifTimesLltv < WAD(), "maxLif * lltv < 1 so the RCF denominator (1 - maxLif * lltv) is positive";
+
+    uint256 price = summaryPrice(globalMarketCollateralOracle[0]);
+    uint256 collatBefore = collateral(globalId, globalBorrower, 0);
+    uint256 debtBefore = debtOf(globalId, globalBorrower);
+
+    require collatBefore > 0, "borrower has collateral to seize";
+    require e.block.timestamp < globalMarketMaturity, "ensure RCF condition is activated";
+
+    uint256 maxDebt = summaryMulDivDown(summaryMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()), lltv, WAD());
+    require debtBefore > maxDebt, "position is unhealthy before liquidation";
+
+    uint256 rcfCap = summaryMulDivUp(assert_uint256(debtBefore - maxDebt), WAD(), assert_uint256(WAD() - lifTimesLltv));
+
+    uint256 actualSeized;
+    uint256 actualRepaid;
+
+    actualSeized, actualRepaid = liquidate(e, globalMarket, 0, seizedAssets, repaidUnits, globalBorrower, receiver, callbackAddr, data);
+
+    require actualRepaid == rcfCap, "max allowed to be repaid by RCF condition is repaid";
+    assert isHealthyNoBitmap(globalMarket, globalId, globalBorrower);
+}
+
 // Single-collateral variant of healthyAfterMaxRcfLiquidation: pins
 // globalMarketCollateralLength == 1 so the only valid collateralIndex is 0.
 rule healthyAfterMaxRcfLiquidationSingleCollateral(env e, uint256 seizedAssets, uint256 repaidUnits, address receiver, address callbackAddr, bytes data) {
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownLowerBound(a, b, d), "floor lower bound on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownStrictness(a, b, d), "floor strictness on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomUpUpperBound(a, b, d), "ceil upper bound on mulDivUp";
+
     require globalMarketCollateralLength == 1, "single collateral asset";
 
     Midnight.Market globalMarket = getGlobalMarket();
@@ -153,6 +215,10 @@ rule healthyAfterMaxRcfLiquidationSingleCollateral(env e, uint256 seizedAssets, 
 // leaves the position healthy. The market is bound to the global ghosts via
 // getGlobalMarket(), so storage keys come from globalId.
 rule healthyAfterMaxRcfLiquidation(env e, uint256 seizedAssets, uint256 repaidUnits, address receiver, address callbackAddr, bytes data) {
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownLowerBound(a, b, d), "floor lower bound on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomDownStrictness(a, b, d), "floor strictness on mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. axiomUpUpperBound(a, b, d), "ceil upper bound on mulDivUp";
+
     require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
     uint256 collateralIndex;
