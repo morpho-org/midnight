@@ -30,6 +30,10 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
+function marketIsCreated(Midnight.Market market) returns (bool) {
+    return tickSpacing(summaryToId(market)) > 0;
+}
+
 /// The market's lossFactor is only modified by liquidate.
 rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
@@ -68,7 +72,7 @@ rule updatePositionSyncsLastLossFactor(env e, Midnight.Market market, address us
 rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require tickSpacing(id) > 0, "market must be created";
+    require marketIsCreated(market), "market must be created";
     require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
@@ -86,7 +90,7 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address bor
     bytes32 id = summaryToId(market);
 
     require data.length == 0, "no callback to avoid unrelated external call reverts";
-    require tickSpacing(id) > 0, "market must be created";
+    require marketIsCreated(market), "market must be created";
     require market.liquidatorGate == 0, "Assumption:no liquidator gate";
     require market.collateralParams.length > 0, "market has at least one collateral (enforced by touchMarket)";
     require !liquidationLocked(id, borrower), "liquidation not locked (transient storage is zero at transaction start)";
