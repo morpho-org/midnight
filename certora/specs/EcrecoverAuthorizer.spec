@@ -2,12 +2,10 @@
 
 // Signature verification is verified in tests.
 
-using Midnight as midnight;
-
 methods {
     function nonce(address) external returns (uint256) envfree;
     function MIDNIGHT() external returns (address) envfree;
-    function midnight.isAuthorized(address, address) external returns (bool) envfree;
+    function Midnight.isAuthorized(address, address) external returns (bool) envfree;
 }
 
 /// EcrecoverAuthorizer increments nonce on success and does not change other nonces.
