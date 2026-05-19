@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, invalidRoot, new bytes32[](0), 0)
+            merkleRatifierData(lenderOffer, 0, invalidRoot, 0, new bytes32[](0))
         );
     }
 
@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, uint256(0), root([lenderOffer]), new bytes32[](0))
+            abi.encode(_sig, 0, root([lenderOffer]), 0, new bytes32[](0))
         );
     }
 
@@ -960,8 +960,8 @@ contract TakeTest is BaseTest {
         midnight.take(0, sender, address(0), hex"", sender, lenderOffer, _ratifierData);
     }
 
-    function testTakeInvalidPathOneLeaf(bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
+    function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
@@ -971,13 +971,13 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer]), _path, 0)
+            merkleRatifierData(lenderOffer, 0, root([lenderOffer]), 0, _proof)
         );
     }
 
-    function testTakeInvalidPathTwoLeaves(Offer memory otherOffer, bytes32[] memory _path) public {
-        vm.assume(_path.length >= 1);
-        vm.assume(_path[0] != HashLib.hashOffer(otherOffer));
+    function testTakeInvalidProof2LeavesWrongLeafHash(Offer memory otherOffer, bytes32[] memory _proof) public {
+        vm.assume(_proof.length >= 1);
+        vm.assume(_proof[0] != HashLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
@@ -987,7 +987,23 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), _path, 1)
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, _proof)
+        );
+    }
+
+    function testTakeInvalidProof2LeavesWrongLeafIndex(Offer memory otherOffer) public {
+        bytes32[] memory _proof = new bytes32[](1);
+        _proof[0] = HashLib.hashOffer(otherOffer);
+        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
+        vm.prank(borrower);
+        midnight.take(
+            100,
+            borrower,
+            address(0),
+            hex"",
+            borrower,
+            lenderOffer,
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 1, _proof)
         );
     }
 
@@ -1006,11 +1022,11 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData([lenderOffer, otherOffer], proof([lenderOffer, otherOffer]))
+            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
         );
     }
 
-    // Adding salt to the expiry to test different ordering (see commutativeHash).
+    // Adding salt to the expiry to test different leaf hashes.
     function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
         public
     {
@@ -1040,7 +1056,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer0,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofFirstLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer0, 2, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1052,7 +1070,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer1,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofSecondLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer1, 2, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1064,7 +1084,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer2,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofThirdLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer2, 2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
+            )
         );
 
         vm.revertToState(snapshot);
@@ -1076,7 +1098,9 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             offer3,
-            merkleRatifierData([offer0, offer1, offer2, offer3], proofFourthLeaf([offer0, offer1, offer2, offer3]))
+            merkleRatifierData(
+                offer3, 2, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
+            )
         );
     }
 
