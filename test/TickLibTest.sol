@@ -5,7 +5,7 @@ import {BaseTest} from "./BaseTest.sol";
 import {console} from "forge-std/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {LN_ONE_PLUS_DELTA, MAX_TICK} from "../src/libraries/TickLib.sol";
 
 contract TickLibTest is BaseTest {
     using UtilsLib for uint256;
@@ -22,6 +22,21 @@ contract TickLibTest is BaseTest {
     function testTickMonotonicity() public pure {
         for (uint256 i = 0; i < MAX_TICK; i++) {
             assertGe(TickLib.tickToPrice(i + 1), TickLib.tickToPrice(i));
+        }
+    }
+
+    function testWExpMonotonicityOnTickToPriceDomain() public pure {
+        // forge-lint: disable-next-line(unsafe-typecast) as MAX_TICK / 2 < type(int256).max.
+        int256 halfMaxTick = int256(MAX_TICK / 2);
+        for (uint256 tick = 0; tick < MAX_TICK; tick++) {
+            // forge-lint: disable-next-line(unsafe-typecast) as tick < MAX_TICK < type(int256).max.
+            int256 currentTick = int256(tick);
+            // forge-lint: disable-next-line(unsafe-typecast) as tick + 1 <= MAX_TICK < type(int256).max.
+            int256 nextTick = int256(tick + 1);
+            int256 current = LN_ONE_PLUS_DELTA * (halfMaxTick - currentTick);
+            int256 next = LN_ONE_PLUS_DELTA * (halfMaxTick - nextTick);
+
+            assertGe(TickLib.wExp(current), TickLib.wExp(next));
         }
     }
 
