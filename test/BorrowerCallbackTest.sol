@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -15,7 +15,7 @@ contract BorrowerCallbackTest is BaseTest {
     using UtilsLib for uint256;
 
     BorrowerCallback internal borrowerCallback;
-    Obligation internal obligation;
+    Market internal obligation;
     bytes32 internal id;
     Offer internal borrowerOffer;
 
@@ -53,7 +53,7 @@ contract BorrowerCallbackTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.market = obligation;
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -139,7 +139,7 @@ contract BorrowerCallbackTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = units;
-        lenderOffer.obligation = obligation;
+        lenderOffer.market = obligation;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -171,16 +171,14 @@ contract BorrowerCallbackTest is BaseTest {
             abi.encode(collateralData),
             borrower,
             lenderOffer,
-            ratifierData([lenderOffer]),
-            root([lenderOffer]),
-            proof([lenderOffer])
+            merkleRatifierData([lenderOffer])
         );
 
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
     function testOnSellUnauthorized() public {
-        Obligation memory ob;
+        Market memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");

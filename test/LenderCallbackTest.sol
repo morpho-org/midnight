@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Obligation, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, LLTV_2} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -31,7 +31,7 @@ contract VaultLenderCallbackTest is BaseTest {
     using UtilsLib for uint256;
 
     VaultLenderCallback internal vaultLenderCallback;
-    Obligation internal obligation;
+    Market internal obligation;
     bytes32 internal id;
     Offer internal borrowerOffer;
 
@@ -69,7 +69,7 @@ contract VaultLenderCallbackTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.market = obligation;
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -95,7 +95,7 @@ contract VaultLenderCallbackTest is BaseTest {
         lenderOffer.callback = address(vaultLenderCallback);
         lenderOffer.callbackData = abi.encode(address(vault));
         lenderOffer.maxUnits = units;
-        lenderOffer.obligation = obligation;
+        lenderOffer.market = obligation;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -132,9 +132,7 @@ contract VaultLenderCallbackTest is BaseTest {
             abi.encode(address(vault)),
             address(0),
             borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
+            merkleRatifierData([borrowerOffer])
         );
 
         assertEq(midnight.creditOf(id, lender), units);
@@ -143,7 +141,7 @@ contract VaultLenderCallbackTest is BaseTest {
     }
 
     function testOnBuyUnauthorized() public {
-        Obligation memory ob;
+        Market memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
@@ -154,7 +152,7 @@ contract ObligationLenderCallbackTest is BaseTest {
     using UtilsLib for uint256;
 
     ObligationLenderCallback internal obligationLenderCallback;
-    Obligation internal obligation;
+    Market internal obligation;
     bytes32 internal id;
     Offer internal borrowerOffer;
 
@@ -192,7 +190,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.obligation = obligation;
+        borrowerOffer.market = obligation;
         borrowerOffer.ratifier = address(ecrecoverRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -203,7 +201,7 @@ contract ObligationLenderCallbackTest is BaseTest {
     }
 
     /// @dev Helper to set up obligation2 with lender credit and withdrawable funds.
-    function _setupMidnightSource(uint256 buyerAssets) internal returns (Obligation memory obligation2, bytes32 id2) {
+    function _setupMidnightSource(uint256 buyerAssets) internal returns (Market memory obligation2, bytes32 id2) {
         obligation2.loanToken = address(loanToken);
         obligation2.maturity = block.timestamp + 200;
         obligation2.collateralParams = obligation.collateralParams;
@@ -218,7 +216,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         lenderOffer2.buy = true;
         lenderOffer2.maker = lender;
         lenderOffer2.maxUnits = buyerAssets;
-        lenderOffer2.obligation = obligation2;
+        lenderOffer2.market = obligation2;
         lenderOffer2.ratifier = address(ecrecoverRatifier);
         lenderOffer2.expiry = block.timestamp + 300;
         lenderOffer2.tick = MAX_TICK;
@@ -250,7 +248,7 @@ contract ObligationLenderCallbackTest is BaseTest {
         lenderOffer.callback = address(obligationLenderCallback);
         lenderOffer.callbackData = abi.encode(address(uint160(uint256(id2))));
         lenderOffer.maxUnits = units;
-        lenderOffer.obligation = obligation;
+        lenderOffer.market = obligation;
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
@@ -285,9 +283,7 @@ contract ObligationLenderCallbackTest is BaseTest {
             abi.encode(address(uint160(uint256(id2)))),
             address(0),
             borrowerOffer,
-            ratifierData([borrowerOffer]),
-            root([borrowerOffer]),
-            proof([borrowerOffer])
+            merkleRatifierData([borrowerOffer])
         );
 
         assertEq(midnight.creditOf(id, lender), units);
@@ -296,7 +292,7 @@ contract ObligationLenderCallbackTest is BaseTest {
     }
 
     function testOnBuyUnauthorized() public {
-        Obligation memory ob;
+        Market memory ob;
         vm.prank(makeAddr("attacker"));
         vm.expectRevert("unauthorized");
         obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");

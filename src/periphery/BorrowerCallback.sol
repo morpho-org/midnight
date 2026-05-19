@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {Obligation} from "../interfaces/IMidnight.sol";
+import {Market} from "../interfaces/IMidnight.sol";
 import {Midnight} from "../Midnight.sol";
 import {ISellCallback} from "../interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
@@ -21,7 +21,7 @@ contract BorrowerCallback is ISellCallback {
 
     /// @dev Callback to supply collateral on behalf of borrower.
     /// @dev The callback contract should be authorized to supply collateral on behalf of the borrower.
-    function onSell(bytes32, Obligation memory obligation, address seller, uint256, uint256, bytes memory data)
+    function onSell(bytes32, Market memory market, address seller, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -29,7 +29,7 @@ contract BorrowerCallback is ISellCallback {
         CollateralData[] memory collateralData = abi.decode(data, (CollateralData[]));
         for (uint256 i = 0; i < collateralData.length; i++) {
             Midnight(MIDNIGHT)
-                .supplyCollateral(obligation, collateralData[i].collateralIndex, collateralData[i].amount, seller);
+                .supplyCollateral(market, collateralData[i].collateralIndex, collateralData[i].amount, seller);
         }
         return CALLBACK_SUCCESS;
     }
