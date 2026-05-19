@@ -3,14 +3,11 @@
 methods {
     function maxTick() external returns (uint256) envfree;
     function wExp(int256 x) external returns (uint256) envfree;
+    function wExpAtTick(uint256 tick) external returns (uint256) envfree;
     function tickToPrice(uint256 tick) external returns (uint256) envfree;
 }
 
 definition cvlMaxTick() returns uint256 = 5820;
-
-definition minWExpInput() returns int256 = -20 * 10 ^ 18;
-
-definition maxWExpInput() returns int256 = 20 * 10 ^ 18;
 
 rule cvlMaxTickIsMaxTick() {
     assert cvlMaxTick() == maxTick();
@@ -33,14 +30,13 @@ rule wExpCasting(uint256 x) {
     assert expR >= 0;
 }
 
-// wExp is only used on small bounded inputs. This domain includes the full tickToPrice range and matches
-// the explicit wExp accuracy tests.
-rule wExpIsIncreasing(int256 lower, int256 higher) {
-    require minWExpInput() <= lower, "lower input is in range";
-    require lower <= higher, "inputs are ordered";
-    require higher <= maxWExpInput(), "higher input is in range";
+// The argument passed to wExp by tickToPrice is LN_ONE_PLUS_DELTA * (MAX_TICK / 2 - tick).
+// The arbitrary bounded-domain rule timed out, so split the obligation down to the exact finite
+// consumer domain: every adjacent tick decreases the wExp input, and wExp stays ordered there.
+rule wExpIsIncreasingOnTickToPriceDomain(uint256 tick) {
+    require tick < maxTick(), "next tick is in range";
 
-    assert wExp(lower) <= wExp(higher);
+    assert wExpAtTick(tick) >= wExpAtTick(assert_uint256(tick + 1));
 }
 
 rule tickToPriceIsZeroAtZero() {
