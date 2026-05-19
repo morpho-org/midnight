@@ -1252,8 +1252,6 @@ contract TakeTest is BaseTest {
         offer.group = keccak256("otherBorrower");
         collateralize(market, otherBorrower, units);
         deal(address(loanToken), borrower, units.mulDivUp(price, WAD));
-        vm.prank(borrower);
-        loanToken.approve(address(midnight), type(uint256).max);
         take(units, borrower, offer);
     }
 
