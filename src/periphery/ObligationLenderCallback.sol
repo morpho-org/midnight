@@ -9,6 +9,8 @@ import {IERC20} from "./IERC20.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract ObligationLenderCallback is IBuyCallback {
+    error NotMidnight();
+
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -21,7 +23,7 @@ contract ObligationLenderCallback is IBuyCallback {
         external
         returns (bytes32)
     {
-        require(msg.sender == MIDNIGHT, "unauthorized");
+        require(msg.sender == MIDNIGHT, NotMidnight());
         bytes32 otherMarketId = abi.decode(data, (bytes32));
         Market memory otherMarket = abi.decode(address(uint160(uint256(otherMarketId))).code, (Market));
         Midnight(MIDNIGHT).withdraw(otherMarket, buyerAssets, buyer, address(this));

@@ -9,6 +9,8 @@ import {IBuyCallback} from "../interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 
 contract VaultLenderCallback is IBuyCallback {
+    error NotMidnight();
+
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -21,7 +23,7 @@ contract VaultLenderCallback is IBuyCallback {
         external
         returns (bytes32)
     {
-        require(msg.sender == MIDNIGHT, "unauthorized");
+        require(msg.sender == MIDNIGHT, NotMidnight());
         address vault = abi.decode(data, (address));
         IERC4626(vault).withdraw(buyerAssets, address(this), buyer);
         IERC20(market.loanToken).approve(MIDNIGHT, buyerAssets);

@@ -13,6 +13,8 @@ struct CollateralData {
 }
 
 contract BorrowerCallback is ISellCallback {
+    error NotMidnight();
+
     address public immutable MIDNIGHT;
 
     constructor(address _midnight) {
@@ -25,7 +27,7 @@ contract BorrowerCallback is ISellCallback {
         external
         returns (bytes32)
     {
-        require(msg.sender == MIDNIGHT, "unauthorized");
+        require(msg.sender == MIDNIGHT, NotMidnight());
         CollateralData[] memory collateralData = abi.decode(data, (CollateralData[]));
         for (uint256 i = 0; i < collateralData.length; i++) {
             Midnight(MIDNIGHT)
