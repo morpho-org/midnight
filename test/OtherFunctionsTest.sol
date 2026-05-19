@@ -66,7 +66,7 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         id = toId(market);
     }
@@ -140,7 +140,7 @@ contract OtherFunctionsTest is BaseTest {
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, caller, true);
+        midnight.setIsAuthorized(caller, true, borrower);
         vm.prank(address(callback));
         loanToken.approve(address(midnight), repaid);
 
@@ -718,7 +718,7 @@ contract RepayCallback {
         midnight.repay(market, units, onBehalf, address(this), data);
     }
 
-    function onRepay(bytes32 marketId, Market memory market, address onBehalf, uint256 units, bytes memory data)
+    function onRepay(bytes32 marketId, Market memory market, uint256 units, address onBehalf, bytes memory data)
         external
         returns (bytes32)
     {

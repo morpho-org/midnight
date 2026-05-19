@@ -328,12 +328,12 @@ contract Midnight is IMidnight {
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
+        Offer memory offer,
         uint256 units,
         address taker,
+        address receiverIfTakerIsSeller,
         address takerCallback,
         bytes memory takerCallbackData,
-        address receiverIfTakerIsSeller,
-        Offer memory offer,
         bytes memory ratifierData
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
@@ -437,7 +437,7 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyerCallback).onBuy(id, offer.market, buyer, buyerAssets, units, buyerCallbackData)
+                IBuyCallback(buyerCallback).onBuy(id, offer.market, buyerAssets, units, buyer, buyerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
@@ -450,7 +450,7 @@ contract Midnight is IMidnight {
         if (sellerCallback != address(0)) {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(sellerCallback).onSell(id, offer.market, seller, sellerAssets, units, sellerCallbackData)
+                ISellCallback(sellerCallback).onSell(id, offer.market, sellerAssets, units, seller, sellerCallbackData)
                     == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
@@ -500,7 +500,7 @@ contract Midnight is IMidnight {
 
         if (callback != address(0)) {
             require(
-                IRepayCallback(callback).onRepay(id, market, onBehalf, units, data) == CALLBACK_SUCCESS,
+                IRepayCallback(callback).onRepay(id, market, units, onBehalf, data) == CALLBACK_SUCCESS,
                 WrongRepayCallbackReturnValue()
             );
         }
@@ -680,7 +680,7 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ILiquidateCallback(callback)
-                    .onLiquidate(id, market, borrower, collateralIndex, seizedAssets, repaidUnits, data)
+                    .onLiquidate(id, market, collateralIndex, seizedAssets, repaidUnits, borrower, data)
                 == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
@@ -700,7 +700,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev See AUTHORIZATIONS section above.
-    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
+    function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);

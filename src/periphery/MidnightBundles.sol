@@ -68,7 +68,7 @@ contract MidnightBundles is IMidnightBundles {
                 ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
             );
             try IMidnight(midnight)
-                .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
+                .take(takes[i].offer, unitsToTake, taker, address(0), address(0), "", takes[i].ratifierData) returns (
                 uint256 resBuyerAssets, uint256
             ) {
                 filledUnits += unitsToTake;
@@ -142,7 +142,7 @@ contract MidnightBundles is IMidnightBundles {
             );
             try IMidnight(midnight)
                 .take(
-                    unitsToTake, taker, address(0), "", address(this), takes[i].offer, takes[i].ratifierData
+                    takes[i].offer, unitsToTake, taker, address(this), address(0), "", takes[i].ratifierData
                 ) returns (
                 uint256, uint256 resSellerAssets
             ) {
@@ -204,7 +204,7 @@ contract MidnightBundles is IMidnightBundles {
                 ConsumableUnitsLib.consumableUnits(midnight, id, takes[i].offer)
             );
             try IMidnight(midnight)
-                .take(unitsToTake, taker, address(0), "", address(0), takes[i].offer, takes[i].ratifierData) returns (
+                .take(takes[i].offer, unitsToTake, taker, address(0), address(0), "", takes[i].ratifierData) returns (
                 uint256 resBuyerAssets, uint256
             ) {
                 filledBuyerAssets += resBuyerAssets;
@@ -284,7 +284,7 @@ contract MidnightBundles is IMidnightBundles {
             );
             try IMidnight(midnight)
                 .take(
-                    unitsToTake, taker, address(0), "", address(this), takes[i].offer, takes[i].ratifierData
+                    takes[i].offer, unitsToTake, taker, address(this), address(0), "", takes[i].ratifierData
                 ) returns (
                 uint256, uint256 resSellerAssets
             ) {
