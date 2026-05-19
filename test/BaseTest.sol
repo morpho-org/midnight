@@ -222,53 +222,47 @@ abstract contract BaseTest is Test {
         return IdLib.toId(market, block.chainid, address(midnight));
     }
 
-    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
-    }
-
     function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
         return new bytes32[](0);
     }
 
     // assumes the offer is the first one!
     function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](1);
-        _path[0] = HashLib.hashOffer(offers[1]);
-        return _path;
+        bytes32[] memory _proof = new bytes32[](1);
+        _proof[0] = HashLib.hashOffer(offers[1]);
+        return _proof;
     }
 
     // 4 leaves, assumes the offer is the first one
     function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[1]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _path;
+        bytes32[] memory _proof = new bytes32[](2);
+        _proof[0] = HashLib.hashOffer(offers[1]);
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return _proof;
     }
 
     // 4 leaves, assumes the offer is the second one
     function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[0]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _path;
+        bytes32[] memory _proof = new bytes32[](2);
+        _proof[0] = HashLib.hashOffer(offers[0]);
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return _proof;
     }
 
     // 4 leaves, assumes the offer is the third one
     function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[3]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _path;
+        bytes32[] memory _proof = new bytes32[](2);
+        _proof[0] = HashLib.hashOffer(offers[3]);
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return _proof;
     }
 
     // 4 leaves, assumes the offer is the fourth one
     function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[2]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _path;
+        bytes32[] memory _proof = new bytes32[](2);
+        _proof[0] = HashLib.hashOffer(offers[2]);
+        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return _proof;
     }
 
     function root(Offer memory offer) internal pure returns (bytes32) {
@@ -280,13 +274,13 @@ abstract contract BaseTest is Test {
     }
 
     function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        return HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
     }
 
     function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        bytes32 right = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return HashLib.commutativeHash(left, right);
+        bytes32 left = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
+        bytes32 right = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
+        return HashLib.hashNode(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -305,41 +299,28 @@ abstract contract BaseTest is Test {
         return _signature;
     }
 
-    function _encodeMerkleRatifierData(Signature memory _sig, uint256 _height, bytes32 _root, bytes32[] memory _proof)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encode(_sig, _height, _root, _proof);
+    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
+        bytes32 _root = root(offers);
+        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
+        return abi.encode(_sig, 0, _root, 0, proof(offers));
     }
 
     function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
+        return abi.encode(_sig, 0, _root, 0, proof(offers));
     }
 
-    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1);
-        return _encodeMerkleRatifierData(_sig, 1, _root, _proof);
-    }
-
-    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2);
-        return _encodeMerkleRatifierData(_sig, 2, _root, _proof);
-    }
-
-    /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
-    /// the signed root or the proof is intentionally inconsistent with the offer.
-    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
-        internal
-        view
-        returns (bytes memory)
-    {
+    /// @dev Builds merkle ratifier data with explicit root, height, leaf index, and proof.
+    function merkleRatifierData(
+        Offer memory offer,
+        uint256 _height,
+        bytes32 _root,
+        uint256 _leafIndex,
+        bytes32[] memory _proof
+    ) internal view returns (bytes memory) {
         Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
-        return _encodeMerkleRatifierData(_sig, _height, _root, _proof);
+        return abi.encode(_sig, _height, _root, _leafIndex, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
