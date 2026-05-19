@@ -15,7 +15,6 @@ bytes32 constant SIG_R = 0x3b634e6e609860ff1d80ec02a97d6d82bfe7ff35a8108120138ff
 bytes32 constant SIG_S = 0x3eb97018d5ccf0711062df8c70faea0971c4f8e9556d57673a03246728bd91c6;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
-uint256 constant HEIGHT = 2;
 
 contract FrontendSignatureTest is Test {
     function setUp() public {
@@ -67,7 +66,7 @@ contract FrontendSignatureTest is Test {
         proof3[1] = left;
         assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
-        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, 0, proof0);
+        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), _root, 0, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
