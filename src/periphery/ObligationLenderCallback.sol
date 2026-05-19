@@ -17,14 +17,10 @@ contract ObligationLenderCallback is IBuyCallback {
 
     /// @dev Callback to withdraw funds from another Midnight obligation.
     /// @dev The callback contract should be authorized to withdraw funds on behalf of the lender.
-    function onBuy(
-        bytes32,
-        Market memory market,
-        address buyer,
-        uint256 buyerAssets,
-        uint256,
-        bytes memory data
-    ) external returns (bytes32) {
+    function onBuy(bytes32, Market memory market, address buyer, uint256 buyerAssets, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
         require(msg.sender == MIDNIGHT, "unauthorized");
         bytes32 otherMarketId = abi.decode(data, (bytes32));
         Market memory otherMarket = abi.decode(address(uint160(uint256(otherMarketId))).code, (Market));

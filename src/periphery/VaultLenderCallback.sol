@@ -17,14 +17,10 @@ contract VaultLenderCallback is IBuyCallback {
 
     /// @dev Callback to withdraw funds from an ERC4626 vault.
     /// @dev The callback contract should be authorized to withdraw funds on behalf of the lender.
-    function onBuy(
-        bytes32,
-        Market memory market,
-        address buyer,
-        uint256 buyerAssets,
-        uint256,
-        bytes memory data
-    ) external returns (bytes32) {
+    function onBuy(bytes32, Market memory market, address buyer, uint256 buyerAssets, uint256, bytes memory data)
+        external
+        returns (bytes32)
+    {
         require(msg.sender == MIDNIGHT, "unauthorized");
         address vault = abi.decode(data, (address));
         IERC4626(vault).withdraw(buyerAssets, address(this), buyer);
