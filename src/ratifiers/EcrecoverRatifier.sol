@@ -27,7 +27,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
     function cancelRoot(address maker, bytes32 root) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootCanceled[maker][root] = true;
-        emit CancelRoot(maker, root);
+        emit CancelRoot(msg.sender, maker, root);
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
