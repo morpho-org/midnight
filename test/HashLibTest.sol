@@ -2,7 +2,13 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {HashLib, MARKET_TYPEHASH} from "../src/ratifiers/libraries/HashLib.sol";
+import {
+    HashLib,
+    COLLATERAL_PARAMS_TYPE,
+    MARKET_TYPE,
+    MARKET_TYPEHASH,
+    OFFER_TYPE
+} from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 
 contract HashLibTest is Test {
