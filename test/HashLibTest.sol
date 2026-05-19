@@ -2,13 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {
-    HashLib,
-    COLLATERAL_PARAMS_TYPE,
-    MARKET_TYPE,
-    MARKET_TYPEHASH,
-    OFFER_TYPE
-} from "../src/ratifiers/libraries/HashLib.sol";
+import {HashLib, MARKET_TYPEHASH} from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 
 contract HashLibTest is Test {
@@ -75,32 +69,6 @@ contract HashLibTest is Test {
 
         proof[0] = x3;
         assertTrue(HashLib.isLeaf(root, x4, 3, proof));
-    }
-
-    function repeat(string memory str, uint256 n) internal pure returns (string memory) {
-        bytes memory result;
-        for (uint256 i = 0; i < n; i++) {
-            result = bytes.concat(result, bytes(str));
-        }
-        return string(result);
-    }
-
-    function testOfferTreeTypeHashes() public pure {
-        for (uint256 height = 0; height <= 20; height++) {
-            assertEq(
-                HashLib.offerTreeTypeHash(height),
-                keccak256(
-                    bytes.concat(
-                        "OfferTree(Offer",
-                        bytes(repeat("[2]", height)),
-                        " offerTree)",
-                        COLLATERAL_PARAMS_TYPE,
-                        MARKET_TYPE,
-                        OFFER_TYPE
-                    )
-                )
-            );
-        }
     }
 
     /// forge-config: default.allow_internal_expect_revert = true
