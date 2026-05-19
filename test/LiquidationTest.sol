@@ -930,7 +930,7 @@ contract LiquidationTest is BaseTest {
         uint256 _collateralIndex,
         uint256 _seizedAssets,
         uint256 _repaidUnits,
-        uint256 _badDebt,
+        uint256 badDebt,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
@@ -940,7 +940,7 @@ contract LiquidationTest is BaseTest {
         recordedCollateralIndex = _collateralIndex;
         recordedSeizedAssets = _seizedAssets;
         recordedRepaidUnits = _repaidUnits;
-        recordedBadDebt = _badDebt;
+        recordedBadDebt = badDebt;
         recordedData = data;
         return CALLBACK_SUCCESS;
     }
