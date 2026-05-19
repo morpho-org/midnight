@@ -68,7 +68,7 @@ rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, addres
 
     uint256 claimableBefore = claimableTradingFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData, ratifierData);
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
