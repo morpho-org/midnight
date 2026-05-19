@@ -500,7 +500,7 @@ contract Midnight is IMidnight {
 
         if (callback != address(0)) {
             require(
-                IRepayCallback(callback).onRepay(id, market, units, onBehalf, data) == CALLBACK_SUCCESS,
+                IRepayCallback(callback).onRepay(id, market, onBehalf, units, data) == CALLBACK_SUCCESS,
                 WrongRepayCallbackReturnValue()
             );
         }
@@ -680,7 +680,7 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ILiquidateCallback(callback)
-                    .onLiquidate(id, market, collateralIndex, seizedAssets, repaidUnits, borrower, data)
+                    .onLiquidate(id, market, borrower, collateralIndex, seizedAssets, repaidUnits, data)
                 == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
