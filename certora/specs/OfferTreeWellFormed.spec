@@ -12,10 +12,10 @@ methods {
     function isWellFormed(bytes32) external returns (bool) envfree;
 }
 
-invariant zeroIsEmpty()
+strong invariant zeroIsEmpty()
     isEmpty(to_bytes32(0));
 
-invariant wellFormed(bytes32 id)
+strong invariant wellFormed(bytes32 id)
     isWellFormed(id)
     {
         preserved {

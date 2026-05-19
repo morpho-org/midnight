@@ -89,7 +89,8 @@ contract OfferTree {
     // Check that the nodes are well-formed starting from `id` and going down the `tree`.
     // The bits of `leafIndex` choose the path downward; `proof` supplies the sibling hashes consumed from end to start.
     // The path must terminate at a leaf, matching the depth implied by `proof.length`.
-    function wellFormedPath(bytes32 id, uint256 leafIndex, bytes32[] memory proof) public view {
+    // Returns the id of the leaf at the bottom of the path.
+    function wellFormedPath(bytes32 id, uint256 leafIndex, bytes32[] memory proof) public view returns (bytes32) {
         require(leafIndex >> proof.length == 0, "leaf index out of range");
         for (uint256 i = proof.length;;) {
             require(isWellFormed(id));
@@ -113,5 +114,6 @@ contract OfferTree {
             }
         }
         require(tree[id].isLeaf);
+        return id;
     }
 }

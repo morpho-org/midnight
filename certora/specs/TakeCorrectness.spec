@@ -8,7 +8,7 @@ methods {
     function OfferTree.getHash(bytes32) external returns (bytes32) envfree;
     function OfferTree.isLeafNode(bytes32) external returns (bool) envfree;
     function OfferTree.isWellFormed(bytes32) external returns (bool) envfree;
-    function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external envfree;
+    function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bytes32) envfree;
 
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
@@ -37,7 +37,7 @@ function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
 }
 
 // The main correctness result of the verification.
-// It ensures that if a maker-ratified root corresponds to a node of a well-formed offer-tree, then a successful merkle verification of the offer's hash against that root implies the offer is registered as a leaf in the tree.
+// If a maker-ratified root corresponds to a node of a well-formed offer-tree, then a successful merkle verification of the offer's hash against that root implies the offer is registered as a leaf in the tree.
 rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
 
@@ -54,4 +54,17 @@ rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, byte
     require Utils.isLeaf(root, leafId, leafIndex, proof);
 
     assert OfferTree.isLeafNode(leafId);
+}
+
+// The completeness dual of takeCorrectness.
+// Every leaf in a well-formed offer-tree has a verifying merkle proof: folding the path's sibling hashes back up against the leaf reproduces the root.
+rule takeCompleteness(bytes32 node, bytes32 root, uint256 leafIndex, bytes32[] proof) {
+    // Assume that root is the hash of node in the tree.
+    require OfferTree.getHash(node) == root;
+    require root != to_bytes32(0);
+
+    // Walk the well-formed path; the call returns the leaf at the bottom.
+    bytes32 endLeaf = OfferTree.wellFormedPath(node, leafIndex, proof);
+
+    assert Utils.isLeaf(root, endLeaf, leafIndex, proof);
 }
