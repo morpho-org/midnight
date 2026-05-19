@@ -10,6 +10,7 @@ import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
 import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
+import {DummyRatifier} from "./helpers/DummyRatifier.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -56,6 +57,7 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
     EcrecoverRatifier internal ecrecoverRatifier;
     EcrecoverAuthorizer internal ecrecoverAuthorizer;
+    DummyRatifier internal dummyRatifier;
 
     bytes internal emptySig;
 
@@ -63,6 +65,7 @@ abstract contract BaseTest is Test {
         midnight = new Midnight();
         ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
+        dummyRatifier = new DummyRatifier();
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
@@ -77,8 +80,18 @@ abstract contract BaseTest is Test {
         (otherLender, _privateKey) = makeAddrAndKey("otherLender");
         privateKey[otherLender] = _privateKey;
 
+        // Authorize the dummy ratifier (used by default in Midnight integration tests).
         vm.prank(borrower);
+        midnight.setIsAuthorized(borrower, address(dummyRatifier), true);
+        vm.prank(lender);
+        midnight.setIsAuthorized(lender, address(dummyRatifier), true);
+        vm.prank(otherBorrower);
+        midnight.setIsAuthorized(otherBorrower, address(dummyRatifier), true);
+        vm.prank(otherLender);
+        midnight.setIsAuthorized(otherLender, address(dummyRatifier), true);
 
+        // Authorize the ecrecover ratifier (used by ratifier-specific tests).
+        vm.prank(borrower);
         midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
         vm.prank(lender);
         midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
@@ -144,12 +157,12 @@ abstract contract BaseTest is Test {
         vm.stopPrank();
     }
 
-    // hardcodes the right root, signature, proof, and callback (no callback)
+    // Convenience wrapper for take with the dummy ratifier and no callbacks.
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        return midnight.take(units, taker, address(0), hex"", taker, offer, hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -163,7 +176,7 @@ abstract contract BaseTest is Test {
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
-        lenderOffer.ratifier = address(ecrecoverRatifier);
+        lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -183,14 +196,14 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
-        badBorrowerOffer.ratifier = address(ecrecoverRatifier);
+        badBorrowerOffer.ratifier = address(dummyRatifier);
         badBorrowerOffer.start = block.timestamp;
         badBorrowerOffer.expiry = block.timestamp + 200;
         badBorrowerOffer.tick = MAX_TICK;
 
         vm.prank(badBorrower);
 
-        midnight.setIsAuthorized(badBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(badBorrower, address(dummyRatifier), true);
         vm.prank(badBorrower);
         midnight.setIsAuthorized(badBorrower, address(this), true);
 
@@ -365,10 +378,9 @@ abstract contract BaseTest is Test {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
         Offer memory borrowerOffer = _setupMarketOffer(market, units);
-        bytes memory rd = merkleRatifierData([borrowerOffer]);
 
         vm.prank(lender);
-        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
+        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, hex"");
     }
 
     function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {
@@ -377,7 +389,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
+        borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = block.timestamp;
         borrowerOffer.expiry = block.timestamp;
         borrowerOffer.tick = MAX_TICK;

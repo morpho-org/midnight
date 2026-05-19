@@ -48,7 +48,7 @@ contract TickGatingTest is BaseTest {
         offer.market = market;
         offer.buy = true;
         offer.maker = lender;
-        offer.ratifier = address(ecrecoverRatifier);
+        offer.ratifier = address(dummyRatifier);
         offer.maxUnits = type(uint256).max;
         offer.expiry = block.timestamp + 200;
         offer.tick = tick;
@@ -82,7 +82,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, hex"");
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -97,7 +97,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, hex"");
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -114,7 +114,7 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(units, borrower, address(0), hex"", borrower, offer, hex"");
 
         // Refine to spacing 2.
         midnight.setMarketTickSpacing(id, 2);

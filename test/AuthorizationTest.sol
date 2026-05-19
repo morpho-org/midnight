@@ -201,7 +201,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.ratifier = address(ecrecoverRatifier);
+        offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
         offer.expiry = block.timestamp + 200;
@@ -214,7 +214,7 @@ contract AuthorizationTest is BaseTest {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert(IMidnight.TakerUnauthorized.selector);
-        midnight.take(units, taker, address(0), hex"", address(0), offer, merkleRatifierData([offer]));
+        midnight.take(units, taker, address(0), hex"", address(0), offer, hex"");
     }
 
     function testTakeAuthorized() public {
@@ -225,7 +225,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.ratifier = address(ecrecoverRatifier);
+        offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
         offer.expiry = block.timestamp + 200;
@@ -240,7 +240,7 @@ contract AuthorizationTest is BaseTest {
 
         // Operator can take on behalf of taker
         vm.prank(operator);
-        midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        midnight.take(units, taker, address(0), hex"", taker, offer, hex"");
 
         assertEq(midnight.debtOf(id, taker), units);
     }
@@ -309,7 +309,7 @@ contract AuthorizationTest is BaseTest {
         Offer memory offer;
         offer.buy = true;
         offer.maker = lender;
-        offer.ratifier = address(ecrecoverRatifier);
+        offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
         offer.expiry = block.timestamp + 200;
