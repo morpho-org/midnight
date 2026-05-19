@@ -16,12 +16,10 @@ methods {
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
 
     // Summarized so the merkle verification and the helper-side leaf hash agree on the leaf-hash function.
-    function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) =>
-        summaryHashOffer(offer);
+    function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
 
     // Summarized to a ghost so the upward fold and the downward walk see the same injective hash function.
-    function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) =>
-        summaryHashNode(a, b);
+    function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) => summaryHashNode(a, b);
 
     // Take-side externals summarized as NONDET / havoc — irrelevant to the merkle-membership property.
     // `isRatified` is NONDET'd so the rule abstracts over the ratifier choice: the bridge from
@@ -48,8 +46,7 @@ function summaryHashOffer(Midnight.Offer offer) returns bytes32 {
 
 // Injective on ordered pairs.
 persistent ghost ghostHashNode(bytes32, bytes32) returns bytes32 {
-    axiom forall bytes32 a1. forall bytes32 b1. forall bytes32 a2. forall bytes32 b2.
-        ghostHashNode(a1, b1) == ghostHashNode(a2, b2) => (a1 == a2 && b1 == b2);
+    axiom forall bytes32 a1. forall bytes32 b1. forall bytes32 a2. forall bytes32 b2. ghostHashNode(a1, b1) == ghostHashNode(a2, b2) => (a1 == a2 && b1 == b2);
 }
 
 function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
@@ -91,12 +88,7 @@ rule takeCompleteness(bytes32 node, bytes32 root, uint256 leafIndex, bytes32[] p
 
 // The take-level guarantee: every successful Midnight.take is for an offer registered as a leaf in the maker's offer-tree.
 // The bridge from take's success to the merkle check is supplied by `require Utils.isLeaf(...)` below. It is justified by composition: take's body requires `isRatified(offer, ratifierData) == CALLBACK_SUCCESS`, and both SetterRatifier and EcrecoverRatifier implementations `require(HashLib.isLeaf(root, hashOffer(offer), leafIndex, proof))` for the (root, leafIndex, proof) they decode from ratifierData — regardless of how the maker committed the root (on-chain via `isRootRatified`, or off-chain via EIP-712 signature).
-rule takeImpliesLeafInTree(
-    env e,
-    uint256 units, address taker, address takerCallback, bytes takerCallbackData,
-    address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData,
-    bytes32 root, uint256 leafIndex, bytes32[] proof
-) {
+rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
 
     // Assume that root is the hash of node in the maker's tree.
