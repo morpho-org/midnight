@@ -22,7 +22,7 @@ interface IEcrecoverRatifier is IRatifier {
     error Unauthorized();
 
     /// EVENTS ///
-    event CancelRoot(address caller, address indexed maker, bytes32 indexed root);
+    event CancelRoot(address indexed caller, address indexed maker, bytes32 indexed root);
 
     /// FUNCTIONS ///
     function cancelRoot(address maker, bytes32 root) external;

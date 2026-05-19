@@ -12,7 +12,7 @@ interface ISetterRatifier is IRatifier {
     error NotRatified();
 
     /// EVENTS ///
-    event SetIsRootRatified(address caller, address indexed maker, bytes32 indexed root, bool newIsRootRatified);
+    event SetIsRootRatified(address indexed caller, address indexed maker, bytes32 indexed root, bool newIsRootRatified);
 
     /// FUNCTIONS ///
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external;
