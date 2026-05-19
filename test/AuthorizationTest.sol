@@ -39,12 +39,12 @@ contract AuthorizationTest is BaseTest {
         assertEq(midnight.isAuthorized(user, authorized), false);
 
         vm.prank(user);
-        midnight.setIsAuthorized(user, authorized, true);
+        midnight.setIsAuthorized(authorized, true, user);
 
         assertEq(midnight.isAuthorized(user, authorized), true);
 
         vm.prank(user);
-        midnight.setIsAuthorized(user, authorized, false);
+        midnight.setIsAuthorized(authorized, false, user);
 
         assertEq(midnight.isAuthorized(user, authorized), false);
     }
@@ -103,7 +103,7 @@ contract AuthorizationTest is BaseTest {
         // Lender authorizes operator
         address operator = makeAddr("operator");
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, operator, true);
+        midnight.setIsAuthorized(operator, true, lender);
 
         // Operator can withdraw on behalf of lender
         vm.prank(operator);
@@ -124,7 +124,7 @@ contract AuthorizationTest is BaseTest {
 
         // User authorizes operator
         vm.prank(user);
-        midnight.setIsAuthorized(user, operator, true);
+        midnight.setIsAuthorized(operator, true, user);
 
         deal(collateralToken, user, collateralAmount);
 
@@ -157,7 +157,7 @@ contract AuthorizationTest is BaseTest {
 
         // User authorizes operator
         vm.prank(user);
-        midnight.setIsAuthorized(user, operator, true);
+        midnight.setIsAuthorized(operator, true, user);
 
         vm.prank(operator);
         midnight.supplyCollateral(market, 0, collateralAmount, user);
@@ -224,7 +224,7 @@ contract AuthorizationTest is BaseTest {
         address attacker = makeAddr("attacker");
         vm.prank(attacker);
         vm.expectRevert(IMidnight.TakerUnauthorized.selector);
-        midnight.take(units, taker, address(0), hex"", address(0), offer, merkleRatifierData([offer]));
+        midnight.take(offer, units, taker, address(0), address(0), hex"", merkleRatifierData([offer]));
     }
 
     function testTakeAuthorized() public {
@@ -246,11 +246,11 @@ contract AuthorizationTest is BaseTest {
 
         // Taker authorizes operator
         vm.prank(taker);
-        midnight.setIsAuthorized(taker, operator, true);
+        midnight.setIsAuthorized(operator, true, taker);
 
         // Operator can take on behalf of taker
         vm.prank(operator);
-        midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        midnight.take(offer, units, taker, taker, address(0), hex"", merkleRatifierData([offer]));
 
         assertEq(midnight.debtOf(id, taker), units);
     }
@@ -273,7 +273,7 @@ contract AuthorizationTest is BaseTest {
         midnight.repay(market, units, borrower, address(0), hex"");
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, authorized, true);
+        midnight.setIsAuthorized(authorized, true, borrower);
 
         vm.prank(authorized);
         midnight.repay(market, units, borrower, address(0), hex"");
@@ -289,7 +289,7 @@ contract AuthorizationTest is BaseTest {
         midnight.setConsumed(bytes32(0), 100, user);
 
         vm.prank(user);
-        midnight.setIsAuthorized(user, authorized, true);
+        midnight.setIsAuthorized(authorized, true, user);
 
         vm.prank(authorized);
         midnight.setConsumed(bytes32(0), 100, user);
@@ -302,13 +302,13 @@ contract AuthorizationTest is BaseTest {
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
-        midnight.setIsAuthorized(user, newAuthorized, true);
+        midnight.setIsAuthorized(newAuthorized, true, user);
 
         vm.prank(user);
-        midnight.setIsAuthorized(user, authorized, true);
+        midnight.setIsAuthorized(authorized, true, user);
 
         vm.prank(authorized);
-        midnight.setIsAuthorized(user, newAuthorized, true);
+        midnight.setIsAuthorized(newAuthorized, true, user);
 
         assertEq(midnight.isAuthorized(user, newAuthorized), true);
     }
