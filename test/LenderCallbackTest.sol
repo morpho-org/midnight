@@ -143,7 +143,7 @@ contract VaultLenderCallbackTest is BaseTest {
     function testOnBuyUnauthorized() public {
         Market memory ob;
         vm.prank(makeAddr("attacker"));
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(VaultLenderCallback.NotMidnight.selector);
         vaultLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
     }
 }
@@ -294,7 +294,7 @@ contract ObligationLenderCallbackTest is BaseTest {
     function testOnBuyUnauthorized() public {
         Market memory ob;
         vm.prank(makeAddr("attacker"));
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(ObligationLenderCallback.NotMidnight.selector);
         obligationLenderCallback.onBuy(bytes32(0), ob, address(0), 0, 0, "");
     }
 }

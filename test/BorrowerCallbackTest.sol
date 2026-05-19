@@ -180,7 +180,7 @@ contract BorrowerCallbackTest is BaseTest {
     function testOnSellUnauthorized() public {
         Market memory ob;
         vm.prank(makeAddr("attacker"));
-        vm.expectRevert("unauthorized");
+        vm.expectRevert(BorrowerCallback.NotMidnight.selector);
         borrowerCallback.onSell(bytes32(0), ob, address(0), 0, 0, "");
     }
 }
