@@ -30,11 +30,11 @@ methods {
 
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.onBuy(bytes32 id, Midnight.Market market, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onSell(bytes32 id, Midnight.Market market, address seller, address receiver, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onRepay(bytes32 id, Midnight.Market market, address onBehalf, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, address liquidator, address borrower, address receiver, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address initiator, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onBuy(bytes32 id, Midnight.Market market, uint256 buyerAssets, uint256 units, address buyer, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onSell(bytes32 id, Midnight.Market market, uint256 sellerAssets, uint256 units, address seller, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address liquidator, address borrower, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address[] tokens, uint256[] amounts, address initiator, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///

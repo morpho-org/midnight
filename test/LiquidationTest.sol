@@ -615,7 +615,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         deal(market.collateralParams[0].token, address(this), collateral1);
         midnight.supplyCollateral(market, 0, collateral1, borrower);
@@ -649,7 +649,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -690,7 +690,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Supply both collateralParams.
         for (uint256 i = 0; i < 2; i++) {
@@ -805,7 +805,7 @@ contract LiquidationTest is BaseTest {
         uint256 collateral = midnight.collateral(id, borrower, 0);
         assertGt(collateral, 0, "has collateral");
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
         midnight.withdrawCollateral(market, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }
@@ -904,12 +904,12 @@ contract LiquidationTest is BaseTest {
     function onLiquidate(
         bytes32 _id,
         Market memory _market,
-        address,
-        address,
-        address,
         uint256,
         uint256,
         uint256 _repaidUnits,
+        address,
+        address,
+        address,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
