@@ -12,6 +12,9 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     address[] internal tokensStored;
     uint256[] internal amountsStored;
     bytes internal dataStored;
+    address[] internal recordedTokens;
+    uint256[] internal recordedAmounts;
+    bytes internal recordedData;
     bool internal discardToken = false;
 
     function testFlashLoan(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data, address caller)
@@ -41,10 +44,15 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         vm.prank(caller);
         midnight.flashLoan(tokens, amounts, address(this), data);
 
+        assertEq(recordedTokens.length, tokens.length, "recorded tokens length");
+        assertEq(recordedAmounts.length, amounts.length, "recorded amounts length");
         for (uint256 i = 0; i < tokens.length; i++) {
+            assertEq(recordedTokens[i], tokens[i], "recorded token");
+            assertEq(recordedAmounts[i], amounts[i], "recorded amount");
             assertEq(ERC20(tokens[i]).balanceOf(address(this)), 0, "balanceOf(this)");
             assertEq(ERC20(tokens[i]).balanceOf(address(midnight)), amounts[i], "balanceOf(midnight)");
         }
+        assertEq(recordedData, data, "recorded data");
     }
 
     function testFlashLoanNotReimbursed(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data) public {
@@ -84,6 +92,9 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
             assertEq(tokens[i], tokensStored[i], "wrong token");
             assertEq(amounts[i], amountsStored[i], "wrong amount");
         }
+        recordedTokens = tokens;
+        recordedAmounts = amounts;
+        recordedData = data;
         assertEq(data, dataStored, "wrong data");
         if (discardToken) {
             for (uint256 i = 0; i < tokens.length; i++) {

@@ -30,6 +30,11 @@ contract LiquidationTest is BaseTest {
     Market internal market;
     bytes32 internal id;
 
+    bytes32 internal recordedId;
+    Market internal recordedMarket;
+    address internal recordedBorrower;
+    uint256 internal recordedCollateralIndex;
+    uint256 internal recordedSeizedAssets;
     uint256 internal recordedRepaidUnits;
     uint256 internal recordedBadDebt;
     bytes internal recordedData;
@@ -210,25 +215,37 @@ contract LiquidationTest is BaseTest {
         uint256 units,
         uint256 repaid,
         uint256 liquidationOraclePrice,
+        uint256 collateralIndex,
         bytes memory data,
         address caller
     ) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, ORACLE_PRICE_SCALE);
+        collateralIndex = bound(collateralIndex, 0, market.collateralParams.length - 1);
         vm.assume(data.length > 0);
-        collateralize(market, borrower, units);
+
+        collateralize(market, borrower, units, collateralIndex);
         setupMarket(market, units);
-        Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
+        uint256 collateral = midnight.collateral(id, borrower, collateralIndex);
+        Oracle(market.collateralParams[collateralIndex].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
         uint256 expectedBadDebt = _badDebt();
-        uint256 maxRepaid = midnight.collateral(id, borrower, 0).mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, market.collateralParams[0].maxLif);
+        uint256 maxRepaid = midnight.collateral(id, borrower, collateralIndex)
+            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, market.collateralParams[collateralIndex].maxLif);
         repaid = bound(repaid, 0, UtilsLib.min(units - expectedBadDebt, maxRepaid));
+        uint256 expectedSeizedAssets = repaid.mulDivDown(market.collateralParams[collateralIndex].maxLif, WAD)
+            .mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice);
 
         vm.prank(caller);
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(this), data);
+        midnight.liquidate(market, collateralIndex, 0, repaid, borrower, address(this), address(this), data);
 
+        assertEq(recordedId, id, "id");
+        assertEq(toId(recordedMarket), id, "market");
+        assertEq(recordedBorrower, borrower, "borrower");
+        assertEq(recordedCollateralIndex, collateralIndex, "collateral index");
+        assertEq(recordedSeizedAssets, expectedSeizedAssets, "seized assets");
         assertEq(recordedRepaidUnits, repaid, "repaid units");
         assertEq(recordedBadDebt, expectedBadDebt, "bad debt");
         assertEq(recordedData, data, "data");
@@ -910,14 +927,19 @@ contract LiquidationTest is BaseTest {
     function onLiquidate(
         bytes32 _id,
         Market memory _market,
-        address,
-        uint256,
-        uint256,
+        address _borrower,
+        uint256 _collateralIndex,
+        uint256 _seizedAssets,
         uint256 _repaidUnits,
         uint256 _badDebt,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
+        recordedId = _id;
+        recordedMarket = _market;
+        recordedBorrower = _borrower;
+        recordedCollateralIndex = _collateralIndex;
+        recordedSeizedAssets = _seizedAssets;
         recordedRepaidUnits = _repaidUnits;
         recordedBadDebt = _badDebt;
         recordedData = data;

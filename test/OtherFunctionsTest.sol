@@ -130,7 +130,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(borrower), 0);
     }
 
-    function testRepayCallback(uint256 units, uint256 repaid, address caller) public {
+    function testRepayCallback(uint256 units, uint256 repaid, bytes memory data, address caller) public {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 1, units);
         collateralize(market, borrower, units);
@@ -145,13 +145,14 @@ contract OtherFunctionsTest is BaseTest {
         loanToken.approve(address(midnight), repaid);
 
         vm.prank(caller);
-        midnight.repay(market, repaid, borrower, address(callback), hex"deadbeef");
+        midnight.repay(market, repaid, borrower, address(callback), data);
 
         assertEq(midnight.debtOf(id, borrower), units - repaid);
-        assertEq(callback.recordedMarketId(), id);
-        assertEq(callback.recordedData(), hex"deadbeef");
-        assertEq(callback.recordedUnits(), repaid);
-        assertEq(callback.recordedOnBehalf(), borrower);
+        assertEq(callback.recordedId(), id, "id");
+        assertEq(toId(callback.recordedMarket()), id, "market");
+        assertEq(callback.recordedOnBehalf(), borrower, "onBehalf");
+        assertEq(callback.recordedUnits(), repaid, "units");
+        assertEq(callback.recordedData(), data, "data");
     }
 
     function testWithdraw(uint256 units, uint256 withdraw) public {
@@ -706,7 +707,8 @@ contract OtherFunctionsTest is BaseTest {
 }
 
 contract RepayCallback {
-    bytes32 public recordedMarketId;
+    bytes32 public recordedId;
+    Market internal _recordedMarket;
     bytes public recordedData;
     uint256 public recordedUnits;
     address public recordedOnBehalf;
@@ -723,10 +725,15 @@ contract RepayCallback {
         returns (bytes32)
     {
         require(marketId == IdLib.toId(market, block.chainid, msg.sender), "wrong marketId");
-        recordedMarketId = marketId;
+        recordedId = marketId;
+        _recordedMarket = market;
         recordedData = data;
         recordedUnits = units;
         recordedOnBehalf = onBehalf;
         return CALLBACK_SUCCESS;
+    }
+
+    function recordedMarket() external view returns (Market memory) {
+        return _recordedMarket;
     }
 }
