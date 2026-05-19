@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
+using Havoc as havocCallback;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -23,7 +24,7 @@ methods {
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 
     // Assume that tokens and callbacks do not reenter: this is justified as we verify properties about the function's bodies.
-    function Havoc.callHavoc(address) external => HAVOC_ECF;
+    function havocCallback.callHavoc(address) external => HAVOC_ECF ALL;
 }
 
 /// HELPERS ///
@@ -51,7 +52,9 @@ function cvlSafeTransferFrom(address token, address from, address to, uint256 am
     }
     tokenBalance[token][from] = tokenBalance[token][from] - amount;
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
-    Havoc.callHavoc(currentContract);
+
+    env e;
+    havocCallback.callHavoc(e, currentContract);
 }
 
 function marketIsCreated(bytes32 id) returns (bool) {
