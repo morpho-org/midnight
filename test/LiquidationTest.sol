@@ -904,10 +904,10 @@ contract LiquidationTest is BaseTest {
     function onLiquidate(
         bytes32 _id,
         Market memory _market,
+        address,
         uint256,
         uint256,
         uint256 _repaidUnits,
-        address,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
