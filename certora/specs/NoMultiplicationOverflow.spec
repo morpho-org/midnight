@@ -45,7 +45,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 // Bound every storage collateral (uint128) * oracle price product.
 function boundedPrice(address oracle) returns uint256 {
     uint256 price;
-    require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collateral (uint128) * price fits in uint256 with mulDivUp rounding headroom";
+    require to_mathint(price) * max_uint128 + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "same as assuming that collateral * price <= uint256 with mulDivUp rounding headroom";
     return price;
 }
 
