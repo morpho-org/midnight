@@ -30,8 +30,6 @@ persistent ghost bool mulOverflow;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition validMaxLif(uint256 x) returns bool = x >= WAD() && x <= 2 * WAD();
-
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 // Proven in CreatedMarkets.spec (createdMarketsHaveLltvLessThanOrEqualToOne)
@@ -39,7 +37,7 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {
     require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => validMaxLif(market.collateralParams[i].maxLif), "proven in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "proven in ExactMath.spec";
     require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
     return Utils.hashMarket(market);
 }
