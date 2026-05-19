@@ -22,7 +22,7 @@ methods {
     // The axioms are proved in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
-    function havocCallback.callHavoc(address) external => HAVOC_ALL ALL;
+    function _.havocAll() external => HAVOC_ALL;
 
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);

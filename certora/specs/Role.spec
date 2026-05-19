@@ -23,9 +23,6 @@ methods {
     // Assume that tokens do not reenter and do not revert: this is justified as we verify properties about the function's bodies.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
-
-    // Assume that dcallbacks do not reenter: this is justified as we verify properties about the function's bodies.
-    function havocCallback.callHavoc(address) external => HAVOC_ECF ALL;
 }
 
 /// HELPERS ///
@@ -49,9 +46,6 @@ function cvlSafeTransfer(address token, address receiver, uint256 amount) {
 function cvlSafeTransferFrom(address token, address from, address to, uint256 amount) {
     tokenBalance[token][from] = tokenBalance[token][from] - amount;
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
-
-    env e;
-    havocCallback.callHavoc(e, currentContract);
 }
 
 function marketIsCreated(bytes32 id) returns (bool) {

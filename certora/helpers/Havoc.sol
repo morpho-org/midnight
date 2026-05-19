@@ -2,6 +2,12 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+interface IHavoc {
+    function havocAll() external;
+}
+
 contract Havoc {
-    function callHavoc(address account) external {}
+    function callHavoc(address account) external {
+        (IHavoc(account)).havocAll();
+    }
 }
