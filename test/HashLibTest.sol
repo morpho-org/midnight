@@ -96,6 +96,7 @@ contract HashLibTest is Test {
             );
         }
     }
+
     /// forge-config: default.allow_internal_expect_revert = true
     function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
         height = bound(height, 21, type(uint256).max);
