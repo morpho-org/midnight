@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Offer, Market} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
+import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
 import {
     CALLBACK_SUCCESS,
     LIQUIDATION_CURSOR_LOW,
@@ -19,6 +20,14 @@ contract Utils {
 
     function hashOffer(Offer memory offer) external pure returns (bytes32) {
         return keccak256(abi.encode(offer));
+    }
+
+    function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
+        external
+        pure
+        returns (bool)
+    {
+        return HashLib.isLeaf(root, leafHash, leafIndex, proof);
     }
 
     function getBit(uint128 bitmap, uint256 bit) external pure returns (bool) {
