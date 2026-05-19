@@ -92,7 +92,7 @@ rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
     assert marketIsCreated(market);
 }
 
-rule marketIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+rule marketIsCreatedAfterTake(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
     assert marketIsCreated(offer.market);
 }

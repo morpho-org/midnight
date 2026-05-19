@@ -111,7 +111,7 @@ rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, addr
 /// ACCESS CONTROL ///
 
 /// take requires the caller to be the taker or authorized by the taker
-rule unauthorizedTakeFails(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+rule unauthorizedTakeFails(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     bool senderAuthorized = isAuthorized(taker, e.msg.sender);
     take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 

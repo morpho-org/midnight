@@ -62,7 +62,7 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, Midnight.Offer offer, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
 

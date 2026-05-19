@@ -82,7 +82,7 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
 
 /// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
 /// and only changes credit of maker and taker and debt of maker and taker at the market id.
-rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.market);
 
     uint128 makerCreditBefore;
@@ -110,7 +110,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 /// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
 /// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
 /// Buyer's debt is non-increasing and can decrease by at most take units.
-rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule takeBuyerEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     bytes32 id = toId(e, offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
@@ -130,7 +130,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
 /// Seller's debt is non-decreasing, and can increase by at most take units.
 /// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
-rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule takeSellerEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     bytes32 id = toId(e, offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
