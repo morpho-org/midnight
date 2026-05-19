@@ -20,6 +20,7 @@ import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
+/// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 

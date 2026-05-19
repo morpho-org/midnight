@@ -30,7 +30,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
-/// particular, the borrowers of multicollat markets can completely change their collateral composition.
+/// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
 /// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
 /// supplyCollateral.
@@ -322,7 +322,7 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed. A smart-contract can
     /// be used to perform atomic price checks.
     /// @dev Taking buy offers with price < trading fee will revert.
-    /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
+    /// @dev In particular, if the trading fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
