@@ -903,7 +903,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, 0, invalidRoot, 0, new bytes32[](0))
+            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0))
         );
     }
 
@@ -918,7 +918,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            abi.encode(_sig, 0, root([lenderOffer]), 0, new bytes32[](0))
+            abi.encode(_sig, root([lenderOffer]), 0, new bytes32[](0))
         );
     }
 
@@ -961,7 +961,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
-        vm.assume(_proof.length >= 1);
+        vm.assume(_proof.length >= 1 && _proof.length <= 20);
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
         midnight.take(
@@ -971,12 +971,12 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, 0, root([lenderOffer]), 0, _proof)
+            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof)
         );
     }
 
     function testTakeInvalidProof2LeavesWrongLeafHash(Offer memory otherOffer, bytes32[] memory _proof) public {
-        vm.assume(_proof.length >= 1);
+        vm.assume(_proof.length >= 1 && _proof.length <= 20);
         vm.assume(_proof[0] != HashLib.hashOffer(otherOffer));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
         vm.prank(borrower);
@@ -987,7 +987,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, _proof)
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, _proof)
         );
     }
 
@@ -1003,7 +1003,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 1, _proof)
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof)
         );
     }
 
@@ -1022,7 +1022,7 @@ contract TakeTest is BaseTest {
             hex"",
             borrower,
             lenderOffer,
-            merkleRatifierData(lenderOffer, 1, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
         );
     }
 
@@ -1057,7 +1057,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer0,
             merkleRatifierData(
-                offer0, 2, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
+                offer0, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1071,7 +1071,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer1,
             merkleRatifierData(
-                offer1, 2, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
+                offer1, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1085,7 +1085,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer2,
             merkleRatifierData(
-                offer2, 2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
+                offer2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
             )
         );
 
@@ -1099,7 +1099,7 @@ contract TakeTest is BaseTest {
             borrower,
             offer3,
             merkleRatifierData(
-                offer3, 2, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
+                offer3, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
             )
         );
     }
