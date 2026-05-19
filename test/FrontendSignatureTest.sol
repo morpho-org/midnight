@@ -43,35 +43,31 @@ contract FrontendSignatureTest is Test {
         bytes32 h1 = HashLib.hashOffer(offers[1]);
         bytes32 h2 = HashLib.hashOffer(offers[2]);
         bytes32 h3 = HashLib.hashOffer(offers[3]);
-        bytes32 left = HashLib.commutativeHash(h0, h1);
-        bytes32 right = HashLib.commutativeHash(h2, h3);
-        bytes32 _root = HashLib.commutativeHash(left, right);
-
-        require(uint256(h0) < uint256(h1), "h0 < h1");
-        require(uint256(h2) < uint256(h3), "h2 < h3");
-        require(uint256(left) < uint256(right), "left < right");
+        bytes32 left = HashLib.hashNode(h0, h1);
+        bytes32 right = HashLib.hashNode(h2, h3);
+        bytes32 _root = HashLib.hashNode(left, right);
 
         bytes32[] memory proof0 = new bytes32[](2);
         proof0[0] = h1;
         proof0[1] = right;
-        assertTrue(HashLib.isLeaf(_root, h0, proof0));
+        assertTrue(HashLib.isLeaf(_root, h0, 0, proof0));
 
         bytes32[] memory proof1 = new bytes32[](2);
         proof1[0] = h0;
         proof1[1] = right;
-        assertTrue(HashLib.isLeaf(_root, h1, proof1));
+        assertTrue(HashLib.isLeaf(_root, h1, 1, proof1));
 
         bytes32[] memory proof2 = new bytes32[](2);
         proof2[0] = h3;
         proof2[1] = left;
-        assertTrue(HashLib.isLeaf(_root, h2, proof2));
+        assertTrue(HashLib.isLeaf(_root, h2, 2, proof2));
 
         bytes32[] memory proof3 = new bytes32[](2);
         proof3[0] = h2;
         proof3[1] = left;
-        assertTrue(HashLib.isLeaf(_root, h3, proof3));
+        assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
-        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, proof0);
+        bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), HEIGHT, _root, 0, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
