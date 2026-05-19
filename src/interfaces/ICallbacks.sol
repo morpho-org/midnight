@@ -6,11 +6,11 @@ import {Market} from "./IMidnight.sol";
 
 // forgefmt: disable-start
 interface IBuyCallback {
-    function onBuy(bytes32 id, Market memory market, address buyer, uint256 buyerAssets, uint256 units, uint pendingFeeIncrease, bytes memory data) external returns (bytes32);
+    function onBuy(bytes32 id, Market memory market, address buyer, uint256 buyerAssets, uint256 units, uint256 pendingFeeIncrease, bytes memory data) external returns (bytes32);
 }
 
 interface ISellCallback {
-    function onSell(bytes32 id, Market memory market, address seller, address receiver, uint256 sellerAssets, uint256 units, uint pendingFeeDecrease, bytes memory data) external returns (bytes32);
+    function onSell(bytes32 id, Market memory market, address seller, address receiver, uint256 sellerAssets, uint256 units, uint256 pendingFeeDecrease, bytes memory data) external returns (bytes32);
 }
 
 interface ILiquidateCallback {
