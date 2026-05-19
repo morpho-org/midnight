@@ -13,9 +13,9 @@ methods {
     // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer, so we
     // model them with a plain HAVOC_ALL.
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => onCallBackSummary(calledContract, buyCallbackAllowed) expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
-    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => onCallBackSummary(calledContract, flashLoanCallbackAllowed) expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, address, address, address, uint256, uint256, uint256, bytes) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
+    function _.onRepay(bytes32, Midnight.Market, address, uint256, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => onCallBackSummary(calledContract, flashLoanCallbackAllowed) expect(bytes32);
 
     // Checks every token pull against the current explicit-payer allowlist.
     function _.transferFrom(address src, address dest, uint256 value) external with(env e) => CVL_transferFrom(calledContract, src, dest, value) expect(bool);
