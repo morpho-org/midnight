@@ -413,7 +413,7 @@ rule callbackRevertOrBadReturnCausesTakeRevert(env e, Midnight.Offer offer, uint
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require takerCallback != 0 || offer.callback != 0 || offer.ratifier != 0, "callback-enabled take";
 
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take@withrevert(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert lastReverted;
 }
