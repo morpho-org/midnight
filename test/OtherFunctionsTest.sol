@@ -718,7 +718,7 @@ contract RepayCallback {
         midnight.repay(market, units, onBehalf, address(this), data);
     }
 
-    function onRepay(bytes32 marketId, Market memory market, uint256 units, address onBehalf, bytes memory data)
+    function onRepay(bytes32 marketId, Market memory market, address onBehalf, uint256 units, bytes memory data)
         external
         returns (bytes32)
     {

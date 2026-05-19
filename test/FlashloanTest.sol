@@ -74,7 +74,7 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(tokens, amounts, address(this), data);
     }
 
-    function onFlashLoan(address[] memory tokens, uint256[] memory amounts, bytes memory data)
+    function onFlashLoan(address, address[] memory tokens, uint256[] memory amounts, bytes memory data)
         external
         returns (bytes32)
     {
