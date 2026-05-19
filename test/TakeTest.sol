@@ -1568,6 +1568,7 @@ contract BorrowCallback is ISellCallback {
         bytes32 id,
         Market memory market,
         address seller,
+        address,
         uint256,
         uint256,
         uint256 pendingFeeDecrease,
@@ -1589,10 +1590,16 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
 
-    function onSell(bytes32 id, Market memory market, address seller, uint256, uint256, uint256, bytes memory data)
-        external
-        returns (bytes32)
-    {
+    function onSell(
+        bytes32 id,
+        Market memory market,
+        address seller,
+        address,
+        uint256,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
@@ -1646,7 +1653,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         storedRepaidUnits = _repaidUnits;
     }
 
-    function onSell(bytes32 id, Market memory market, address seller, uint256, uint256, uint256, bytes memory)
+    function onSell(bytes32 id, Market memory market, address seller, address, uint256, uint256, uint256, bytes memory)
         external
         returns (bytes32)
     {
@@ -1705,7 +1712,7 @@ contract LendCallback is IBuyCallback {
 }
 
 contract InvalidSellCallback is ISellCallback {
-    function onSell(bytes32, Market memory, address, uint256, uint256, uint256, bytes memory)
+    function onSell(bytes32, Market memory, address, address, uint256, uint256, uint256, bytes memory)
         external
         pure
         returns (bytes32)
