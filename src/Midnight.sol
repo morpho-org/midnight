@@ -381,7 +381,10 @@ contract Midnight is IMidnight {
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
-        require(!offer.reduceOnly || offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
+        require(
+            !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
+            MakerCreditOrDebtIncreased()
+        );
 
         require(
             offer.market.enterGate == address(0) || buyerCreditIncrease == 0
