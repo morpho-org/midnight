@@ -24,8 +24,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
-/// @dev When assets become withdrawable before maturity (after a repayment or a liquidation), it can be profitable
-/// to take resting sell offers with price < WAD and immediately withdraw the assets. Lenders (and the fee claimer)
+/// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
+/// is an incentive to take resting sell offers with price < WAD and withdraw instantly. Lenders (and the fee claimer)
 /// might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
