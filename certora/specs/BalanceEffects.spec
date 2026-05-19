@@ -23,8 +23,8 @@ methods {
     // body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
+    function _.onLiquidate(bytes32, Midnight.Market, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onRepay(bytes32, Midnight.Market, address, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }

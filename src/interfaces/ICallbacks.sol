@@ -14,11 +14,11 @@ interface ISellCallback {
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external returns (bytes32);
+    function onLiquidate(bytes32 id, Market memory market, address borrower, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {
-    function onRepay(bytes32 id, Market memory market, uint256 units, address onBehalf, bytes memory data) external returns (bytes32);
+    function onRepay(bytes32 id, Market memory market, address onBehalf, uint256 units, bytes memory data) external returns (bytes32);
 }
 
 interface IFlashLoanCallback {
