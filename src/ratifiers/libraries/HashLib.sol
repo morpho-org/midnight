@@ -17,6 +17,7 @@ bytes constant OFFER_TYPE =
 bytes32 constant OFFER_TYPEHASH = 0x980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c;
 
 library HashLib {
+    error LeafIndexOutOfRange();
     error TreeTooHigh();
 
     /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
@@ -51,22 +52,27 @@ library HashLib {
         }
     }
 
-    /// @dev Returns hash(... hash(leafHash, proof[0]), ..., proof[n]) == root.
-    /// @dev Hash sorts the inputs lexicographically.
-    function isLeaf(bytes32 root, bytes32 leafHash, bytes32[] memory proof) internal pure returns (bool) {
+    /// @dev Verifies a Merkle proof using the leaf index to determine the left/right position of each sibling.
+    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex. In practice the height is capped at 20
+    /// by offerTreeTypeHash.
+    function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
+        internal
+        pure
+        returns (bool)
+    {
+        require(leafIndex >> proof.length == 0, LeafIndexOutOfRange());
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = commutativeHash(currentHash, proof[i]);
+            currentHash = (leafIndex >> i) & 1 == 0 ? hashNode(currentHash, proof[i]) : hashNode(proof[i], currentHash);
         }
         return currentHash == root;
     }
 
-    /// @dev Returns the keccak256 hash of the sorted concatenation of a and b.
-    function commutativeHash(bytes32 a, bytes32 b) internal pure returns (bytes32 value) {
-        if (a > b) (a, b) = (b, a);
+    /// @dev Returns the keccak256 hash of the concatenation of left and right.
+    function hashNode(bytes32 left, bytes32 right) internal pure returns (bytes32 value) {
         assembly ("memory-safe") {
-            mstore(0x00, a)
-            mstore(0x20, b)
+            mstore(0x00, left)
+            mstore(0x20, right)
             value := keccak256(0x00, 0x40)
         }
     }

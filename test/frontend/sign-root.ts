@@ -84,7 +84,6 @@ function defaultOffer(number: string) {
   };
 }
 
-// WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
 function buildOfferTree() {
   return [
     [defaultOffer("1"), defaultOffer("2")],
