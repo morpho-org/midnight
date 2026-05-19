@@ -681,8 +681,9 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ILiquidateCallback(callback)
-                    .onLiquidate(id, market, borrower, receiver, collateralIndex, seizedAssets, repaidUnits, data)
-                == CALLBACK_SUCCESS,
+                    .onLiquidate(
+                        id, market, msg.sender, borrower, receiver, collateralIndex, seizedAssets, repaidUnits, data
+                    ) == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
         }
@@ -716,7 +717,7 @@ contract Midnight is IMidnight {
             SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
         }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(msg.sender, tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         for (uint256 i = 0; i < tokens.length; i++) {

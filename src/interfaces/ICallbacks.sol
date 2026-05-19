@@ -14,7 +14,7 @@ interface ISellCallback {
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Market memory market, address borrower, address receiver, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
+    function onLiquidate(bytes32 id, Market memory market, address liquidator, address borrower, address receiver, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {
@@ -22,6 +22,6 @@ interface IRepayCallback {
 }
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
+    function onFlashLoan(address initiator, address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
 }
 // forgefmt: disable-end
