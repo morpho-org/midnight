@@ -29,9 +29,9 @@ methods {
 
     // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, address, address, uint256, uint256, bytes) external => NONDET;
     function _.isRatified(Midnight.Offer offer, bytes) external => CVL_isRatified(offer) expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }

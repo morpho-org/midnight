@@ -32,11 +32,11 @@ methods {
     // For oracle rules, re-entrant callbacks cannot deactivate collaterals without calling
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onSell(bytes32, Midnight.Market, address, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, address, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, address, uint256, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, address, address, address, uint256, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
