@@ -50,6 +50,10 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
+        // Settle pending trading fee receipts as the corresponding tokens arrive at the contract.
+        if (dest == currentContract && pendingFeeReceipt[token] >= to_mathint(value)) {
+            pendingFeeReceipt[token] = pendingFeeReceipt[token] - value;
+        }
     }
     return success;
 }
@@ -132,12 +136,24 @@ hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (ui
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
+// Trading fee receipts pending settlement: claimableTradingFee is incremented in take before
+// the inbound fee transfer happens, so we track the gap and clear it in CVL_transferFrom.
+persistent ghost mapping(address => mathint) pendingFeeReceipt {
+    init_state axiom (forall address token. pendingFeeReceipt[token] == 0);
+}
+
+hook Sstore claimableTradingFee[KEY address token] uint256 newVal (uint256 oldVal) {
+    if (newVal > oldVal) {
+        pendingFeeReceipt[token] = pendingFeeReceipt[token] + newVal - oldVal;
+    }
+}
+
 /// INVARIANTS AND RULES ///
 
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
+    tokenBalances[token][currentContract] + pendingFeeReceipt[token] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
     {
         preserved with (env e) {
             require e.msg.sender != currentContract, "only external calls";
@@ -165,3 +181,8 @@ rule flashLoansPaidBack(method f, address token) {
 // With tokenBalanceCorrect, this proves that for any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token.
 weak invariant flashLoansZero(address token)
     flashloans[token] == 0;
+
+// For any token, the pending trading fee receipt after a transaction is 0: every claimableTradingFee
+// increment in take is paid back in by the same-function inbound transfer.
+weak invariant pendingFeeReceiptZero(address token)
+    pendingFeeReceipt[token] == 0;

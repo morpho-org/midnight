@@ -393,6 +393,7 @@ contract Midnight is IMidnight {
 
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
         if (offer.reduceOnly) {
             require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
@@ -444,7 +445,6 @@ contract Midnight is IMidnight {
         }
 
         SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
