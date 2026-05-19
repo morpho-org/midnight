@@ -81,8 +81,7 @@ contract OfferTree {
             if (n.left == 0 || n.right == 0) return false;
             Node storage L = tree[n.left];
             Node storage R = tree[n.right];
-            return !_isEmpty(L) && !_isEmpty(R)
-                && n.hashNode == HashLib.hashNode(L.hashNode, R.hashNode);
+            return !_isEmpty(L) && !_isEmpty(R) && n.hashNode == HashLib.hashNode(L.hashNode, R.hashNode);
         }
     }
 
@@ -97,7 +96,8 @@ contract OfferTree {
 
             if (i == 0) break;
 
-            // If proof elements remain, the current node must be internal; otherwise the path walks off a leaf's zero children into the unrelated `tree[0]` entry.
+            // If proof elements remain, the current node must be internal; otherwise the path walks off a leaf's zero
+            // children into the unrelated `tree[0]` entry.
             require(!tree[id].isLeaf);
 
             bytes32 sibling = proof[--i];
