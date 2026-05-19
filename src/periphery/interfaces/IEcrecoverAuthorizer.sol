@@ -16,7 +16,8 @@ struct Authorization {
     uint256 deadline;
 }
 
-/// @dev keccak256("Authorization(address authorizer,address authorized,bool isAuthorized,uint256 nonce,uint256 deadline)")
+/// @dev keccak256("Authorization(address authorizer,address authorized,bool isAuthorized,uint256 nonce,uint256
+/// deadline)")
 bytes32 constant AUTHORIZATION_TYPEHASH = 0x81d0284fb0e2cde18d0553b06189d6f7613c96a01bb5b5e7828eade6a0dcac91;
 
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)")

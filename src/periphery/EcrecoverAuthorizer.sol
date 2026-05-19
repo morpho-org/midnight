@@ -31,8 +31,7 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0), InvalidSignature());
         require(
-            signer == authorization.authorizer
-                || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer),
+            signer == authorization.authorizer || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer),
             Unauthorized()
         );
 
