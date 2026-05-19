@@ -19,13 +19,13 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
 /// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
-/// @dev The case LLTV=WAD is special, and should be used with care, notably:
+/// @dev The case LLTV=1 is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 /// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
-/// is an incentive to take resting sell offers with price < WAD and withdraw instantly. Lenders (and the fee claimer)
+/// is an incentive to take resting sell offers with price < 1 and withdraw instantly. Lenders (and the fee claimer)
 /// might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
@@ -90,7 +90,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < WAD.
+/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the market's spacing.
