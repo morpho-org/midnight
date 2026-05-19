@@ -20,10 +20,10 @@ methods {
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
-    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, address, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, uint256, uint256, address, address, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onFlashLoan(address[] tokens, uint256[] amounts, address initiator, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address liquidator, address borrower, address receiver, bytes data) external => DISPATCHER(true);
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => DISPATCHER(true);
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);

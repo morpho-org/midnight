@@ -24,6 +24,7 @@ contract FlashLiquidateCallback {
         uint256,
         uint256,
         uint256 repaidUnits,
+        uint256,
         address,
         address,
         address,

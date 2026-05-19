@@ -31,11 +31,11 @@ methods {
     // For gate rules, gate checks precede callbacks so re-entrant state changes cannot affect them.
     // For oracle rules, re-entrant callbacks cannot deactivate collaterals without calling
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
-    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onSell(bytes32, Midnight.Market, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, uint256, address, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onFlashLoan(address[], uint256[], address, bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
