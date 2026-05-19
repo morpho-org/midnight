@@ -10,11 +10,11 @@ interface IBuyCallback {
 }
 
 interface ISellCallback {
-    function onSell(bytes32 id, Market memory market, address seller, uint256 sellerAssets, uint256 units, bytes memory data) external returns (bytes32);
+    function onSell(bytes32 id, Market memory market, address seller, address receiver, uint256 sellerAssets, uint256 units, bytes memory data) external returns (bytes32);
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Market memory market, address borrower, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
+    function onLiquidate(bytes32 id, Market memory market, address borrower, address receiver, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {
