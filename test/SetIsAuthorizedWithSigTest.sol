@@ -77,7 +77,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.Unauthorized.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);
