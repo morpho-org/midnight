@@ -64,6 +64,18 @@ rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, add
     assert claimableTradingFee(token) == before - amount;
 }
 
+rule takeIncreasesClaimableTradingFee(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, address anyToken) {
+    uint256 before = claimableTradingFee(anyToken);
+
+    uint256 buyerAssets;
+    uint256 sellerAssets;
+    buyerAssets, sellerAssets = take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+
+    // We know that buyerAssets - sellerAssets >= 0, see rule tradingFeeSpreadBounds.
+    assert anyToken == offer.market.loanToken => claimableTradingFee(anyToken) == before + buyerAssets - sellerAssets;
+    assert anyToken != offer.market.loanToken => claimableTradingFee(anyToken) == before;
+}
+
 rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
     uint256 before = claimableTradingFee(token);
     f(e, args);
