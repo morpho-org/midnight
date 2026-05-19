@@ -240,7 +240,6 @@ rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 
 /// FEE CLAIMER: LIVENESS ///
 
 rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
     address feeClaimerBefore = feeClaimer();
     uint256 claimableBefore = claimableTradingFee(token);
     mathint midnightBalanceBefore = tokenBalance[token][currentContract];
@@ -253,11 +252,10 @@ rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address 
     assert !reverted => claimableTradingFee(token) == claimableBefore - amount;
     assert !reverted => tokenBalance[token][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[token][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[token][user] == userBalanceBefore;
+    assert !reverted => user != currentContract && user != receiver => tokenBalance[token][user] == userBalanceBefore;
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
     bytes32 id = toId(e, market);
     address feeClaimerBefore = feeClaimer();
     bool marketIsCreated = marketIsCreated(id);
@@ -276,5 +274,5 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
     assert !reverted => tokenBalance[market.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[market.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[market.loanToken][user] == userBalanceBefore;
+    assert !reverted => user != currentContract && user != receiver => tokenBalance[market.loanToken][user] == userBalanceBefore;
 }
