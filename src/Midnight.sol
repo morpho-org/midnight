@@ -21,9 +21,12 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
 /// @dev The case LLTV=WAD is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
-/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
+/// @dev When some assets become withdrawable before the maturity (after a repayment or a liquidation), there
+/// is an incentive to take resting sell offers with price<1 and withdraw instantly. Lenders (and the fee claimer)
+/// might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
@@ -36,9 +39,10 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The trading fee is computed using piecewise linear interpolation on the TTM between breakpoints.
+/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
+/// approximation between breakpoints.
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
-/// @dev For TTM (time to maturity) > 360d, the trading fee is the fee at the 360d breakpoint.
+/// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
@@ -55,7 +59,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
+/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
+/// maturity + TIME_TO_MAX_LIF.
 /// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
 /// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
