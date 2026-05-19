@@ -450,8 +450,9 @@ contract Midnight is IMidnight {
         if (sellerCallback != address(0)) {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(sellerCallback).onSell(id, offer.market, seller, receiver, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ISellCallback(sellerCallback)
+                    .onSell(id, offer.market, seller, receiver, sellerAssets, units, sellerCallbackData)
+                == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }

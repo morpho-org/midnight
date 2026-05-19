@@ -1644,7 +1644,11 @@ contract LendCallback is IBuyCallback {
 }
 
 contract InvalidSellCallback is ISellCallback {
-    function onSell(bytes32, Market memory, address, address, uint256, uint256, bytes memory) external pure returns (bytes32) {
+    function onSell(bytes32, Market memory, address, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
         return bytes32(0);
     }
 }
