@@ -21,8 +21,8 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function Midnight.isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function Midnight.tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
+    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
 /// Every successful take requires the maker to have authorized the ratifier.
