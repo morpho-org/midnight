@@ -23,8 +23,8 @@ methods {
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => DISPATCHER(true);
-    function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
+    function _.onLiquidate(bytes32 id, Midnight.Market market, address borrower, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes data) external => DISPATCHER(true);
+    function _.onRepay(bytes32 id, Midnight.Market market, address onBehalf, uint256 units, bytes data) external => DISPATCHER(true);
     function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
     function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
