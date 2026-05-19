@@ -437,8 +437,9 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyerCallback).onBuy(id, offer.market, buyer, buyerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                IBuyCallback(buyerCallback)
+                    .onBuy(id, offer.market, buyer, buyerAssets, units, buyerPendingFeeIncrease, buyerCallbackData)
+                == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
@@ -450,8 +451,9 @@ contract Midnight is IMidnight {
         if (sellerCallback != address(0)) {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(sellerCallback).onSell(id, offer.market, seller, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ISellCallback(sellerCallback)
+                    .onSell(id, offer.market, seller, sellerAssets, units, sellerPendingFeeDecrease, sellerCallbackData)
+                == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }
@@ -680,7 +682,7 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ILiquidateCallback(callback)
-                    .onLiquidate(id, market, borrower, collateralIndex, seizedAssets, repaidUnits, data)
+                    .onLiquidate(id, market, borrower, collateralIndex, seizedAssets, repaidUnits, badDebt, data)
                 == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );

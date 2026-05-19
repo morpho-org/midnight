@@ -6,8 +6,8 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     function _.isRatified(Midnight.Offer, bytes) external => DISPATCHER(true);
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, uint256, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, uint256, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function HashLib.isLeaf(bytes32, bytes32, uint256, bytes32[] memory) internal returns (bool) => NONDET;

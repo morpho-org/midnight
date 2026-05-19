@@ -25,6 +25,7 @@ contract FlashLiquidateCallback {
         uint256,
         uint256,
         uint256 repaidUnits,
+        uint256,
         bytes memory data
     ) external returns (bytes32) {
         startFlashloan(market.loanToken, repaidUnits);
