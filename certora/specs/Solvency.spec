@@ -159,7 +159,7 @@ weak invariant pendingFeeReceiptZero(address token)
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] + pendingFeeReceipt[token] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
+    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token] - pendingFeeReceipt[token]
     {
         preserved with (env e) {
             requireInvariant pendingFeeReceiptZero(token);
