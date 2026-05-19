@@ -144,6 +144,7 @@ persistent ghost mapping(address => mathint) pendingFeeReceipt {
 }
 
 hook Sstore claimableTradingFee[KEY address token] uint256 newVal (uint256 oldVal) {
+    // Except for claimTradingFee, the claimableTradingFee is non-decreasing, see WithdrawableMonotonicity.spec.
     if (newVal > oldVal) {
         pendingFeeReceipt[token] = pendingFeeReceipt[token] + newVal - oldVal;
     }
