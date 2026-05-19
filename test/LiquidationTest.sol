@@ -914,12 +914,12 @@ contract LiquidationTest is BaseTest {
         uint256,
         uint256,
         uint256 _repaidUnits,
-        uint256 _badDebt,
+        uint256 badDebt,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
         recordedRepaidUnits = _repaidUnits;
-        recordedBadDebt = _badDebt;
+        recordedBadDebt = badDebt;
         recordedData = data;
         return CALLBACK_SUCCESS;
     }
