@@ -17,6 +17,7 @@ bytes constant OFFER_TYPE =
 bytes32 constant OFFER_TYPEHASH = 0x980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c;
 
 library HashLib {
+    error LeafIndexOutOfRange();
     error TreeTooHigh();
 
     /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
@@ -59,13 +60,12 @@ library HashLib {
         pure
         returns (bool)
     {
+        require(leafIndex >> proof.length == 0, LeafIndexOutOfRange());
         bytes32 currentHash = leafHash;
         for (uint256 i = 0; i < proof.length; i++) {
-            currentHash = leafIndex % 2 == 0 ? hashNode(currentHash, proof[i]) : hashNode(proof[i], currentHash);
-            leafIndex = leafIndex / 2;
+            currentHash = (leafIndex >> i) & 1 == 0 ? hashNode(currentHash, proof[i]) : hashNode(proof[i], currentHash);
         }
-        // leafIndex == 0 is checked to have unicity of the leafIndex.
-        return currentHash == root && leafIndex == 0;
+        return currentHash == root;
     }
 
     /// @dev Returns the keccak256 hash of the concatenation of left and right.

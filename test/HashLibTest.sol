@@ -35,6 +35,15 @@ contract HashLibTest is Test {
         assertTrue(HashLib.isLeaf(x, x, 0, new bytes32[](0)));
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testIsLeafRevertsWhenLeafIndexOutOfRange(bytes32 root, bytes32 leafHash, bytes32 sibling) public {
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = sibling;
+
+        vm.expectRevert(HashLib.LeafIndexOutOfRange.selector);
+        HashLib.isLeaf(root, leafHash, 2, proof);
+    }
+
     function testIsLeaf2Leaves(bytes32 x1, bytes32 x2) public pure {
         bytes32 root = keccak256(abi.encode(x1, x2));
         bytes32[] memory proof = new bytes32[](1);
