@@ -226,7 +226,6 @@ contract LiquidationTest is BaseTest {
 
         collateralize(market, borrower, units, collateralIndex);
         setupMarket(market, units);
-        uint256 collateral = midnight.collateral(id, borrower, collateralIndex);
         Oracle(market.collateralParams[collateralIndex].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
 
