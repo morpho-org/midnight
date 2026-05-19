@@ -113,7 +113,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
-        emit IEcrecoverRatifier.CancelRoot(lender, _root);
+        emit IEcrecoverRatifier.CancelRoot(lender, lender, _root);
         vm.prank(lender);
         ecrecoverRatifier.cancelRoot(lender, _root);
 

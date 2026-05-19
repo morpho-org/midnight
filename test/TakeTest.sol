@@ -1516,7 +1516,7 @@ contract BorrowCallback is ISellCallback {
     bytes public recordedData;
     bytes32 public recordedId;
 
-    function onSell(bytes32 id, Market memory market, address seller, uint256, uint256, bytes memory data)
+    function onSell(bytes32 id, Market memory market, address seller, address, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1535,7 +1535,7 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
     bool public liquidateSucceeded;
     bytes4 public liquidateErrorSelector;
 
-    function onSell(bytes32 id, Market memory market, address seller, uint256, uint256, bytes memory data)
+    function onSell(bytes32 id, Market memory market, address seller, address, uint256, uint256, bytes memory data)
         external
         returns (bytes32)
     {
@@ -1592,7 +1592,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         storedRepaidUnits = _repaidUnits;
     }
 
-    function onSell(bytes32 id, Market memory market, address seller, uint256, uint256, bytes memory)
+    function onSell(bytes32 id, Market memory market, address seller, address, uint256, uint256, bytes memory)
         external
         returns (bytes32)
     {
@@ -1644,7 +1644,11 @@ contract LendCallback is IBuyCallback {
 }
 
 contract InvalidSellCallback is ISellCallback {
-    function onSell(bytes32, Market memory, address, uint256, uint256, bytes memory) external pure returns (bytes32) {
+    function onSell(bytes32, Market memory, address, address, uint256, uint256, bytes memory)
+        external
+        pure
+        returns (bytes32)
+    {
         return bytes32(0);
     }
 }
