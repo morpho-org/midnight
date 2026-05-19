@@ -20,10 +20,11 @@ methods {
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
+    // Assume that tokens do not reenter and do not revert: this is justified as we verify properties about the function's bodies.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 
-    // Assume that tokens and callbacks do not reenter: this is justified as we verify properties about the function's bodies.
+    // Assume that dcallbacks do not reenter: this is justified as we verify properties about the function's bodies.
     function havocCallback.callHavoc(address) external => HAVOC_ECF ALL;
 }
 
@@ -46,10 +47,6 @@ function cvlSafeTransfer(address token, address receiver, uint256 amount) {
 }
 
 function cvlSafeTransferFrom(address token, address from, address to, uint256 amount) {
-    bool shouldRevert;
-    if (shouldRevert) {
-        revert();
-    }
     tokenBalance[token][from] = tokenBalance[token][from] - amount;
     tokenBalance[token][to] = tokenBalance[token][to] + amount;
 
