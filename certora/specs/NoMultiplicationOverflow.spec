@@ -1,17 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Proves that successful calls do not overflow in mulDivDown or mulDivUp.
-//
-// mulDivDown(x, y, d) computes (x * y) / d with Solidity 0.8 checked arithmetic.
-// mulDivUp(x, y, d) computes (x * y + (d - 1)) / d with Solidity 0.8 checked arithmetic.
-// The multiplication x * y must not exceed type(uint256).max, or the transaction reverts.
-//
-// The toId summary follows the approach from CreatedMarkets.spec and encodes
-// market field bounds (lltv, maxLif) proven in other specs, plus the realistic
-// timestamp range assumption used by this overflow-focused proof.
-//
-// Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
-// Storage collateral is uint128, so boundedPrice enforces the product bound against max_uint128.
+// Proves that successful calls do not overflow in mulDivDown or mulDivUp, given the oracle price is bounded.
 
 using Utils as Utils;
 
@@ -20,7 +9,8 @@ methods {
 
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Oracle integration assumption: see header.
+    // Oracle integration assumption: every (collateralAmount * oraclePrice) fits in uint256.
+    // Storage collateral is uint128, so boundedPrice enforces the product bound against max_uint128.
     function _.price() external => boundedPrice(calledContract) expect(uint256);
 
     // Deterministic toId: links call-site markets to validated state from touchMarket.
@@ -29,20 +19,14 @@ methods {
     // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
 
-    // Proven in ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
-    // Wildcard contract: maxLif is a free function and is called from both Midnight and Utils.
-    function _.maxLif(uint256 lltv, uint256 cursor) internal => maxLifSummary(lltv) expect(uint256);
-
     // Summarize mulDivDown and mulDivUp to track overflow.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
 }
 
-/// GHOSTS ///
+/// HELPERS ///
 
 persistent ghost bool mulOverflow;
-
-/// SUMMARIES ///
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -54,8 +38,8 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "lltv <= WAD: proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => validMaxLif(market.collateralParams[i].maxLif), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "proven in CreatedMarkets.spec";
+    require forall uint256 i. i < market.collateralParams.length => validMaxLif(market.collateralParams[i].maxLif), "proven in ExactMath.spec";
     require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
     return Utils.hashMarket(market);
 }
@@ -74,13 +58,6 @@ function boundedTickPrice() returns uint256 {
     return price;
 }
 
-// Proven in ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
-function maxLifSummary(uint256 lltv) returns uint256 {
-    uint256 result;
-    require validMaxLif(result), "WAD <= maxLif <= 2 * WAD: proven in ExactMath.spec";
-    return result;
-}
-
 function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     mathint product = to_mathint(x) * y;
     if (product > max_uint256) {
@@ -89,8 +66,8 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
     uint256 result;
     require d > 0 => result * d <= product, "proven in MulDiv.spec (mulDivDownRoundsDown)";
-    require d == 0 || y > d || result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
-    require d == 0 || x > d || result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d > 0 => y <= d => result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d > 0 => x <= d => result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
 
     return result;
 }
@@ -103,8 +80,8 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 
     uint256 result;
     require d > 0 => result * d <= product + d - 1, "proven in MulDiv.spec (mulDivUpUpperBound)";
-    require d == 0 || y > d || result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
-    require d == 0 || x > d || result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d > 0 => y <= d => result <= x, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
+    require d > 0 => x <= d => result <= y, "proven in MulDiv.spec (mulDivArgumentLesserThanDenominator)";
 
     return result;
 }
