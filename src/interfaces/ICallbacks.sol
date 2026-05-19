@@ -10,18 +10,18 @@ interface IBuyCallback {
 }
 
 interface ISellCallback {
-    function onSell(bytes32 id, Market memory market, address seller, uint256 sellerAssets, uint256 units, bytes memory data) external returns (bytes32);
+    function onSell(bytes32 id, Market memory market, address seller, address receiver, uint256 sellerAssets, uint256 units, bytes memory data) external returns (bytes32);
 }
 
 interface ILiquidateCallback {
-    function onLiquidate(bytes32 id, Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes memory data) external returns (bytes32);
+    function onLiquidate(bytes32 id, Market memory market, address liquidator, address borrower, address receiver, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, bytes memory data) external returns (bytes32);
 }
 
 interface IRepayCallback {
-    function onRepay(bytes32 id, Market memory market, uint256 units, address onBehalf, bytes memory data) external returns (bytes32);
+    function onRepay(bytes32 id, Market memory market, address onBehalf, uint256 units, bytes memory data) external returns (bytes32);
 }
 
 interface IFlashLoanCallback {
-    function onFlashLoan(address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
+    function onFlashLoan(address initiator, address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
 }
 // forgefmt: disable-end

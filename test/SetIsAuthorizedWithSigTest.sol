@@ -11,7 +11,19 @@ import {
 } from "../src/periphery/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
+bytes constant AUTHORIZATION_TYPE =
+    "Authorization(address authorizer,address authorized,bool isAuthorized,uint256 nonce,uint256 deadline)";
+bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
+
 contract EcrecoverAuthorizerTest is BaseTest {
+    function testAuthorizationTypeHash() public pure {
+        assertEq(AUTHORIZATION_TYPEHASH, keccak256(AUTHORIZATION_TYPE));
+    }
+
+    function testEip712DomainTypeHash() public pure {
+        assertEq(EIP712_DOMAIN_TYPEHASH, keccak256(EIP712_DOMAIN_TYPE));
+    }
+
     function makeAuthorization(address authorizer, address authorized, bool isAuth)
         internal
         view
@@ -77,7 +89,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.Unauthorized.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);

@@ -117,10 +117,10 @@ contract TickLibTest is BaseTest {
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
-            // 3-term Taylor in wExp yields max ~1.7 bps absolute error; 2 bps threshold leaves headroom.
-            assertLe(absErrorWad, 0.0002e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
+            // 3-term Taylor in wExp yields max ~1.4 bps absolute error; 2 bps threshold leaves headroom.
+            assertLe(absErrorWad, 0.00014e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
             if (solPrice > 0.01e18) {
-                assertLe(relErrorWad, 0.0015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.15%"));
+                assertLe(relErrorWad, 0.0007e18, string.concat("Tick ", vm.toString(tick), " error exceeds 7 bps"));
             }
 
             // Check exact price is bracketed by adjacent sol prices in the bulk of the range,

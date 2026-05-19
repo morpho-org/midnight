@@ -10,7 +10,8 @@ struct Signature {
     bytes32 s;
 }
 
-bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(uint256 chainId,address verifyingContract)");
+/// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
+bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
 interface IEcrecoverRatifier is IRatifier {
     /// ERRORS ///
@@ -21,7 +22,7 @@ interface IEcrecoverRatifier is IRatifier {
     error Unauthorized();
 
     /// EVENTS ///
-    event CancelRoot(address indexed maker, bytes32 indexed root);
+    event CancelRoot(address indexed caller, address indexed maker, bytes32 indexed root);
 
     /// FUNCTIONS ///
     function cancelRoot(address maker, bytes32 root) external;
