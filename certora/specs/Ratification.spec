@@ -29,7 +29,7 @@ methods {
 rule takeRequiresMakerConsent(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
     bool makerAuthorizedRatifier = isAuthorized(offer.maker, offer.ratifier);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 
     assert makerAuthorizedRatifier;
 }
@@ -49,6 +49,6 @@ strong invariant addressZeroCantAuthorize(address authorized)
 rule takeRequiresNonZeroMaker(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
     requireInvariant addressZeroCantAuthorize(offer.ratifier);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
     assert offer.maker != 0;
 }

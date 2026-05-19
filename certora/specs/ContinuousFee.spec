@@ -49,7 +49,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, uint256 units, address taker, ad
 
     require pendingFee(id, buyer) <= creditOf(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     require id == lastId, "id should be derived from market";
 
@@ -73,7 +73,7 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, uint256 units, address ta
 
     require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     require id == lastId, "id should be derived from market";
 
@@ -119,7 +119,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, uint256 units, address tak
 
     uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     require id == lastId, "id should be derived from market";
 
@@ -139,7 +139,7 @@ rule takeDoesNotAffectThirdParties(env e, uint256 units, address taker, address 
     uint256 userAccruedFeeBefore;
     postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.market, id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     require id == lastId, "id should be derived from market";
 

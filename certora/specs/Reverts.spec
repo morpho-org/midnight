@@ -235,7 +235,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     uint128 bitmap = collateralBitmap(id, seller);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -284,7 +284,7 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker
     address seller = offer.buy ? taker : offer.maker;
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -299,7 +299,7 @@ rule enterGateBlocksCreditIncrease(env e, uint256 units, address taker, address 
     bytes32 id = summaryToId(offer.market);
     uint256 creditBefore = creditOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     uint256 creditAfter = creditOf(id, user);
 
@@ -314,7 +314,7 @@ rule enterGateBlocksDebtIncrease(env e, uint256 units, address taker, address ta
     bytes32 id = summaryToId(offer.market);
     uint256 debtBefore = debtOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     uint256 debtAfter = debtOf(id, user);
 
@@ -336,7 +336,7 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Market market, uint256 coll
 /// If transferFrom reverts, take, repay, supplyCollateral, and liquidate all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+    f -> f.selector == sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
         || f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector

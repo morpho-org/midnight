@@ -18,7 +18,7 @@ methods {
 }
 
 ///  Only setConsumed and take can modify the consumed mapping.
-rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint256, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector } {
+rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint256, address).selector && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
     uint256 consumedBefore = consumed(user, group);
 
     f(e, args);
@@ -40,7 +40,7 @@ rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint256 amount, addres
 rule takeOnlyAffectsMakerConsumed(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, address user, bytes32 group) {
     uint256 consumedBefore = consumed(user, group);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     // Any pair that is not exactly (offer.maker, offer.group) must be unchanged.
     assert (user != offer.maker || group != offer.group) => consumed(user, group) == consumedBefore;
@@ -57,7 +57,7 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
 
 /// After a successful take, consumed[offer.maker][offer.group] does not exceed the effective max.
 rule takeConsumedBoundedByMax(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert offer.maxAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxAssets;
     assert offer.maxAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
@@ -69,7 +69,7 @@ rule takeConsumedDelta(env e, uint256 units, address taker, address takerCallbac
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert consumed(offer.maker, offer.group) == consumedBefore + units;
 }
@@ -80,7 +80,7 @@ rule takeConsumedAtMaxUnchangedUnits(env e, uint256 units, address taker, addres
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert consumedBefore >= offer.maxUnits => consumed(offer.maker, offer.group) == consumedBefore;
 }
@@ -91,7 +91,7 @@ rule takeConsumedAtMaxUnchangedAssets(env e, uint256 units, address taker, addre
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert consumedBefore >= offer.maxAssets => consumed(offer.maker, offer.group) == consumedBefore;
 }
@@ -104,7 +104,7 @@ rule fullyConsumedOfferRevertsOnNonTrivialTake(env e, uint256 units, address tak
 
     require offer.maxUnits > 0 && consumedBefore >= offer.maxUnits, "assume the offer is fully consumed";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     // If take does not revert, its input has to be zero.
     assert units == 0;
