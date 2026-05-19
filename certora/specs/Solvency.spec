@@ -50,6 +50,7 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
+    
         // Settle pending trading fee receipts as the corresponding tokens arrive at the contract.
         if (dest == currentContract && pendingFeeReceipt[token] >= to_mathint(value)) {
             pendingFeeReceipt[token] = pendingFeeReceipt[token] - value;
