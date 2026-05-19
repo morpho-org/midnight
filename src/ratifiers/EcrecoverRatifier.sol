@@ -5,21 +5,38 @@ pragma solidity 0.8.34;
 import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IEcrecoverRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {HashLib} from "./libraries/HashLib.sol";
 
-/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are no
-/// longer valid.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
+/// no longer valid.
+/// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers.
+/// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the
+/// offer, and the proof of the offer in the tree.
+/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
+/// @dev The leaf index determines each sibling's left/right position.
+/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
+
+    mapping(address maker => mapping(bytes32 root => bool)) public isRootCanceled;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
     }
 
-    function onRatify(Offer memory offer, bytes32 root, bytes memory ratifierData) external view returns (bytes32) {
+    function cancelRoot(address maker, bytes32 root) external {
+        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
+        isRootCanceled[maker][root] = true;
+        emit CancelRoot(maker, root);
+    }
+
+    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
-        (Signature memory sig, uint256 height) = abi.decode(ratifierData, (Signature, uint256));
-        bytes32 structHash = keccak256(abi.encode(UtilsLib.offerTreeTypeHash(height), root));
+        (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
+            abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));
+        require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
+        require(!isRootCanceled[offer.maker][root], RootCanceled());
+        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(proof.length), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
