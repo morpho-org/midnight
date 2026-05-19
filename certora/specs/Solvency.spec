@@ -50,10 +50,10 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
-    
-        // Settle pending trading fee receipts as the corresponding tokens arrive at the contract.
-        if (dest == currentContract && pendingFeeReceipt[token] >= to_mathint(value)) {
-            pendingFeeReceipt[token] = pendingFeeReceipt[token] - value;
+
+        // Settle pending trading fee receipts only on the exact fee transfer expected by take().
+        if (dest == currentContract && pendingFeeReceipt[token] == to_mathint(value)) {
+            pendingFeeReceipt[token] = 0;
         }
     }
     return success;
@@ -151,15 +151,22 @@ hook Sstore claimableTradingFee[KEY address token] uint256 newVal (uint256 oldVa
 
 /// INVARIANTS AND RULES ///
 
+// For any token, the pending trading fee receipt after a transaction is 0: every claimableTradingFee
+// increment in take is paid back in by the same-function inbound transfer.
+weak invariant pendingFeeReceiptZero(address token)
+    pendingFeeReceipt[token] == 0;
+
 // For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
     tokenBalances[token][currentContract] + pendingFeeReceipt[token] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token]
     {
         preserved with (env e) {
+            requireInvariant pendingFeeReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
         }
         preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) with (env e) {
+            requireInvariant pendingFeeReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
             require taker != currentContract, "no trading with contract";
             require offer.maker != currentContract, "no trading with contract";
@@ -182,8 +189,3 @@ rule flashLoansPaidBack(method f, address token) {
 // With tokenBalanceCorrect, this proves that for any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token.
 weak invariant flashLoansZero(address token)
     flashloans[token] == 0;
-
-// For any token, the pending trading fee receipt after a transaction is 0: every claimableTradingFee
-// increment in take is paid back in by the same-function inbound transfer.
-weak invariant pendingFeeReceiptZero(address token)
-    pendingFeeReceipt[token] == 0;
