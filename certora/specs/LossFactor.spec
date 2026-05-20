@@ -35,7 +35,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 }
 
 /// The market's lossFactor is only modified by liquidate.
-rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
+rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
 
     f(e, args);
@@ -51,7 +51,8 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collater
 
     require lossFactorBefore < max_uint128, "market lossFactor must not be saturated";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    bool _unhealthy;
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
 
     bool lossFactorChanged = currentContract.marketState[id].lossFactor != lossFactorBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;

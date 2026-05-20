@@ -55,7 +55,8 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Market market,
     uint256 debtBefore = debtOf(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
-    liquidate(e, market, liqIndex, seizedAssets, repaidUnits, liqUser, receiver, callback, data);
+    bool _unhealthy;
+    liquidate(e, market, liqIndex, seizedAssets, repaidUnits, liqUser, _unhealthy, receiver, callback, data);
 
     uint256 creditAfter = creditOf(id, user);
     uint256 debtAfter = debtOf(id, user);

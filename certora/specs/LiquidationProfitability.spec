@@ -78,7 +78,8 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, receiver, callback, data);
+    bool _unhealthy;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, _unhealthy, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
@@ -99,7 +100,8 @@ rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collatera
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, receiver, callback, data);
+    bool _unhealthy;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, _unhealthy, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 

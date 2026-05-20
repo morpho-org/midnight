@@ -71,6 +71,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
 /// healthy after a liquidation.
 /// @dev The RCF is deactivated for post-maturity healthy borrowers.
+/// @dev The liquidator chooses the liquidation path via the `unhealthyPath` flag:
+/// - unhealthyPath=true: uses maxLif and enforces RCF; requires the borrower to be unhealthy.
+/// - unhealthyPath=false: uses the ramped LIF and skips RCF; requires the maturity to have passed.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
@@ -581,6 +584,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        bool unhealthyPath,
         address receiver,
         address callback,
         bytes calldata data
@@ -614,7 +618,7 @@ contract Midnight is IMidnight {
 
         require(
             originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (block.timestamp > market.maturity || originalDebt > maxDebt),
+                && (unhealthyPath ? originalDebt > maxDebt : block.timestamp > market.maturity),
             NotLiquidatable()
         );
 
@@ -637,7 +641,7 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = originalDebt > maxDebt
+            uint256 lif = unhealthyPath
                 ? _maxLif
                 : UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF);
 
@@ -647,7 +651,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (originalDebt > maxDebt) {
+            if (unhealthyPath) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD

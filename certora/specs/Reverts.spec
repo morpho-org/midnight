@@ -339,7 +339,7 @@ filtered {
     f -> f.selector == sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
         || f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
-        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require forceTransferFromRevert, "transferFrom reverts";
     f@withrevert(e, args);
@@ -361,7 +361,7 @@ filtered {
         || f.selector == sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
         || f.selector == sig:claimTradingFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Market, uint256, address).selector
-        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);

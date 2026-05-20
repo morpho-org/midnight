@@ -118,7 +118,8 @@ rule marketIsCreatedAfterWithdrawCollateral(env e, Midnight.Market market, uint2
 }
 
 rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    bool _unhealthy;
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
     assert marketIsCreated(market);
 }
 
@@ -131,7 +132,7 @@ filtered {
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require !marketIsCreated(market), "Assume that the market is not created";
     f(e, args);

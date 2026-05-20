@@ -177,7 +177,8 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    bool _unhealthy;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -193,7 +194,7 @@ filtered {
         && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Market, address).selector
 } {
     uint256 creditBefore = creditOf(id, user);
@@ -246,7 +247,8 @@ rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collatera
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    bool _unhealthy;
+    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
@@ -260,7 +262,7 @@ filtered {
     f -> !f.isView
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     uint256 collateralBefore = collateral(id, user, colIdx);
     f(e, args);
