@@ -69,8 +69,8 @@ contract OfferTree {
     // The specification of a well-formed tree is the following:
     //   - empty nodes (all fields zero) are well-formed
     //   - leaves (left == 0 && right == 0 && hashNode != 0) require hashNode == id
-    //   - internal nodes (left != 0 && right != 0) require non-empty children and hashNode = hashNode(left.hashNode, right.hashNode)
-    //   - any other field combination is malformed
+    //   - internal nodes (left != 0 && right != 0) require non-empty children and hashNode = hashNode(left.hashNode,
+    // right.hashNode) - any other field combination is malformed
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (_isEmpty(n)) return true;
@@ -80,8 +80,7 @@ contract OfferTree {
         if (n.left != 0 && n.right != 0) {
             bytes32 leftHash = tree[n.left].hashNode;
             bytes32 rightHash = tree[n.right].hashNode;
-            return leftHash != 0 && rightHash != 0
-                && n.hashNode == HashLib.hashNode(leftHash, rightHash);
+            return leftHash != 0 && rightHash != 0 && n.hashNode == HashLib.hashNode(leftHash, rightHash);
         }
         return false;
     }
