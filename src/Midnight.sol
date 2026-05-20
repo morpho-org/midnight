@@ -680,6 +680,7 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
+            unhealthyPath,
             badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit,
