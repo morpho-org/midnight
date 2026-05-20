@@ -6,6 +6,7 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
+    MAX_CONTINUOUS_FEE,
     LLTV_8,
     LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
@@ -306,19 +307,28 @@ contract LiquidationTest is BaseTest {
         assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
     }
 
-    function testLiquidateEmitsLossFactor(uint256 units) public {
-        units = bound(units, 10, MAX_UNITS);
+    function testLiquidateEmitsLossFactorAndContinuousFeeCredit(uint256 units) public {
+        units = bound(units, 1e18, MAX_UNITS);
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
         collateralize(market, borrower, units);
         setupMarket(market, units);
+        vm.warp(block.timestamp + 50);
+        midnight.updatePosition(market, lender);
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
         uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
         uint256 previousLossFactor = midnight.lossFactor(id);
+        uint256 previousContinuousFeeCredit = midnight.continuousFeeCredit(id);
         uint256 expectedLossFactor = expectedBadDebt == 0
             ? previousLossFactor
             : type(uint128).max
                 - (type(uint128).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+        uint256 expectedContinuousFeeCredit = previousLossFactor < type(uint128).max
+            ? previousContinuousFeeCredit.mulDivDown(
+                type(uint128).max - expectedLossFactor, type(uint128).max - previousLossFactor
+            )
+            : 0;
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -330,6 +340,7 @@ contract LiquidationTest is BaseTest {
             borrower,
             expectedBadDebt,
             expectedLossFactor,
+            expectedContinuousFeeCredit,
             address(this),
             address(this)
         );
