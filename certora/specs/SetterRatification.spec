@@ -12,14 +12,15 @@ methods {
     function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bytes32) envfree;
 
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
+    function Utils.hashNode(bytes32, bytes32) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
 
     function SetterRatifier.isRootRatified(address, bytes32) external returns (bool) envfree;
 
-    // Summarized so the merkle verification and the helper-side leaf hash agree on the leaf-hash function.
+    // Align the merkle verification and the helper's well-formedness on the same hash functions.
+    // Routing through Utils (`keccak256(abi.encode(...))`) lets Certora's bounded-hash recognition
+    // supply injectivity automatically, instead of needing a ghost + axiom.
     function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
-
-    // Summarized to a ghost so the upward fold and the downward walk see the same injective hash function.
     function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) => summaryHashNode(a, b);
 }
 
@@ -27,13 +28,8 @@ function summaryHashOffer(Midnight.Offer offer) returns bytes32 {
     return Utils.hashOffer(offer);
 }
 
-// Injective on ordered pairs.
-persistent ghost ghostHashNode(bytes32, bytes32) returns bytes32 {
-    axiom forall bytes32 a1. forall bytes32 b1. forall bytes32 a2. forall bytes32 b2. ghostHashNode(a1, b1) == ghostHashNode(a2, b2) => (a1 == a2 && b1 == b2);
-}
-
 function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
-    return ghostHashNode(a, b);
+    return Utils.hashNode(a, b);
 }
 
 // SetterRatifier-specific framing of takeCorrectness.

@@ -12,9 +12,10 @@ methods {
     function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bytes32) envfree;
 
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
+    function Utils.hashNode(bytes32, bytes32) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
 
-    // Align the merkle verification and the helper's well-formedness on the same injective hash functions.
+    // Align the merkle verification and the helper's well-formedness on the same hash functions.
     function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
     function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) => summaryHashNode(a, b);
 
@@ -40,13 +41,8 @@ function summaryHashOffer(Midnight.Offer offer) returns bytes32 {
     return Utils.hashOffer(offer);
 }
 
-// Injective on ordered pairs.
-persistent ghost ghostHashNode(bytes32, bytes32) returns bytes32 {
-    axiom forall bytes32 a1. forall bytes32 b1. forall bytes32 a2. forall bytes32 b2. ghostHashNode(a1, b1) == ghostHashNode(a2, b2) => (a1 == a2 && b1 == b2);
-}
-
 function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
-    return ghostHashNode(a, b);
+    return Utils.hashNode(a, b);
 }
 
 /// SOUNDNESS ///
