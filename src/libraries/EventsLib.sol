@@ -21,7 +21,7 @@ library EventsLib {
     event MarketCreated(bytes32 indexed id_, Market market);
     event Take(address caller, bytes32 indexed id_, address indexed maker, address indexed taker, bool offerIsBuy, uint256 buyerAssets, uint256 sellerAssets, uint256 units, address payer, address receiver, bytes32 group, uint256 consumed, uint256 buyerPendingFeeIncrease, uint256 sellerPendingFeeDecrease, uint256 buyerCreditIncrease, uint256 sellerCreditDecrease);
     event Withdraw(address caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address indexed receiver, uint256 pendingFeeDecrease);
-    event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address callback);
+    event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address payer);
     event SupplyCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf);
     event WithdrawCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf, address receiver);
     event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, uint256 badDebt, uint256 latestLossFactor, address payer, address receiver);
