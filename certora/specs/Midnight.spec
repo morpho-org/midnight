@@ -81,8 +81,8 @@ rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 coll
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
 
-    bool _unhealthy;
-    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
 
     // At most one of the input arguments can be zero.
     assert seizedAssets == 0 || repaidUnits == 0;

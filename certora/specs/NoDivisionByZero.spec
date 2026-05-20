@@ -124,7 +124,7 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
 
-    bool _unhealthy;
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
     assert true;
 }

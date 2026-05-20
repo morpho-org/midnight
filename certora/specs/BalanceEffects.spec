@@ -177,8 +177,8 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 
     uint256 seizedResult;
     uint256 repaidResult;
-    bool _unhealthy;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -247,8 +247,8 @@ rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collatera
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    bool _unhealthy;
-    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;

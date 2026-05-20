@@ -51,8 +51,8 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collater
 
     require lossFactorBefore < max_uint128, "market lossFactor must not be saturated";
 
-    bool _unhealthy;
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
 
     bool lossFactorChanged = currentContract.marketState[id].lossFactor != lossFactorBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;

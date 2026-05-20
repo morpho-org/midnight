@@ -21,8 +21,8 @@ rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 colla
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
-    bool _unhealthy;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callback, data);
+    bool _unhealthyPath;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore + repaidResult;
 }

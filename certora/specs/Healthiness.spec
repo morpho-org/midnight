@@ -218,8 +218,8 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    bool _unhealthy;
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, _unhealthy, receiver, callbackAddr, data);
+    bool _unhealthyPath;
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, _unhealthyPath, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -255,8 +255,8 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 
     require callIsHealthy(globalMarket, globalId, globalBorrower), "user is healthy before call";
 
-    bool _unhealthy;
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthy, receiver, callbackAddr, data);
+    bool _unhealthyPath;
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callbackAddr, data);
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalMarket, globalId, globalBorrower), "user is healthy after call";
