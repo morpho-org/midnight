@@ -2,11 +2,6 @@
 -- Fields: total_units, loss_factor, withdrawable, continuous_fee_credit,
 --         trading_fee_cbp_0..6, continuous_fee, tick_spacing
 -- Platform: Dune Analytics (Trino SQL, native uint256)
---
--- continuousFeeCredit requires ordered processing (multiplicative Liquidate effect)
--- and is computed via a RECURSIVE CTE.
-
--- MAX_U128 = 2^128 - 1 = 340282366920938463463374607431768211455
 
 WITH
 
@@ -64,78 +59,54 @@ withdrawable AS (
 ),
 
 -- ── continuousFeeCredit ───────────────────────────────────────────────────────
--- Three types of event affect it (must be processed in block/log order per market):
---   UpdatePosition:     cfc += accruedFee                  (simple addition)
---   Liquidate:          cfc *= (MAX_U128 - newLF) / (MAX_U128 - oldLF)
---                       (= 0 when oldLF == MAX_U128)
---   ClaimContinuousFee: cfc -= amount                      (simple subtraction)
---
--- We merge the three event tables into a single ordered stream per market,
--- then process with a RECURSIVE CTE.
+-- Liquidate emits latestContinuousFeeCredit = the CFC value immediately after
+-- the liquidation. Start from the last liquidation's emitted CFC, then add
+-- UpdatePosition accruedFee and subtract ClaimContinuousFee amounts that
+-- follow it (or process all events if no liquidation has occurred yet).
 
-cfc_events_raw AS (
-    SELECT 'U' AS etype, id_, accruedfee AS amount, CAST(NULL AS uint256) AS loss_factor,
-           evt_block_number, evt_index
-    FROM midnight.midnight_evt_updateposition
-
-    UNION ALL
-
-    SELECT 'L' AS etype, id_, CAST(NULL AS uint256), latestlossfactor,
-           evt_block_number, evt_index
+last_liq AS (
+    SELECT id_,
+           MAX_BY(latestcontinuousfeecredit, ROW(evt_block_number, evt_index)) AS cfc_after_last_liq,
+           MAX_BY(evt_block_number,          ROW(evt_block_number, evt_index)) AS last_liq_block,
+           MAX_BY(evt_index,                 ROW(evt_block_number, evt_index)) AS last_liq_index
     FROM midnight.midnight_evt_liquidate
-
-    UNION ALL
-
-    SELECT 'C' AS etype, id_, amount, CAST(NULL AS uint256),
-           evt_block_number, evt_index
-    FROM midnight.midnight_evt_claimcontinuousfee
+    GROUP BY id_
 ),
 
-cfc_events AS (
-    SELECT etype, id_, amount, loss_factor, evt_block_number, evt_index,
-           ROW_NUMBER() OVER (PARTITION BY id_ ORDER BY evt_block_number, evt_index) AS n
-    FROM cfc_events_raw
+up_after_liq AS (
+    SELECT u.id_, SUM(u.accruedfee) AS total_up
+    FROM midnight.midnight_evt_updateposition u
+    LEFT JOIN last_liq ll ON ll.id_ = u.id_
+    WHERE ll.id_ IS NULL
+       OR u.evt_block_number > ll.last_liq_block
+       OR (u.evt_block_number = ll.last_liq_block AND u.evt_index > ll.last_liq_index)
+    GROUP BY u.id_
 ),
 
-all_market_ids AS (
-    SELECT DISTINCT id_ FROM midnight.midnight_evt_marketcreated
-),
-
--- Recursive processing: seed with n=0 (initial state), then apply each event.
--- state columns: id_, n (event counter), cfc (current continuousFeeCredit), prev_lf (previous lossFactor)
-cfc_state(id_, n, cfc, prev_lf) AS (
-    -- Base: initial state before any events
-    SELECT id_, BIGINT '0', UINT256 '0', UINT256 '0'
-    FROM all_market_ids
-
-    UNION ALL
-
-    SELECT
-        s.id_,
-        s.n + 1,
-        CASE e.etype
-            WHEN 'U' THEN s.cfc + e.amount
-            WHEN 'L' THEN
-                CASE
-                    WHEN s.prev_lf = UINT256 '340282366920938463463374607431768211455'
-                        THEN UINT256 '0'
-                    ELSE (s.cfc * (UINT256 '340282366920938463463374607431768211455' - e.loss_factor))
-                         / (UINT256 '340282366920938463463374607431768211455' - s.prev_lf)
-                END
-            WHEN 'C' THEN s.cfc - e.amount
-        END AS cfc,
-        CASE e.etype WHEN 'L' THEN e.loss_factor ELSE s.prev_lf END AS prev_lf
-    FROM cfc_state s
-    JOIN cfc_events e ON e.id_ = s.id_ AND e.n = s.n + 1
+claim_after_liq AS (
+    SELECT c.id_, SUM(c.amount) AS total_claim
+    FROM midnight.midnight_evt_claimcontinuousfee c
+    LEFT JOIN last_liq ll ON ll.id_ = c.id_
+    WHERE ll.id_ IS NULL
+       OR c.evt_block_number > ll.last_liq_block
+       OR (c.evt_block_number = ll.last_liq_block AND c.evt_index > ll.last_liq_index)
+    GROUP BY c.id_
 ),
 
 continuous_fee_credit AS (
-    SELECT id_, cfc AS continuous_fee_credit
+    SELECT
+        ids.id_,
+        COALESCE(ll.cfc_after_last_liq, UINT256 '0')
+            + COALESCE(up.total_up,     UINT256 '0')
+            - COALESCE(tc.total_claim,  UINT256 '0') AS continuous_fee_credit
     FROM (
-        SELECT id_, cfc,
-               ROW_NUMBER() OVER (PARTITION BY id_ ORDER BY n DESC) AS rn
-        FROM cfc_state
-    ) WHERE rn = 1
+             SELECT id_ FROM last_liq
+        UNION SELECT id_ FROM up_after_liq
+        UNION SELECT id_ FROM claim_after_liq
+    ) ids
+    LEFT JOIN last_liq        ll ON ll.id_ = ids.id_
+    LEFT JOIN up_after_liq    up ON up.id_ = ids.id_
+    LEFT JOIN claim_after_liq tc ON tc.id_ = ids.id_
 ),
 
 -- ── tradingFeeCbp[0..6] and continuousFee ─────────────────────────────────────

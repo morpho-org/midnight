@@ -77,7 +77,7 @@ contract SqlScenarioTest is BaseTest {
     bytes32 internal constant SEL_SET_FEE_CLAIMER = keccak256("SetFeeClaimer(address)");
     bytes32 internal constant SEL_SET_TS_SETTER   = keccak256("SetTickSpacingSetter(address)");
     bytes32 internal constant SEL_SET_DEF_CF      = keccak256("SetDefaultContinuousFee(address,uint256)");
-    bytes32 internal constant SEL_LIQUIDATE       = keccak256("Liquidate(address,bytes32,address,uint256,uint256,address,uint256,uint256,address,address)");
+    bytes32 internal constant SEL_LIQUIDATE       = keccak256("Liquidate(address,bytes32,address,uint256,uint256,address,uint256,uint256,uint256,address,address)");
 
     // ── Per-event JSON accumulators ───────────────────────────────────────────
     string internal jTake; string internal jUpdatePos; string internal jWithdraw;
@@ -565,16 +565,17 @@ contract SqlScenarioTest is BaseTest {
         bytes32 _id      = log.topics[1];
         address collat   = address(uint160(uint256(log.topics[2])));
         address borrowerAddr = address(uint160(uint256(log.topics[3])));
-        // data: caller, seizedAssets, repaidUnits, badDebt, latestLossFactor, payer, receiver
-        (, uint256 seized, uint256 repaid, uint256 bad, uint256 latestLF,,)
-            = abi.decode(log.data, (address, uint256, uint256, uint256, uint256, address, address));
+        // data: caller, seizedAssets, repaidUnits, badDebt, latestLossFactor, latestContinuousFeeCredit, payer, receiver
+        (, uint256 seized, uint256 repaid, uint256 bad, uint256 latestLF, uint256 latestCFC,,)
+            = abi.decode(log.data, (address, uint256, uint256, uint256, uint256, uint256, address, address));
         string memory body = string.concat(
             _sb("id_", _b32s(_id)), _c, _sb("collateral", _as(collat)), _c,
             _sb("borrower", _as(borrowerAddr)), _c,
             _sn("seizedassets", seized), _c, _sn("repaidunits", repaid), _c,
             _sn("baddebt", bad), _c, _sn("latestlossfactor", latestLF)
         );
-        body = string.concat(body, _c, _sn("evt_block_number", bn), _c, _sn("evt_index", idx));
+        body = string.concat(body, _c, _sn("latestcontinuousfeecredit", latestCFC),
+            _c, _sn("evt_block_number", bn), _c, _sn("evt_index", idx));
         jLiquidate = _app(jLiquidate, body);
     }
 

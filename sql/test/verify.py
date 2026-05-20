@@ -32,15 +32,6 @@ def adapt_sql(sql: str) -> str:
     sql = re.sub(r"\bWITH\b", "WITH RECURSIVE", sql, count=1)
     # to_unixtime must come before the CAST regex (the CAST may wrap it)
     sql = sql.replace("to_unixtime(evt_block_time)", "evt_block_time")
-    # MAX_U128 must become UHUGEINT before the general UINT256 regex strips the type annotation
-    _MAX_U128 = "340282366920938463463374607431768211455"
-    sql = sql.replace(f"UINT256 '{_MAX_U128}'", f"{_MAX_U128}::UHUGEINT")
-    # cfc_state base-case seed: make cfc and prev_lf UHUGEINT so the recursive CTE
-    # preserves that type and arithmetic with UHUGEINT columns doesn't truncate
-    sql = sql.replace(
-        "    SELECT id_, BIGINT '0', UINT256 '0', UINT256 '0'\n    FROM all_market_ids",
-        "    SELECT id_, CAST(0 AS BIGINT), CAST(0 AS UHUGEINT), CAST(0 AS UHUGEINT)\n    FROM all_market_ids",
-    )
     sql = re.sub(r"UINT256 '(\d+)'", r"\1", sql)
     sql = re.sub(r"BIGINT '(\d+)'", r"\1", sql)
     sql = re.sub(
@@ -194,7 +185,7 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
          "evt_block_number", "evt_index"],
         [],
         ["id_", "collateral", "borrower"],
-        ["latestlossfactor"],  # uint128 — stored as UHUGEINT to hold values up to MAX_U128
+        ["latestlossfactor", "latestcontinuousfeecredit"],  # uint128 — stored as UHUGEINT to hold values up to MAX_U128
     ),
 }
 
