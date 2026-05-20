@@ -62,13 +62,13 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, Midnight.Offer offer, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
 
     uint256 claimableBefore = claimableTradingFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData, ratifierData);
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
@@ -143,7 +143,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
         }
-        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly

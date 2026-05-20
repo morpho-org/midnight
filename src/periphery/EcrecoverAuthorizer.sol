@@ -44,6 +44,6 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         );
 
         IMidnight(MIDNIGHT)
-            .setIsAuthorized(authorization.authorizer, authorization.authorized, authorization.isAuthorized);
+            .setIsAuthorized(authorization.authorized, authorization.isAuthorized, authorization.authorizer);
     }
 }

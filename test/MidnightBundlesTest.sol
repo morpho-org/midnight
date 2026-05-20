@@ -90,13 +90,13 @@ contract MidnightBundlesTest is BaseTest {
         deal(address(loanToken), lender, type(uint256).max);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(midnightBundles), true);
+        midnight.setIsAuthorized(address(midnightBundles), true, borrower);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(midnightBundles), true);
+        midnight.setIsAuthorized(address(midnightBundles), true, lender);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(this), true);
+        midnight.setIsAuthorized(address(this), true, lender);
 
         vm.prank(lender);
         loanToken.approve(address(midnightBundles), type(uint256).max);
