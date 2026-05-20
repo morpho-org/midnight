@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
+import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 
 contract UtilsLibTest is Test {
     int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
@@ -106,6 +106,15 @@ contract UtilsLibTest is Test {
         // Also pin the old and new range-reduction boundaries, where jumps are most likely.
         _assertWExpNonDecreasingAround(WEXP_LN2 / 2 - 1);
         _assertWExpNonDecreasingAround(WEXP_LN2 - WEXP_OFFSET - 1);
+    }
+
+    function testWExpIncreasingAtTicks() public pure {
+        uint256 previous = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(MAX_TICK)));
+        for (uint256 tick = MAX_TICK; tick > 0; tick--) {
+            uint256 current = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick - 1)));
+            assertGt(current, previous);
+            previous = current;
+        }
     }
 
     function _assertWExpNonDecreasing(int256 start, int256 end, int256 step) internal pure {
