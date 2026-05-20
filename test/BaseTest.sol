@@ -79,13 +79,13 @@ abstract contract BaseTest is Test {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, borrower);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, lender);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(otherBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherBorrower);
         vm.prank(otherLender);
-        midnight.setIsAuthorized(otherLender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherLender);
 
         uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
         if (tokenType == 1) {
@@ -149,7 +149,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        return midnight.take(offer, units, taker, taker, address(0), hex"", merkleRatifierData([offer]));
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -190,15 +190,15 @@ abstract contract BaseTest is Test {
 
         vm.prank(badBorrower);
 
-        midnight.setIsAuthorized(badBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, badBorrower);
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
 
         deal(market.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(market, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), false);
+        midnight.setIsAuthorized(address(this), false, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
@@ -209,7 +209,7 @@ abstract contract BaseTest is Test {
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
         deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
         midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
         assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
@@ -395,7 +395,7 @@ abstract contract BaseTest is Test {
         bytes memory rd = merkleRatifierData([borrowerOffer]);
 
         vm.prank(lender);
-        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
+        midnight.take(borrowerOffer, units, lender, borrower, address(0), hex"", rd);
     }
 
     function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {

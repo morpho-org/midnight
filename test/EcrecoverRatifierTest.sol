@@ -36,7 +36,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
@@ -130,7 +130,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
 
         vm.prank(borrower);
         ecrecoverRatifier.cancelRoot(lender, _root);
@@ -156,7 +156,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         // Works while authorized.
@@ -165,7 +165,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         // Revoke.
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, false);
+        midnight.setIsAuthorized(borrower, false, lender);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);

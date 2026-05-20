@@ -76,7 +76,7 @@ rule takeIncreasesClaimableTradingFee(env e, uint256 units, address taker, addre
     assert anyToken != offer.market.loanToken => claimableTradingFee(anyToken) == before;
 }
 
-rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
+rule claimableTradingFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector && f.selector != sig:claimTradingFee(address, uint256, address).selector } {
     uint256 before = claimableTradingFee(token);
     f(e, args);
     assert claimableTradingFee(token) == before;
