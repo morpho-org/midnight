@@ -59,27 +59,25 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
-/// maturity + TIME_TO_MAX_LIF.
-/// @dev When the borrower is unhealthy, the liquidation cannot put the borrower back into health (recovery close
-/// factor), unless the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold
-/// units.
-/// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
-/// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
+/// @dev There are two liquidations modes: The "unhealthy path", available if the borrower is unhealthy and the
+/// "post-maturity path", available after the market's maturity. For a unhealthy borrower after the maturity, the
+/// liquidator can choose between both modes.
+/// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// by what is needed to put back the position into health ("recovery close factor", or "RCF"). The RCF is deactivated
+/// if the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold.
+/// @dev The RCF means (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
 /// healthy after a liquidation.
-/// @dev The RCF is deactivated for post-maturity healthy borrowers.
-/// @dev The liquidator chooses the liquidation path via the `unhealthyPath` flag:
-/// - unhealthyPath=true: uses maxLif and enforces RCF; requires the borrower to be unhealthy.
-/// - unhealthyPath=false: uses the ramped LIF and skips RCF; requires the maturity to have passed.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
+/// @dev In the "post-maturity path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 ///
 /// SLASHING
 /// @dev When a borrower's bad debt is realized, it is socialized among lenders in this market.
