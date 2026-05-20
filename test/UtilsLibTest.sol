@@ -109,8 +109,12 @@ contract UtilsLibTest is Test {
     }
 
     function testWExpIncreasingAtTicks() public pure {
+        // MAX_TICK is a small constant, so casting it to int256 is safe.
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 previous = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(MAX_TICK)));
         for (uint256 tick = MAX_TICK; tick > 0; tick--) {
+            // tick - 1 is bounded by MAX_TICK - 1, so casting it to int256 is safe.
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint256 current = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick - 1)));
             assertGt(current, previous);
             previous = current;
