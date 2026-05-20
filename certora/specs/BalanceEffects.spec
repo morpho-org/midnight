@@ -168,7 +168,7 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
 
 /// Liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
-rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser) {
+rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool unhealthyPath) {
     bytes32 id = toId(e, market);
 
     uint256 debtBefore = debtOf(id, borrower);
@@ -177,8 +177,7 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 
     uint256 seizedResult;
     uint256 repaidResult;
-    bool _unhealthyPath;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, unhealthyPath, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -240,15 +239,14 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 
 
 /// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
 /// and only changes position[id][borrower].collateral[collateralIndex].
-rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex, bool unhealthyPath) {
     bytes32 id = toId(e, market);
 
     uint256 collateralBefore = collateral(id, borrower, collateralIndex);
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    bool _unhealthyPath;
-    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
+    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, unhealthyPath, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;

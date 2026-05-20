@@ -69,7 +69,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 /// LIF CHARACTERIZATION ///
 
 /// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
-rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool unhealthyPath) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
@@ -78,8 +78,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
 
     uint256 seizedResult;
     uint256 repaidResult;
-    bool _unhealthyPath;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, _unhealthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, unhealthyPath, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
@@ -91,7 +90,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
 }
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when borrower is unhealthy or >= 15 min post-maturity (profitability).
-rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data) {
+rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool unhealthyPath) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
@@ -100,8 +99,7 @@ rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collatera
 
     uint256 seizedResult;
     uint256 repaidResult;
-    bool _unhealthyPath;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, _unhealthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, unhealthyPath, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
