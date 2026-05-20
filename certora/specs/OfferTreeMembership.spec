@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
 
 using OfferTree as OfferTree;
 using Utils as Utils;
 
 methods {
-    function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
+    function isAuthorized(address, address) external returns (bool) envfree;
 
     function OfferTree.getHash(bytes32) external returns (bytes32) envfree;
     function OfferTree.isLeafNode(bytes32) external returns (bool) envfree;
@@ -15,15 +14,12 @@ methods {
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
 
-    // Summarized so the merkle verification and the helper-side leaf hash agree on the leaf-hash function.
+    // Align the merkle verification and the helper's well-formedness on the same injective hash functions.
     function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
-
-    // Summarized to a ghost so the upward fold and the downward walk see the same injective hash function.
     function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) => summaryHashNode(a, b);
 
-    // Take-side externals summarized as NONDET / havoc — irrelevant to the merkle-membership property.
-    // `isRatified` is NONDET'd so the rule abstracts over the ratifier choice: the bridge from
-    // `take ⇒ Utils.isLeaf success` is supplied explicitly in `takeImpliesLeafInTree` below.
+    // Take-side externals are irrelevant to merkle membership. `isRatified` is NONDET'd so the rule
+    // abstracts over the ratifier choice; the bridge to `Utils.isLeaf` is supplied in the rule body.
     function _.isRatified(Midnight.Offer, bytes) external => NONDET;
     function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
@@ -53,55 +49,48 @@ function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
     return ghostHashNode(a, b);
 }
 
-// The main correctness result of the verification.
-// If a maker-ratified root corresponds to a node of a well-formed offer-tree, then a successful merkle verification of the offer's hash against that root implies the offer is registered as a leaf in the tree.
+/// SOUNDNESS ///
+
+/// If a root corresponds to a node of a well-formed offer-tree, a successful merkle verification of the offer's hash against that root implies the offer is registered as a leaf in the tree.
 rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
+    require OfferTree.getHash(node) == root, "root is the hash of node";
+    require root != to_bytes32(0), "root is non-zero";
 
-    // Assume that root is the hash of node in the tree.
-    require OfferTree.getHash(node) == root;
-    require root != to_bytes32(0);
-
-    // Assume that the tree is well-formed along the proof path from node down to a leaf.
     OfferTree.wellFormedPath(node, leafIndex, proof);
 
-    // Compute the leaf hash once so both uses below bind to the same symbolic value.
+    // Compute leafId once so both uses below bind to the same symbolic hash.
     bytes32 leafId = Utils.hashOffer(offer);
-
-    require Utils.isLeaf(root, leafId, leafIndex, proof);
+    require Utils.isLeaf(root, leafId, leafIndex, proof), "merkle proof verifies";
 
     assert OfferTree.isLeafNode(leafId);
 }
 
-// The completeness dual of takeCorrectness.
-// Every leaf in a well-formed offer-tree has a verifying merkle proof: folding the path's sibling hashes back up against the leaf reproduces the root.
-rule takeCompleteness(bytes32 node, bytes32 root, uint256 leafIndex, bytes32[] proof) {
-    // Assume that root is the hash of node in the tree.
-    require OfferTree.getHash(node) == root;
-    require root != to_bytes32(0);
+/// COMPLETENESS ///
 
-    // Walk the well-formed path; the call returns the leaf at the bottom.
+/// Every leaf in a well-formed offer-tree has a verifying merkle proof: folding the path's sibling hashes back up against the leaf reproduces the root.
+rule takeCompleteness(bytes32 node, bytes32 root, uint256 leafIndex, bytes32[] proof) {
+    require OfferTree.getHash(node) == root, "root is the hash of node";
+    require root != to_bytes32(0), "root is non-zero";
+
     bytes32 endLeaf = OfferTree.wellFormedPath(node, leafIndex, proof);
 
     assert Utils.isLeaf(root, endLeaf, leafIndex, proof);
 }
 
-// The take-level guarantee: every successful Midnight.take is for an offer registered as a leaf in the maker's offer-tree.
-// The bridge from take's success to the merkle check is supplied by `require Utils.isLeaf(...)` below. It is justified by composition: take's body requires `isRatified(offer, ratifierData) == CALLBACK_SUCCESS`, and both SetterRatifier and EcrecoverRatifier implementations `require(HashLib.isLeaf(root, hashOffer(offer), leafIndex, proof))` for the (root, leafIndex, proof) they decode from ratifierData — regardless of how the maker committed the root (on-chain via `isRootRatified`, or off-chain via EIP-712 signature).
+/// TAKE-LEVEL LIFT ///
+
+/// Every successful Midnight.take is for an offer registered as a leaf in the maker's offer-tree.
+/// The `require Utils.isLeaf(...)` below is the bridge from take to the merkle check, justified by composition: take requires `isRatified(...) == CALLBACK_SUCCESS`, and both SetterRatifier and EcrecoverRatifier require HashLib.isLeaf to pass.
 rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
+    require OfferTree.getHash(node) == root, "root is the hash of node";
+    require root != to_bytes32(0), "root is non-zero";
 
-    // Assume that root is the hash of node in the maker's tree.
-    require OfferTree.getHash(node) == root;
-    require root != to_bytes32(0);
-
-    // Assume that the tree is well-formed along the proof path from node down to a leaf.
     OfferTree.wellFormedPath(node, leafIndex, proof);
 
     bytes32 leafId = Utils.hashOffer(offer);
-
-    // Bridge: a successful take implies the chosen ratifier's `isRatified` returned CALLBACK_SUCCESS, which implies `HashLib.isLeaf(...)` passed for the (root, leafIndex, proof) it decoded from ratifierData. We model that decoded triple as the rule's (root, leafIndex, proof).
-    require Utils.isLeaf(root, leafId, leafIndex, proof);
+    require Utils.isLeaf(root, leafId, leafIndex, proof), "ratifier bridge: matches the merkle check inside isRatified";
 
     take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
 
