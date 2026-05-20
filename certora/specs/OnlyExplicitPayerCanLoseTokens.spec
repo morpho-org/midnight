@@ -95,7 +95,7 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
 /// 1. msg.sender (when !offer.buy and buyerCallback == 0),
 /// 2. the buyerCallback that returned CALLBACK_SUCCESS,
 /// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker is the buyer with no callback).
-rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
+rule takeOnlyExplicitPayer(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     require e.msg.sender != currentContract, "only external calls";
 
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
@@ -112,14 +112,14 @@ rule takeOnlyExplicitPayer(env e, uint256 units, address taker, address takerCal
     flashLoanCallbackAllowed = false;
     badPullSeen = false;
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 
     assert !badPullSeen;
 }
 
 /// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender
 /// or from a callback that returned CALLBACK_SUCCESS.
-rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector } {
+rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
     require e.msg.sender != currentContract, "only external calls";
 
     msgSender = e.msg.sender;
