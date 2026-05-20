@@ -66,7 +66,7 @@ contract OtherFunctionsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         id = toId(market);
     }
@@ -140,7 +140,7 @@ contract OtherFunctionsTest is BaseTest {
         RepayCallback callback = new RepayCallback();
         deal(address(loanToken), address(callback), repaid);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, caller, true);
+        midnight.setIsAuthorized(caller, true, borrower);
         vm.prank(address(callback));
         loanToken.approve(address(midnight), repaid);
 

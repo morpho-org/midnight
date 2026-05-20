@@ -92,8 +92,8 @@ rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
     assert marketIsCreated(market);
 }
 
-rule marketIsCreatedAfterTake(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) {
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+rule marketIsCreatedAfterTake(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
     assert marketIsCreated(offer.market);
 }
 
@@ -126,7 +126,7 @@ rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collat
 rule onlyTouchMarketCreatesMarket(env e, method f, calldataarg args, Midnight.Market market)
 filtered {
     f -> f.selector != sig:touchMarket(Midnight.Market).selector
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+        && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
