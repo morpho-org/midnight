@@ -92,7 +92,7 @@ rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCal
     bytes32 leafId = Utils.hashOffer(offer);
     require Utils.isLeaf(root, leafId, leafIndex, proof), "ratifier bridge: matches the merkle check inside isRatified";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 
     assert OfferTree.isLeafNode(leafId);
 }
