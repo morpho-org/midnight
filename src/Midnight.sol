@@ -328,12 +328,12 @@ contract Midnight is IMidnight {
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
+        Offer memory offer,
         uint256 units,
         address taker,
+        address receiverIfTakerIsSeller,
         address takerCallback,
         bytes memory takerCallbackData,
-        address receiverIfTakerIsSeller,
-        Offer memory offer,
         bytes memory ratifierData
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
@@ -437,8 +437,9 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyerCallback).onBuy(id, offer.market, buyer, buyerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                IBuyCallback(buyerCallback)
+                    .onBuy(id, offer.market, buyerAssets, units, buyerPendingFeeIncrease, buyer, buyerCallbackData)
+                == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
@@ -450,8 +451,16 @@ contract Midnight is IMidnight {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
                 ISellCallback(sellerCallback)
-                    .onSell(id, offer.market, seller, receiver, sellerAssets, units, sellerCallbackData)
-                == CALLBACK_SUCCESS,
+                    .onSell(
+                        id,
+                        offer.market,
+                        sellerAssets,
+                        units,
+                        sellerPendingFeeDecrease,
+                        seller,
+                        receiver,
+                        sellerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }
@@ -500,7 +509,7 @@ contract Midnight is IMidnight {
 
         if (callback != address(0)) {
             require(
-                IRepayCallback(callback).onRepay(id, market, onBehalf, units, data) == CALLBACK_SUCCESS,
+                IRepayCallback(callback).onRepay(id, market, units, onBehalf, data) == CALLBACK_SUCCESS,
                 WrongRepayCallbackReturnValue()
             );
         }
@@ -681,7 +690,16 @@ contract Midnight is IMidnight {
             require(
                 ILiquidateCallback(callback)
                     .onLiquidate(
-                        id, market, msg.sender, borrower, receiver, collateralIndex, seizedAssets, repaidUnits, data
+                        id,
+                        market,
+                        collateralIndex,
+                        seizedAssets,
+                        repaidUnits,
+                        badDebt,
+                        msg.sender,
+                        borrower,
+                        receiver,
+                        data
                     ) == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
@@ -701,7 +719,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev See AUTHORIZATIONS section above.
-    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
+    function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
@@ -716,7 +734,7 @@ contract Midnight is IMidnight {
             SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
         }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(msg.sender, tokens, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, msg.sender, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         for (uint256 i = 0; i < tokens.length; i++) {
