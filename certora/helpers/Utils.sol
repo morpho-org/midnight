@@ -22,6 +22,10 @@ contract Utils {
         return keccak256(abi.encode(offer));
     }
 
+    function hashNode(bytes32 a, bytes32 b) external pure returns (bytes32) {
+        return keccak256(abi.encode(a, b));
+    }
+
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         external
         pure
