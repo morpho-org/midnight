@@ -10,4 +10,4 @@ forge test --match-test testGenerateScenario -vv
 
 echo ""
 echo "=== Verifying SQL queries ==="
-python3 sql/test/verify.py
+uv run --with-requirements sql/test/requirements.txt python3 sql/test/verify.py

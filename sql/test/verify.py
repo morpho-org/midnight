@@ -277,26 +277,9 @@ def run_sql(conn: duckdb.DuckDBPyConnection, sql_path: str) -> pd.DataFrame:
         raw = f.read()
     adapted = adapt_sql(raw)
     try:
-        # First pass: discover output column types.
-        probe = conn.execute(adapted)
-        descriptions = probe.description
-        # DuckDB converts UHUGEINT to Python float64 in fetchall(), silently
-        # losing precision for values > 2^53.  Re-execute casting those columns
-        # to VARCHAR so Python receives exact decimal strings.
-        uhugeint_cols = {
-            desc[0] for desc in descriptions
-            if "UHUGEINT" in str(desc[1]).upper()
-        }
-        if uhugeint_cols:
-            cast_list = ", ".join(
-                f"CAST({desc[0]} AS VARCHAR) AS {desc[0]}"
-                if desc[0] in uhugeint_cols
-                else desc[0]
-                for desc in descriptions
-            )
-            probe = conn.execute(f"SELECT {cast_list} FROM ({adapted}) _q")
-        columns = [desc[0] for desc in probe.description]
-        rows = probe.fetchall()
+        result = conn.execute(adapted)
+        columns = [desc[0] for desc in result.description]
+        rows = result.fetchall()
         return pd.DataFrame(rows, columns=columns)
     except Exception as exc:
         print(f"ERROR in {os.path.basename(sql_path)}:")
