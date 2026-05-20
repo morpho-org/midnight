@@ -20,7 +20,6 @@ methods {
 
     // Implicit (default AUTO → HAVOC_ECF on external calls): callbacks, gates,
     // ratifiers, oracles, and token transfers are assumed not to re-enter Midnight.
-    // Matches the convention used in ContinuousFee.spec and Healthiness.spec.
 }
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -74,16 +73,15 @@ function requireLiquidateMulDivAxioms() {
 weak invariant noDebtWithoutCollateral(bytes32 id, address user)
     currentContract.position[id][user].collateralBitmap == 0 => currentContract.position[id][user].debt == 0
     {
-        preserved take(uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) with (env e) {
             // Transient storage is logically zero at the start of an externally-initiated tx.
             require !liquidationLocked(id, taker), "transient lock zero at tx start";
             require !liquidationLocked(id, offer.maker), "transient lock zero at tx start";
         }
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
-            // Liquidate's debt-zeroing math (badDebt absorbed + repayment) needs mulDiv
-            // monotonicity + inverse axioms (proved in MulDiv.spec) so the prover can
-            // derive repaidUnits >= debt_after_badDebt when the last bitmap bit is cleared.
-            require market.collateralParams.length <= MAX_COLLATERALS_PER_BORROWER(), "restrict to MAX_COLLATERALS_PER_BORROWER collaterals (matches loop_iter: 10)";
+            // Liquidate's debt-zeroing math (badDebt absorbed + repayment) needs mulDiv monotonicity + inverse axioms 
+            // (proved in MulDiv.spec) so the prover can derive repaidUnits >= debt_after_badDebt when the last bitmap bit is cleared.
+            require market.collateralParams.length <= MAX_COLLATERALS_PER_BORROWER(), "restrict to MAX_COLLATERALS_PER_BORROWER collaterals";
             requireLiquidateMulDivAxioms();
         }
     }
