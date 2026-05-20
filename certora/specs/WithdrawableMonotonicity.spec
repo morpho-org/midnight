@@ -69,7 +69,7 @@ rule takeIncreasesClaimableTradingFee(env e, Midnight.Offer offer, uint256 units
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    buyerAssets, sellerAssets = take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 
     // We know that buyerAssets - sellerAssets >= 0, see rule tradingFeeSpreadBounds.
     assert anyToken == offer.market.loanToken => claimableTradingFee(anyToken) == before + buyerAssets - sellerAssets;
