@@ -152,11 +152,13 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 1, MAX_UNITS);
         repaid = bound(repaid, 0, units);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to get full LIF.
 
         (uint256 seizedAssets, uint256 repaidUnits) =
             midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
@@ -176,6 +178,8 @@ contract LiquidationTest is BaseTest {
     function testLiquidateCollateralInput(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
@@ -189,7 +193,7 @@ contract LiquidationTest is BaseTest {
             )
         );
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to get full LIF.
 
         (uint256 seizedAssets, uint256 repaidUnits) =
             midnight.liquidate(market, 0, seized, 0, borrower, address(this), address(0), "");
@@ -216,10 +220,12 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, 1, ORACLE_PRICE_SCALE);
         vm.assume(data.length > 0);
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to get full LIF.
 
         uint256 expectedBadDebt = _badDebt();
         uint256 maxRepaid = midnight.collateral(id, borrower, 0).mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
@@ -236,9 +242,11 @@ contract LiquidationTest is BaseTest {
 
     function testCannotRepayMoreThanDebt(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS - 1);
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to get full LIF.
 
         uint256 _maxLif = market.collateralParams[0].maxLif;
         uint256 collateral = midnight.collateral(id, borrower, 0);
@@ -259,9 +267,11 @@ contract LiquidationTest is BaseTest {
     function testCannotSeizeMoreThanCollateral(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
         units = bound(units, 10, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to get full LIF.
         seized = bound(seized, midnight.collateral(id, borrower, 0) + 1, MAX_TEST_AMOUNT);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
@@ -426,6 +436,8 @@ contract LiquidationTest is BaseTest {
         repaid = bound(repaid, 0, units);
         delay = bound(delay, 0, 100 weeks);
 
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
@@ -563,26 +575,30 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
     }
 
-    /// @dev Recovery close factor applies at exact maturity but not one second after.
-    function testRecoveryCloseFactorMaturityBoundary(uint256 units, uint256 liquidationOraclePrice) public {
+    /// @dev Recovery close factor still applies after maturity when the borrower is unhealthy.
+    function testRecoveryCloseFactorAppliesPostMaturityWhenUnhealthy(
+        uint256 units,
+        uint256 liquidationOraclePrice,
+        uint256 delay
+    ) public {
         units = bound(units, 100, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
+        delay = bound(delay, 0, 100 weeks);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
+        vm.assume(maxRepaid < units);
 
         // At exact maturity: recovery close factor applies.
-        if (maxRepaid < units) {
-            vm.warp(market.maturity);
-            vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
-            midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
-        }
-
-        // One second later: recovery close factor no longer applies.
-        vm.warp(market.maturity + 1);
+        vm.warp(market.maturity);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
-        assertEq(midnight.debtOf(id, borrower), 0);
+
+        // After maturity, while still unhealthy: recovery close factor still applies.
+        vm.warp(market.maturity + 1 + delay);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
+        midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
     }
 
     /// @dev With RCF deactivated, liquidation can always end by fully repaying debt or fully seizing collateral.
@@ -693,6 +709,9 @@ contract LiquidationTest is BaseTest {
     function testGasLiquidateMultipleCollaterals() public {
         uint256 units = 1000e18;
         uint256 collateralAmount = units.mulDivUp(WAD, market.collateralParams[0].lltv);
+
+        market.rcfThreshold = type(uint256).max; // Deactivate RCF.
+        id = toId(market);
 
         vm.prank(borrower);
 

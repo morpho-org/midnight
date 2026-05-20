@@ -61,15 +61,16 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
 /// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
 /// maturity + TIME_TO_MAX_LIF.
-/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
-/// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
+/// @dev When the borrower is unhealthy, the liquidation cannot put the borrower back into health (recovery close
+/// factor), unless the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold
+/// units.
 /// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
 /// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
 /// healthy after a liquidation.
-/// @dev The RCF is deactivated after the maturity.
+/// @dev The RCF is deactivated when the borrower is healthy (which can only happen after the maturity).
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
@@ -646,7 +647,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (block.timestamp <= market.maturity) {
+            if (originalDebt > maxDebt) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
