@@ -21,8 +21,8 @@ methods {
     // Take-side externals are irrelevant to merkle membership. `isRatified` is NONDET'd so the rule
     // abstracts over the ratifier choice; the bridge to `Utils.isLeaf` is supplied in the rule body.
     function _.isRatified(Midnight.Offer, bytes) external => NONDET;
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
