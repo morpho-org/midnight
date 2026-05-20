@@ -64,7 +64,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// liquidator can choose between both modes.
 /// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
-/// @dev The RCF means (omitting scaling and roundings):
+/// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
