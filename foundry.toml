@@ -4,7 +4,7 @@ optimizer = true
 optimizer_runs = 800
 bytecode_hash = "none"
 evm_version = "osaka"
-fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
+fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }, { access = "read-write", path = "sql/test/" }]
 
 [profile.default.fmt]
 wrap_comments = true
