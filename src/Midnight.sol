@@ -581,7 +581,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
-        bool unhealthyPath,
+        bool healthyPath,
         address receiver,
         address callback,
         bytes calldata data
@@ -615,7 +615,7 @@ contract Midnight is IMidnight {
 
         require(
             originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (unhealthyPath ? originalDebt > maxDebt : block.timestamp > market.maturity),
+                && (healthyPath ? block.timestamp > market.maturity : originalDebt > maxDebt),
             NotLiquidatable()
         );
 
@@ -638,9 +638,9 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = unhealthyPath
-                ? _maxLif
-                : UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF);
+            uint256 lif = healthyPath
+                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
+                : _maxLif;
 
             if (seizedAssets > 0) {
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
@@ -648,7 +648,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (unhealthyPath) {
+            if (!healthyPath) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
@@ -680,7 +680,7 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
-            unhealthyPath,
+            healthyPath,
             badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit,

@@ -68,15 +68,15 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 /// LIF CHARACTERIZATION ///
 
 /// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when the unhealthy path is taken or the call is >= 15 min post-maturity (profitability).
-rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool unhealthyPath) {
+rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
-    bool maxLifReached = unhealthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
+    bool maxLifReached = !healthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, unhealthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, healthyPath, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
@@ -88,15 +88,15 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
 }
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when the unhealthy path is taken or the call is >= 15 min post-maturity (profitability).
-rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool unhealthyPath) {
+rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
-    bool maxLifReached = unhealthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
+    bool maxLifReached = !healthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, unhealthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, healthyPath, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
