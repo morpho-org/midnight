@@ -64,7 +64,7 @@ rule claimDecreasesClaimableTradingFee(env e, address token, uint256 amount, add
     assert claimableTradingFee(token) == before - amount;
 }
 
-rule takeIncreasesClaimableTradingFee(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, address anyToken) {
+rule takeIncreasesClaimableTradingFee(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData, address anyToken) {
     uint256 before = claimableTradingFee(anyToken);
 
     uint256 buyerAssets;
