@@ -21,10 +21,13 @@ contract FlashLiquidateCallback {
     function onLiquidate(
         bytes32,
         Market memory market,
-        address,
         uint256,
         uint256,
         uint256 repaidUnits,
+        uint256,
+        address,
+        address,
+        address,
         bytes memory data
     ) external returns (bytes32) {
         startFlashloan(market.loanToken, repaidUnits);
@@ -34,7 +37,7 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onRepay(bytes32, Market memory market, address, uint256 units, bytes memory data)
+    function onRepay(bytes32, Market memory market, uint256 units, address, bytes memory data)
         external
         returns (bytes32)
     {
@@ -45,7 +48,7 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
+    function onFlashLoan(address[] calldata tokens, uint256[] calldata amounts, address, bytes calldata data)
         external
         returns (bytes32)
     {

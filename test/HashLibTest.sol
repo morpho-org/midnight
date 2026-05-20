@@ -4,14 +4,31 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {
     HashLib,
-    COLLATERAL_PARAMS_TYPE,
-    MARKET_TYPE,
+    COLLATERAL_PARAMS_TYPEHASH,
     MARKET_TYPEHASH,
-    OFFER_TYPE
+    OFFER_TYPEHASH
 } from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 
+bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
+bytes constant MARKET_TYPE =
+    "Market(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
+bytes constant OFFER_TYPE =
+    "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
+
 contract HashLibTest is Test {
+    function testCollateralParamsTypeHash() public pure {
+        assertEq(COLLATERAL_PARAMS_TYPEHASH, keccak256(COLLATERAL_PARAMS_TYPE));
+    }
+
+    function testMarketTypeHash() public pure {
+        assertEq(MARKET_TYPEHASH, keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE)));
+    }
+
+    function testOfferTypeHash() public pure {
+        assertEq(OFFER_TYPEHASH, keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)));
+    }
+
     function testHashMarketMatchesReference(Market memory market) public pure {
         bytes32[] memory collateralParamsHashes = new bytes32[](market.collateralParams.length);
         for (uint256 i = 0; i < market.collateralParams.length; i++) {
