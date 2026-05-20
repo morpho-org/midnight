@@ -30,11 +30,11 @@ methods {
 
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
-    function _.onBuy(bytes32 id, Midnight.Market market, address buyer, uint256 buyerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onSell(bytes32 id, Midnight.Market market, address seller, uint256 sellerAssets, uint256 units, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onBuy(bytes32 id, Midnight.Market market, uint256 buyerAssets, uint256 units, uint256 pendingFeeIncrease, address buyer, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onSell(bytes32 id, Midnight.Market market, uint256 sellerAssets, uint256 units, uint256 pendingFeeDecrease, address seller, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address[] tokens, uint256[] amounts, address initiator, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///
@@ -261,7 +261,7 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector } {
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
     // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector);
 

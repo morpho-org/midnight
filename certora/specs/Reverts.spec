@@ -31,12 +31,12 @@ methods {
     // For gate rules, gate checks precede callbacks so re-entrant state changes cannot affect them.
     // For oracle rules, re-entrant callbacks cannot deactivate collaterals without calling
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, uint256, address, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address[], uint256[], address, bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
@@ -222,7 +222,7 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Market market, bytes32 id
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
-rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, uint256 collateralIndex) {
+rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, uint256 collateralIndex) {
     require singleRevertingOracle == offer.market.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(offer.market);
@@ -235,7 +235,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     uint128 bitmap = collateralBitmap(id, seller);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -277,14 +277,14 @@ rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Market market
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
-rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(offer.market);
     address seller = offer.buy ? taker : offer.maker;
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -292,14 +292,14 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker
 /// GATE BLOCKING ///
 
 /// If enterGate.canIncreaseCredit returns false and take succeeds, no user's credit increases.
-rule enterGateBlocksCreditIncrease(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, address user) {
+rule enterGateBlocksCreditIncrease(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, address user) {
     require !ghostCanIncreaseCredit(offer.market.enterGate), "canIncreaseCredit blocked";
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
     uint256 creditBefore = creditOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     uint256 creditAfter = creditOf(id, user);
 
@@ -307,14 +307,14 @@ rule enterGateBlocksCreditIncrease(env e, uint256 units, address taker, address 
 }
 
 /// If enterGate.canIncreaseDebt returns false and take succeeds, no user's debt increases.
-rule enterGateBlocksDebtIncrease(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, address user) {
+rule enterGateBlocksDebtIncrease(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, address user) {
     require !ghostCanIncreaseDebt(offer.market.enterGate), "canIncreaseDebt blocked";
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
     uint256 debtBefore = debtOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     uint256 debtAfter = debtOf(id, user);
 
@@ -336,7 +336,7 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Market market, uint256 coll
 /// If transferFrom reverts, take, repay, supplyCollateral, and liquidate all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+    f -> f.selector == sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
         || f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
@@ -409,11 +409,11 @@ rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uin
 }
 
 /// If a buy/sell/isRatified callback reverts or returns something other than CALLBACK_SUCCESS, take reverts.
-rule callbackRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule callbackRevertOrBadReturnCausesTakeRevert(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require takerCallback != 0 || offer.callback != 0 || offer.ratifier != 0, "callback-enabled take";
 
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take@withrevert(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
 
     assert lastReverted;
 }

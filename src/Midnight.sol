@@ -19,15 +19,18 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
 /// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
-/// @dev The case LLTV=WAD is special, and should be used with care, notably:
+/// @dev The case LLTV = 1 is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
-/// particular, the RCF is "inactive", meaning liquidations can always liquidate everything.
+/// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
+/// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
+/// is an incentive to take resting sell offers with price < 1 and withdraw instantly. Lenders (and the fee claimer)
+/// might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
-/// particular, the borrowers of multicollat markets can completely change their collateral composition.
+/// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
 /// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
 /// supplyCollateral.
@@ -36,9 +39,10 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// TRADING FEES
 /// @dev A default trading fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The trading fee is computed using piecewise linear interpolation on the TTM between breakpoints.
+/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
+/// approximation between breakpoints.
 /// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
-/// @dev For TTM (time to maturity) > 360d, the trading fee is the fee at the 360d breakpoint.
+/// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
 /// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
@@ -55,7 +59,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF grows linearly from 1 at maturity to maxLif at maturity + TIME_TO_MAX_LIF.
+/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
+/// maturity + TIME_TO_MAX_LIF.
 /// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
 /// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
 /// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
@@ -85,7 +90,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < WAD.
+/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the market's spacing.
@@ -317,18 +322,18 @@ contract Midnight is IMidnight {
     /// @dev The taker might not get the price they expected if the trading fee was just changed. A smart-contract can
     /// be used to perform atomic price checks.
     /// @dev Taking buy offers with price < trading fee will revert.
-    /// @dev In particular, if the trading fee gets increased, it might implicitely cancel offers with very low price.
+    /// @dev In particular, if the trading fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
+        Offer memory offer,
         uint256 units,
         address taker,
+        address receiverIfTakerIsSeller,
         address takerCallback,
         bytes memory takerCallbackData,
-        address receiverIfTakerIsSeller,
-        Offer memory offer,
         bytes memory ratifierData
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
@@ -336,15 +341,12 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
         require(UtilsLib.atMostOneNonZero(offer.maxAssets, offer.maxUnits), MultipleNonZero());
+        require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
-
-        require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
-
-        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
@@ -363,6 +365,7 @@ contract Midnight is IMidnight {
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
         }
 
+        (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
 
@@ -378,20 +381,10 @@ contract Midnight is IMidnight {
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
-        buyerPos.pendingFee += buyerPendingFeeIncrease;
-        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
-
-        sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
-        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
-
-        _marketState.totalUnits =
-            UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
-
-        if (offer.reduceOnly) {
-            require(offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0, MakerCreditOrDebtIncreased());
-        }
+        require(
+            !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
+            MakerCreditOrDebtIncreased()
+        );
 
         require(
             offer.market.enterGate == address(0) || buyerCreditIncrease == 0
@@ -403,6 +396,18 @@ contract Midnight is IMidnight {
                 || IEnterGate(offer.market.enterGate).canIncreaseDebt(seller),
             SellerGatedFromIncreasingDebt()
         );
+
+        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
+        buyerPos.pendingFee += buyerPendingFeeIncrease;
+        buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
+
+        sellerPos.pendingFee -= sellerPendingFeeDecrease;
+        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
+        sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
+
+        _marketState.totalUnits =
+            UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -432,21 +437,30 @@ contract Midnight is IMidnight {
         if (buyerCallback != address(0)) {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
-                IBuyCallback(buyerCallback).onBuy(id, offer.market, buyer, buyerAssets, units, buyerCallbackData)
-                    == CALLBACK_SUCCESS,
+                IBuyCallback(buyerCallback)
+                    .onBuy(id, offer.market, buyerAssets, units, buyerPendingFeeIncrease, buyer, buyerCallbackData)
+                == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
 
         SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, address(this), buyerAssets - sellerAssets);
-        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
         SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
             bytes memory sellerCallbackData = offer.buy ? takerCallbackData : offer.callbackData;
             require(
-                ISellCallback(sellerCallback).onSell(id, offer.market, seller, sellerAssets, units, sellerCallbackData)
-                    == CALLBACK_SUCCESS,
+                ISellCallback(sellerCallback)
+                    .onSell(
+                        id,
+                        offer.market,
+                        sellerAssets,
+                        units,
+                        sellerPendingFeeDecrease,
+                        seller,
+                        receiver,
+                        sellerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
             );
         }
@@ -666,6 +680,7 @@ contract Midnight is IMidnight {
             borrower,
             badDebt,
             _marketState.lossFactor,
+            _marketState.continuousFeeCredit,
             payer,
             receiver
         );
@@ -675,8 +690,18 @@ contract Midnight is IMidnight {
         if (callback != address(0)) {
             require(
                 ILiquidateCallback(callback)
-                    .onLiquidate(id, market, collateralIndex, seizedAssets, repaidUnits, borrower, data)
-                == CALLBACK_SUCCESS,
+                    .onLiquidate(
+                        id,
+                        market,
+                        collateralIndex,
+                        seizedAssets,
+                        repaidUnits,
+                        badDebt,
+                        msg.sender,
+                        borrower,
+                        receiver,
+                        data
+                    ) == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
         }
@@ -695,7 +720,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev See AUTHORIZATIONS section above.
-    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external {
+    function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
         emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
@@ -710,7 +735,7 @@ contract Midnight is IMidnight {
             SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
         }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, msg.sender, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         for (uint256 i = 0; i < tokens.length; i++) {

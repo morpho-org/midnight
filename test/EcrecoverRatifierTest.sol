@@ -11,7 +11,7 @@ import {BaseTest} from "./BaseTest.sol";
 contract EcrecoverRatifierTest is BaseTest {
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
         Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
-        return abi.encode(sig, uint256(0), _root, new bytes32[](0));
+        return abi.encode(sig, _root, 0, new bytes32[](0));
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -36,7 +36,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
@@ -66,9 +66,8 @@ contract EcrecoverRatifierTest is BaseTest {
     function testIsRatifiedInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), uint256(0), _root, new bytes32[](0)
-        );
+        bytes memory ratifierData =
+            abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), _root, 0, new bytes32[](0));
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
@@ -85,13 +84,36 @@ contract EcrecoverRatifierTest is BaseTest {
         ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
+    function testIsRatifiedWorksForUnorderedTree() public {
+        Offer memory leftOffer = makeOffer(lender);
+        Offer memory rightOffer = makeOffer(lender);
+        rightOffer.expiry += 1;
+
+        bytes32 leftHash = HashLib.hashOffer(leftOffer);
+        bytes32 rightHash = HashLib.hashOffer(rightOffer);
+        if (leftHash < rightHash) {
+            (leftOffer, rightOffer) = (rightOffer, leftOffer);
+            (leftHash, rightHash) = (rightHash, leftHash);
+        }
+
+        bytes32 root = HashLib.hashNode(leftHash, rightHash);
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = leftHash;
+        Signature memory sig = signature(root, privateKey[lender], address(ecrecoverRatifier), 1);
+        bytes memory ratifierData = abi.encode(sig, root, 1, proof);
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData);
+        assertEq(result, CALLBACK_SUCCESS);
+    }
+
     function testCancelRootMaker() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
-        emit IEcrecoverRatifier.CancelRoot(lender, _root);
+        emit IEcrecoverRatifier.CancelRoot(lender, lender, _root);
         vm.prank(lender);
         ecrecoverRatifier.cancelRoot(lender, _root);
 
@@ -108,7 +130,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
 
         vm.prank(borrower);
         ecrecoverRatifier.cancelRoot(lender, _root);
@@ -134,7 +156,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         // Works while authorized.
@@ -143,7 +165,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         // Revoke.
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, false);
+        midnight.setIsAuthorized(borrower, false, lender);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
