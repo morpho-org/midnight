@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2025 Morpho Association
 
-// Rule A — Well-formed offer-tree invariant.
-//
-// Verifies that the helper's only mutators (`newLeaf`, `newInternalNode`)
-// preserve `isWellFormed` for every node id. This justifies using the helper
+// Verifies that the tree construction via `newLeaf` and `newInternalNode`
+// preserves `isWellFormed` for every node id. This justifies using the helper
 // as a ghost tree to reason about Midnight's runtime merkle verification.
 
 methods {

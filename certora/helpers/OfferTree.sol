@@ -12,7 +12,6 @@ contract OfferTree {
         bytes32 left;
         bytes32 right;
         bytes32 hashNode;
-        bool isLeaf;
     }
 
     /* STORAGE */
@@ -26,26 +25,25 @@ contract OfferTree {
         Node storage n = tree[leafHash];
         require(_isEmpty(n), "leaf already populated");
         n.hashNode = leafHash;
-        n.isLeaf = true;
     }
 
     function newInternalNode(bytes32 id, bytes32 left, bytes32 right) public {
         require(id != 0, "zero id");
         Node storage n = tree[id];
         require(_isEmpty(n), "node already populated");
-        Node storage L = tree[left];
-        Node storage R = tree[right];
-        require(!_isEmpty(L), "left empty");
-        require(!_isEmpty(R), "right empty");
+        bytes32 leftHash = tree[left].hashNode;
+        bytes32 rightHash = tree[right].hashNode;
+        require(leftHash != 0, "left empty");
+        require(rightHash != 0, "right empty");
         n.left = left;
         n.right = right;
-        n.hashNode = HashLib.hashNode(L.hashNode, R.hashNode);
+        n.hashNode = HashLib.hashNode(leftHash, rightHash);
     }
 
     /* PURE AND VIEW FUNCTIONS */
 
     function _isEmpty(Node storage n) internal view returns (bool) {
-        return n.left == 0 && n.right == 0 && n.hashNode == 0 && !n.isLeaf;
+        return n.left == 0 && n.right == 0 && n.hashNode == 0;
     }
 
     function isEmpty(bytes32 id) public view returns (bool) {
@@ -57,7 +55,7 @@ contract OfferTree {
     }
 
     function isLeafNode(bytes32 id) public view returns (bool) {
-        return tree[id].isLeaf;
+        return tree[id].left == 0 && tree[id].right == 0 && tree[id].hashNode != 0;
     }
 
     function getLeft(bytes32 id) public view returns (bytes32) {
@@ -69,20 +67,23 @@ contract OfferTree {
     }
 
     // The specification of a well-formed tree is the following:
-    //   - empty nodes are well-formed
-    //   - leaves have id == hashNode and no children
-    //   - internal nodes have non-empty children and hashNode = hashNode(left.hashNode, right.hashNode)
+    //   - empty nodes (all fields zero) are well-formed
+    //   - leaves (left == 0 && right == 0 && hashNode != 0) require hashNode == id
+    //   - internal nodes (left != 0 && right != 0) require non-empty children and hashNode = hashNode(left.hashNode, right.hashNode)
+    //   - any other field combination is malformed
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (_isEmpty(n)) return true;
-        if (n.isLeaf) {
-            return n.left == 0 && n.right == 0 && n.hashNode == id && n.hashNode != 0;
-        } else {
-            if (n.left == 0 || n.right == 0) return false;
-            Node storage L = tree[n.left];
-            Node storage R = tree[n.right];
-            return !_isEmpty(L) && !_isEmpty(R) && n.hashNode == HashLib.hashNode(L.hashNode, R.hashNode);
+        if (n.left == 0 && n.right == 0) {
+            return n.hashNode == id;
         }
+        if (n.left != 0 && n.right != 0) {
+            bytes32 leftHash = tree[n.left].hashNode;
+            bytes32 rightHash = tree[n.right].hashNode;
+            return leftHash != 0 && rightHash != 0
+                && n.hashNode == HashLib.hashNode(leftHash, rightHash);
+        }
+        return false;
     }
 
     // Check that the nodes are well-formed starting from `id` and going down the `tree`.
@@ -98,7 +99,7 @@ contract OfferTree {
 
             // If proof elements remain, the current node must be internal; otherwise the path walks off a leaf's zero
             // children into the unrelated `tree[0]` entry.
-            require(!tree[id].isLeaf);
+            require(!isLeafNode(id));
 
             bytes32 sibling = proof[--i];
 
@@ -113,7 +114,7 @@ contract OfferTree {
                 id = right;
             }
         }
-        require(tree[id].isLeaf);
+        require(isLeafNode(id));
         return id;
     }
 }
