@@ -63,8 +63,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// "post-maturity path", available after the market's maturity. For an unhealthy borrower after the maturity, the
 /// liquidator can choose between both modes.
 /// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
-/// by what is needed to put back the position into health ("recovery close factor", or "RCF"). The RCF is deactivated
-/// if the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold.
+/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF means (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
