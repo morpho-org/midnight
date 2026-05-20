@@ -86,7 +86,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 }
 
 /// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
-rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address borrower, bytes data, bool healthyPath) {
+rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address borrower, bytes data) {
     bytes32 id = summaryToId(market);
 
     require data.length == 0, "no callback to avoid unrelated external call reverts";
@@ -100,7 +100,7 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address bor
     require e.msg.value == 0, "Midnight is not payable";
 
     address zero = 0;
-    liquidate@withrevert(e, market, 0, 0, 0, borrower, healthyPath, borrower, zero, data);
+    liquidate@withrevert(e, market, 0, 0, 0, borrower, false, borrower, zero, data);
 
     assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
 }
