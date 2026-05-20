@@ -1,3 +1,7 @@
 cache
 out
 .certora_internal
+sql/test/__pycache__/
+sql/test/events/
+sql/test/expected_state.json
+
