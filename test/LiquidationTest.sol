@@ -372,7 +372,7 @@ contract LiquidationTest is BaseTest {
             0,
             0,
             borrower,
-            true,
+            false,
             expectedBadDebt,
             expectedLossFactor,
             expectedContinuousFeeCredit,
