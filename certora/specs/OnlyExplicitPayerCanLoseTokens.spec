@@ -13,7 +13,7 @@ methods {
     // eg onLiquidate is only called by liquidate. onRatify and onSell cannot authorize a payer, so we
     // model them with a plain HAVOC_ALL.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, buyCallbackAllowed) expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, uint256, address, address, address, bytes) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
     function _.onFlashLoan(address[], uint256[], address, bytes) external => onCallBackSummary(calledContract, flashLoanCallbackAllowed) expect(bytes32);
 
