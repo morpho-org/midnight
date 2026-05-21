@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+using Utils as Utils;
+
+methods {
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+
+    // Summary to capture the oracle price so the spec can reference it in assertions.
+    function _.price() external => summaryPrice(calledContract) expect(uint256);
+
+    // Summarize mulDivDown and mulDivUp by ghost functions for prover performance.
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // Deterministic toId summary using a wrapper that extracts all scalar Market fields.
+    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market);
+
+    // Skip market creation logic: removes the collateral-validation loop.
+    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+
+    // Token transfers happen after return values are computed; irrelevant to the assertion.
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+}
+
+/// SUMMARIES ///
+
+definition WAD() returns uint256 = 10 ^ 18;
+
+definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
+
+definition TIME_TO_MAX_LIF() returns uint256 = 900; // 15 min
+
+persistent ghost summaryPrice(address) returns uint256;
+
+// Axioms proven in MulDiv.spec (mulDivDownTightBound, mulDivDownRoundsDown).
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+}
+
+// Axioms proven in MulDiv.spec (mulDivUpUpperBound, mulDivUpRoundsUp).
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d < a * b + d;
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+}
+
+function summaryToId(Midnight.Market market) returns bytes32 {
+    return Utils.hashMarket(market);
+}
+
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    return ghostMulDivDown(a, b, d);
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    return ghostMulDivUp(a, b, d);
+}
+
+/// LIF CHARACTERIZATION ///
+
+/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when the unhealthy path is taken or the call is >= 15 min post-maturity (profitability).
+rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
+    require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
+
+    bool maxLifReached = !healthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, healthyPath, receiver, callback, data);
+
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+
+    // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit floor rounding on seizedAssets) at the oracle price.
+    assert (seizedResult + 1) * price >= repaidResult * ORACLE_PRICE_SCALE();
+
+    // lif == maxLif when the unhealthy path is taken or >= 15 min post-maturity: full liquidation incentive factor applies.
+    assert maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
+}
+
+/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when the unhealthy path is taken or the call is >= 15 min post-maturity (profitability).
+rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
+    require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
+
+    bool maxLifReached = !healthyPath || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
+
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, healthyPath, receiver, callback, data);
+
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+
+    // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits) at the oracle price.
+    assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
+
+    // lif == maxLif when the unhealthy path is taken or >= 15 min post-maturity: full liquidation incentive factor applies.
+    assert maxLifReached => seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
+}

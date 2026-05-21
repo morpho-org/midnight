@@ -1,7 +1,7 @@
 [profile.default]
 via_ir = true
 optimizer = true
-optimizer_runs = 100
+optimizer_runs = 800
 bytecode_hash = "none"
 evm_version = "osaka"
 fs_permissions = [
@@ -13,4 +13,9 @@ fs_permissions = [
 wrap_comments = true
 
 [lint]
-exclude_lints = ["asm-keccak256", "unsafe-cheatcode", "incorrect-shift"]
+exclude_lints = [
+    "asm-keccak256",
+    "unsafe-cheatcode",
+    "incorrect-shift",
+    "block-timestamp",
+]

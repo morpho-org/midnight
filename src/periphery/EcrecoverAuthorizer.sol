@@ -11,8 +11,8 @@ import {
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IEcrecoverAuthorizer.sol";
 
-/// @dev If `block.chainid` changes (hard fork), the EIP-712 domain separator changes and previously signed
-/// authorizations are no longer valid.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed authorizations
+/// are no longer valid.
 contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
     address public immutable MIDNIGHT;
     mapping(address => uint256) public nonce;
@@ -29,11 +29,10 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signer != address(0), InvalidSignature());
         require(
-            signer != address(0)
-                && (signer == authorization.authorizer
-                    || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer)),
-            InvalidSignature()
+            signer == authorization.authorizer || IMidnight(MIDNIGHT).isAuthorized(authorization.authorizer, signer),
+            Unauthorized()
         );
 
         emit SetIsAuthorized(
@@ -45,6 +44,6 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         );
 
         IMidnight(MIDNIGHT)
-            .setIsAuthorized(authorization.authorizer, authorization.authorized, authorization.isAuthorized);
+            .setIsAuthorized(authorization.authorized, authorization.isAuthorized, authorization.authorizer);
     }
 }
