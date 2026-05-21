@@ -13,7 +13,7 @@ methods {
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
-    // Over-approximate view functions for prover performance.
+    // Over-approximate view functions.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;

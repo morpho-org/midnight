@@ -149,7 +149,7 @@ interface IMidnight {
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
+    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
