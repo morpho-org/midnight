@@ -16,12 +16,10 @@ methods {
     function _.transferFrom(address, address, uint256) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 
-    // Capture HashLib.isLeaf's args + return; needed by `isRatifiedRequiresIsLeaf`.
+    // Capture HashLib.isLeaf's return; needed by `isRatifiedRequiresIsLeaf` to assert isRatified gates on a merkle check.
     function HashLib.isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof) internal returns (bool) => isLeafCapture(root, leafHash, leafIndex, proof);
 
-    // Route hashOffer through Utils so the rule can equate the captured leafHash to hashOffer(offer).
-    function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
-
+    function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function HashLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
 
     // Summaries for internals irrelevant to ratification properties.

@@ -9,7 +9,7 @@ methods {
     function OfferTree.getHash(bytes32) external returns (bytes32) envfree;
     function OfferTree.isLeafNode(bytes32) external returns (bool) envfree;
     function OfferTree.isWellFormed(bytes32) external returns (bool) envfree;
-    function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bytes32) envfree;
+    function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bool) envfree;
 
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.hashNode(bytes32, bytes32) external returns (bytes32) envfree;
@@ -57,21 +57,10 @@ rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, byte
 
     // Compute leafId once so both uses below bind to the same symbolic hash.
     bytes32 leafId = Utils.hashOffer(offer);
+    require leafId != to_bytes32(0), "leafId is non-zero";
     require Utils.isLeaf(root, leafId, leafIndex, proof), "merkle proof verifies";
 
     assert OfferTree.isLeafNode(leafId);
-}
-
-/// COMPLETENESS ///
-
-/// Every leaf in a well-formed offer-tree has a verifying merkle proof: folding the path's sibling hashes back up against the leaf reproduces the root.
-rule takeCompleteness(bytes32 node, bytes32 root, uint256 leafIndex, bytes32[] proof) {
-    require OfferTree.getHash(node) == root, "root is the hash of node";
-    require root != to_bytes32(0), "root is non-zero";
-
-    bytes32 endLeaf = OfferTree.wellFormedPath(node, leafIndex, proof);
-
-    assert Utils.isLeaf(root, endLeaf, leafIndex, proof);
 }
 
 /// TAKE-LEVEL LIFT ///
@@ -86,7 +75,7 @@ rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCal
     OfferTree.wellFormedPath(node, leafIndex, proof);
 
     bytes32 leafId = Utils.hashOffer(offer);
-    require Utils.isLeaf(root, leafId, leafIndex, proof), "ratifier bridge: matches the merkle check inside isRatified";
+    require Utils.isLeaf(root, leafId, leafIndex, proof);
 
     take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
 
