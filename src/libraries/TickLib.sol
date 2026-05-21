@@ -26,7 +26,9 @@ library TickLib {
                 return 1e36 / wExp(-x);
             } else {
                 int256 ln2 = 0.693147180559945309e18; // floor(ln(2) * 1e18)
-                int256 q = (x + ln2 / 2) / ln2;
+                // offset is chosen such that expR(-offset) == expR(ln2 - offset - 1), so wExp is non-decreasing.
+                int256 offset = 0.32261121498945987e18;
+                int256 q = (x + offset) / ln2;
                 int256 r = x - q * ln2;
                 int256 secondTerm = r * r / (2 * 1e18);
                 int256 thirdTerm = secondTerm * r / (3 * 1e18);

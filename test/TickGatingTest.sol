@@ -82,7 +82,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -97,7 +97,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -114,7 +114,7 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(units, borrower, address(0), hex"", borrower, offer, merkleRatifierData([offer]));
+        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
 
         // Refine to spacing 2.
         midnight.setMarketTickSpacing(id, 2);

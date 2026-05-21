@@ -21,7 +21,8 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    // External calls are assumed non-reentrant.
+    // External calls are assumed non-reentrant: this is justified as we verify properties about the function's bodies.
+    // External calls are assumed non-reverting: we verify that reverts do not happen in the function's bodies.
 }
 
 /// HELPERS ///

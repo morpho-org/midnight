@@ -6,6 +6,7 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
+    MAX_CONTINUOUS_FEE,
     LLTV_8,
     LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
@@ -322,19 +323,28 @@ contract LiquidationTest is BaseTest {
         assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
     }
 
-    function testLiquidateEmitsLossFactor(uint256 units) public {
-        units = bound(units, 10, MAX_UNITS);
+    function testLiquidateEmitsLossFactorAndContinuousFeeCredit(uint256 units) public {
+        units = bound(units, 1e18, MAX_UNITS);
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
         collateralize(market, borrower, units);
         setupMarket(market, units);
+        vm.warp(block.timestamp + 50);
+        midnight.updatePosition(market, lender);
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
         uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
         uint256 previousLossFactor = midnight.lossFactor(id);
+        uint256 previousContinuousFeeCredit = midnight.continuousFeeCredit(id);
         uint256 expectedLossFactor = expectedBadDebt == 0
             ? previousLossFactor
             : type(uint128).max
                 - (type(uint128).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+        uint256 expectedContinuousFeeCredit = previousLossFactor < type(uint128).max
+            ? previousContinuousFeeCredit.mulDivDown(
+                type(uint128).max - expectedLossFactor, type(uint128).max - previousLossFactor
+            )
+            : 0;
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -346,6 +356,7 @@ contract LiquidationTest is BaseTest {
             borrower,
             expectedBadDebt,
             expectedLossFactor,
+            expectedContinuousFeeCredit,
             address(this),
             address(this)
         );
@@ -637,7 +648,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         deal(market.collateralParams[0].token, address(this), collateral1);
         midnight.supplyCollateral(market, 0, collateral1, borrower);
@@ -671,7 +682,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -712,7 +723,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Supply both collateralParams.
         for (uint256 i = 0; i < 2; i++) {
@@ -827,7 +838,7 @@ contract LiquidationTest is BaseTest {
         uint256 collateral = midnight.collateral(id, borrower, 0);
         assertGt(collateral, 0, "has collateral");
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
         midnight.withdrawCollateral(market, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }
@@ -926,11 +937,13 @@ contract LiquidationTest is BaseTest {
     function onLiquidate(
         bytes32 _id,
         Market memory _market,
-        address _borrower,
         uint256 _collateralIndex,
         uint256 _seizedAssets,
         uint256 _repaidUnits,
         uint256 badDebt,
+        address,
+        address _borrower,
+        address,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");

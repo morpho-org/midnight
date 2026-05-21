@@ -12,7 +12,6 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each hash order during merkle proof verification.
-/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
@@ -25,7 +24,7 @@ contract SetterRatifier is ISetterRatifier {
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) public {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootRatified[maker][root] = newIsRootRatified;
-        emit SetIsRootRatified(maker, root, newIsRootRatified);
+        emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
