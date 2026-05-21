@@ -19,7 +19,7 @@ methods {
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
-    // Assumption: token transfers do not revert and do not re-enter Midnight.
+    // Assume that tokens do not reenter and do not revert: this is justified as we verify properties about the function's bodies.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 }
@@ -233,7 +233,6 @@ rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 
 /// FEE CLAIMER: LIVENESS ///
 
 rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
     address feeClaimerBefore = feeClaimer();
     uint256 claimableBefore = claimableTradingFee(token);
     mathint midnightBalanceBefore = tokenBalance[token][currentContract];
@@ -246,11 +245,10 @@ rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address 
     assert !reverted => claimableTradingFee(token) == claimableBefore - amount;
     assert !reverted => tokenBalance[token][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[token][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[token][user] == userBalanceBefore;
+    assert !reverted => user != currentContract && user != receiver => tokenBalance[token][user] == userBalanceBefore;
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
-    require user != currentContract && user != receiver;
     bytes32 id = toId(e, market);
     address feeClaimerBefore = feeClaimer();
     bool marketIsCreated = marketIsCreated(id);
@@ -269,5 +267,5 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
     assert !reverted => tokenBalance[market.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[market.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
-    assert !reverted => tokenBalance[market.loanToken][user] == userBalanceBefore;
+    assert !reverted => user != currentContract && user != receiver => tokenBalance[market.loanToken][user] == userBalanceBefore;
 }

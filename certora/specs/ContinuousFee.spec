@@ -20,6 +20,7 @@ methods {
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy: callbacks and transfers do not re-enter Midnight.
+    // This is justified because the properties we verify are about the effect of each function's own body on the continuous fee, not the effect of the full transaction including callbacks.
 }
 
 /// HELPERS ///
