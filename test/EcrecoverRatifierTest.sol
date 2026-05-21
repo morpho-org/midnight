@@ -5,13 +5,29 @@ pragma solidity ^0.8.0;
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
-import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRatifier, Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverRatifierTest is BaseTest {
+    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
+    }
+
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
+        internal
+        view
+        returns (Signature memory)
+    {
+        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
+        Signature memory _sig;
+        (_sig.v, _sig.r, _sig.s) = vm.sign(_privateKey, messageHash);
+        return _sig;
+    }
+
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
         Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
-        return abi.encode(sig, 0, _root, 0, new bytes32[](0));
+        return abi.encode(sig, _root, 0, new bytes32[](0));
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -36,7 +52,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
@@ -66,9 +82,8 @@ contract EcrecoverRatifierTest is BaseTest {
     function testIsRatifiedInvalidSignature() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = abi.encode(
-            Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), 0, _root, 0, new bytes32[](0)
-        );
+        bytes memory ratifierData =
+            abi.encode(Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}), _root, 0, new bytes32[](0));
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
@@ -101,7 +116,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftHash;
         Signature memory sig = signature(root, privateKey[lender], address(ecrecoverRatifier), 1);
-        bytes memory ratifierData = abi.encode(sig, 1, root, 1, proof);
+        bytes memory ratifierData = abi.encode(sig, root, 1, proof);
 
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData);
@@ -114,7 +129,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
-        emit IEcrecoverRatifier.CancelRoot(lender, _root);
+        emit IEcrecoverRatifier.CancelRoot(lender, lender, _root);
         vm.prank(lender);
         ecrecoverRatifier.cancelRoot(lender, _root);
 
@@ -131,7 +146,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
 
         vm.prank(borrower);
         ecrecoverRatifier.cancelRoot(lender, _root);
@@ -157,7 +172,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(lender);
 
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         // Works while authorized.
@@ -166,7 +181,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         // Revoke.
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, false);
+        midnight.setIsAuthorized(borrower, false, lender);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
