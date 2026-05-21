@@ -1281,6 +1281,7 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(borrowerOffer.callback).recordedId(), id, "id");
         assertEq(toId(BorrowCallback(borrowerOffer.callback).recordedMarket()), id, "market");
         assertEq(BorrowCallback(borrowerOffer.callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedReceiver(), borrower, "receiver");
         assertEq(
             BorrowCallback(borrowerOffer.callback).recordedSellerAssets(), units.mulDivUp(price, WAD), "sellerAssets"
         );
@@ -1325,6 +1326,7 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(callback).recordedId(), id, "id");
         assertEq(toId(BorrowCallback(callback).recordedMarket()), id, "market");
         assertEq(BorrowCallback(callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(callback).recordedReceiver(), borrower, "receiver");
         assertEq(BorrowCallback(callback).recordedSellerAssets(), units.mulDivDown(price, WAD), "sellerAssets");
         assertEq(BorrowCallback(callback).recordedUnits(), units, "units");
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral, data));
@@ -1577,6 +1579,7 @@ contract BorrowCallback is ISellCallback {
     bytes32 public recordedId;
     Market internal _recordedMarket;
     address public recordedSeller;
+    address public recordedReceiver;
     uint256 public recordedSellerAssets;
     uint256 public recordedUnits;
     uint256 public recordedPendingFeeDecrease;
@@ -1588,13 +1591,14 @@ contract BorrowCallback is ISellCallback {
         uint256 units,
         uint256 pendingFeeDecrease,
         address seller,
-        address,
+        address receiver,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         recordedId = id;
         _recordedMarket = market;
         recordedSeller = seller;
+        recordedReceiver = receiver;
         recordedSellerAssets = sellerAssets;
         recordedUnits = units;
         recordedData = data;
