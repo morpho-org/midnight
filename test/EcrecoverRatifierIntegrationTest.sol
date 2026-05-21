@@ -122,22 +122,6 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         return _proof;
     }
 
-    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
-    }
-
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
-        internal
-        view
-        returns (Signature memory)
-    {
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
-        Signature memory _sig;
-        (_sig.v, _sig.r, _sig.s) = vm.sign(_privateKey, messageHash);
-        return _sig;
-    }
-
     function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
         bytes32 _root = root(offers);
         bytes32[] memory _proof = proof(offers);

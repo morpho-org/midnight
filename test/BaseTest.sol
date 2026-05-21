@@ -10,6 +10,12 @@ import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
 import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
+import {
+    IEcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {DummyRatifier} from "./helpers/DummyRatifier.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -231,6 +237,22 @@ abstract contract BaseTest is Test {
 
     function toId(Market memory market) internal view returns (bytes32) {
         return IdLib.toId(market, block.chainid, address(midnight));
+    }
+
+    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
+    }
+
+    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
+        internal
+        view
+        returns (Signature memory)
+    {
+        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
+        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
+        Signature memory _sig;
+        (_sig.v, _sig.r, _sig.s) = vm.sign(_privateKey, messageHash);
+        return _sig;
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {

@@ -13,22 +13,6 @@ import {
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverRatifierTest is BaseTest {
-    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
-    }
-
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
-        internal
-        view
-        returns (Signature memory)
-    {
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
-        Signature memory _sig;
-        (_sig.v, _sig.r, _sig.s) = vm.sign(_privateKey, messageHash);
-        return _sig;
-    }
-
     function buildRatifierData(bytes32 _root, address _signer) internal view returns (bytes memory) {
         Signature memory sig = signature(_root, privateKey[_signer], address(ecrecoverRatifier), 0);
         return abi.encode(sig, _root, 0, new bytes32[](0));
@@ -38,6 +22,34 @@ contract EcrecoverRatifierTest is BaseTest {
         offer.maker = maker;
         offer.ratifier = address(ecrecoverRatifier);
         offer.expiry = block.timestamp + 200;
+    }
+
+    function testDomainSeparator() public view {
+        bytes32 _domainSeparator =
+            keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(ecrecoverRatifier)));
+        bytes32 expectedDomainSeparator = vm.eip712HashStruct(
+            "EIP712Domain(uint256 chainId,address verifyingContract)",
+            abi.encode(block.chainid, address(ecrecoverRatifier))
+        );
+        assertEq(_domainSeparator, expectedDomainSeparator);
+    }
+
+    function testIsRatifiedValidSignature(uint256 privateKey) public {
+        privateKey = boundPrivateKey(privateKey);
+        address maker = vm.addr(privateKey);
+
+        Offer memory offer;
+        offer.maker = maker;
+        bytes32 root = HashLib.hashOffer(offer);
+
+        Signature memory _sig = signature(root, privateKey, address(ecrecoverRatifier), 0);
+
+        vm.prank(maker);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, maker);
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(offer, abi.encode(_sig, root, 0, new bytes32[](0)));
+        assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testIsRatifiedMakerSigns() public {
