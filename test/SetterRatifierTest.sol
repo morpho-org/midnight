@@ -73,7 +73,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(offer, 0, borrower, borrower, address(0), hex"", abi.encode(_root, 0, proof([offer])));
+        midnight.take(offer, 0, borrower, borrower, address(0), hex"", abi.encode(_root, 0, new bytes32[](0)));
     }
 
     function testIsRatifiedUsesLeafIndex() public {
@@ -81,7 +81,7 @@ contract SetterRatifierTest is BaseTest {
         Offer memory rightOffer = makeOffer(lender);
         rightOffer.expiry += 1;
 
-        bytes32 _root = root([leftOffer, rightOffer]);
+        bytes32 _root = HashLib.hashNode(HashLib.hashOffer(leftOffer), HashLib.hashOffer(rightOffer));
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = HashLib.hashOffer(leftOffer);
 
