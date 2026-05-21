@@ -18,6 +18,7 @@ methods {
 
     // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+    // Assume that the obligations are already created.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Pure helpers called with identical args across the three takes; CONSTANT collapses
@@ -29,8 +30,9 @@ methods {
     // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
     function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
 
-    // Transient storage lock: uses inline assembly TLOAD/TSTORE; NONDET removes assembly complexity.
+    // Over-approximate transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+    function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
     // Offer hashing only feeds the Merkle gate; this rule compares position state after successful split paths.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
