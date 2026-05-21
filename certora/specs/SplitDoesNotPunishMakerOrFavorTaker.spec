@@ -42,7 +42,7 @@ persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivDown(0, b, c) == 0;
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
 
-    // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
+    // Sub-additivity (1st arg): floor((b+c)*x/d) - floor(b*x/d)+floor(c*x/d) ∈ [0, 1].
     axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
 }
 
@@ -99,7 +99,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     // Protocol fee accrued in storage after path 2.
     uint256 claimableAfterBC = currentContract.claimableTradingFee[offer.obligation.loanToken];
 
-    // Maker is buyer: splitting saves them at most 1 wei (tight rounding bound).
+    // Maker is buyer: splitting should not make them pay more.
     assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
     assert offer.buy => to_mathint(buyerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) + 1;
 
