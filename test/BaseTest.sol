@@ -12,7 +12,6 @@ import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {DummyRatifier} from "./helpers/DummyRatifier.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -34,7 +33,6 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
@@ -82,23 +80,23 @@ abstract contract BaseTest is Test {
 
         // Authorize the dummy ratifier (used by default in Midnight integration tests).
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(dummyRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, borrower);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(dummyRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, lender);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(otherBorrower, address(dummyRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, otherBorrower);
         vm.prank(otherLender);
-        midnight.setIsAuthorized(otherLender, address(dummyRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, otherLender);
 
         // Authorize the ecrecover ratifier (used by ratifier-specific tests).
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, borrower);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, lender);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(otherBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherBorrower);
         vm.prank(otherLender);
-        midnight.setIsAuthorized(otherLender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherLender);
 
         uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
         if (tokenType == 1) {
@@ -162,7 +160,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, hex"");
+        return midnight.take(offer, units, taker, taker, address(0), hex"", hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -203,26 +201,26 @@ abstract contract BaseTest is Test {
 
         vm.prank(badBorrower);
 
-        midnight.setIsAuthorized(badBorrower, address(dummyRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, badBorrower);
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
 
         deal(market.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(market, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), false);
+        midnight.setIsAuthorized(address(this), false, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(market, 0, 0, 0, badBorrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, badBorrower, false, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
         deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
         midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
         assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
@@ -233,107 +231,6 @@ abstract contract BaseTest is Test {
 
     function toId(Market memory market) internal view returns (bytes32) {
         return IdLib.toId(market, block.chainid, address(midnight));
-    }
-
-    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
-        return new bytes32[](0);
-    }
-
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _proof = new bytes32[](1);
-        _proof[0] = HashLib.hashOffer(offers[1]);
-        return _proof;
-    }
-
-    // 4 leaves, assumes the offer is the first one
-    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _proof = new bytes32[](2);
-        _proof[0] = HashLib.hashOffer(offers[1]);
-        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _proof;
-    }
-
-    // 4 leaves, assumes the offer is the second one
-    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _proof = new bytes32[](2);
-        _proof[0] = HashLib.hashOffer(offers[0]);
-        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _proof;
-    }
-
-    // 4 leaves, assumes the offer is the third one
-    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _proof = new bytes32[](2);
-        _proof[0] = HashLib.hashOffer(offers[3]);
-        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _proof;
-    }
-
-    // 4 leaves, assumes the offer is the fourth one
-    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _proof = new bytes32[](2);
-        _proof[0] = HashLib.hashOffer(offers[2]);
-        _proof[1] = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _proof;
-    }
-
-    function root(Offer memory offer) internal pure returns (bytes32) {
-        return HashLib.hashOffer(offer);
-    }
-
-    function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return HashLib.hashOffer(offers[0]);
-    }
-
-    function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-    }
-
-    function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = HashLib.hashNode(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        bytes32 right = HashLib.hashNode(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return HashLib.hashNode(left, right);
-    }
-
-    function domainSeparator(address verifyingContract) internal view returns (bytes32) {
-        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, verifyingContract));
-    }
-
-    function signature(bytes32 _root, uint256 _privateKey, address verifyingContract, uint256 height)
-        internal
-        view
-        returns (Signature memory)
-    {
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
-        bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
-        Signature memory _signature;
-        (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
-        return _signature;
-    }
-
-    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
-        return abi.encode(_sig, 0, _root, 0, proof(offers));
-    }
-
-    function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
-        return abi.encode(_sig, 0, _root, 0, proof(offers));
-    }
-
-    /// @dev Builds merkle ratifier data with explicit root, height, leaf index, and proof.
-    function merkleRatifierData(
-        Offer memory offer,
-        uint256 _height,
-        bytes32 _root,
-        uint256 _leafIndex,
-        bytes32[] memory _proof
-    ) internal view returns (bytes memory) {
-        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
-        return abi.encode(_sig, _height, _root, _leafIndex, _proof);
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -380,7 +277,7 @@ abstract contract BaseTest is Test {
         Offer memory borrowerOffer = _setupMarketOffer(market, units);
 
         vm.prank(lender);
-        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, hex"");
+        midnight.take(borrowerOffer, units, lender, borrower, address(0), hex"", hex"");
     }
 
     function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {

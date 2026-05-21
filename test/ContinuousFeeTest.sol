@@ -39,9 +39,9 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setFeeClaimer(feeClaimer);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(otherBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, otherBorrower);
     }
 
     /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * feeRate * ttm / WAD,

@@ -6,6 +6,7 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
+    MAX_CONTINUOUS_FEE,
     LLTV_8,
     LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
@@ -31,6 +32,7 @@ contract LiquidationTest is BaseTest {
     bytes32 internal id;
 
     uint256 internal recordedRepaidUnits;
+    uint256 internal recordedBadDebt;
     bytes internal recordedData;
 
     function setUp() public override {
@@ -71,7 +73,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(1e36 - 1);
 
         vm.expectRevert(stdError.indexOOBError);
-        midnight.liquidate(market, 2, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 2, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidateInactiveCollateralIndex(uint256 units) public {
@@ -83,13 +85,13 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 1), 0);
 
         vm.expectRevert();
-        midnight.liquidate(market, 1, 0, 1, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 1, 0, 1, borrower, false, address(this), address(0), "");
 
         vm.expectRevert();
-        midnight.liquidate(market, 1, 1, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 1, 1, 0, borrower, false, address(this), address(0), "");
 
         uint256 collatBefore = midnight.collateral(id, borrower, 0);
-        midnight.liquidate(market, 1, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 1, 0, 0, borrower, false, address(this), address(0), "");
         assertEq(midnight.debtOf(id, borrower), 0);
         assertEq(midnight.collateral(id, borrower, 0), collatBefore);
         assertEq(midnight.collateral(id, borrower, 1), 0);
@@ -103,7 +105,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidateUnhealthyPreMaturity(uint256 units, uint256 liquidationOraclePrice) public {
@@ -113,7 +115,7 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidateHealthyPostMaturity(uint256 units, uint256 liquidationOraclePrice) public {
@@ -124,7 +126,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + 1);
 
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
     }
 
     function testLiquidateUnhealthyPostMaturity(uint256 units, uint256 liquidationOraclePrice) public {
@@ -135,7 +137,7 @@ contract LiquidationTest is BaseTest {
         vm.warp(market.maturity + 1);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidateInconsistentInput(uint256 units) public {
@@ -144,7 +146,41 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
 
         vm.expectRevert(IMidnight.InconsistentInput.selector);
-        midnight.liquidate(market, 0, 1, 1, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 1, 1, borrower, false, address(this), address(0), "");
+    }
+
+    function testLiquidatePostMaturityPathBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
+        units = bound(units, 1, MAX_UNITS);
+        liquidationOraclePrice = bound(liquidationOraclePrice, 0, ORACLE_PRICE_SCALE - 1);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
+
+        // Pre-maturity: the post-maturity path is not available.
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
+
+        // At exact maturity: still not available (only valid strictly after maturity).
+        vm.warp(market.maturity);
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
+
+        // One second after maturity: accepted.
+        vm.warp(market.maturity + 1);
+        midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
+    }
+
+    function testLiquidateUnhealthyPathRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
+        units = bound(units, 1, MAX_UNITS);
+        liquidationOraclePrice = bound(liquidationOraclePrice, ORACLE_PRICE_SCALE, 10 * ORACLE_PRICE_SCALE);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
+        vm.warp(market.maturity + 1);
+
+        // Post-maturity but borrower is healthy: the unhealthy path is rejected.
+        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidateUnitsInput(uint256 units, uint256 repaid, uint256 liquidationOraclePrice) public {
@@ -155,10 +191,10 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
 
         (uint256 seizedAssets, uint256 repaidUnits) =
-            midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+            midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
 
         assertEq(repaidUnits, repaid, "repaid units");
         assertEq(
@@ -188,10 +224,10 @@ contract LiquidationTest is BaseTest {
             )
         );
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
 
         (uint256 seizedAssets, uint256 repaidUnits) =
-            midnight.liquidate(market, 0, seized, 0, borrower, address(this), address(0), "");
+            midnight.liquidate(market, 0, seized, 0, borrower, true, address(this), address(0), "");
 
         assertEq(
             repaidUnits,
@@ -213,18 +249,23 @@ contract LiquidationTest is BaseTest {
         address caller
     ) public {
         units = bound(units, 1, MAX_UNITS);
-        repaid = bound(repaid, 0, units);
-        liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE);
+        liquidationOraclePrice = bound(liquidationOraclePrice, 1, ORACLE_PRICE_SCALE);
         vm.assume(data.length > 0);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
+
+        uint256 expectedBadDebt = _badDebt();
+        uint256 maxRepaid = midnight.collateral(id, borrower, 0).mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, market.collateralParams[0].maxLif);
+        repaid = bound(repaid, 0, UtilsLib.min(units - expectedBadDebt, maxRepaid));
 
         vm.prank(caller);
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(this), data);
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(this), data);
 
         assertEq(recordedRepaidUnits, repaid, "repaid units");
+        assertEq(recordedBadDebt, expectedBadDebt, "bad debt");
         assertEq(recordedData, data, "data");
     }
 
@@ -232,7 +273,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 10, MAX_UNITS - 1);
         collateralize(market, borrower, units);
         setupMarket(market, units);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
 
         uint256 _maxLif = market.collateralParams[0].maxLif;
         uint256 collateral = midnight.collateral(id, borrower, 0);
@@ -247,7 +288,7 @@ contract LiquidationTest is BaseTest {
         repaid = bound(repaid, units + 1, max(maxRepaid, units + 1));
 
         vm.expectRevert(stdError.arithmeticError);
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
     }
 
     function testCannotSeizeMoreThanCollateral(uint256 units, uint256 seized, uint256 liquidationOraclePrice) public {
@@ -255,12 +296,12 @@ contract LiquidationTest is BaseTest {
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE);
         collateralize(market, borrower, units);
         setupMarket(market, units);
-        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity to bypass recovery close factor.
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
         seized = bound(seized, midnight.collateral(id, borrower, 0) + 1, MAX_TEST_AMOUNT);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         vm.expectRevert(stdError.arithmeticError);
-        midnight.liquidate(market, 0, seized, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, seized, 0, borrower, true, address(this), address(0), "");
     }
 
     function testBadDebtPriceDownGivesBadDebt(uint256 units) public {
@@ -291,7 +332,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 expectedBadDebt = _badDebt();
 
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
@@ -300,19 +341,28 @@ contract LiquidationTest is BaseTest {
         assertApproxEqAbs(midnight.creditOf(id, lender), units - expectedBadDebt, 1, "lender units after slashing");
     }
 
-    function testLiquidateEmitsLossFactor(uint256 units) public {
-        units = bound(units, 10, MAX_UNITS);
+    function testLiquidateEmitsLossFactorAndContinuousFeeCredit(uint256 units) public {
+        units = bound(units, 1e18, MAX_UNITS);
+        midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
         collateralize(market, borrower, units);
         setupMarket(market, units);
+        vm.warp(block.timestamp + 50);
+        midnight.updatePosition(market, lender);
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
         uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
         uint256 previousLossFactor = midnight.lossFactor(id);
+        uint256 previousContinuousFeeCredit = midnight.continuousFeeCredit(id);
         uint256 expectedLossFactor = expectedBadDebt == 0
             ? previousLossFactor
             : type(uint128).max
                 - (type(uint128).max - previousLossFactor).mulDivDown(oldTotalUnits - expectedBadDebt, oldTotalUnits);
+        uint256 expectedContinuousFeeCredit = previousLossFactor < type(uint128).max
+            ? previousContinuousFeeCredit.mulDivDown(
+                type(uint128).max - expectedLossFactor, type(uint128).max - previousLossFactor
+            )
+            : 0;
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
@@ -322,12 +372,14 @@ contract LiquidationTest is BaseTest {
             0,
             0,
             borrower,
+            false,
             expectedBadDebt,
             expectedLossFactor,
+            expectedContinuousFeeCredit,
             address(this),
             address(this)
         );
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function testSlashNonFull(uint256 units) public {
@@ -336,7 +388,7 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
 
         uint256 lossFactor = midnight.lossFactor(id);
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossFactor, type(uint128).max);
@@ -358,7 +410,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 debtAfterBadDebt = units - _badDebt();
 
-        (, uint256 repaid) = midnight.liquidate(market, 0, seized, 0, borrower, address(this), address(0), "");
+        (, uint256 repaid) = midnight.liquidate(market, 0, seized, 0, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
@@ -380,7 +432,7 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, lif0);
         repaid = bound(repaid, 0, UtilsLib.min(UtilsLib.min(maxRepaid, debtAfterBadDebt), maxRepaidFromCollat));
 
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");
@@ -397,7 +449,9 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        midnight.liquidate(market, 0, midnight.collateral(id, borrower, 0), 0, borrower, address(this), address(0), "");
+        midnight.liquidate(
+            market, 0, midnight.collateral(id, borrower, 0), 0, borrower, false, address(this), address(0), ""
+        );
 
         assertApproxEqAbs(midnight.debtOf(id, borrower), 0, 1e3, "almost all remaining debt repaid");
         assertApproxEqAbs(
@@ -428,7 +482,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
 
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), units - repaid, "debt");
         assertEq(
@@ -457,7 +511,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
 
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
 
         uint256 lif = WAD + (market.collateralParams[0].maxLif - WAD) * delay / TIME_TO_MAX_LIF;
 
@@ -481,10 +535,10 @@ contract LiquidationTest is BaseTest {
 
         repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
         vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
 
         repaid = bound(repaid, 0, min(maxR, units));
-        midnight.liquidate(market, 0, 0, repaid, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
     }
 
     function testMaxRepaidMeansRecovery(uint256 units, uint256 liquidationOraclePrice) public {
@@ -495,7 +549,7 @@ contract LiquidationTest is BaseTest {
 
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
 
-        midnight.liquidate(market, 0, 0, min(maxR, units), borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, min(maxR, units), borrower, false, address(this), address(0), "");
 
         uint256 remainingCollateral = midnight.collateral(id, borrower, 0);
         uint256 remainingDebt = midnight.debtOf(id, borrower);
@@ -526,7 +580,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
         // Full liquidation should succeed because remaining debt < rcfThreshold.
-        midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
         assertEq(midnight.debtOf(toId(market), borrower), 0, "debt should be zero");
     }
 
@@ -554,29 +608,33 @@ contract LiquidationTest is BaseTest {
 
         // Full liquidation should revert because remaining debt >= rcfThreshold.
         vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
-        midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
     }
 
-    /// @dev Recovery close factor applies at exact maturity but not one second after.
-    function testRecoveryCloseFactorMaturityBoundary(uint256 units, uint256 liquidationOraclePrice) public {
+    /// @dev Recovery close factor still applies after maturity when the borrower is unhealthy.
+    function testRecoveryCloseFactorAppliesPostMaturityWhenUnhealthy(
+        uint256 units,
+        uint256 liquidationOraclePrice,
+        uint256 delay
+    ) public {
         units = bound(units, 100, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
+        delay = bound(delay, 0, 100 weeks);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
+        vm.assume(maxRepaid < units);
 
         // At exact maturity: recovery close factor applies.
-        if (maxRepaid < units) {
-            vm.warp(market.maturity);
-            vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
-            midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
-        }
+        vm.warp(market.maturity);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
+        midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
 
-        // One second later: recovery close factor no longer applies.
-        vm.warp(market.maturity + 1);
-        midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
-        assertEq(midnight.debtOf(id, borrower), 0);
+        // After maturity, while still unhealthy: recovery close factor still applies.
+        vm.warp(market.maturity + 1 + delay);
+        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
+        midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
     }
 
     /// @dev With RCF deactivated, liquidation can always end by fully repaying debt or fully seizing collateral.
@@ -615,7 +673,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         deal(market.collateralParams[0].token, address(this), collateral1);
         midnight.supplyCollateral(market, 0, collateral1, borrower);
@@ -629,9 +687,9 @@ contract LiquidationTest is BaseTest {
 
         uint256 collateralNeededToRepayAll = units.mulDivDown(market.collateralParams[0].maxLif, WAD);
         if (collateralNeededToRepayAll <= collateral1) {
-            midnight.liquidate(market, 0, 0, units, borrower, address(this), address(0), "");
+            midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
         } else {
-            midnight.liquidate(market, 0, collateral1, 0, borrower, address(this), address(0), "");
+            midnight.liquidate(market, 0, collateral1, 0, borrower, false, address(this), address(0), "");
         }
 
         uint256 debtAfter = midnight.debtOf(id, borrower);
@@ -649,7 +707,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Deposit enough for each collateral so position is healthy at par.
         uint256 collatPerToken = units.mulDivUp(WAD, lltv0 + lltv1) + 1;
@@ -678,7 +736,7 @@ contract LiquidationTest is BaseTest {
         uint256 maxR = (units - _maxDebt)
         .mulDivUp(WAD, WAD - market.collateralParams[liqIdx].maxLif.mulDivUp(market.collateralParams[liqIdx].lltv, WAD));
 
-        midnight.liquidate(market, liqIdx, 0, maxR, borrower, address(this), address(0), "");
+        midnight.liquidate(market, liqIdx, 0, maxR, borrower, false, address(this), address(0), "");
     }
 
     // gas tests
@@ -690,7 +748,7 @@ contract LiquidationTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Supply both collateralParams.
         for (uint256 i = 0; i < 2; i++) {
@@ -712,7 +770,8 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 1 liquidation.
         bytes[] memory calls1 = new bytes[](1);
-        calls1[0] = abi.encodeCall(midnight.liquidate, (market, 0, 0, repay, borrower, address(this), address(0), ""));
+        calls1[0] =
+            abi.encodeCall(midnight.liquidate, (market, 0, 0, repay, borrower, true, address(this), address(0), ""));
         uint256 gasBefore1 = gasleft();
         midnight.multicall(calls1);
         uint256 gas1 = gasBefore1 - gasleft();
@@ -720,8 +779,10 @@ contract LiquidationTest is BaseTest {
 
         // Multicall with 2 liquidations.
         bytes[] memory calls2 = new bytes[](2);
-        calls2[0] = abi.encodeCall(midnight.liquidate, (market, 0, 0, repay, borrower, address(this), address(0), ""));
-        calls2[1] = abi.encodeCall(midnight.liquidate, (market, 1, 0, repay, borrower, address(this), address(0), ""));
+        calls2[0] =
+            abi.encodeCall(midnight.liquidate, (market, 0, 0, repay, borrower, true, address(this), address(0), ""));
+        calls2[1] =
+            abi.encodeCall(midnight.liquidate, (market, 1, 0, repay, borrower, true, address(this), address(0), ""));
         uint256 gasBefore2 = gasleft();
         midnight.multicall(calls2);
         uint256 gas2 = gasBefore2 - gasleft();
@@ -750,7 +811,7 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
 
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
@@ -770,7 +831,7 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
 
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
 
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
         midnight.updatePosition(market, lender);
@@ -792,7 +853,7 @@ contract LiquidationTest is BaseTest {
         setupMarket(market, units);
 
         Oracle(market.collateralParams[0].oracle).setPrice(0);
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
@@ -805,7 +866,7 @@ contract LiquidationTest is BaseTest {
         uint256 collateral = midnight.collateral(id, borrower, 0);
         assertGt(collateral, 0, "has collateral");
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
         midnight.withdrawCollateral(market, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }
@@ -891,14 +952,14 @@ contract LiquidationTest is BaseTest {
 
         uint256 debtBefore = midnight.debtOf(id, borrower);
         // Non-zero seizedAssets exercises the recovery close factor path.
-        midnight.liquidate(market, 0, 1, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 1, 0, borrower, false, address(this), address(0), "");
         assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
     }
 
     function testLiquidateNoDebtReverts() public {
         midnight.touchMarket(market);
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
-        midnight.liquidate(market, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     function onLiquidate(
@@ -907,11 +968,15 @@ contract LiquidationTest is BaseTest {
         uint256,
         uint256,
         uint256 _repaidUnits,
+        uint256 badDebt,
+        address,
+        address,
         address,
         bytes memory data
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
         recordedRepaidUnits = _repaidUnits;
+        recordedBadDebt = badDebt;
         recordedData = data;
         return CALLBACK_SUCCESS;
     }

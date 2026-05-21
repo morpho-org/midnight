@@ -36,7 +36,7 @@ contract MaxAmountsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
     }
 
     function testMaxAmountIsUint128Max() public pure {
@@ -50,7 +50,7 @@ contract MaxAmountsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Set a very high oracle price so a small collateral amount is sufficient.
         // With price = ORACLE_PRICE_SCALE * 1e36, 1 collateral token = 1e36 loan tokens.
@@ -109,7 +109,7 @@ contract MaxAmountsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         midnight.supplyCollateral(market, 0, amount, borrower);
 
@@ -123,7 +123,7 @@ contract MaxAmountsTest is BaseTest {
 
         vm.prank(borrower);
 
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         vm.expectRevert(UtilsLib.CastOverflow.selector);
         midnight.supplyCollateral(market, 0, amount, borrower);

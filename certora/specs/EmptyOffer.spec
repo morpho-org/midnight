@@ -19,6 +19,6 @@ methods {
 rule emptyOfferCantBeTaken(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
     Midnight.Offer offer = Utils.emptyOffer();
     require e.block.timestamp > 0, "block.timestamp is always positive";
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiverIfTakerIsSeller, offer, ratifierData);
+    take@withrevert(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
     assert lastReverted;
 }
