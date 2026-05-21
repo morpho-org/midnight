@@ -1637,7 +1637,7 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         oracle.setPrice(healthyPrice / 2);
         ERC20(market.loanToken).approve(msg.sender, repaidUnits);
         try Midnight(msg.sender)
-            .liquidate(market, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
+            .liquidate(market, collateralIndex, 0, repaidUnits, seller, false, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1698,7 +1698,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             oracle.setPrice(healthyPrice / 2);
             ERC20(market.loanToken).approve(msg.sender, storedRepaidUnits);
             try Midnight(msg.sender)
-                .liquidate(market, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
+                .liquidate(market, idx, 0, storedRepaidUnits, seller, false, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;

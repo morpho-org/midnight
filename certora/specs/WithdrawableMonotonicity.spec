@@ -16,12 +16,12 @@ rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, ad
     assert withdrawableAfter == withdrawableBefore + units;
 }
 
-rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
     bytes32 id = toId(e, market);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore + repaidResult;
 }
@@ -46,7 +46,7 @@ rule withdrawableUnchanged(method f, env e, calldataarg args, bytes32 id)
 filtered {
     f -> !f.isView
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:claimContinuousFee(Midnight.Market, uint256, address).selector
 } {
