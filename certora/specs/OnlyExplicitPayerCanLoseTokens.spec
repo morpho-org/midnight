@@ -125,7 +125,7 @@ rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filte
     makerAllowed = false;
 
     buyCallbackAllowed = false;
-    liquidateCallbackAllowed = f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector;
+    liquidateCallbackAllowed = f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector;
     repayCallbackAllowed = f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector;
     flashLoanCallbackAllowed = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
     badPullSeen = false;

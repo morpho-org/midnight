@@ -59,23 +59,24 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
-/// maturity + TIME_TO_MAX_LIF.
-/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
-/// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
-/// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
-/// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
+/// @dev There are two liquidation modes: The "unhealthy path", available if the borrower is unhealthy and the
+/// "post-maturity path", available after the market's maturity. For an unhealthy borrower after the maturity, the
+/// liquidator can choose between both modes.
+/// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
 /// healthy after a liquidation.
-/// @dev The RCF is deactivated after the maturity.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
+/// @dev In the "post-maturity path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 ///
 /// SLASHING
 /// @dev When a borrower's bad debt is realized, it is socialized among lenders in this market.
@@ -580,6 +581,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        bool healthyPath,
         address receiver,
         address callback,
         bytes calldata data
@@ -613,7 +615,7 @@ contract Midnight is IMidnight {
 
         require(
             originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (block.timestamp > market.maturity || originalDebt > maxDebt),
+                && (healthyPath ? block.timestamp > market.maturity : originalDebt > maxDebt),
             NotLiquidatable()
         );
 
@@ -636,9 +638,9 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = originalDebt > maxDebt
-                ? _maxLif
-                : UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF);
+            uint256 lif = healthyPath
+                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
+                : _maxLif;
 
             if (seizedAssets > 0) {
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
@@ -646,7 +648,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (block.timestamp <= market.maturity) {
+            if (!healthyPath) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
@@ -678,6 +680,7 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
+            healthyPath,
             badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit,

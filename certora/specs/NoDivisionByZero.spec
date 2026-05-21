@@ -106,13 +106,13 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 /// RULES ///
 
 // The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
-rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
+rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     f(e, args);
     assert true;
 }
 
 // Show that liquidate does not cause a division by zero, in case the oracle price is non-zero and the collateral is active.
-rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
     require equalsGlobalMarket(market);
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
@@ -124,6 +124,6 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
     assert true;
 }
