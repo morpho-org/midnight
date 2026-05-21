@@ -95,15 +95,17 @@ function validCollateralAt(Midnight.Market market, bytes32 id, address borrower,
     uint256 maxLif = market.collateralParams[i].maxLif;
     require lltv > 0 && lltv <= WAD(), "valid lltv";
     require maxLif >= WAD(), "valid maxLif";
+
     //require lltv < WAD() => lltv * maxLif <= WAD() * (WAD() - 1), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
     require lltv < WAD() => to_mathint(lltv) * to_mathint(maxLif) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
+
     // @todo check if not needed
     require to_mathint(lltv) * to_mathint(maxLif) <= to_mathint(WAD()) * to_mathint(WAD()), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
 
     address oracle = market.collateralParams[i].oracle;
+
     //require collateral(id, borrower, i) * summaryPrice(oracle) <= ORACLE_PRICE_SCALE() * WAD() * MAX_UINT128(), "collateral value fits in uint128";
     require to_mathint(collateral(id, borrower, i)) * to_mathint(summaryPrice(oracle)) <= to_mathint(ORACLE_PRICE_SCALE()) * to_mathint(WAD()) * MAX_UINT128(), "...";
-
 }
 
 /// Two-activated-collateral market with bitmap == 3 (bits 0 and 1 set); matches `loop_iter: 2`.
@@ -134,16 +136,16 @@ function strategyARepaidUnitsAtMaxLif(Midnight.Market market, uint128 collat) re
 /// accounting, not locked, and positive debt.
 function commonDualPreamble(env e, Midnight.Market market, bytes32 id, address borrower) {
     dualCollateralSetup(market, id, borrower);
-    
+
     require e.msg.value == 0, "no value sent";
     require market.liquidatorGate == 0, "no liquidator gate (see Reverts.spec)";
     require e.block.timestamp < MAX_TIMESTAMP(), "timestamp bounded";
     require market.maturity < MAX_TIMESTAMP(), "maturity bounded";
-    
+
     uint256 _debt = debtOf(id, borrower);
     require totalUnits(id) >= _debt, "totalUnits >= borrower debt (Midnight.spec totalUnitsEqualsSumNegativeDebtPlusWithdrawable)";
     require to_mathint(withdrawable(id)) + to_mathint(debtOf(id, borrower)) <= MAX_UINT128(), "withdrawable += repaidUnits won't overflow";
-    
+
     require !liquidationLocked(id, borrower), "not locked";
     require _debt > 0, "borrower has debt";
 }
@@ -153,7 +155,7 @@ function commonDualPreamble(env e, Midnight.Market market, bytes32 id, address b
 function oneUnitDualPreamble(env e, Midnight.Market market, bytes32 id, address borrower) {
     commonDualPreamble(e, market, id, borrower);
 
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0); 
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     address oracle = market.collateralParams[0].oracle;
@@ -168,7 +170,7 @@ function oneUnitDualPreamble(env e, Midnight.Market market, bytes32 id, address 
 function seizeAllDualPreamble(env e, Midnight.Market market, bytes32 id, address borrower) returns uint128 {
     commonDualPreamble(e, market, id, borrower);
 
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0); 
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     uint128 collat = collateral(id, borrower, 0);
@@ -189,7 +191,7 @@ rule liquidateZeroZeroNoRevert(env e, Midnight.Market market, address borrower, 
     require market.liquidatorGate == 0, "no liquidator gate (see Reverts.spec)";
     require e.block.timestamp < MAX_TIMESTAMP(), "timestamp bounded";
     require market.maturity < MAX_TIMESTAMP(), "maturity bounded";
-    
+
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     require debtOf(id, borrower) > 0, "borrower has debt";
@@ -283,9 +285,7 @@ rule liquidatableCanBeLiquidatedOneUnitPinnedLifDual(env e, Midnight.Market mark
     assert !lastReverted;
 }
 
-
 ///////////////////
-
 
 function wellBehavedEnv(env e, Midnight.Market market) {
     require e.msg.value == 0, "no value sent";
