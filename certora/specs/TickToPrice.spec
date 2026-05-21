@@ -1,31 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import "WExp.spec";
+
 methods {
-    function maxTick() external returns (uint256) envfree;
-    function wExp(int256 x) external returns (uint256) envfree;
-    function tickToPrice(uint256 tick) external returns (uint256) envfree;
+    function wExp(int256 x) internal returns (uint256) => summaryWExp(x);
+}
+
+persistent ghost summaryWExp(int256) returns uint256 {
+    // The rule wExpIsMonotonicOnPositiveRange and wExpIsMonotonicOnNegativeRange in WExp.spec prove that wExp is non-decreasing.
+    axiom forall int256 x. forall int256 y. x <= y => summaryWExp(x) <= summaryWExp(y);
+
+    // matches rule maxOutputIsWExpOfMaxInput in WExp.spec
+    axiom summaryWExp(maxInput()) == maxOutput();
 }
 
 definition cvlMaxTick() returns uint256 = 5820;
 
 rule cvlMaxTickIsMaxTick() {
     assert cvlMaxTick() == maxTick();
-}
-
-// Check the casting assertions in the wExp function.
-rule wExpCasting(uint256 x) {
-    require x >= 0, "wExp calls wExp(-x) when x < 0";
-
-    mathint ln2 = 693147180559945309;
-    mathint q = (x + ln2 / 2) / ln2;
-    mathint r = x - q * ln2;
-    mathint secondTerm = r * r / (2 * 10 ^ 18);
-    mathint thirdTerm = secondTerm * r / (3 * 10 ^ 18);
-    mathint expR = 10 ^ 18 + r + secondTerm + thirdTerm;
-
-    assert q >= 0;
-    assert r < ln2 && r > -ln2;
-    assert expR >= 0;
 }
 
 rule tickToPriceIsZeroAtZero() {
@@ -40,4 +32,8 @@ rule tickToPriceIsOneAtMaxTick() {
 // This notably ensures that offer prices are at most 1e18.
 rule tickToPriceAtMostWad(uint256 tick) {
     assert tickToPrice(tick) <= 10 ^ 18;
+}
+
+rule tickToPriceIsMonotonic(uint256 tick1, uint256 tick2) {
+    assert tick1 < tick2 => tickToPrice(tick1) <= tickToPrice(tick2);
 }
