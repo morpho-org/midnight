@@ -419,19 +419,19 @@ contract Midnight is IMidnight {
             msg.sender,
             id,
             offer.maker,
-            taker,
             offer.buy,
+            offer.group,
             buyerAssets,
             sellerAssets,
             units,
-            payer,
-            receiver,
-            offer.group,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             buyerCreditIncrease,
-            sellerCreditDecrease
+            sellerCreditDecrease,
+            taker,
+            receiver,
+            payer
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
@@ -491,7 +491,7 @@ contract Midnight is IMidnight {
         _marketState.withdrawable -= UtilsLib.toUint128(units);
         _marketState.totalUnits -= UtilsLib.toUint128(units);
 
-        emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
+        emit EventsLib.Withdraw(msg.sender, id, units, pendingFeeDecrease, onBehalf, receiver);
 
         SafeTransferLib.safeTransfer(market.loanToken, receiver, units);
     }
@@ -679,13 +679,13 @@ contract Midnight is IMidnight {
             market.collateralParams[collateralIndex].token,
             seizedAssets,
             repaidUnits,
-            borrower,
             healthyPath,
             badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit,
-            payer,
-            receiver
+            borrower,
+            receiver,
+            payer
         );
 
         SafeTransferLib.safeTransfer(market.collateralParams[collateralIndex].token, receiver, seizedAssets);
@@ -719,14 +719,14 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;
-        emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
+        emit EventsLib.SetConsumed(msg.sender, group, amount, onBehalf);
     }
 
     /// @dev See AUTHORIZATIONS section above.
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
+        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized, onBehalf);
     }
 
     function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
@@ -840,7 +840,7 @@ contract Midnight is IMidnight {
         _position.lastAccrual = uint128(block.timestamp);
         marketState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
-        emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
+        emit EventsLib.UpdatePosition(id, creditDecrease, pendingFeeDecrease, accruedFee, user);
 
         return (newCredit, newPendingFee, accruedFee);
     }

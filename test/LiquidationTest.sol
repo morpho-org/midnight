@@ -371,11 +371,11 @@ contract LiquidationTest is BaseTest {
             market.collateralParams[0].token,
             0,
             0,
-            borrower,
             false,
             expectedBadDebt,
             expectedLossFactor,
             expectedContinuousFeeCredit,
+            borrower,
             address(this),
             address(this)
         );
@@ -394,7 +394,7 @@ contract LiquidationTest is BaseTest {
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossFactor, type(uint128).max);
 
         vm.expectEmit(true, true, false, true);
-        emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
+        emit EventsLib.UpdatePosition(id, units - expectedCredit, 0, 0, lender);
         midnight.updatePosition(market, lender);
 
         assertEq(midnight.creditOf(id, lender), expectedCredit, "credit");

@@ -81,9 +81,9 @@ contract ContinuousFeeTest is BaseTest {
         // Via withdraw(0)
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, expectedFee, expectedFee, expectedFee);
+        emit EventsLib.UpdatePosition(id, expectedFee, expectedFee, expectedFee, lender);
         vm.expectEmit();
-        emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
+        emit EventsLib.Withdraw(lender, id, 0, 0, lender, lender);
         vm.prank(lender);
         midnight.withdraw(market, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after withdraw");
@@ -92,7 +92,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Via direct call
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, expectedFee, expectedFee, expectedFee);
+        emit EventsLib.UpdatePosition(id, expectedFee, expectedFee, expectedFee, lender);
         midnight.updatePosition(market, lender);
         assertEq(midnight.creditOf(id, lender), credit - expectedFee, "credit after direct call");
         assertEq(midnight.pendingFee(id, lender), remaining - expectedFee, "remaining after direct call");
@@ -119,9 +119,9 @@ contract ContinuousFeeTest is BaseTest {
         // Via withdraw(0)
         uint256 snap = vm.snapshotState();
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, remaining, remaining, remaining);
+        emit EventsLib.UpdatePosition(id, remaining, remaining, remaining, lender);
         vm.expectEmit();
-        emit EventsLib.Withdraw(lender, id, 0, lender, lender, 0);
+        emit EventsLib.Withdraw(lender, id, 0, 0, lender, lender);
         vm.prank(lender);
         midnight.withdraw(market, 0, lender, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (withdraw)");
@@ -130,7 +130,7 @@ contract ContinuousFeeTest is BaseTest {
 
         // Via direct call
         vm.expectEmit();
-        emit EventsLib.UpdatePosition(id, lender, remaining, remaining, remaining);
+        emit EventsLib.UpdatePosition(id, remaining, remaining, remaining, lender);
         midnight.updatePosition(market, lender);
         assertEq(midnight.creditOf(id, lender), credit - remaining, "all remaining consumed (direct)");
         assertEq(midnight.pendingFee(id, lender), 0, "remaining is zero (direct)");
@@ -268,30 +268,30 @@ contract ContinuousFeeTest is BaseTest {
 
         if (exitAmount > 0) {
             vm.expectEmit();
-            emit EventsLib.UpdatePosition(id, otherLender, 0, 0, 0);
+            emit EventsLib.UpdatePosition(id, 0, 0, 0, otherLender);
         }
         vm.expectEmit();
         emit EventsLib.UpdatePosition(
-            id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
+            id, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits, lender
         );
         vm.expectEmit();
         emit EventsLib.Take(
             lender,
             id,
             otherLender,
-            lender,
             true,
+            keccak256("lender-exit"),
             takeAssets,
             takeAssets,
             exitAmount,
-            otherLender,
-            lender,
-            keccak256("lender-exit"),
             exitAmount,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             exitAmount,
-            exitAmount
+            exitAmount,
+            lender,
+            lender,
+            otherLender
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
@@ -339,10 +339,10 @@ contract ContinuousFeeTest is BaseTest {
 
         vm.expectEmit();
         emit EventsLib.UpdatePosition(
-            id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
+            id, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits, lender
         );
         vm.expectEmit();
-        emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, pendingFeeDecrease);
+        emit EventsLib.Withdraw(lender, id, withdrawAmount, pendingFeeDecrease, lender, lender);
         vm.prank(lender);
         midnight.withdraw(market, withdrawAmount, lender, lender);
 
