@@ -373,11 +373,11 @@ contract LiquidationTest is BaseTest {
             0,
             borrower,
             false,
-            expectedBadDebt,
-            expectedLossFactor,
-            expectedContinuousFeeCredit,
             address(this),
-            address(this)
+            expectedBadDebt,
+            address(this),
+            expectedLossFactor,
+            expectedContinuousFeeCredit
         );
         midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
@@ -963,16 +963,16 @@ contract LiquidationTest is BaseTest {
     }
 
     function onLiquidate(
+        address,
         bytes32 _id,
         Market memory _market,
         uint256,
         uint256,
         uint256 _repaidUnits,
-        uint256 badDebt,
         address,
         address,
-        address,
-        bytes memory data
+        bytes memory data,
+        uint256 badDebt
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
         recordedRepaidUnits = _repaidUnits;
