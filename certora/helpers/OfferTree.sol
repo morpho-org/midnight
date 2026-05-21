@@ -25,9 +25,9 @@ contract OfferTree {
 
     function newLeaf(Offer memory offer) public {
         bytes32 id = HashLib.hashOffer(offer);
-        require(id != 0, "zero offer hash");
+        require(id != 0, "id is the zero bytes");
         Node storage n = tree[id];
-        require(_isEmpty(n), "leaf already populated");
+        require(_isEmpty(n), "leaf is not empty");
         n.offer = offer;
         n.hashNode = id;
     }
