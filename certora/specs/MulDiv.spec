@@ -32,6 +32,24 @@ rule mulDivAddDownDown(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     assert mulDivDown(a1, b, d) + mulDivDown(a2, b, d) <= mulDivDown(a1plusa2, b, d);
 }
 
+// Sub-additivity upper bound for mulDivDown: floor((a1+a2)*b/d) <= floor(a1*b/d) + floor(a2*b/d) + 1.
+rule mulDivAddDownDownTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivDown(a1plusa2, b, d) <= mulDivDown(a1, b, d) + mulDivDown(a2, b, d) + 1;
+}
+
+// Super-additivity upper bound for mulDivUp: ceil((a1+a2)*b/d) <= ceil(a1*b/d) + ceil(a2*b/d).
+rule mulDivAddUpUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivUp(a1plusa2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d);
+}
+
+// Super-additivity lower bound for mulDivUp: ceil(a1*b/d) + ceil(a2*b/d) <= ceil((a1+a2)*b/d) + 1.
+rule mulDivAddUpUpTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivUp(a1, b, d) + mulDivUp(a2, b, d) <= mulDivUp(a1plusa2, b, d) + 1;
+}
+
 rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     uint256 a1plusa2 = require_uint256(a1 + a2);
     assert mulDivDown(a1, b, d) + mulDivUp(a2, b, d) >= mulDivDown(a1plusa2, b, d);
