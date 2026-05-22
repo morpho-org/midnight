@@ -2,11 +2,15 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {TickLib, MAX_TICK} from "../../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK, PRICE_ROUNDING_STEP} from "../../src/libraries/TickLib.sol";
 
 contract TickLibWrapper {
     function maxTick() external pure returns (uint256) {
         return MAX_TICK;
+    }
+
+    function priceRoundingStep() external pure returns (uint256) {
+        return PRICE_ROUNDING_STEP;
     }
 
     function wExp(int256 x) external pure returns (uint256) {
