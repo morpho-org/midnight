@@ -15,7 +15,7 @@ methods {
     // Deterministic floor division; must not call MulDiv (it delegates back to UtilsLib.mulDivDown).
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
 
-    // Token / permit plumbing is irrelevant to the units formula.
+    // Token / permit plumbing is irrelevant to the units formula but NONDET prevent havoc calls.
     function _.allowance(address, address) external => NONDET;
     function _.approve(address, uint256) external => NONDET;
     function _.permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external => NONDET;
