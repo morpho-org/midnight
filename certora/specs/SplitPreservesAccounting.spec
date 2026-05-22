@@ -19,6 +19,7 @@ methods {
 
     // Deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
+
     // Assume that the obligations are already created.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
@@ -49,10 +50,13 @@ function summaryToId(Midnight.Obligation obligation) returns (bytes32) {
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     // Identity (b=d=x): floor(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivDownTightBound in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivDown(a, x, x) == a;
+
     // floor(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
     axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivDown(a, 0, c) == 0;
+
     // floor(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivDown(0, b, c) == 0;
+
     // Boundedness: b <= d => floor(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
 }
@@ -61,10 +65,13 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     // Identity (b=d=x): ceil(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivUpTightBound in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
+
     // ceil(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
     axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivUp(a, 0, c) == 0;
+
     // ceil(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
     axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivUp(0, b, c) == 0;
+
     // Boundedness: b <= d => ceil(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
 }
