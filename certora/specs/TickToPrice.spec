@@ -8,6 +8,7 @@ methods {
 }
 
 definition cvlMaxTick() returns uint256 = 5820;
+
 definition cvlPriceRoundingStep() returns uint256 = 10 ^ 12;
 
 rule cvlMaxTickIsMaxTick() {
