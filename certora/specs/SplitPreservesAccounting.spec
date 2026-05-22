@@ -99,17 +99,13 @@ rule splitPreservesAccounting(env e, uint256 obligationUnitsA, uint256 obligatio
     uint256 creditOfSeller1 = creditOf(id, seller);
     uint256 debtOfSeller1 = debtOf(id, seller);
     uint256 totalUnits1 = totalUnits(id);
-
-    // take() never writes obligationState.lossFactor; _updatePosition mirrors it into position.lastLossFactor.
     uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
     uint128 sellerLossFactor1 = lastLossFactor(id, seller);
+    uint128 continuousFeeCredit1 = currentContract.obligationState[id].continuousFeeCredit;
 
     // lastAccrual is set to block.timestamp by _updatePosition; same env across both paths.
     uint128 buyerLastAccrual1 = lastAccrual(id, buyer);
     uint128 sellerLastAccrual1 = lastAccrual(id, seller);
-
-    // _updatePosition is idempotent at lastAccrual == block.timestamp, so split-C adds 0 to the accumulator.
-    uint128 continuousFeeCredit1 = currentContract.obligationState[id].continuousFeeCredit;
 
     // Path 2: take B then C from the initial state.
     take(e, obligationUnitsB, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData, root, proof) at initState;
