@@ -31,7 +31,7 @@ function buildTypes(height: number) {
       { name: "maxLif", type: "uint256" },
       { name: "oracle", type: "address" },
     ],
-    Obligation: [
+    Market: [
       { name: "loanToken", type: "address" },
       { name: "collateralParams", type: "CollateralParams[]" },
       { name: "maturity", type: "uint256" },
@@ -40,29 +40,27 @@ function buildTypes(height: number) {
       { name: "liquidatorGate", type: "address" },
     ],
     Offer: [
-      { name: "obligation", type: "Obligation" },
+      { name: "market", type: "Market" },
       { name: "buy", type: "bool" },
       { name: "maker", type: "address" },
       { name: "start", type: "uint256" },
       { name: "expiry", type: "uint256" },
       { name: "tick", type: "uint256" },
       { name: "group", type: "bytes32" },
-      { name: "session", type: "bytes32" },
       { name: "callback", type: "address" },
       { name: "callbackData", type: "bytes" },
       { name: "receiverIfMakerIsSeller", type: "address" },
       { name: "ratifier", type: "address" },
       { name: "reduceOnly", type: "bool" },
       { name: "maxUnits", type: "uint256" },
-      { name: "maxSellerAssets", type: "uint256" },
-      { name: "maxBuyerAssets", type: "uint256" },
+      { name: "maxAssets", type: "uint256" },
     ],
   };
 }
 
 function defaultOffer(number: string) {
   return {
-    obligation: {
+    market: {
       loanToken: "0x" + number.repeat(40),
       collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: ZERO_ADDR}],
       maturity: "0",
@@ -76,20 +74,16 @@ function defaultOffer(number: string) {
     expiry: 2**32,
     tick: "0",
     group: ZERO_B32,
-    session: ZERO_B32,
     callback: ZERO_ADDR,
     callbackData: "0x",
     receiverIfMakerIsSeller: ZERO_ADDR,
     ratifier: RATIFIER,
     reduceOnly: false,
     maxUnits: "0",
-    maxSellerAssets: "0",
-    maxBuyerAssets: "0",
+    maxAssets: "0",
   };
 }
 
-// WARNING: The tree should be built by sorting the nodes in ascending order of their hash.
-// By luck, the following offers happen to be correctly sorted already.
 function buildOfferTree() {
   return [
     [defaultOffer("1"), defaultOffer("2")],

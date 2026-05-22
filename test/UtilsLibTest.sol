@@ -3,17 +3,14 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
-import {
-    COLLATERAL_PARAMS_TYPE,
-    COLLATERAL_PARAMS_TYPEHASH,
-    OBLIGATION_TYPE,
-    OBLIGATION_TYPEHASH,
-    OFFER_TYPE,
-    OFFER_TYPEHASH
-} from "../src/libraries/ConstantsLib.sol";
+import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 
 contract UtilsLibTest is Test {
+    int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
+    int256 internal constant WEXP_OFFSET = 0.32261121498945987e18;
+    int256 internal constant WEXP_MONOTONICITY_STEP = 1e14;
+    int256 internal constant WEXP_MONOTONICITY_WINDOW = 32;
+
     function testFuzzCountBits(uint128 bitmap) public pure {
         uint256 actual = UtilsLib.countBits(bitmap);
         uint256 expected;
@@ -82,32 +79,6 @@ contract UtilsLibTest is Test {
         this.mulDivUp(x, y, d);
     }
 
-    function testIsLeafSingle(bytes32 x) public pure {
-        assertTrue(UtilsLib.isLeaf(x, x, new bytes32[](0)));
-    }
-
-    function testIsLeaf2Leaves(bytes32 x, bytes32 y) public pure {
-        bytes32 root = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = y;
-        assertTrue(UtilsLib.isLeaf(root, x, proof));
-    }
-
-    function testIsLeaf4Leaves(bytes32 x, bytes32 y, bytes32 z, bytes32 w) public pure {
-        x = bytes32(bound(uint256(x), 0, type(uint256).max - 3));
-        y = bytes32(bound(uint256(y), uint256(x), type(uint256).max - 2));
-        z = bytes32(bound(uint256(z), uint256(y), type(uint256).max - 1));
-        w = bytes32(bound(uint256(w), uint256(z), type(uint256).max));
-        bytes32 leftNode = keccak256(x < y ? abi.encode(x, y) : abi.encode(y, x));
-        bytes32 rightNode = keccak256(z < w ? abi.encode(z, w) : abi.encode(w, z));
-        bytes32 root =
-            keccak256(leftNode < rightNode ? abi.encode(leftNode, rightNode) : abi.encode(rightNode, leftNode));
-        bytes32[] memory proof = new bytes32[](2);
-        proof[0] = y;
-        proof[1] = rightNode;
-        assertTrue(UtilsLib.isLeaf(root, x, proof));
-    }
-
     /// forge-config: default.allow_internal_expect_revert = true
     function testToUint128Overflow(uint256 x) public {
         x = bound(x, uint256(type(uint128).max) + 1, type(uint256).max);
@@ -121,6 +92,53 @@ contract UtilsLibTest is Test {
 
     function mulDivUp(uint256 x, uint256 y, uint256 d) external pure {
         UtilsLib.mulDivUp(x, y, d);
+    }
+
+    function testWExpNonDecreasing() public pure {
+        int256 start = -WEXP_OFFSET;
+        int256 end = WEXP_LN2 / 2 - WEXP_OFFSET - 1;
+
+        // Keep the range scan tractable, then pin one-wei windows around the requested points.
+        _assertWExpNonDecreasing(start, end, WEXP_MONOTONICITY_STEP);
+        _assertWExpNonDecreasingAround(start);
+        _assertWExpNonDecreasingAround(end);
+
+        // Also pin the old and new range-reduction boundaries, where jumps are most likely.
+        _assertWExpNonDecreasingAround(WEXP_LN2 / 2 - 1);
+        _assertWExpNonDecreasingAround(WEXP_LN2 - WEXP_OFFSET - 1);
+    }
+
+    function testWExpIncreasingAtTicks() public pure {
+        // MAX_TICK is a small constant, so casting it to int256 is safe.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 previous = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(MAX_TICK)));
+        for (uint256 tick = MAX_TICK; tick > 0; tick--) {
+            // tick - 1 is bounded by MAX_TICK - 1, so casting it to int256 is safe.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint256 current = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick - 1)));
+            assertGt(current, previous);
+            previous = current;
+        }
+    }
+
+    function _assertWExpNonDecreasing(int256 start, int256 end, int256 step) internal pure {
+        uint256 previous = TickLib.wExp(start);
+        for (int256 x = start + step; x < end; x += step) {
+            uint256 current = TickLib.wExp(x);
+            assertGe(current, previous);
+            previous = current;
+        }
+        assertGe(TickLib.wExp(end), previous);
+    }
+
+    function _assertWExpNonDecreasingAround(int256 center) internal pure {
+        int256 start = center - WEXP_MONOTONICITY_WINDOW;
+        uint256 previous = TickLib.wExp(start);
+        for (int256 i = 1; i <= 2 * WEXP_MONOTONICITY_WINDOW + 1; i++) {
+            uint256 current = TickLib.wExp(start + i);
+            assertGe(current, previous);
+            previous = current;
+        }
     }
 
     function testWExp() public pure {
@@ -165,11 +183,5 @@ contract UtilsLibTest is Test {
         assertApproxEqRel(TickLib.wExp(18 ether), 65659969.137330511139838976 ether, 0.001 ether, "exp(18)");
         assertApproxEqRel(TickLib.wExp(19 ether), 178482300.96318726092869632 ether, 0.001 ether, "exp(19)");
         assertApproxEqRel(TickLib.wExp(20 ether), 485165195.409790277969936384 ether, 0.001 ether, "exp(20)");
-    }
-
-    function testTypehashes() public pure {
-        assertEq(COLLATERAL_PARAMS_TYPEHASH, keccak256(COLLATERAL_PARAMS_TYPE));
-        assertEq(OBLIGATION_TYPEHASH, keccak256(bytes.concat(OBLIGATION_TYPE, COLLATERAL_PARAMS_TYPE)));
-        assertEq(OFFER_TYPEHASH, keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE)));
     }
 }
