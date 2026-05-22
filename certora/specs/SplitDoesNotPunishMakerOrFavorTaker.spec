@@ -15,7 +15,7 @@ methods {
     // Summarize toId: deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
 
-    // Skip obligation creation logic: irrelevant to asset computation, removes collateral loop.
+    // Assume that the obligations are already created.
     function touchObligation(Midnight.Obligation memory obligation) internal returns (bytes32) => summaryToId(obligation);
 
     // Pure helpers called with identical args across the three takes; CONSTANT collapses
@@ -30,8 +30,9 @@ methods {
     // Offer hashing only feeds the Merkle gate; this rule asserts asset arithmetic on successful split paths.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
 
-    // Transient storage lock: uses inline assembly TLOAD/TSTORE; irrelevant to return values.
+    // Over-approximate transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+    function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 }
 
 /// GHOSTS ///
