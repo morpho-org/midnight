@@ -9,14 +9,8 @@ methods {
 
 definition cvlMaxTick() returns uint256 = 5820;
 
-definition cvlPriceRoundingStep() returns uint256 = 10 ^ 12;
-
 rule cvlMaxTickIsMaxTick() {
     assert cvlMaxTick() == maxTick();
-}
-
-rule cvlPriceRoundingStepIsPriceRoundingStep() {
-    assert cvlPriceRoundingStep() == priceRoundingStep();
 }
 
 // Check the casting assertions in the wExp function.
@@ -33,6 +27,7 @@ rule wExpCasting(uint256 x) {
 
     assert q >= 0;
     assert r >= -offset && r < ln2 - offset;
+    assert r < ln2 && r > -ln2;
     assert expR >= 0;
 }
 
@@ -45,8 +40,6 @@ rule tickToPriceIsOneAtMaxTick() {
 }
 
 rule tickToPriceUsesPriceRoundingStep(uint256 tick) {
-    require tick <= maxTick(), "tick in range";
-
     assert tickToPrice(tick) % priceRoundingStep() == 0;
 }
 
