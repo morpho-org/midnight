@@ -47,7 +47,10 @@ rule maxOutputIsWExpOfMaxInput() {
 }
 
 rule wExpIsMonotonicOnPositiveRange(int256 x1) {
-    assert 0 <= x1 && x1 < maxInput() => wExp(x1) <= wExp(assert_int256(x1 + 1));
+    require 0 <= x1 && x1 < maxInput();
+    require expR(require_uint256(x1)) <= 2 * expR(require_uint256(x1 + 1)),
+        "by expRCantGoMoreThanTimesTwo";
+    assert wExp(x1) <= wExp(assert_int256(x1 + 1));
 }
 
 rule wExpIsMonotonicOnNegativeRange(int256 x1) {
