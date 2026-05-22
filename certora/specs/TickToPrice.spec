@@ -3,7 +3,7 @@
 import "WExp.spec";
 
 methods {
-    function wExp(int256 x) internal returns (uint256) => summaryWExp(x);
+    function TickLib.wExp(int256 x) internal returns (uint256) => summaryWExp(x);
 }
 
 persistent ghost summaryWExp(int256) returns uint256 {
