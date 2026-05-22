@@ -57,14 +57,7 @@ rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
 
 // End-to-end: repayAndWithdrawCollateral with assets = floor(D * WAD / (WAD - pct))
 // repays exactly D units on Midnight when the borrower owes D.
-rule repayAndWithdrawCollateralRepaysExactDebt(
-    env e,
-    Midnight.Market market,
-    address onBehalf,
-    address collateralReceiver,
-    address referralFeeRecipient,
-    uint256 referralFeePct
-) {
+rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct) {
     require e.msg.sender == onBehalf, "bundler auth: caller is onBehalf";
     require referralFeePct < WAD(), "PctExceeded";
 
@@ -80,6 +73,7 @@ rule repayAndWithdrawCollateralRepaysExactDebt(
     uint256 assets = summaryMulDivDown(D, WAD(), wMinusP);
 
     MidnightBundles.TokenPermit loanTokenPermit;
+
     // PermitKind.None — avoid ERC2612 / Permit2 paths (irrelevant to units, havoc external calls).
     require assert_uint8(loanTokenPermit.kind) == 0;
 
@@ -88,17 +82,7 @@ rule repayAndWithdrawCollateralRepaysExactDebt(
 
     uint256 debtBefore = midnight.debtOf(id, onBehalf);
 
-    repayAndWithdrawCollateral(
-        e,
-        market,
-        assets,
-        onBehalf,
-        loanTokenPermit,
-        collateralWithdrawals,
-        collateralReceiver,
-        referralFeePct,
-        referralFeeRecipient
-    );
+    repayAndWithdrawCollateral(e, market, assets, onBehalf, loanTokenPermit, collateralWithdrawals, collateralReceiver, referralFeePct, referralFeeRecipient);
 
     assert midnight.debtOf(id, onBehalf) == debtBefore - D;
 }
