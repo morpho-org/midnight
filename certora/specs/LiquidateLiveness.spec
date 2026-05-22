@@ -69,6 +69,7 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(a, d, d) == a;
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(0, a, d) == 0 && ghostMulDivUp(a, 0, d) == 0;
+
     // Monotonicity in first arg — often needed to relate helper to contract:
     axiom forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 && a1 <= a2 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
 }
@@ -101,15 +102,17 @@ function validCollateralAt(Midnight.Market market, bytes32 id, address borrower,
     uint256 maxLif = market.collateralParams[i].maxLif;
     require lltv > 0 && lltv <= WAD(), "valid lltv";
     require maxLif >= WAD(), "valid maxLif";
+
     //require lltv < WAD() => lltv * maxLif <= WAD() * (WAD() - 1), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
     require lltv < WAD() => to_mathint(lltv) * to_mathint(maxLif) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
+
     // @todo check if not needed
     require to_mathint(lltv) * to_mathint(maxLif) <= to_mathint(WAD()) * to_mathint(WAD()), "ExactMath condition for RCF denominator WAD - lif*lltv/WAD is positive";
 
     address oracle = market.collateralParams[i].oracle;
+
     //require collateral(id, borrower, i) * summaryPrice(oracle) <= ORACLE_PRICE_SCALE() * WAD() * MAX_UINT128(), "collateral value fits in uint128";
     require to_mathint(collateral(id, borrower, i)) * to_mathint(summaryPrice(oracle)) <= to_mathint(ORACLE_PRICE_SCALE()) * to_mathint(WAD()) * MAX_UINT128(), "...";
-
 }
 
 /// Two-activated-collateral market with bitmap == 3 (bits 0 and 1 set); matches `loop_iter: 2`.
@@ -341,8 +344,8 @@ rule liquidatableCanBeLiquidatedRepayAll(env e, Midnight.Market market, address 
     require strategyARepaidUnitsAtMaxLif(market, collat) > debt, "Strategy B applicable";
 
     bytes data;
+
     // healthyPath=true so RCF check is skipped (it lives inside `if (!healthyPath)`)
     liquidate@withrevert(e, market, 0, 0, debt, borrower, true, receiver, 0, data);
     assert !lastReverted;
 }
-
