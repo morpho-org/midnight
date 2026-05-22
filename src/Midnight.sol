@@ -682,8 +682,8 @@ contract Midnight is IMidnight {
             borrower,
             healthyPath,
             receiver,
-            badDebt,
             payer,
+            badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit
         );
