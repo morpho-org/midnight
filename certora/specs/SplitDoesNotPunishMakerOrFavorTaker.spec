@@ -8,8 +8,9 @@ methods {
     function Utils.hashObligation(Midnight.Obligation) external returns (bytes32) envfree;
 
     // Ghost summaries for mulDivDown/mulDivUp: replaces nonlinear 256-bit arithmetic with axiomatic reasoning.
-    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivDown(a, b, d);
-    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghost_mulDivUp(a, b, d);
+    // Axioms are discharged by rules in MulDiv.spec (see references on the ghosts below).
+    function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghostMulDivDown(a, b, d);
+    function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghostMulDivUp(a, b, d);
 
     // Summarize toId: deterministic hash preserves obligation-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Obligation memory obligation, uint256, address) internal returns (bytes32) => summaryToId(obligation);
@@ -20,11 +21,11 @@ methods {
     // Pure helpers called with identical args across the three takes; CONSTANT collapses
     // their bit / hashing / arithmetic complexity (no behavioral abstraction).
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
-    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => CONSTANT;
-    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => CONSTANT;
+    function UtilsLib.isLeaf(bytes32, bytes32, bytes32[] memory) internal returns (bool) => NONDET;
+    function UtilsLib.atMostOneNonZero(uint256, uint256, uint256) internal returns (bool) => NONDET;
 
     // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
-    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => CONSTANT;
+    function isHealthy(Midnight.Obligation memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Offer hashing only feeds the Merkle gate; this rule asserts asset arithmetic on successful split paths.
     function UtilsLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
@@ -35,26 +36,36 @@ methods {
 
 /// GHOSTS ///
 
-// ghost_mulDivDown(a, b, d) abstracts floor(a*b/d).
-persistent ghost ghost_mulDivDown(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivDown(a, x, x) == a;
-    axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivDown(a, 0, c) == 0;
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivDown(0, b, c) == 0;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivDown(a, b, d) <= a;
+// ghostMulDivDown(a, b, d) abstracts floor(a*b/d). Axioms are proven as rules in MulDiv.spec.
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
+    // Identity (b=d=x): floor(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivDownTightBound in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivDown(a, x, x) == a;
+    // floor(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivDown(a, 0, c) == 0;
+    // floor(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
+    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivDown(0, b, c) == 0;
+    // Boundedness: b <= d => floor(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
 
-    // Sub-additivity (1st arg): floor((b+c)*x/d) - floor(b*x/d)+floor(c*x/d) ∈ [0, 1].
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivDown(a, x, d)) >= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) && to_mathint(ghost_mulDivDown(a, x, d)) <= to_mathint(ghost_mulDivDown(b, x, d)) + to_mathint(ghost_mulDivDown(c, x, d)) + 1;
+    // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
+    // Lower bound proven by mulDivAddDownDown, upper bound by mulDivAddDownDownTight in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && a == b + c => ghostMulDivDown(a, x, d) >= ghostMulDivDown(b, x, d) + ghostMulDivDown(c, x, d) && ghostMulDivDown(a, x, d) <= ghostMulDivDown(b, x, d) + ghostMulDivDown(c, x, d) + 1;
 }
 
-// ghost_mulDivUp(a, b, d) abstracts ceil(a*b/d).
-persistent ghost ghost_mulDivUp(uint256, uint256, uint256) returns uint256 {
-    axiom forall uint256 a. forall uint256 x. x != 0 => ghost_mulDivUp(a, x, x) == a;
-    axiom forall uint256 a. forall uint256 c. c != 0 => ghost_mulDivUp(a, 0, c) == 0;
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghost_mulDivUp(0, b, c) == 0;
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghost_mulDivUp(a, b, d) <= a;
+// ghostMulDivUp(a, b, d) abstracts ceil(a*b/d). Axioms are proven as rules in MulDiv.spec.
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
+    // Identity (b=d=x): ceil(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivUpTightBound in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
+    // ceil(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivUp(a, 0, c) == 0;
+    // ceil(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
+    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivUp(0, b, c) == 0;
+    // Boundedness: b <= d => ceil(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
 
     // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
-    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && to_mathint(a) == to_mathint(b) + to_mathint(c) => to_mathint(ghost_mulDivUp(a, x, d)) <= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d)) && to_mathint(ghost_mulDivUp(a, x, d)) + 1 >= to_mathint(ghost_mulDivUp(b, x, d)) + to_mathint(ghost_mulDivUp(c, x, d));
+    // Lower bound proven by mulDivAddUpUpTight, upper bound by mulDivAddUpUp in MulDiv.spec.
+    axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && a == b + c => ghostMulDivUp(a, x, d) <= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d) && ghostMulDivUp(a, x, d) + 1 >= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d);
 }
 
 /// SUMMARY FUNCTIONS ///
@@ -100,32 +111,28 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 obligationUnitsA, uint25
     uint256 claimableAfterBC = currentContract.claimableTradingFee[offer.obligation.loanToken];
 
     // Maker is buyer: splitting should not make them pay more.
-    assert offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA);
-    assert offer.buy => to_mathint(buyerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) + 1;
+    assert offer.buy => buyerAssetsB + buyerAssetsC <= buyerAssetsA;
+    assert offer.buy => buyerAssetsA <= buyerAssetsB + buyerAssetsC + 1;
 
     // Taker is seller: splitting should not make them receive more.
-    assert offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) <= to_mathint(sellerAssetsA);
-    assert offer.buy => to_mathint(sellerAssetsA) <= to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) + 1;
+    assert offer.buy => sellerAssetsB + sellerAssetsC <= sellerAssetsA;
+    assert offer.buy => sellerAssetsA <= sellerAssetsB + sellerAssetsC + 1;
 
     // Maker is seller: splitting should not make them receive less.
-    assert !offer.buy => to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC) >= to_mathint(sellerAssetsA);
-    assert !offer.buy => to_mathint(sellerAssetsA) + 1 >= to_mathint(sellerAssetsB) + to_mathint(sellerAssetsC);
+    assert !offer.buy => sellerAssetsB + sellerAssetsC >= sellerAssetsA;
+    assert !offer.buy => sellerAssetsA + 1 >= sellerAssetsB + sellerAssetsC;
 
     // Taker is buyer: splitting should not make them pay less.
-    assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) >= to_mathint(buyerAssetsA);
-    assert !offer.buy => to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) <= to_mathint(buyerAssetsA) + 1;
-
-    // Protocol trading fee delta (buyerAssets - sellerAssets) can change by at most 1 wei across splits.
-    assert to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) <= to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) + 1;
-    assert to_mathint(buyerAssetsB) + to_mathint(buyerAssetsC) - to_mathint(sellerAssetsB) - to_mathint(sellerAssetsC) <= to_mathint(buyerAssetsA) - to_mathint(sellerAssetsA) + 1;
+    assert !offer.buy => buyerAssetsB + buyerAssetsC >= buyerAssetsA;
+    assert !offer.buy => buyerAssetsB + buyerAssetsC <= buyerAssetsA + 1;
 
     // Maker's offer cap consumption can change by at most 1 wei across splits in maxSellerAssets/maxBuyerAssets mode
     // (bounded by the asset deviation), and is exact in maxUnits mode (consumed += units, with A == B + C).
-    assert to_mathint(consumedAfterA) <= to_mathint(consumedAfterBC) + 1;
-    assert to_mathint(consumedAfterBC) <= to_mathint(consumedAfterA) + 1;
+    assert consumedAfterA <= consumedAfterBC + 1;
+    assert consumedAfterBC <= consumedAfterA + 1;
     assert offer.maxSellerAssets == 0 && offer.maxBuyerAssets == 0 => consumedAfterA == consumedAfterBC;
 
-    // Protocol fee storage can change matches the delta changes: claimableTradingFee += buyerAssets - sellerAssets per take.
-    assert to_mathint(claimableAfterA) <= to_mathint(claimableAfterBC) + 1;
-    assert to_mathint(claimableAfterBC) <= to_mathint(claimableAfterA) + 1;
+    // Protocol fee storage delta (claimableTradingFee += buyerAssets - sellerAssets per take) can change by at most 1 wei across splits.
+    assert claimableAfterA <= claimableAfterBC + 1;
+    assert claimableAfterBC <= claimableAfterA + 1;
 }
