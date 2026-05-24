@@ -39,7 +39,7 @@ rule wExpOutputBound(int256 input) {
 }
 
 rule wExpIsMonotonicOnNegativeRange(int256 x) {
-    require -maxInput() <= x && x < 0;
+    require -maxInput() <= x && x < 0, "the positive range is proven in wExpIsMonotonicOnPositiveRange";
     int256 x1 = assert_int256(x + 1);
     assert wExp(x) <= wExp(x1);
 }
@@ -60,7 +60,7 @@ rule expRCantGoMoreThanTimesTwo(uint256 x, uint256 y) {
 }
 
 rule wExpIsMonotonicOnPositiveRange(int256 x) {
-    require 0 <= x && x < maxInput();
+    require 0 <= x && x < maxInput(), "the negative range is proven in wExpIsMonotonicOnNegativeRange";
     int256 x1 = assert_int256(x + 1);
     require expR(assert_uint256(x)) <= 2 * expR(assert_uint256(x1)), "by expRCantGoMoreThanTimesTwo";
     assert wExp(x) <= wExp(x1);
