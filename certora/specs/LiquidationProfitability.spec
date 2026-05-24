@@ -16,13 +16,19 @@ methods {
 
     // Deterministic toId summary using a wrapper that extracts all scalar Market fields.
     function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market);
-
+    
     // Skip market creation logic: removes the collateral-validation loop.
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+
+    // Sound over approximations, returns value are subset of prover paths.
+    function Midnight.liquidationLocked(bytes32, address) internal returns (bool) => NONDET;
+    function _.onLiquidate(bytes32, uint256, uint256, address, bytes) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
+
 }
 
 /// SUMMARIES ///
