@@ -28,7 +28,6 @@ methods {
     function Midnight.liquidationLocked(bytes32, address) internal returns (bool) => NONDET;
     function _.onLiquidate(bytes32, uint256, uint256, address, bytes) external => NONDET;
     function _.canLiquidate(address) external => NONDET;
-
 }
 
 /// SUMMARIES ///
