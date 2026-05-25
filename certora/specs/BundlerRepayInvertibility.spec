@@ -44,8 +44,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 // Proof sketch Euclidean division on Dw = k(W-p)+ell and kp = k'W+ell'
 // with a = k, u = k - k', D - u = (ell - ell')/W and |ell - ell'| < W.
 rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
-    require D > 0;
-    require referralFeePct < WAD();
+    require referralFeePct < WAD(), "PctExceeded: bundler reverts otherwise";
 
     uint256 wMinusP = assert_uint256(WAD() - referralFeePct);
     uint256 assets = summaryMulDivDown(D, WAD(), wMinusP);
@@ -58,14 +57,13 @@ rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
 // End-to-end: repayAndWithdrawCollateral with assets = floor(D * WAD / (WAD - pct))
 // repays exactly D units on Midnight when the borrower owes D.
 rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct) {
-    require e.msg.sender == onBehalf, "bundler auth: caller is onBehalf";
     require referralFeePct < WAD(), "PctExceeded";
 
     bytes32 id = summaryToId(market);
-    require midnight.tickSpacing(id) > 0, "market already touched";
+    //require midnight.tickSpacing(id) > 0, "market already touched";
 
     uint256 D = midnight.debtOf(id, onBehalf);
-    require D > 0;
+    //require D > 0,"units = D ≤ debt by construction";
 
     require midnight.isAuthorized(onBehalf, currentContract), "bundler must be authorized on Midnight for repay";
 
@@ -75,10 +73,10 @@ rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, ad
     MidnightBundles.TokenPermit loanTokenPermit;
 
     // PermitKind.None — avoid ERC2612 / Permit2 paths (irrelevant to units, havoc external calls).
-    require assert_uint8(loanTokenPermit.kind) == 0;
+    require assert_uint8(loanTokenPermit.kind) == 0,"PermitKind.None == 0.";
 
     MidnightBundles.CollateralWithdrawal[] collateralWithdrawals;
-    require collateralWithdrawals.length == 0;
+    require collateralWithdrawals.length == 0, "isolate repay path from withdrawals";
 
     uint256 debtBefore = midnight.debtOf(id, onBehalf);
 
