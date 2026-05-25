@@ -26,7 +26,7 @@ methods {
 
     // Sound over approximations, returns value are subset of prover paths.
     function Midnight.liquidationLocked(bytes32, address) internal returns (bool) => NONDET;
-    function _.onLiquidate(bytes32, uint256, uint256, address, bytes) external => NONDET;
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => NONDET;
     function _.canLiquidate(address) external => NONDET;
 }
 
