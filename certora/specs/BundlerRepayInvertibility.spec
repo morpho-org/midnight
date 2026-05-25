@@ -15,7 +15,7 @@ methods {
     // Deterministic floor division; must not call MulDiv (it delegates back to UtilsLib.mulDivDown).
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
 
-    // Token / permit plumbing is irrelevant to the units formula but NONDET prevent havoc calls.
+    // Token / permit functions are irrelevant to the units formula but NONDET prevent havoc calls.
     function _.allowance(address, address) external => NONDET;
     function _.approve(address, uint256) external => NONDET;
     function _.permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external => NONDET;
@@ -54,18 +54,20 @@ rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
     assert units == D;
 }
 
-// End-to-end: repayAndWithdrawCollateral with assets = floor(D * WAD / (WAD - pct))
-// repays exactly D units on Midnight when the borrower owes D.
-rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct) {
+// End-to-end: for any target units U <= debtBefore, calling repayAndWithdrawCollateral
+// with assets = floor(U * WAD / (WAD - pct)) repays exactly U units on Midnight.
+// Composes with repayUnitsFormula: units(assets, pct) == U, hence debt decreases by U.
+rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct, uint256 U) {
     require referralFeePct < WAD(), "PctExceeded";
 
     bytes32 id = summaryToId(market);
-    uint256 D = midnight.debtOf(id, onBehalf);
+    uint256 debtBefore = midnight.debtOf(id, onBehalf);
+    require U > 0 && U <= debtBefore, "target units within current debt";
 
     require midnight.isAuthorized(onBehalf, currentContract), "bundler must be authorized on Midnight for repay";
 
     uint256 wMinusP = assert_uint256(WAD() - referralFeePct);
-    uint256 assets = summaryMulDivDown(D, WAD(), wMinusP);
+    uint256 assets = summaryMulDivDown(U, WAD(), wMinusP);
 
     MidnightBundles.TokenPermit loanTokenPermit;
 
@@ -75,9 +77,7 @@ rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, ad
     MidnightBundles.CollateralWithdrawal[] collateralWithdrawals;
     require collateralWithdrawals.length == 0, "isolate repay path from withdrawals";
 
-    uint256 debtBefore = midnight.debtOf(id, onBehalf);
-
     repayAndWithdrawCollateral(e, market, assets, onBehalf, loanTokenPermit, collateralWithdrawals, collateralReceiver, referralFeePct, referralFeeRecipient);
 
-    assert midnight.debtOf(id, onBehalf) == debtBefore - D;
+    assert midnight.debtOf(id, onBehalf) == debtBefore - U;
 }
