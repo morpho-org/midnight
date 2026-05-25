@@ -60,10 +60,7 @@ rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, ad
     require referralFeePct < WAD(), "PctExceeded";
 
     bytes32 id = summaryToId(market);
-    //require midnight.tickSpacing(id) > 0, "market already touched";
-
     uint256 D = midnight.debtOf(id, onBehalf);
-    //require D > 0,"units = D ≤ debt by construction";
 
     require midnight.isAuthorized(onBehalf, currentContract), "bundler must be authorized on Midnight for repay";
 
@@ -73,7 +70,7 @@ rule repayAndWithdrawCollateralRepaysExactDebt(env e, Midnight.Market market, ad
     MidnightBundles.TokenPermit loanTokenPermit;
 
     // PermitKind.None — avoid ERC2612 / Permit2 paths (irrelevant to units, havoc external calls).
-    require assert_uint8(loanTokenPermit.kind) == 0,"PermitKind.None == 0.";
+    require assert_uint8(loanTokenPermit.kind) == 0, "PermitKind.None == 0.";
 
     MidnightBundles.CollateralWithdrawal[] collateralWithdrawals;
     require collateralWithdrawals.length == 0, "isolate repay path from withdrawals";
