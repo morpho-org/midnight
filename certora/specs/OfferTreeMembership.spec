@@ -14,14 +14,16 @@ methods {
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.hashNode(bytes32, bytes32) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
+    function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     // Align the merkle verification and the helper's well-formedness on the same hash functions.
     function HashLib.hashOffer(Midnight.Offer memory offer) internal returns (bytes32) => summaryHashOffer(offer);
     function HashLib.hashNode(bytes32 a, bytes32 b) internal returns (bytes32) => summaryHashNode(a, b);
 
-    // Take-side externals are irrelevant to merkle membership. `isRatified` is NONDET'd so the rule
-    // abstracts over the ratifier choice; the bridge to `Utils.isLeaf` is supplied in the rule body.
-    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
+    // A successful ratifier must witness a merkle proof for the offer's hash. The
+    // obligation is discharged in Ratification.spec/isRatifiedRequiresIsLeaf, which
+    // dispatches across all linked ratifier implementations.
+    function _.isRatified(Midnight.Offer offer, bytes) external => isRatifiedSummary(offer) expect bytes32;
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.transferFrom(address, address, uint256) external => NONDET;
@@ -45,6 +47,15 @@ function summaryHashNode(bytes32 a, bytes32 b) returns bytes32 {
     return Utils.hashNode(a, b);
 }
 
+function isRatifiedSummary(Midnight.Offer offer) returns bytes32 {
+    bytes32 result;
+    bytes32 root;
+    uint256 leafIndex;
+    bytes32[] proof;
+    require result == Utils.callbackSuccess() => Utils.isLeaf(root, Utils.hashOffer(offer), leafIndex, proof);
+    return result;
+}
+
 /// SOUNDNESS ///
 
 /// If a root corresponds to a node of a well-formed offer-tree, a successful merkle verification of the offer's hash against that root implies the offer is registered as a leaf in the tree.
@@ -66,7 +77,7 @@ rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, byte
 /// TAKE-LEVEL LIFT ///
 
 /// Every successful Midnight.take is for an offer registered as a leaf in the maker's offer-tree.
-/// The `require Utils.isLeaf(...)` below is the bridge from take to the merkle check, justified by composition: take requires `isRatified(...) == CALLBACK_SUCCESS`, and both SetterRatifier and EcrecoverRatifier require HashLib.isLeaf to pass.
+/// `require Utils.isLeaf(...)` binds the merkle witness to the specific (root, leafIndex, proof) used in the well-formedness premise; the take->ratifier->merkle composition is mechanised via the `isRatifiedSummary` above (obligation discharged in Ratification.spec/isRatifiedRequiresIsLeaf).
 rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
     require OfferTree.getHash(node) == root, "root is the hash of node";
