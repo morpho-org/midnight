@@ -3,9 +3,14 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
+import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 
 contract UtilsLibTest is Test {
+    int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
+    int256 internal constant WEXP_OFFSET = 0.32261121498945987e18;
+    int256 internal constant WEXP_MONOTONICITY_STEP = 1e14;
+    int256 internal constant WEXP_MONOTONICITY_WINDOW = 32;
+
     function testFuzzCountBits(uint128 bitmap) public pure {
         uint256 actual = UtilsLib.countBits(bitmap);
         uint256 expected;
@@ -87,6 +92,53 @@ contract UtilsLibTest is Test {
 
     function mulDivUp(uint256 x, uint256 y, uint256 d) external pure {
         UtilsLib.mulDivUp(x, y, d);
+    }
+
+    function testWExpNonDecreasing() public pure {
+        int256 start = -WEXP_OFFSET;
+        int256 end = WEXP_LN2 / 2 - WEXP_OFFSET - 1;
+
+        // Keep the range scan tractable, then pin one-wei windows around the requested points.
+        _assertWExpNonDecreasing(start, end, WEXP_MONOTONICITY_STEP);
+        _assertWExpNonDecreasingAround(start);
+        _assertWExpNonDecreasingAround(end);
+
+        // Also pin the old and new range-reduction boundaries, where jumps are most likely.
+        _assertWExpNonDecreasingAround(WEXP_LN2 / 2 - 1);
+        _assertWExpNonDecreasingAround(WEXP_LN2 - WEXP_OFFSET - 1);
+    }
+
+    function testWExpIncreasingAtTicks() public pure {
+        // MAX_TICK is a small constant, so casting it to int256 is safe.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 previous = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(MAX_TICK)));
+        for (uint256 tick = MAX_TICK; tick > 0; tick--) {
+            // tick - 1 is bounded by MAX_TICK - 1, so casting it to int256 is safe.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint256 current = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick - 1)));
+            assertGt(current, previous);
+            previous = current;
+        }
+    }
+
+    function _assertWExpNonDecreasing(int256 start, int256 end, int256 step) internal pure {
+        uint256 previous = TickLib.wExp(start);
+        for (int256 x = start + step; x < end; x += step) {
+            uint256 current = TickLib.wExp(x);
+            assertGe(current, previous);
+            previous = current;
+        }
+        assertGe(TickLib.wExp(end), previous);
+    }
+
+    function _assertWExpNonDecreasingAround(int256 center) internal pure {
+        int256 start = center - WEXP_MONOTONICITY_WINDOW;
+        uint256 previous = TickLib.wExp(start);
+        for (int256 i = 1; i <= 2 * WEXP_MONOTONICITY_WINDOW + 1; i++) {
+            uint256 current = TickLib.wExp(start + i);
+            assertGe(current, previous);
+            previous = current;
+        }
     }
 
     function testWExp() public pure {
