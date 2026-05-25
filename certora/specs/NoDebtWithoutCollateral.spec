@@ -78,7 +78,7 @@ weak invariant noDebtWithoutCollateral(bytes32 id, address user)
             require !liquidationLocked(id, taker), "transient lock zero at tx start";
             require !liquidationLocked(id, offer.maker), "transient lock zero at tx start";
         }
-        preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) with (env e) {
+        preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes data) with (env e) {
             // Liquidate's debt-zeroing math (badDebt absorbed + repayment) needs mulDiv monotonicity + inverse axioms 
             // (proved in MulDiv.spec) so the prover can derive repaidUnits >= debt_after_badDebt when the last bitmap bit is cleared.
             require market.collateralParams.length <= MAX_COLLATERALS_PER_BORROWER(), "restrict to MAX_COLLATERALS_PER_BORROWER collaterals";
