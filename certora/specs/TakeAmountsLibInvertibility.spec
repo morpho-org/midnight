@@ -13,8 +13,7 @@ methods {
     function TakeAmountsLibHarness.buyerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
     function TakeAmountsLibHarness.sellerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
 
-    // Deterministic id: same Market => same id. Matches what take() and TakeAmountsLib observe
-    // (both reach IdLib.toId via Midnight.toId / Midnight.touchMarket).
+    // Deterministic id: same Market => same id. Matches what take() and TakeAmountsLib observe (both reach IdLib.toId via Midnight.toId / Midnight.touchMarket).
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic price: the same tick yields the same price for both the library and take().
@@ -24,7 +23,7 @@ methods {
     // so the value the library reads matches the value take() reads internally.
     function _.tradingFee(bytes32, uint256) external => DISPATCHER(true);
 
-    // Axiomatic mulDiv summaries (kept consistent across TakeAmountsLib and take()).
+    // Axiomatic mulDiv summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
