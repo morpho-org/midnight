@@ -24,10 +24,12 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    // Sound over approximations, returns value are subset of prover paths.
+    // Sound over-approximation: NONDET return values are a superset of the prover paths.
     function Midnight.liquidationLocked(bytes32, address) internal returns (bool) => NONDET;
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => NONDET;
     function _.canLiquidate(address) external => NONDET;
+    // Assume no reentrancy: the onLiquidate callback does not re-enter Midnight.
+    // The properties we verify are about the effect of liquidate's own body on the returned (seizedAssets, repaidUnits), not the effect of the full transaction including callbacks.
+    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => NONDET;
 }
 
 /// SUMMARIES ///
