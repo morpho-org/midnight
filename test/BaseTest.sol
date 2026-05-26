@@ -302,7 +302,7 @@ abstract contract BaseTest is Test {
         midnight.take(borrowerOffer, units, lender, borrower, address(0), hex"", hex"");
     }
 
-    function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
+    function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;

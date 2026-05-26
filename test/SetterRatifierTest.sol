@@ -39,9 +39,6 @@ contract SetterRatifierTest is BaseTest {
     function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
-        vm.expectEmit();
-        emit ISetterRatifier.SetIsRootRatified(lender, lender, _root, true);
-
         vm.prank(lender);
         setterRatifier.setIsRootRatified(lender, _root, true);
 

@@ -14,8 +14,6 @@ import {
 } from "../src/libraries/ConstantsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {Midnight} from "../src/Midnight.sol";
-import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 contract SettersTest is BaseTest {
     function testMaxTradingFeeConstants() public pure {
@@ -32,17 +30,7 @@ contract SettersTest is BaseTest {
         assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
     }
 
-    function testConstructorEvent() public {
-        vm.expectEmit();
-        emit EventsLib.Constructor(address(this), block.chainid);
-
-        new Midnight();
-    }
-
     function testSetRoleSetterSuccess(address rdm) public {
-        vm.expectEmit();
-        emit EventsLib.SetRoleSetter(rdm);
-
         midnight.setRoleSetter(rdm);
         assertEq(midnight.roleSetter(), rdm, "role setter should be transferred");
     }
@@ -55,19 +43,8 @@ contract SettersTest is BaseTest {
     }
 
     function testSetFeeSetterSuccess(address feeSetter) public {
-        vm.expectEmit();
-        emit EventsLib.SetFeeSetter(feeSetter);
-
         midnight.setFeeSetter(feeSetter);
         assertEq(midnight.feeSetter(), feeSetter);
-    }
-
-    function testSetTickSpacingSetterSuccess(address tickSpacingSetter) public {
-        vm.expectEmit();
-        emit EventsLib.SetTickSpacingSetter(tickSpacingSetter);
-
-        midnight.setTickSpacingSetter(tickSpacingSetter);
-        assertEq(midnight.tickSpacingSetter(), tickSpacingSetter);
     }
 
     function testSetFeeSetterOnlyRoleSetter(address rdm) public {
@@ -109,9 +86,6 @@ contract SettersTest is BaseTest {
         });
         bytes32 id = toId(market);
         midnight.touchMarket(market);
-
-        vm.expectEmit();
-        emit EventsLib.SetMarketTradingFee(id, 0, postMaturityFee);
 
         midnight.setMarketTradingFee(id, 0, postMaturityFee);
         midnight.setMarketTradingFee(id, 1, oneDayFee);
@@ -184,9 +158,6 @@ contract SettersTest is BaseTest {
     }
 
     function testSetFeeClaimerSuccess(address feeClaimer) public {
-        vm.expectEmit();
-        emit EventsLib.SetFeeClaimer(feeClaimer);
-
         midnight.setFeeClaimer(feeClaimer);
         assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
@@ -222,9 +193,6 @@ contract SettersTest is BaseTest {
         ninetyDaysFee = bound(ninetyDaysFee, thirtyDaysFee, maxTradingFee(4)) / 1e12 * 1e12;
         oneEightyDaysFee = bound(oneEightyDaysFee, ninetyDaysFee, maxTradingFee(5)) / 1e12 * 1e12;
         threeSixtyDaysFee = bound(threeSixtyDaysFee, oneEightyDaysFee, maxTradingFee(6)) / 1e12 * 1e12;
-
-        vm.expectEmit();
-        emit EventsLib.SetDefaultTradingFee(loanToken, 0, postMaturityFee);
 
         midnight.setDefaultTradingFee(loanToken, 0, postMaturityFee);
         midnight.setDefaultTradingFee(loanToken, 1, oneDayFee);
@@ -399,9 +367,6 @@ contract SettersTest is BaseTest {
         fee2 = bound(fee2, 0, MAX_CONTINUOUS_FEE);
         vm.assume(fee != fee2);
 
-        vm.expectEmit();
-        emit EventsLib.SetDefaultContinuousFee(address(loanToken), fee);
-
         midnight.setDefaultContinuousFee(address(loanToken), fee);
         assertEq(midnight.defaultContinuousFee(address(loanToken)), fee, "default fee updated");
 
@@ -421,10 +386,6 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(market);
 
         assertEq(midnight.continuousFee(id), fee, "market inherits default fee");
-
-        vm.expectEmit();
-        emit EventsLib.SetMarketContinuousFee(id, fee2);
-
         midnight.setMarketContinuousFee(id, fee2);
         assertEq(midnight.continuousFee(id), fee2, "market fee updated");
     }

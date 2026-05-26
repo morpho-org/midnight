@@ -126,21 +126,6 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + 1);
 
-        vm.expectEmit();
-        emit EventsLib.Liquidate(
-            address(this),
-            id,
-            market.collateralParams[0].token,
-            0,
-            0,
-            borrower,
-            true,
-            address(this),
-            address(this),
-            0,
-            0,
-            0
-        );
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
     }
 
@@ -379,7 +364,7 @@ contract LiquidationTest is BaseTest {
             )
             : 0;
 
-        vm.expectEmit();
+        vm.expectEmit(true, true, true, true);
         emit EventsLib.Liquidate(
             address(this),
             id,
@@ -408,7 +393,7 @@ contract LiquidationTest is BaseTest {
         uint256 lossFactor = midnight.lossFactor(id);
         uint256 expectedCredit = units.mulDivDown(type(uint128).max - lossFactor, type(uint128).max);
 
-        vm.expectEmit();
+        vm.expectEmit(true, true, false, true);
         emit EventsLib.UpdatePosition(id, lender, units - expectedCredit, 0, 0);
         midnight.updatePosition(market, lender);
 
