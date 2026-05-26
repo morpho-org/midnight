@@ -24,7 +24,7 @@ methods {
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address[], uint256[], address, bytes) external => NONDET;
+    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }
 

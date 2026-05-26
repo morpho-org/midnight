@@ -48,7 +48,7 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address[] calldata tokens, uint256[] calldata amounts, address, bytes calldata data)
+    function onFlashLoan(address, address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
         external
         returns (bytes32)
     {

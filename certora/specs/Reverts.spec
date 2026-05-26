@@ -37,7 +37,7 @@ methods {
     function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
