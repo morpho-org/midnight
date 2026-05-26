@@ -189,8 +189,8 @@ contract MidnightBundles is IMidnightBundles {
         // touchMarket to have the correct trading fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
-        _forceApproveMax(loanToken, MIDNIGHT);
         _pullToken(loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
+        _forceApproveMax(loanToken, MIDNIGHT);
 
         uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
