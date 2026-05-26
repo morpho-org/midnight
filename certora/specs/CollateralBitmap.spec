@@ -2,12 +2,15 @@
 
 import "BitmapSummaries.spec";
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
+    function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
     /* Assumption: price does not change during rules.
      * We want to show that isHealthy() and isHealthyNoBitmap() behaves the same under the
@@ -26,8 +29,6 @@ methods {
 
 /// SUMMARY ///
 
-definition MAX_COLLATERALS_PER_BORROWER() returns uint256 = 10;
-
 persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivZero in MulDiv.spec */
     axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDown(0, b, d) == 0;
@@ -42,7 +43,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 // Check that the number of activated collaterals never exceeds MAX_COLLATERALS_PER_BORROWER.
 // This bounds the while-loop iterations in isHealthy() and liquidate().
 strong invariant atMostMaxCollateralsBitsSet(bytes32 id, address user)
-    summaryCountBits(currentContract.position[id][user].collateralBitmap) <= MAX_COLLATERALS_PER_BORROWER();
+    summaryCountBits(currentContract.position[id][user].collateralBitmap) <= Utils.maxCollateralsPerBorrower();
 
 // This shows that the real isHealthy returns true if and only if the isHealthy function
 // that does not use collateral bitmap returns true.  We also check that the latter function

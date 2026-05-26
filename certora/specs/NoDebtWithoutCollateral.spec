@@ -9,10 +9,13 @@
 
 import "BitmapSummaries.spec";
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
+    function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
     // Internal library summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
@@ -27,7 +30,7 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(summaryMulDivDownM(a, b, d));
+    return ghostMulDivDown(a, b, d);
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -35,38 +38,17 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(summaryMulDivUpM(a, b, d));
+    return ghostMulDivUp(a, b, d);
 }
-
-// Mirrors ConstantsLib.sol; same pattern as CollateralBitmap.spec.
-definition MAX_COLLATERALS_PER_BORROWER() returns uint256 = 10;
 
 /// MULDIV GHOSTS ///
 
-persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivZero in MulDiv.spec */
-    axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(0, b, d) == 0;
+    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
 }
 
-persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint;
-
-/* Axioms proved in MulDiv.spec. */
-
-/* proved in mulDivMonotoneA */
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => summaryMulDivUpM(a1, b, d) <= summaryMulDivUpM(a2, b, d);
-
-/* proved in mulDivMonotoneD */
-definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => summaryMulDivUpM(a, b, d1) >= summaryMulDivUpM(a, b, d2);
-
-/* proved in mulDivInverseUpDown */
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => summaryMulDivUpM(summaryMulDivDownM(a, b, d), d, b) <= a;
-
-// Minimal mulDiv axioms needed for liquidate's bad-debt + repayment cancellation argument.
-function requireLiquidateMulDivAxioms() {
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d);
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2);
-    require forall mathint a. forall mathint b. forall mathint d. axiomInverseUpDown(a, b, d);
-}
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 /// INVARIANT ///
 
@@ -79,9 +61,20 @@ weak invariant noDebtWithoutCollateral(bytes32 id, address user)
             require !liquidationLocked(id, offer.maker), "transient lock zero at tx start";
         }
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes data) with (env e) {
-            // Liquidate's debt-zeroing math (badDebt absorbed + repayment) needs mulDiv monotonicity + inverse axioms 
-            // (proved in MulDiv.spec) so the prover can derive repaidUnits >= debt_after_badDebt when the last bitmap bit is cleared.
-            require market.collateralParams.length <= MAX_COLLATERALS_PER_BORROWER(), "restrict to MAX_COLLATERALS_PER_BORROWER collaterals";
-            requireLiquidateMulDivAxioms();
+            // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
+            // The bound below is a performance restriction, not a soundness assumption: a market can have up to 128 collaterals,
+            // but a borrower can have at most MAX_COLLATERALS_PER_BORROWER of them activated at any time (see nonZeroCollateralsAreActivated in CollateralBitmap.spec).
+            // We restrict the market shape to the same bound to keep loop unrolling tractable.
+            require market.collateralParams.length <= Utils.maxCollateralsPerBorrower(), "restrict to MAX_COLLATERALS_PER_BORROWER collaterals for performance";
+        
+            // Inlined axioms (proved in MulDiv.spec): mulDivUp monotonicity in a and d, and the up/down inverse.
+            // mulDivMonotoneA
+            require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. a1 <= a2 && d > 0 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
+        
+            // mulDivMonotoneD
+            require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2);
+        
+            // mulDivInverseUpDown
+            require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
         }
     }
