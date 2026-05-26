@@ -126,79 +126,9 @@ def build_dense(leaves, claimed_root):
     )
 
     return {
-        "mode": "dense",
         "root": claimed_root,
         "leafLength": n,
         "leaf": [abi_encode_offer(o) for o in leaves],
-    }
-
-
-# Builds a sparse certificate by walking each leaf's proof up to the root.
-# Every sibling must resolve to another supplied leaf or a derivable internal node.
-def build_sparse(entries, claimed_root):
-    nodes = {}
-    leaf_payloads = []
-
-    for entry in entries:
-        offer = entry["offer"]
-        idx = int(entry["leafIndex"])
-        proof = entry["proof"]
-        leaf_hash = hash_offer(offer)
-        leaf_payloads.append((leaf_hash, offer))
-
-        current = leaf_hash
-        for i, sibling in enumerate(proof):
-            bit = (idx >> i) & 1
-            left_id, right_id = (current, sibling) if bit == 0 else (sibling, current)
-            parent = hash_node(left_id, right_id)
-            nodes.setdefault(parent, (left_id, right_id))
-            current = parent
-        assert current.lower() == claimed_root.lower(), (
-            f"sparse: proof for leafIndex={idx} ends at {current}, not claimed root {claimed_root}"
-        )
-
-    leaf_ids = {h.lower() for (h, _) in leaf_payloads}
-    node_ids_lc = {n.lower() for n in nodes}
-
-    for nid, (left_id, right_id) in nodes.items():
-        for child_id, side in ((left_id, "left"), (right_id, "right")):
-            if child_id.lower() not in leaf_ids and child_id.lower() not in node_ids_lc:
-                raise ValueError(
-                    f"sparse: {side} child {child_id} of internal node {nid} is neither a "
-                    f"supplied leaf nor a derivable internal node."
-                )
-
-    emitted = set(leaf_ids)
-    pending = list(nodes.keys())
-    ordered = []
-    while pending:
-        next_pending = []
-        progressed = False
-        for nid in pending:
-            left_id, right_id = nodes[nid]
-            if left_id.lower() in emitted and right_id.lower() in emitted:
-                ordered.append(nid)
-                emitted.add(nid.lower())
-                progressed = True
-            else:
-                next_pending.append(nid)
-        if not progressed:
-            raise RuntimeError("topological sort failed; cycles or unresolved siblings")
-        pending = next_pending
-
-    assert ordered[-1].lower() == claimed_root.lower(), (
-        f"sparse: last emitted node {ordered[-1]} is not claimed root {claimed_root}"
-    )
-
-    return {
-        "mode": "sparse",
-        "root": claimed_root,
-        "leafLength": len(leaf_payloads),
-        "leaf": [abi_encode_offer(offer) for (_, offer) in leaf_payloads],
-        "nodeLength": len(ordered),
-        "node": [
-            {"id": nid, "left": nodes[nid][0], "right": nodes[nid][1]} for nid in ordered
-        ],
     }
 
 
@@ -253,18 +183,10 @@ def main():
     with open(sys.argv[1]) as f:
         proofs = json.load(f)
 
-    mode = proofs["mode"]
     root = proofs["root"]
-    if mode == "dense":
-        certificate = build_dense([entry["offer"] for entry in proofs["leaves"]], root)
-    elif mode == "sparse":
-        certificate = build_sparse(proofs["leaves"], root)
-    else:
-        raise ValueError(f"unknown mode: {mode}")
+    certificate = build_dense([entry["offer"] for entry in proofs["leaves"]], root)
 
     if "eip712" in proofs:
-        if mode != "dense":
-            raise ValueError("eip712 envelope is only supported for dense (balanced) trees")
         certificate["eip712"] = build_eip712(proofs["eip712"], root, certificate["leafLength"])
 
     with open("certificate.json", "w") as f:

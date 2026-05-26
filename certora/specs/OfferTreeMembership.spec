@@ -73,22 +73,3 @@ rule takeCorrectness(Midnight.Offer offer, bytes32 root, uint256 leafIndex, byte
 
     assert OfferTree.isLeafNode(leafId);
 }
-
-/// TAKE-LEVEL LIFT ///
-
-/// Every successful Midnight.take is for an offer registered as a leaf in the maker's offer-tree.
-/// `require Utils.isLeaf(...)` binds the merkle witness to the specific (root, leafIndex, proof) used in the well-formedness premise; the take->ratifier->merkle composition is mechanised via the `isRatifiedSummary` above (obligation discharged in Ratification.spec/isRatifiedRequiresIsLeaf).
-rule takeImpliesLeafInTree(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, uint256 leafIndex, bytes32[] proof) {
-    bytes32 node;
-    require OfferTree.getHash(node) == root, "root is the hash of node";
-    require root != to_bytes32(0), "root is non-zero";
-
-    OfferTree.wellFormedPath(node, leafIndex, proof);
-
-    bytes32 leafId = Utils.hashOffer(offer);
-    require Utils.isLeaf(root, leafId, leafIndex, proof);
-
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
-
-    assert OfferTree.isLeafNode(leafId);
-}

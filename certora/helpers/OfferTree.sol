@@ -63,14 +63,6 @@ contract OfferTree {
         return tree[id].left == 0 && tree[id].right == 0 && tree[id].hashNode != 0;
     }
 
-    function getLeft(bytes32 id) public view returns (bytes32) {
-        return tree[id].left;
-    }
-
-    function getRight(bytes32 id) public view returns (bytes32) {
-        return tree[id].right;
-    }
-
     // The specification of a well-formed tree is the following:
     //   - empty nodes (left == 0 && right == 0 && hashNode == 0) are well-formed
     //   - leaves (left == 0 && right == 0 && hashNode != 0) require hashNode == hashOffer(offer) and id == hashNode
