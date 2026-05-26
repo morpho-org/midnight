@@ -49,18 +49,24 @@ rule wExpIsMonotonicOnNegativeRange(int256 x) {
 }
 
 // Only used as a hint for the wExpIsMonotonicOnPositiveRange rule, so it's argument type can be uint256.
-function expR(int256 r) returns mathint {
+function expR(uint256 x) returns mathint {
+    mathint ln2 = 693147180559945309;
+    mathint offset = 322611214989459870;
+    mathint q = (x + offset) / ln2;
+    mathint r = x - q * ln2;
     mathint secondTerm = r * r / (2 * 10 ^ 18);
     mathint thirdTerm = secondTerm * r / (3 * 10 ^ 18);
     return 10 ^ 18 + r + secondTerm + thirdTerm;
 }
 
+rule expRCantGoMoreThanTimesTwo(uint256 x, uint256 y) {
+    assert expR(x) <= 2 * expR(y);
+}
+
 rule wExpIsMonotonicOnPositiveRange(int256 x) {
     require 0 <= x && x < maxInput(), "the negative range is proven in wExpIsMonotonicOnNegativeRange";
     int256 x1 = assert_int256(x + 1);
-    int256 ln2 = 693147180559945309;
-    int256 offset = 322611214989459870;
-    assert 2 * expR(assert_int256(-offset)) >= expR(assert_int256(ln2 - offset - 1));
+    require expR(assert_uint256(x)) <= 2 * expR(assert_uint256(x1)), "by expRCantGoMoreThanTimesTwo";
     assert wExp(x) <= wExp(x1);
 }
 
