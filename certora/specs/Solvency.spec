@@ -166,7 +166,7 @@ strong invariant tokenBalanceCorrect(address token)
             requireInvariant pendingFeeReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
         }
-        preserved take(Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) with (env e) {
             requireInvariant pendingFeeReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
             require taker != currentContract, "no trading with contract";
