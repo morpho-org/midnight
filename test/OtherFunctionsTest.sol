@@ -81,9 +81,16 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(market, borrower, units);
         setupMarket(market, units);
         deal(collateralToken, address(this), additionalCollateral);
+
+        vm.expectEmit();
+        emit EventsLib.SupplyCollateral(address(this), id, collateralToken, additionalCollateral, borrower);
+
         midnight.supplyCollateral(market, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
+
+        vm.expectEmit();
+        emit EventsLib.WithdrawCollateral(borrower, id, collateralToken, withdraw, borrower, borrower);
 
         vm.prank(borrower);
         midnight.withdrawCollateral(market, 0, withdraw, borrower, borrower);
@@ -121,6 +128,9 @@ contract OtherFunctionsTest is BaseTest {
         setupMarket(market, units);
         skip(99);
         deal(address(loanToken), address(borrower), repaid);
+
+        vm.expectEmit();
+        emit EventsLib.Repay(borrower, id, repaid, borrower, borrower);
 
         vm.prank(borrower);
         midnight.repay(market, repaid, borrower, address(0), hex"");
