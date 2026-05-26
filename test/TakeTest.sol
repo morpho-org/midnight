@@ -126,6 +126,7 @@ contract TakeTest is BaseTest {
         Offer memory buy0 = _setupMarketOffer(market, existingDebt);
         buy0.buy = true;
         buy0.maker = otherLender;
+        // forge-lint: disable-next-line(unsafe-typecast)
         buy0.group = bytes32("debt-helper");
         deal(address(loanToken), otherLender, existingDebt);
         take(existingDebt, lender, buy0);
@@ -134,6 +135,7 @@ contract TakeTest is BaseTest {
         Offer memory sell0 = _setupMarketOffer(market, existingCredit);
         sell0.maker = otherBorrower;
         sell0.receiverIfMakerIsSeller = otherBorrower;
+        // forge-lint: disable-next-line(unsafe-typecast)
         sell0.group = bytes32("credit-helper");
         deal(address(loanToken), borrower, existingCredit.mulDivUp(WAD + MAX_TRADING_FEE_0_DAYS, WAD));
         take(existingCredit, borrower, sell0);
