@@ -12,6 +12,7 @@ import {
 } from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -197,6 +198,9 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+        vm.expectEmit();
+        emit EventsLib.SetConsumed(user, group, amount, user);
+
         vm.prank(user);
         midnight.setConsumed(group, amount, user);
         assertEq(midnight.consumed(user, group), amount, "consumed");
@@ -236,7 +240,11 @@ contract OtherFunctionsTest is BaseTest {
             midnight.setDefaultTradingFee(_market.loanToken, i, maxTradingFee(i));
         }
 
-        bytes32 _id = midnight.touchMarket(_market);
+        bytes32 _id = toId(_market);
+        vm.expectEmit();
+        emit EventsLib.MarketCreated(_market, _id);
+
+        assertEq(midnight.touchMarket(_market), _id, "id");
         assertEq(midnight.tickSpacing(_id) > 0, true, "market created");
         uint16[7] memory fees = midnight.tradingFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {

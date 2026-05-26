@@ -7,6 +7,7 @@ import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
@@ -38,10 +39,16 @@ contract AuthorizationTest is BaseTest {
 
         assertEq(midnight.isAuthorized(user, authorized), false);
 
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, true, user);
+
         vm.prank(user);
         midnight.setIsAuthorized(authorized, true, user);
 
         assertEq(midnight.isAuthorized(user, authorized), true);
+
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, false, user);
 
         vm.prank(user);
         midnight.setIsAuthorized(authorized, false, user);
