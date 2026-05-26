@@ -1,6 +1,10 @@
-"""Sweep MAX_COLLATERALS_PER_BORROWER and capture the gas reported by
-testGasLiquidateMaxCollaterals at each value, writing the result to
-gas_data.json (the format consumed by interpolate.py).
+"""Sweep MAX_COLLATERALS_PER_BORROWER and capture the gas reported by three liquidation
+tests at each value, writing the result to gas_data.json (consumed by interpolate.py).
+
+Tests captured (all matched by --match-test "testGasLiquidateMaxCollaterals"):
+  • testGasLiquidateMaxCollaterals           – pure Morpho, no DEX swap
+  • testGasLiquidateMaxCollateralsOneHopPerCollat  – one Uniswap V3 swap per collateral
+  • testGasLiquidateMaxCollateralsTwoHopsPerCollat – two Uniswap V3 swaps per collateral
 
 Usage:
     python generate_data.py [--start N] [--stop N] [--step N] [--output PATH]
@@ -21,7 +25,10 @@ CONSTANTS_FILE = REPO_ROOT / "src" / "libraries" / "ConstantsLib.sol"
 DEFAULT_OUTPUT = SCRIPT_DIR / "gas_data.json"
 
 CONSTANT_RE = re.compile(r"(uint256\s+constant\s+MAX_COLLATERALS_PER_BORROWER\s*=\s*)(\d+)(\s*;)")
-GAS_LOG_RE = re.compile(r"Gas max-collats liquidation\s+(\d+)")
+
+GAS_LOG_BASIC    = re.compile(r"Gas max-collats liquidation\s+(\d+)")
+GAS_LOG_ONE_HOP  = re.compile(r"Gas Uniswap V3 liquidation max collaterals one hop per collat\s+(\d+)")
+GAS_LOG_TWO_HOPS = re.compile(r"Gas Uniswap V3 liquidation max collaterals two hops per collat\s+(\d+)")
 
 
 def read_constant() -> int:
@@ -40,7 +47,8 @@ def write_constant(value: int) -> None:
     CONSTANTS_FILE.write_text(new_text)
 
 
-def run_test() -> int:
+def run_tests() -> dict:
+    """Run all three max-collateral tests in one forge invocation and return their gas values."""
     result = subprocess.run(
         ["forge", "test", "--match-test", "testGasLiquidateMaxCollaterals", "-vv"],
         cwd=REPO_ROOT,
@@ -51,11 +59,19 @@ def run_test() -> int:
     if result.returncode != 0:
         sys.stderr.write(output)
         raise RuntimeError("forge test failed")
-    m = GAS_LOG_RE.search(output)
-    if not m:
-        sys.stderr.write(output)
-        raise RuntimeError("Could not parse 'Gas max-collats liquidation' from forge output")
-    return int(m.group(1))
+
+    def parse(pattern: re.Pattern, label: str) -> int:
+        m = pattern.search(output)
+        if not m:
+            sys.stderr.write(output)
+            raise RuntimeError(f"Could not parse '{label}' from forge output")
+        return int(m.group(1))
+
+    return {
+        "gas_basic":    parse(GAS_LOG_BASIC,    "Gas max-collats liquidation"),
+        "gas_one_hop":  parse(GAS_LOG_ONE_HOP,  "Gas Uniswap V3 liquidation max collaterals one hop per collat"),
+        "gas_two_hops": parse(GAS_LOG_TWO_HOPS, "Gas Uniswap V3 liquidation max collaterals two hops per collat"),
+    }
 
 
 def main() -> None:
@@ -78,9 +94,13 @@ def main() -> None:
     try:
         for v in values:
             write_constant(v)
-            gas = run_test()
-            print(f"  MAX_COLLATERALS_PER_BORROWER = {v:>3} -> gas = {gas:,}")
-            results.append({"max_collaterals_per_borrower": v, "gas": gas})
+            gas = run_tests()
+            print(
+                f"  n={v:>3}  basic={gas['gas_basic']:>10,}"
+                f"  one_hop={gas['gas_one_hop']:>10,}"
+                f"  two_hops={gas['gas_two_hops']:>10,}"
+            )
+            results.append({"max_collaterals_per_borrower": v, **gas})
     finally:
         write_constant(original)
         print(f"Restored MAX_COLLATERALS_PER_BORROWER = {original}")

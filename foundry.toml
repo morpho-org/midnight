@@ -6,8 +6,13 @@ bytecode_hash = "none"
 evm_version = "osaka"
 fs_permissions = [
     { access = "read", path = "test/ticks_exact.json" },
+    { access = "read", path = "UniswapV3Factory.json" },
     { access = "write", path = "test/gas_report.json" },
 ]
+gas_limit = "18446744073709551615"
+hardfork= "tempo:T4"
+
+libs = ["lib", "dependencies"]
 
 [profile.default.fmt]
 wrap_comments = true
@@ -19,3 +24,5 @@ exclude_lints = [
     "incorrect-shift",
     "block-timestamp",
 ]
+
+[dependencies]

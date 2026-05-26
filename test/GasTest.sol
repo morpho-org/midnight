@@ -9,7 +9,7 @@ import {
     LIQUIDATION_CURSOR_LOW,
     MAX_COLLATERALS_PER_BORROWER
 } from "../src/libraries/ConstantsLib.sol";
-import {IMidnight, Obligation, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
@@ -28,10 +28,10 @@ contract Liquidator {
         IERC20Approve(loanToken).approve(_midnight, type(uint256).max);
     }
 
-    function liquidateAll(Obligation calldata obligation, uint256 seizePerCall, address borrower) external {
-        uint256 n = obligation.collateralParams.length;
+    function liquidateAll(Market calldata market, uint256 seizePerCall, address borrower) external {
+        uint256 n = market.collateralParams.length;
         for (uint256 i = 0; i < n; i++) {
-            midnight.liquidate(obligation, i, seizePerCall, 0, borrower, address(this), address(0), "");
+            midnight.liquidate(market, i, seizePerCall, 0, borrower, false, address(this), address(0), "");
         }
     }
 }
@@ -39,20 +39,20 @@ contract Liquidator {
 contract GasTest is BaseTest {
     using UtilsLib for uint256;
 
-    Obligation internal obligation;
+    Market internal market;
     bytes32 internal id;
 
     function setUp() public override {
         super.setUp();
-        obligation.loanToken = address(loanToken);
-        obligation.maturity = block.timestamp + 100;
-        obligation.rcfThreshold = 0;
+        market.loanToken = address(loanToken);
+        market.maturity = block.timestamp + 100;
+        market.rcfThreshold = 0;
     }
 
     /// forge-config: default.isolate = true
     function testGasLiquidateSingleCollateral() public {
         uint256 lltv = 0.77e18;
-        obligation.collateralParams
+        market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
@@ -61,20 +61,20 @@ contract GasTest is BaseTest {
                     oracle: address(oracle1)
                 })
             );
-        id = toId(obligation);
+        id = toId(market);
 
         uint256 units = 1000e18;
-        collateralize(obligation, borrower, units);
-        setupObligation(obligation, units);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
 
         // Make position liquidatable post-maturity at full LIF without overflowing collateral.
         oracle1.setPrice(0.9e36);
-        vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
+        vm.warp(market.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), type(uint256).max);
 
         uint256 gasBefore = gasleft();
-        midnight.liquidate(obligation, 0, 0, units, borrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, units, borrower, true, address(this), address(0), "");
         uint256 gasUsed = gasBefore - gasleft();
 
         console.log("Gas single-collat liquidation", gasUsed);
@@ -124,32 +124,32 @@ contract GasTest is BaseTest {
         }
         params = sortCollateralParams(params);
         for (uint256 i = 0; i < n; i++) {
-            obligation.collateralParams.push(params[i]);
+            market.collateralParams.push(params[i]);
         }
-        id = toId(obligation);
+        id = toId(market);
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, borrower);
 
         // Each collateral covers debtPerCollat of debt capacity. units = n * debtPerCollat avoids
         // rounding gaps that would otherwise leave the position unhealthy at par for some n.
         uint256 debtPerCollat = 100e18;
         uint256 units = n * debtPerCollat;
         for (uint256 i = 0; i < n; i++) {
-            CollateralParams memory cp = obligation.collateralParams[i];
+            CollateralParams memory cp = market.collateralParams[i];
             uint256 oraclePrice = Oracle(cp.oracle).price();
             uint256 collateral = debtPerCollat.mulDivUp(WAD, cp.lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
             deal(cp.token, address(this), collateral);
-            midnight.supplyCollateral(obligation, i, collateral, borrower);
+            midnight.supplyCollateral(market, i, collateral, borrower);
         }
 
-        setupObligation(obligation, units);
+        setupMarket(market, units);
 
         // Drop every oracle to make the position liquidatable.
         for (uint256 i = 0; i < n; i++) {
-            Oracle(obligation.collateralParams[i].oracle).setPrice(0.9e36);
+            Oracle(market.collateralParams[i].oracle).setPrice(0.9e36);
         }
-        vm.warp(obligation.maturity + TIME_TO_MAX_LIF);
+        vm.warp(market.maturity + TIME_TO_MAX_LIF);
 
         // Deploy a liquidator contract that loops over every collateral, mimicking what a real
         // liquidator would do on-chain.
@@ -161,7 +161,7 @@ contract GasTest is BaseTest {
         uint256 seizePerCall = 1e18;
 
         uint256 gasBefore = gasleft();
-        liquidator.liquidateAll(obligation, seizePerCall, borrower);
+        liquidator.liquidateAll(market, seizePerCall, borrower);
         return gasBefore - gasleft();
     }
 }
