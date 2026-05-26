@@ -76,7 +76,7 @@ contract GateTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = gatedMarket;
-        lenderOffer.ratifier = address(ecrecoverRatifier);
+        lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = block.timestamp + 200;
         lenderOffer.tick = MAX_TICK;
 
@@ -85,7 +85,7 @@ contract GateTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.market = gatedMarket;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
+        borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.expiry = block.timestamp + 200;
         borrowerOffer.tick = MAX_TICK;
 
@@ -174,7 +174,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.market = gatedMarket;
-        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
+        otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.expiry = block.timestamp + 200;
         otherBorrowerOffer.tick = MAX_TICK;
 
@@ -201,7 +201,7 @@ contract GateTest is BaseTest {
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.market = gatedMarket;
-        otherLenderOffer.ratifier = address(ecrecoverRatifier);
+        otherLenderOffer.ratifier = address(dummyRatifier);
         otherLenderOffer.expiry = block.timestamp + 200;
         otherLenderOffer.tick = MAX_TICK;
 
@@ -217,7 +217,7 @@ contract GateTest is BaseTest {
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
         exitOffer.market = gatedMarket;
-        exitOffer.ratifier = address(ecrecoverRatifier);
+        exitOffer.ratifier = address(dummyRatifier);
         exitOffer.expiry = block.timestamp + 200;
         exitOffer.tick = MAX_TICK;
 
@@ -310,7 +310,7 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.market = market;
-        ungatedLenderOffer.ratifier = address(ecrecoverRatifier);
+        ungatedLenderOffer.ratifier = address(dummyRatifier);
         ungatedLenderOffer.expiry = block.timestamp + 200;
         ungatedLenderOffer.tick = MAX_TICK;
 

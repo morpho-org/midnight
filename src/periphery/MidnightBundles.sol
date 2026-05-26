@@ -357,7 +357,8 @@ contract MidnightBundles is IMidnightBundles {
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
     }
 
-    /// @dev Skips the approval entirely when the current allowance is already 2^95 - 1.
+    /// @dev Skips the approval entirely to save gas when the current allowance is already 2^95 - 1 (value chosen
+    /// because some token like COMP and UNI on ethereum have a max allowance of type(uint96).max).
     /// @dev Resets to 0 before re-approving to support USDT like tokens.
     function _forceApproveMax(address token, address spender) internal {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
