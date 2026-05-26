@@ -21,7 +21,7 @@ import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
-/// @dev Unusable with tokens that do not allow approve(..., type(uint256).max) after approve(..., 0).
+/// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
