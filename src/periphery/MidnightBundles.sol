@@ -60,8 +60,8 @@ contract MidnightBundles is IMidnightBundles {
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
         _forceApproveMax(loanToken, MIDNIGHT);
-_pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
-_forceApproveMax(loanToken, MIDNIGHT);
+        _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
+        _forceApproveMax(loanToken, MIDNIGHT);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
