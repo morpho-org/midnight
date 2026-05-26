@@ -149,15 +149,19 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Market memory market, address _borrower, uint256 debt) internal {
-        uint256 oraclePrice = Oracle(market.collateralParams[0].oracle).price();
+        collateralize(market, _borrower, debt, 0);
+    }
+
+    function collateralize(Market memory market, address _borrower, uint256 debt, uint256 collateralIndex) internal {
+        uint256 oraclePrice = Oracle(market.collateralParams[collateralIndex].oracle).price();
         uint256 collateral =
-            debt.mulDivUp(WAD, market.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
-        deal(address(market.collateralParams[0].token), _borrower, collateral);
+            debt.mulDivUp(WAD, market.collateralParams[collateralIndex].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        deal(address(market.collateralParams[collateralIndex].token), _borrower, collateral);
 
         vm.startPrank(_borrower);
-        ERC20(market.collateralParams[0].token).approve(address(midnight), 0);
-        ERC20(market.collateralParams[0].token).approve(address(midnight), collateral);
-        midnight.supplyCollateral(market, 0, collateral, _borrower);
+        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), 0);
+        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), collateral);
+        midnight.supplyCollateral(market, collateralIndex, collateral, _borrower);
         vm.stopPrank();
     }
 
@@ -302,7 +306,7 @@ abstract contract BaseTest is Test {
         midnight.take(borrowerOffer, units, lender, borrower, address(0), hex"", hex"");
     }
 
-    function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {
+    function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;

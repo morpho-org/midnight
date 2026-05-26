@@ -9,9 +9,10 @@ import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
-    address[] internal tokensStored;
-    uint256[] internal amountsStored;
-    bytes internal dataStored;
+    address[] internal recordedTokens;
+    uint256[] internal recordedAmounts;
+    address internal recordedInitiator;
+    bytes internal recordedData;
     bool internal discardToken = false;
 
     function testFlashLoan(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data, address caller)
@@ -30,10 +31,6 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         amounts[1] = amount1;
         amounts[2] = amount2;
 
-        tokensStored = tokens;
-        amountsStored = amounts;
-        dataStored = data;
-
         for (uint256 i = 0; i < tokens.length; i++) {
             deal(tokens[i], address(midnight), amounts[i]);
         }
@@ -41,10 +38,16 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         vm.prank(caller);
         midnight.flashLoan(tokens, amounts, address(this), data);
 
+        assertEq(recordedTokens.length, tokens.length, "recorded tokens length");
+        assertEq(recordedAmounts.length, amounts.length, "recorded amounts length");
         for (uint256 i = 0; i < tokens.length; i++) {
+            assertEq(recordedTokens[i], tokens[i], "recorded token");
+            assertEq(recordedAmounts[i], amounts[i], "recorded amount");
             assertEq(ERC20(tokens[i]).balanceOf(address(this)), 0, "balanceOf(this)");
             assertEq(ERC20(tokens[i]).balanceOf(address(midnight)), amounts[i], "balanceOf(midnight)");
         }
+        assertEq(recordedInitiator, caller, "recorded initiator");
+        assertEq(recordedData, data, "recorded data");
     }
 
     function testFlashLoanNotReimbursed(uint256 amount0, uint256 amount1, uint256 amount2, bytes memory data) public {
@@ -61,9 +64,6 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         amounts[1] = amount1;
         amounts[2] = amount2;
 
-        tokensStored = tokens;
-        amountsStored = amounts;
-        dataStored = data;
         discardToken = true;
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -74,17 +74,14 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(tokens, amounts, address(this), data);
     }
 
-    function onFlashLoan(address[] memory tokens, uint256[] memory amounts, address, bytes memory data)
+    function onFlashLoan(address[] memory tokens, uint256[] memory amounts, address initiator, bytes memory data)
         external
         returns (bytes32)
     {
-        assertEq(tokens.length, tokensStored.length, "wrong tokens length");
-        assertEq(amounts.length, amountsStored.length, "wrong amounts length");
-        for (uint256 i = 0; i < tokens.length; i++) {
-            assertEq(tokens[i], tokensStored[i], "wrong token");
-            assertEq(amounts[i], amountsStored[i], "wrong amount");
-        }
-        assertEq(data, dataStored, "wrong data");
+        recordedTokens = tokens;
+        recordedAmounts = amounts;
+        recordedInitiator = initiator;
+        recordedData = data;
         if (discardToken) {
             for (uint256 i = 0; i < tokens.length; i++) {
                 SafeTransferLib.safeTransfer(tokens[i], address(0xdead), amounts[i]);

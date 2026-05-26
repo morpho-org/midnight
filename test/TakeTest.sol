@@ -994,7 +994,7 @@ contract TakeTest is BaseTest {
         take(units, user, offer);
     }
 
-    function testBuySellerCallback(uint256 units, uint32 continuousFee) public {
+    function testBuySellerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
@@ -1002,7 +1002,7 @@ contract TakeTest is BaseTest {
 
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
-        borrowerOffer.callbackData = abi.encode(0, collateral);
+        borrowerOffer.callbackData = abi.encode(0, collateral, data);
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -1017,6 +1017,14 @@ contract TakeTest is BaseTest {
         take(units, lender, borrowerOffer);
 
         assertEq(midnight.collateral(id, borrower, 0), collateral);
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedId(), id, "id");
+        assertEq(toId(BorrowCallback(borrowerOffer.callback).recordedMarket()), id, "market");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedReceiver(), borrower, "receiver");
+        assertEq(
+            BorrowCallback(borrowerOffer.callback).recordedSellerAssets(), units.mulDivUp(price, WAD), "sellerAssets"
+        );
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedUnits(), units, "units");
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
         assertEq(
             BorrowCallback(borrowerOffer.callback).recordedPendingFeeDecrease(),
@@ -1025,7 +1033,7 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testSellSellerCallback(uint256 units, uint32 continuousFee) public {
+    function testSellSellerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
@@ -1044,9 +1052,15 @@ contract TakeTest is BaseTest {
         midnight.setIsAuthorized(callback, true, borrower);
 
         vm.prank(borrower);
-        midnight.take(lenderOffer, units, borrower, borrower, callback, abi.encode(0, collateral), hex"");
+        midnight.take(lenderOffer, units, borrower, borrower, callback, abi.encode(0, collateral, data), hex"");
         assertEq(midnight.collateral(id, borrower, 0), collateral);
-        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
+        assertEq(BorrowCallback(callback).recordedId(), id, "id");
+        assertEq(toId(BorrowCallback(callback).recordedMarket()), id, "market");
+        assertEq(BorrowCallback(callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(callback).recordedReceiver(), borrower, "receiver");
+        assertEq(BorrowCallback(callback).recordedSellerAssets(), units.mulDivDown(price, WAD), "sellerAssets");
+        assertEq(BorrowCallback(callback).recordedUnits(), units, "units");
+        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral, data));
         assertEq(
             BorrowCallback(callback).recordedPendingFeeDecrease(),
             units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
@@ -1128,14 +1142,14 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, units, borrower, borrower, callback, hex"", hex"");
     }
 
-    function testSellBuyerCallback(uint256 units, uint32 continuousFee) public {
+    function testSellBuyerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivDown(price, WAD);
         lenderOffer.callback = address(new LendCallback());
-        lenderOffer.callbackData = abi.encode(loanToken, assets);
+        lenderOffer.callbackData = data;
         lenderOffer.maker = address(otherLender);
         lenderOffer.maxUnits = units;
         lenderOffer.tick = MAX_TICK;
@@ -1144,6 +1158,11 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
+        assertEq(LendCallback(lenderOffer.callback).recordedId(), id, "id");
+        assertEq(toId(LendCallback(lenderOffer.callback).recordedMarket()), id, "market");
+        assertEq(LendCallback(lenderOffer.callback).recordedBuyer(), lenderOffer.maker, "buyer");
+        assertEq(LendCallback(lenderOffer.callback).recordedBuyerAssets(), assets, "buyerAssets");
+        assertEq(LendCallback(lenderOffer.callback).recordedUnits(), units, "units");
         assertEq(LendCallback(lenderOffer.callback).recordedData(), lenderOffer.callbackData);
         assertEq(
             LendCallback(lenderOffer.callback).recordedPendingFeeIncrease(),
@@ -1152,24 +1171,26 @@ contract TakeTest is BaseTest {
         );
     }
 
-    function testBuyBuyerCallback(uint256 units, uint32 continuousFee) public {
+    function testBuyBuyerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
-        (address _otherLender,) = makeAddrAndKey("otherLender");
         address callback = address(new LendCallback());
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), callback, assets);
         collateralize(market, borrower, units);
 
-        vm.prank(_otherLender);
-        midnight.take(
-            borrowerOffer, units, _otherLender, address(0), callback, abi.encode(address(loanToken), assets), hex""
-        );
-        assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+        vm.prank(lender);
+        midnight.take(borrowerOffer, units, lender, address(0), callback, data, hex"");
+        assertEq(LendCallback(callback).recordedId(), id, "id");
+        assertEq(toId(LendCallback(callback).recordedMarket()), id, "market");
+        assertEq(LendCallback(callback).recordedBuyer(), lender, "buyer");
+        assertEq(LendCallback(callback).recordedBuyerAssets(), assets, "buyerAssets");
+        assertEq(LendCallback(callback).recordedUnits(), units, "units");
+        assertEq(LendCallback(callback).recordedData(), data);
         assertEq(
             LendCallback(callback).recordedPendingFeeIncrease(),
             units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
@@ -1279,27 +1300,41 @@ contract InvalidBuyCallback is IBuyCallback {
 contract BorrowCallback is ISellCallback {
     bytes public recordedData;
     bytes32 public recordedId;
+    Market internal _recordedMarket;
+    address public recordedSeller;
+    address public recordedReceiver;
+    uint256 public recordedSellerAssets;
+    uint256 public recordedUnits;
     uint256 public recordedPendingFeeDecrease;
 
     function onSell(
         bytes32 id,
         Market memory market,
-        uint256,
-        uint256,
+        uint256 sellerAssets,
+        uint256 units,
         uint256 pendingFeeDecrease,
         address seller,
-        address,
+        address receiver,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         recordedId = id;
+        _recordedMarket = market;
+        recordedSeller = seller;
+        recordedReceiver = receiver;
+        recordedSellerAssets = sellerAssets;
+        recordedUnits = units;
         recordedData = data;
         recordedPendingFeeDecrease = pendingFeeDecrease;
-        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
+        (uint256 collateralIndex, uint256 amount,) = abi.decode(data, (uint256, uint256, bytes));
         address collateralToken = market.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(market, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
+    }
+
+    function recordedMarket() external view returns (Market memory) {
+        return _recordedMarket;
     }
 }
 
@@ -1408,23 +1443,35 @@ contract LendCallback is IBuyCallback {
     bytes public recordedData;
 
     bytes32 public recordedId;
+    Market internal _recordedMarket;
+    address public recordedBuyer;
+    uint256 public recordedBuyerAssets;
+    uint256 public recordedUnits;
     uint256 public recordedPendingFeeIncrease;
 
     function onBuy(
         bytes32 id,
         Market memory market,
         uint256 buyerAssets,
-        uint256,
+        uint256 units,
         uint256 pendingFeeIncrease,
-        address,
+        address buyer,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         recordedId = id;
+        _recordedMarket = market;
+        recordedBuyer = buyer;
+        recordedBuyerAssets = buyerAssets;
+        recordedUnits = units;
         recordedData = data;
         recordedPendingFeeIncrease = pendingFeeIncrease;
         ERC20(market.loanToken).approve(msg.sender, buyerAssets);
         return CALLBACK_SUCCESS;
+    }
+
+    function recordedMarket() external view returns (Market memory) {
+        return _recordedMarket;
     }
 }
 

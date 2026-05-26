@@ -59,8 +59,8 @@ contract MidnightBundles is IMidnightBundles {
         // touchMarket to have the correct trading fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
-        _forceApproveMax(loanToken, MIDNIGHT);
         _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
+        _forceApproveMax(loanToken, MIDNIGHT);
 
         uint256 filledUnits;
         uint256 filledBuyerAssets;
@@ -185,17 +185,18 @@ contract MidnightBundles is IMidnightBundles {
     ) external {
         require(taker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
+        address loanToken = takes[0].offer.market.loanToken;
         // touchMarket to have the correct trading fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
-        _forceApproveMax(takes[0].offer.market.loanToken, MIDNIGHT);
-        _pullToken(takes[0].offer.market.loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
+        _pullToken(loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
+        _forceApproveMax(loanToken, MIDNIGHT);
 
         uint256 referralFeeAssets = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
         uint256 targetFilledBuyerAssets = targetBuyerAssets - referralFeeAssets;
 
-        uint256 filledBuyerAssets;
         uint256 filledUnits;
+        uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
             require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
@@ -210,8 +211,8 @@ contract MidnightBundles is IMidnightBundles {
                 .take(takes[i].offer, unitsToTake, taker, address(0), address(0), "", takes[i].ratifierData) returns (
                 uint256 resBuyerAssets, uint256
             ) {
-                filledBuyerAssets += resBuyerAssets;
                 filledUnits += unitsToTake;
+                filledBuyerAssets += resBuyerAssets;
             } catch {}
         }
 
@@ -230,7 +231,6 @@ contract MidnightBundles is IMidnightBundles {
                 );
         }
 
-        address loanToken = takes[0].offer.market.loanToken;
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
@@ -272,8 +272,8 @@ contract MidnightBundles is IMidnightBundles {
         uint256 referralFeeAssets = targetSellerAssets.mulDivDown(referralFeePct, WAD - referralFeePct);
         uint256 targetFilledSellerAssets = targetSellerAssets + referralFeeAssets;
 
-        uint256 filledSellerAssets;
         uint256 filledUnits;
+        uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
             require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
@@ -290,8 +290,8 @@ contract MidnightBundles is IMidnightBundles {
                 ) returns (
                 uint256, uint256 resSellerAssets
             ) {
-                filledSellerAssets += resSellerAssets;
                 filledUnits += unitsToTake;
+                filledSellerAssets += resSellerAssets;
             } catch {}
         }
 
@@ -357,7 +357,8 @@ contract MidnightBundles is IMidnightBundles {
         require(returndata.length == 0 || abi.decode(returndata, (bool)));
     }
 
-    /// @dev Skips the approval entirely when the current allowance is already 2^95 - 1.
+    /// @dev Skips the approval entirely to save gas when the current allowance is already 2^95 - 1 (value chosen
+    /// because some token like COMP and UNI on ethereum have a max allowance of type(uint96).max).
     /// @dev Resets to 0 before re-approving to support USDT like tokens.
     function _forceApproveMax(address token, address spender) internal {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
