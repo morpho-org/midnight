@@ -60,6 +60,7 @@ function expR(uint256 x) returns mathint {
 }
 
 rule expRCantGoMoreThanTimesTwo(uint256 x, uint256 y) {
+    require x >= 0 && y >= 0, "the function is only called on non-negative inputs";
     assert expR(x) <= 2 * expR(y);
 }
 
