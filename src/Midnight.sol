@@ -84,7 +84,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
+/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
 /// loan token.
 ///
 /// OFFER CAPS
