@@ -1,3 +1,4 @@
 cache
 out
 .certora_internal
+*.DS_Store
