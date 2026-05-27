@@ -16,9 +16,9 @@ methods {
 
 // Show that taking an empty offer always reverts.
 // Useful for padding the offer tree with empty offers.
-rule emptyOfferCantBeTaken(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
+rule emptyOfferCantBeTaken(env e, bytes ratifierData, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller) {
     Midnight.Offer offer = Utils.emptyOffer();
     require e.block.timestamp > 0, "block.timestamp is always positive";
-    take@withrevert(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take@withrevert(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
     assert lastReverted;
 }

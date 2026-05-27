@@ -278,20 +278,20 @@ contract ContinuousFeeTest is BaseTest {
         emit EventsLib.Take(
             lender,
             id,
-            otherLender,
-            lender,
-            true,
-            takeAssets,
-            takeAssets,
             exitAmount,
-            otherLender,
             lender,
+            otherLender,
+            true,
             keccak256("lender-exit"),
+            takeAssets,
+            takeAssets,
             exitAmount,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             exitAmount,
-            exitAmount
+            exitAmount,
+            lender,
+            otherLender
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 

@@ -22,9 +22,9 @@ methods {
     // This is justified because the properties we verify are about the effect of each function's own body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, uint256, address, address, address, bytes) external => NONDET;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address[], uint256[], address, bytes) external => NONDET;
+    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }
 
@@ -81,7 +81,7 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
 
 /// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
 /// and only changes credit of maker and taker and debt of maker and taker at the market id.
-rule takeEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.market);
 
     uint128 makerCreditBefore;
@@ -93,7 +93,7 @@ rule takeEffects(env e, Midnight.Offer offer, uint256 units, address taker, addr
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
@@ -109,7 +109,7 @@ rule takeEffects(env e, Midnight.Offer offer, uint256 units, address taker, addr
 /// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
 /// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
 /// Buyer's debt is non-increasing and can decrease by at most take units.
-rule takeBuyerEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = toId(e, offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
@@ -117,7 +117,7 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, uint256 units, address taker,
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
     assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
@@ -129,7 +129,7 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, uint256 units, address taker,
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
 /// Seller's debt is non-decreasing, and can increase by at most take units.
 /// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
-rule takeSellerEffects(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = toId(e, offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
@@ -137,7 +137,7 @@ rule takeSellerEffects(env e, Midnight.Offer offer, uint256 units, address taker
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
     assert debtOf(id, seller) >= sellerDebtBefore;
@@ -189,7 +189,7 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
-        && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
+        && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
