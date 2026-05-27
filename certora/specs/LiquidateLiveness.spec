@@ -155,8 +155,8 @@ rule postMaturityCanBeLiquidated(env e, Midnight.Market market, address borrower
     assert !lastReverted;
 }
 
-/// Unhealthy, lltv == WAD: healthyPath = false. RCF maxRepaid = type(uint256).max
-/// (L656), so the check passes without any precondition on rcfThreshold.
+/// Unhealthy, lltv == WAD: healthyPath = false. RCF maxRepaid = type(uint256).max,
+/// so the check passes without any precondition on rcfThreshold.
 rule unhealthyLltvFullCanBeLiquidated(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
     preamble(e, market, id, borrower);
@@ -170,7 +170,7 @@ rule unhealthyLltvFullCanBeLiquidated(env e, Midnight.Market market, address bor
 }
 
 /// Unhealthy, any lltv: healthyPath = false. The rcfThreshold escape hatch makes
-/// the second disjunct of L659-660 hold, sidestepping the nonlinear maxRepaid at L655.
+/// the second disjunct hold, sidestepping the nonlinear maxRepaid.
 rule unhealthyCanBeLiquidated(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
     preamble(e, market, id, borrower);
