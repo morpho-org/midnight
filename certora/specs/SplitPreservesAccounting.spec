@@ -88,7 +88,7 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     storage initState = lastStorage;
 
     // Path 1: take the full amount A.
-    take(e, offer, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     uint256 creditOfBuyer1 = creditOf(id, buyer);
     uint256 debtOfBuyer1 = debtOf(id, buyer);
@@ -104,9 +104,9 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     uint128 sellerLastAccrual1 = lastAccrual(id, seller);
 
     // Path 2: take B then C from the initial state.
-    take(e, offer, unitsB, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData) at initState;
+    take(e, offer, ratifierData, unitsB, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData) at initState;
 
-    take(e, offer, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert creditOfBuyer1 == creditOf(id, buyer);
     assert debtOfBuyer1 == debtOf(id, buyer);
