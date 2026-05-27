@@ -73,7 +73,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(offer, 0, borrower, borrower, address(0), hex"", abi.encode(_root, 0, new bytes32[](0)));
+        midnight.take(offer, abi.encode(_root, 0, new bytes32[](0)), 0, borrower, borrower, address(0), hex"");
     }
 
     function testIsRatifiedUsesLeafIndex() public {

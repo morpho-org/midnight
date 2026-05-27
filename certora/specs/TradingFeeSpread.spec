@@ -35,19 +35,19 @@ definition WAD() returns uint256 = 10 ^ 18;
 //   1. buyer-maker pays at most floor(units * offerPrice / WAD).
 //   2. seller-maker receives at least ceil(units * offerPrice / WAD).
 // Note also that this rule ensures that the trading fee is applied on the taker price, not the maker price.
-rule makerFavorableRounding(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     uint256 offerPrice = summaryTickToPrice(offer.tick);
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert offer.buy => buyerAssets * WAD() <= units * offerPrice;
     assert !offer.buy => sellerAssets * WAD() >= units * offerPrice;
 }
 
 // The spread between what the buyer pays and what the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
-rule tradingFeeSpreadBounds(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule tradingFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
     bytes32 id = summaryToId(offer.market);
@@ -55,7 +55,7 @@ rule tradingFeeSpreadBounds(env e, Midnight.Offer offer, uint256 units, address 
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert buyerAssets - sellerAssets >= (units * fee) / WAD();
     assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
