@@ -44,7 +44,7 @@ contract LiquidationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -362,7 +362,7 @@ contract LiquidationTest is BaseTest {
         midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
         collateralize(market, borrower, units);
         setupMarket(market, units);
-        vm.warp(block.timestamp + 50);
+        vm.warp(vm.getBlockTimestamp() + 50);
         midnight.updatePosition(market, lender);
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 

@@ -185,7 +185,7 @@ abstract contract BaseTest is Test {
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         collateralize(market, otherBorrower, units);
@@ -205,8 +205,8 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
         badBorrowerOffer.ratifier = address(dummyRatifier);
-        badBorrowerOffer.start = block.timestamp;
-        badBorrowerOffer.expiry = block.timestamp + 200;
+        badBorrowerOffer.start = vm.getBlockTimestamp();
+        badBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         badBorrowerOffer.tick = MAX_TICK;
 
         vm.prank(badBorrower);
@@ -293,7 +293,7 @@ abstract contract BaseTest is Test {
         }
         collateralParams = sortCollateralParams(collateralParams);
         market.collateralParams = collateralParams;
-        market.maturity = bound(market.maturity, 0, block.timestamp + 100 * 365 days);
+        market.maturity = bound(market.maturity, 0, vm.getBlockTimestamp() + 100 * 365 days);
         return market;
     }
 
@@ -313,8 +313,8 @@ abstract contract BaseTest is Test {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
         borrowerOffer.ratifier = address(dummyRatifier);
-        borrowerOffer.start = block.timestamp;
-        borrowerOffer.expiry = block.timestamp;
+        borrowerOffer.start = vm.getBlockTimestamp();
+        borrowerOffer.expiry = vm.getBlockTimestamp();
         borrowerOffer.tick = MAX_TICK;
     }
 

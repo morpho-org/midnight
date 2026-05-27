@@ -34,10 +34,10 @@ contract TradingFeeTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        vm.warp(block.timestamp + 1000 days); // to be able to come back in time enough
+        vm.warp(vm.getBlockTimestamp() + 1000 days); // to be able to come back in time enough
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 1 days; // TTM = 1 day (exactly at breakpoint)
+        market.maturity = vm.getBlockTimestamp() + 1 days; // TTM = 1 day (exactly at breakpoint)
         market.collateralParams
             .push(
                 CollateralParams({
@@ -65,8 +65,8 @@ contract TradingFeeTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.ratifier = address(dummyRatifier);
-        lenderOffer.start = block.timestamp;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.start = vm.getBlockTimestamp();
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
 
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
@@ -74,7 +74,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.ratifier = address(dummyRatifier);
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
 
         deal(address(loanToken), address(lender), MAX_TEST_AMOUNT * 10000);
 
@@ -164,7 +164,7 @@ contract TradingFeeTest is BaseTest {
         tradingFee1Day = bound(tradingFee1Day, 0, maxTradingFee(1)) / 1e12 * 1e12;
         tradingFee7Days = bound(tradingFee7Days, tradingFee1Day, maxTradingFee(2)) / 1e12 * 1e12;
 
-        market.maturity = block.timestamp + 3 days;
+        market.maturity = vm.getBlockTimestamp() + 3 days;
 
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
         // Must be set before touchMarket, which snapshots defaultFees at creation time.
@@ -176,7 +176,7 @@ contract TradingFeeTest is BaseTest {
         borrowerOffer.market = market;
         borrowerOffer.tick = sellerTick;
 
-        uint256 tradingFee = midnight.tradingFee(id, market.maturity - block.timestamp);
+        uint256 tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
 
         uint256 buyerPrice = sellerPrice + tradingFee;
         vm.assume(buyerPrice <= WAD);
@@ -200,7 +200,7 @@ contract TradingFeeTest is BaseTest {
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         tradingFee0Day = bound(tradingFee0Day, 0, maxTradingFee(0)) / 1e12 * 1e12;
-        maturity = bound(maturity, 0, block.timestamp - 1);
+        maturity = bound(maturity, 0, vm.getBlockTimestamp() - 1);
         market.maturity = maturity;
         id = toId(market);
         lenderOffer.market = market;
@@ -223,7 +223,7 @@ contract TradingFeeTest is BaseTest {
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         tradingFee360Days = bound(tradingFee360Days, 0, maxTradingFee(6)) / 1e12 * 1e12;
-        maturity = bound(maturity, block.timestamp + 360 days, block.timestamp + 36500 days);
+        maturity = bound(maturity, vm.getBlockTimestamp() + 360 days, vm.getBlockTimestamp() + 36500 days);
 
         market.maturity = maturity;
         id = toId(market);
