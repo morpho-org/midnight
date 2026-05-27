@@ -18,12 +18,12 @@ methods {
     // Assume that the markets are already created.
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
-    // Pure helpers called with identical args across the three takes; CONSTANT collapses
-    // their bit / hashing / arithmetic complexity (no behavioral abstraction).
+    // Pure helper called with identical args across the three takes; CONSTANT collapses
+    // its bit / hashing / arithmetic complexity (no behavioral abstraction).
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
-    function UtilsLib.atMostOneNonZero(uint256, uint256) internal returns (bool) => NONDET;
 
-    // Force the same return value across the three calls so the seller-liquidatable check either fires on both paths or neither.
+    // Over-approximate view functions.
+    function UtilsLib.atMostOneNonZero(uint256, uint256) internal returns (bool) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Over-approximate transient storage.
@@ -35,7 +35,7 @@ methods {
 
 // ghostMulDivDown(a, b, d) abstracts floor(a*b/d). Axioms are proven as rules in MulDiv.spec.
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    // Identity (b=d=x): floor(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivDownTightBound in MulDiv.spec.
+    // Identity (b=d=x): floor(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivDown(a, x, x) == a;
 
     // floor(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
@@ -54,7 +54,7 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 
 // ghostMulDivUp(a, b, d) abstracts ceil(a*b/d). Axioms are proven as rules in MulDiv.spec.
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    // Identity (b=d=x): ceil(a*x/x) = a. Follows from mulDivArgumentLesserThanDenominator + mulDivUpTightBound in MulDiv.spec.
+    // Identity (b=d=x): ceil(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
 
     // ceil(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
