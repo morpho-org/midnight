@@ -50,8 +50,11 @@ methods {
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
+
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
+
 definition MAX_UINT128() returns mathint = (1 << 128) - 1;
+
 definition MAX_TIMESTAMP() returns mathint = 1 << 64;
 
 function summaryToId(Midnight.Market market) returns bytes32 {
@@ -105,8 +108,7 @@ function validCollateralAt(Midnight.Market market, bytes32 id, address borrower,
     require to_mathint(lltv) * to_mathint(maxLif) <= to_mathint(WAD()) * to_mathint(WAD());
 
     address oracle = market.collateralParams[i].oracle;
-    require to_mathint(collateral(id, borrower, i)) * to_mathint(summaryPrice(oracle))
-            <= to_mathint(ORACLE_PRICE_SCALE()) * to_mathint(WAD()) * MAX_UINT128();
+    require to_mathint(collateral(id, borrower, i)) * to_mathint(summaryPrice(oracle)) <= to_mathint(ORACLE_PRICE_SCALE()) * to_mathint(WAD()) * MAX_UINT128();
 }
 
 /// Shared preamble: 2-collateral market with both bits activated, well-behaved env,
