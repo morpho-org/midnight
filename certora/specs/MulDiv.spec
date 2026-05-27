@@ -74,6 +74,12 @@ rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
     assert b <= d => mulDivUp(a, b, d) <= a;
 }
 
+// Identity (b = d = x): floor(a*x/x) = ceil(a*x/x) = a.
+rule mulDivIdentity(uint256 a, uint256 x) {
+    assert x != 0 => mulDivDown(a, x, x) == a;
+    assert x != 0 => mulDivUp(a, x, x) == a;
+}
+
 rule mulDivDownRoundsDown(uint256 a, uint256 b, uint256 d) {
     assert mulDivDown(a, b, d) * d <= a * b;
 }
