@@ -5,7 +5,6 @@ methods {
     function maxTick() external returns (uint256) envfree;
     function priceRoundingStep() external returns (uint256) envfree;
     function wExp(int256 x) external returns (uint256) envfree;
-    function expR(int256 x) external returns (int256) envfree;
     function tickToPrice(uint256 tick) external returns (uint256) envfree;
 }
 
@@ -39,20 +38,66 @@ rule maxOutputIsWExpOfMaxInput() {
 
 rule wExpOutputBound(int256 input) {
     require -maxInput() <= input && input <= maxInput(), "sound because wExp is only called on inputs in this range";
-    require wExp(input) <= wExp(maxInput()), "see rules wExpIsMonotonicOnPositiveRange and wExpIsMonotonicOnNegativeRange";
+    require wExp(input) <= wExp(maxInput()), "see rules wExpIsMonotonicOnPositiveRangeWhenQStays/WhenQJumps and wExpIsMonotonicOnNegativeRange";
     assert wExp(input) <= maxOutput();
 }
 
 rule wExpIsMonotonicOnNegativeRange(int256 x) {
-    require -maxInput() <= x && x < 0, "the positive range is proven in wExpIsMonotonicOnPositiveRange";
+    require -maxInput() <= x && x < 0, "the positive range is proven in wExpIsMonotonicOnPositiveRangeWhenQStays/WhenQJumps";
     int256 x1 = assert_int256(x + 1);
     assert wExp(x) <= wExp(x1);
 }
 
-rule wExpIsMonotonicOnPositiveRange(int256 x) {
+// q computed the same way as the inner branch of wExp on non-negative inputs.
+function qOnPositiveRange(int256 x) returns mathint {
+    mathint ln2 = 693147180559945309;
+    mathint offset = 322611214989459870;
+    return (x + offset) / ln2;
+}
+
+// Mirrors the Taylor series used inside wExp; only used as a hint for the rules below.
+function expR(uint256 x) returns mathint {
+    mathint ln2 = 693147180559945309;
+    mathint offset = 322611214989459870;
+    mathint q = (x + offset) / ln2;
+    mathint r = x - q * ln2;
+    mathint secondTerm = r * r / (2 * 10 ^ 18);
+    mathint thirdTerm = secondTerm * r / (3 * 10 ^ 18);
+    return 10 ^ 18 + r + secondTerm + thirdTerm;
+}
+
+// Within a segment, x and x+1 differ only by r -> r+1, on which the Taylor series is increasing.
+rule expRIsMonotonicWithinSegment(int256 x) {
+    require 0 <= x && x < maxInput(), "wExp is only called on inputs in this range";
+    int256 x1 = assert_int256(x + 1);
+    require qOnPositiveRange(x) == qOnPositiveRange(x1), "x and x+1 are in the same segment";
+    assert expR(assert_uint256(x)) <= expR(assert_uint256(x1));
+}
+
+// q changes by 0 or 1 between consecutive inputs; together with the two cases below this proves
+// wExp monotonicity on the positive range. Splitting on q lets the solver pin the polynomial inputs
+// (r) to constants at a jump, avoiding the tight symbolic nonlinear bound it cannot otherwise discharge.
+rule qIncreasesByZeroOrOne(int256 x) {
+    require 0 <= x && x < maxInput(), "wExp is only called on inputs in this range";
+    int256 x1 = assert_int256(x + 1);
+    mathint delta = qOnPositiveRange(x1) - qOnPositiveRange(x);
+    assert delta == 0 || delta == 1;
+}
+
+// When q is unchanged the shift is identical on both sides, so wExp tracks the increasing expR series.
+rule wExpIsMonotonicOnPositiveRangeWhenQStays(int256 x) {
     require 0 <= x && x < maxInput(), "the negative range is proven in wExpIsMonotonicOnNegativeRange";
     int256 x1 = assert_int256(x + 1);
-    assert expR(x) <= 2 * expR(x1);
+    require qOnPositiveRange(x) == qOnPositiveRange(x1), "case: q stays the same";
+    require expR(assert_uint256(x)) <= expR(assert_uint256(x1)), "by expRIsMonotonicWithinSegment";
+    assert wExp(x) <= wExp(x1);
+}
+
+// When q increases by 1 the extra shift doubles the result, which covers the drop in expR.
+rule wExpIsMonotonicOnPositiveRangeWhenQJumps(int256 x) {
+    require 0 <= x && x < maxInput(), "the negative range is proven in wExpIsMonotonicOnNegativeRange";
+    int256 x1 = assert_int256(x + 1);
+    require qOnPositiveRange(x1) == qOnPositiveRange(x) + 1, "case: q increases by exactly 1";
     assert wExp(x) <= wExp(x1);
 }
 

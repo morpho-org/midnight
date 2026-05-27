@@ -21,19 +21,6 @@ contract TickLibWrapper {
         return TickLib.wExp(x);
     }
 
-    // Mirrors the expR Taylor series used inside TickLib.wExp for non-negative inputs.
-    function expR(int256 x) external pure returns (int256) {
-        unchecked {
-            int256 ln2 = 0.693147180559945309e18;
-            int256 offset = 0.32261121498945987e18;
-            int256 q = (x + offset) / ln2;
-            int256 r = x - q * ln2;
-            int256 secondTerm = r * r / (2 * 1e18);
-            int256 thirdTerm = secondTerm * r / (3 * 1e18);
-            return 1e18 + r + secondTerm + thirdTerm;
-        }
-    }
-
     function tickToPrice(uint256 tick) external pure returns (uint256) {
         return TickLib.tickToPrice(tick);
     }
