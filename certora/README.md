@@ -9,81 +9,105 @@ The verified properties are listed below by theme, followed by the verification 
 
 Global invariants on positions, markets and accounting.
 
-- [`Midnight.spec`](specs/Midnight.spec) checks core invariants: `take`/`liquidate` input-output consistency, monotonicity of the loss factor, that a user never has both credit and debt, and that there is no continuous fee without credit.
-- [`BalanceEffects.spec`](specs/BalanceEffects.spec) checks the exact credit/debt/collateral effect of each entry point, and that the other functions leave them unchanged.
-- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the invariants of a created market (non-empty sorted collaterals, valid LLTV tier and `maxLif`) and that markets are created on first interaction and never deleted.
-- [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks that every state field of a non-created market is empty.
-- [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor (and only when bad debt is realized), and that `updatePosition` syncs the user's `lastLossFactor`.
-- [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` runs.
+- [`Midnight.spec`](specs/Midnight.spec) collects the core accounting invariants.
+  Total units always equal the sum of debt plus withdrawable, a user never holds both credit and debt, and a position's pending continuous fee never exceeds its credit.
+  Continuous fees stay below `MAX_CONTINUOUS_FEE` at both the default and the market level, and loss factors only ever increase, with each user's bounded by its market's.
+  Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable trading fee by exactly the buyer/seller spread.
+  It also shows that neither credit nor debt can grow once a market's loss factor is maxed out.
+- [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
+- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an LLTV `<= WAD` from an allowed tier and an allowed `maxLif`.
+  Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
+- [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
+- [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
+  It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
+- [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
 
 ## Positions health and liquidation
 
 Healthy positions stay healthy, and liquidations only touch liquidatable positions within the incentive bound.
 
-- [`Healthiness.spec`](specs/Healthiness.spec) checks that, at constant price, no action can turn a healthy borrower unhealthy.
-- [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` only affects liquidatable positions and can only decrease the borrower's debt and collateral.
-- [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) checks the liquidation incentive factor: `lif >= WAD` (the liquidator never loses) and `lif == maxLif` on the unhealthy or post-maturity path.
-- [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks that liquidation profit is bounded by `maxLif`, for both the `repaidUnits` and `seizedAssets` inputs.
+- [`Healthiness.spec`](specs/Healthiness.spec) checks that no action can turn a healthy borrower unhealthy.
+- [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
+- [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable, either using the unhealthy path or with the unhealthy path enough time after maturity.
+- [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
 
 ## Offers and consumption
 
 How offers are consumed when taken.
 
-- [`Consume.spec`](specs/Consume.spec) checks the `consumed` mapping: only `setConsumed` and `take` change it, it never decreases, and a take's delta matches the units taken up to the offer's max.
+- [`Consume.spec`](specs/Consume.spec) checks the `consumed` mapping that tracks how much of each offer has been taken.
+  Only `setConsumed` and `take` modify it, and each touches only the targeted `(user, group)` pair.
+  It never decreases, a take's delta matches the units taken and stays within the offer's max, and once at the max it stops moving: a fully-consumed offer then admits only no-op takes.
 - [`EmptyOffer.spec`](specs/EmptyOffer.spec) checks that taking an empty offer always reverts (so the offer tree can be padded with empty offers).
-- [`Ratification.spec`](specs/Ratification.spec) checks that every take requires the maker to have authorized the ratifier, and that `address(0)` can never be the maker.
+- [`Ratification.spec`](specs/Ratification.spec) checks that every successful take requires the maker to have authorized the ratifier.
 
 ## Fees
 
 Continuous-fee accrual and trading-fee rounding stay within their expected bounds.
 
-- [`ContinuousFee.spec`](specs/ContinuousFee.spec) checks continuous-fee accrual: buyer/seller pending fees move by the expected rounded amounts and `continuousFeeCredit` grows by exactly the accrued sum, without affecting third parties.
-- [`TradingFeeSpread.spec`](specs/TradingFeeSpread.spec) checks that take rounding always favors the maker and that the buyer/seller spread is bounded by the trading fee.
-- [`TradingFeeBoundaries.spec`](specs/TradingFeeBoundaries.spec) checks that trading fees stay within their per-index cap, new markets inherit the loan token's defaults, and the fee is enclosed by its adjacent breakpoints for any time-to-maturity.
-- [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets and claimable trading fees move: up on repay/liquidate/take, down by exactly the amount on withdraw/claim, unchanged otherwise.
+- [`ContinuousFee.spec`](specs/ContinuousFee.spec) checks continuous-fee changes on `take` and `withdraw`.
+  A buyer's pending fee grows by at most `floor(creditIncrease * fee * timeToMaturity / WAD)`, and a seller's pending fee decreases proportionally to the credit it loses.
+  The contract's `continuousFeeCredit` grows by exactly the buyer-plus-seller accrued fees, and a `take` leaves third parties' positions and fees unchanged.
+- [`TradingFeeSpread.spec`](specs/TradingFeeSpread.spec) checks that take rounding always favors the maker (a buyer-maker pays at most `floor(units * offerPrice / WAD)`, a seller-maker receives at least the ceil) and that the buyer/seller spread stays between `floor` and `ceil` of `units * fee / WAD`.
+- [`TradingFeeBoundaries.spec`](specs/TradingFeeBoundaries.spec) checks that every default and per-market trading fee stays within its per-index cap.
+  A new market inherits its loan token's default fees, only the fee setter can change them, and the fee for any time-to-maturity is enclosed by its two adjacent breakpoint values.
+- [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
+  It checks the claimable trading fee the same way: up on `take`, down on `claimTradingFee`, and unchanged otherwise.
 
 ## Authorization, roles and reverts
 
 Who may change state, sign authorizations and hold roles, and how failures propagate.
 
-- [`OnlyAuthorizedCanChange.spec`](specs/OnlyAuthorizedCanChange.spec) checks that an unauthorized caller cannot change a user's credit, debt, collateral, `consumed` or authorization (outside the `liquidate`/`updatePosition`/`take` paths, covered separately).
-- [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: the nonce increments on success, and an expired deadline, wrong nonce or reused nonce reverts.
-- [`Role.spec`](specs/Role.spec) checks role management: each role setter can update its own parameter, and only the matching role can change role assignments, fees, tick spacing or claim fees.
-- [`Reverts.spec`](specs/Reverts.spec) checks failure propagation: oracle reverts/zeros, blocking gates, and reverting token transfers or callbacks all make the relevant entry points revert.
+- [`OnlyAuthorizedCanChange.spec`](specs/OnlyAuthorizedCanChange.spec) checks that an unauthorized caller cannot change a user's credit or debt (outside `liquidate` and `updatePosition`), collateral (outside `liquidate`), `consumed` (outside `take`), or `isAuthorized` entry.
+  It also checks that `take` requires the caller to be the taker or authorized by them, and that `setIsAuthorized` changes only the targeted pair.
+- [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
+- [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
+  The role setter and only the role setter can reassign each role.
+  The fee setter can set market and default trading and continuous fees, and once a market is created only the fee setter can change the fees.
+  The tick-spacing setter and only the tick-spacing setter can set a market's tick spacing.
+  The fee claimer and only the fee claimer can claim trading and continuous fees.
+- [`Reverts.spec`](specs/Reverts.spec) checks that functions properly revert on failures.
+  A reverting or zero-returning collateral oracle blocks `liquidate`, `withdrawCollateral`, `isHealthy` and `take` whenever the borrower has debt.
+  The liquidator (resp. enter) gate blocks liquidation (resp. credit increase and debt increase).
+  A reverting `transfer`/`transferFrom` or callback (including a wrong return value) makes the calling entry point revert.
 
 ## Token value safety
 
 Value cannot leak to unauthorized parties.
 
-- [`Solvency.spec`](specs/Solvency.spec) checks that the contract balance always covers collateral + withdrawable + claimable fees minus outstanding flash loans, and that flash loans are repaid by the end of the transaction.
-- [`OnlyExplicitPayerCanLoseTokens.spec`](specs/OnlyExplicitPayerCanLoseTokens.spec) checks that tokens can only be pulled from an explicit payer — the caller, or a callback that returned the success value — never an arbitrary account.
+- [`Solvency.spec`](specs/Solvency.spec) checks the central solvency invariant: for every token, the contract's balance always covers the sum of collateral, withdrawable and claimable trading fees.
+- [`OnlyExplicitPayerCanLoseTokens.spec`](specs/OnlyExplicitPayerCanLoseTokens.spec) checks that tokens are only ever pulled from an explicit payer.
+  In `take`, the payer can only be the `buyerCallback` if it is passed, otherwise it is either the maker for a buy offer, or `msg.sender` for a sell offer.
+  In every other entry point, the payer is `msg.sender` or the corresponding callback.
 
 ## Collateral bitmap
 
-The per-borrower collateral bitmap is consistent and bounded.
+The collateral bitmap is an optimization: no functional changes compared to the naive algorithm looping over all collaterals.
 
-- [`CollateralBitmap.spec`](specs/CollateralBitmap.spec) checks that a collateral bit is set exactly when collateral exists at that index, bounds the number of activated collaterals, and proves the bitmap-optimized `isHealthy` matches the bitmap-less one.
-- [`Bitmap.spec`](specs/Bitmap.spec) checks the low-level 128-bit bitmap operations (`setBit`, `clearBit`, `countBits`, `msb`).
+- [`CollateralBitmap.spec`](specs/CollateralBitmap.spec) checks the per-borrower collateral bitmap.
+  A bit is set exactly when there is collateral at that index, and at most `MAX_COLLATERALS_PER_BORROWER` bits are ever set, which bounds the health-check and liquidation loops.
+  It also proves the bitmap-optimized `isHealthy` returns the same value, and reverts no more often, than the bitmap-less implementation.
+- [`Bitmap.spec`](specs/Bitmap.spec) checks the low-level 128-bit bitmap operations underpinning that abstraction: `setBit`/`clearBit` change exactly the targeted bit, `countBits` is at most 128 and positive when a bit is set, and `msb` returns the largest set bit.
 
 ## Fixed-point math
 
-Correctness and safety of the fixed-point primitives the protocol relies on.
+Properties of the fixed-point primitives the protocol relies on.
 
-- [`MulDiv.spec`](specs/MulDiv.spec) checks `mulDivDown`/`mulDivUp` correctness: rounding direction, monotonicity, tight bounds and composition.
-- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds (`lif * lltv <= WAD^2` and `WAD <= maxLif <= 2 * WAD`).
-- [`NoDivisionByZero.spec`](specs/NoDivisionByZero.spec) checks that no reachable protocol path divides by zero.
-- [`NoMultiplicationOverflow.spec`](specs/NoMultiplicationOverflow.spec) checks that the fixed-point multiplications never overflow, given a bounded oracle price.
+- [`MulDiv.spec`](specs/MulDiv.spec) proves the algebra of `mulDivDown`/`mulDivUp` that the other specs assume as axioms: correct rounding direction and tight bounds, monotonicity in each argument, behavior on zero, additivity, the down/up inverse relations, and the argument-below-denominator bound.
+- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds used elsewhere.
+- [`NoDivisionByZero.spec`](specs/NoDivisionByZero.spec) checks that division by zero never occur, except for `liquidate` if the liquidated collateral is not activated or has a price of 0.
+- [`NoMultiplicationOverflow.spec`](specs/NoMultiplicationOverflow.spec) checks that overflows never occur, assuming that the oracles return bounded prices.
 
 # Verification setup
 
 The [`certora/confs`](confs) folder holds one configuration file per verified spec, named to match the spec.
-There are 29: every spec has one except the imported-only [`BitmapSummaries.spec`](specs/BitmapSummaries.spec).
+There are 29 `.conf` files: [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) is only imported.
 Each points `certoraRun` at the spec and the contract under verification — usually [`src/Midnight.sol`](../src/Midnight.sol), sometimes another source contract or a helper wrapper.
 They all share the compiler and prover settings (`solc-0.8.34`, `via_ir`, EVM `osaka`).
 
 The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs link against:
 
-- [`Utils.sol`](helpers/Utils.sol) exposes `UtilsLib` bitmap operations and protocol constants to the specs.
+- [`Utils.sol`](helpers/Utils.sol) exposes `UtilsLib` bitmap operations, hash function and protocol constants to the specs.
 - [`MulDiv.sol`](helpers/MulDiv.sol) exposes `UtilsLib.mulDivDown`/`mulDivUp` for `MulDiv.spec`.
 - [`MidnightWrapper.sol`](helpers/MidnightWrapper.sol) extends `Midnight` with `isHealthyNoBitmap`, the bitmap-less health check used to validate the bitmap optimization.
 - [`FlashLiquidateCallback.sol`](helpers/FlashLiquidateCallback.sol) is a mock flash-loan / repay / liquidate callback used to model those callbacks.
@@ -94,9 +118,11 @@ The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs 
 All specs share a few modeling conventions:
 
 - `multicall` is removed, so each rule reasons about a single entry point.
+  This is sound because `multicall` can only call functions of the current contract.
+  So if all other functions respect an invariant, by induction `multicall` also respects it.
 - `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec).
-- bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) (justified by [`Bitmap.spec`](specs/Bitmap.spec)), which other specs import and which is therefore not verified on its own.
-- ERC20 tokens are assumed well-behaved: no fee-on-transfer, rebasing, blacklisting or transfer limits.
+- bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
+- ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
 - unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
 
 # Getting started
