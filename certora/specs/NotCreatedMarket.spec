@@ -9,8 +9,8 @@ methods {
     function continuousFee(bytes32) external returns (uint32) envfree;
     function creditOf(bytes32, address) external returns (uint256) envfree;
     function debtOf(bytes32, address) external returns (uint256) envfree;
-    function pendingFee(bytes32, address) external returns (uint128) envfree;
-    function lastAccrual(bytes32, address) external returns (uint128) envfree;
+    function pendingFee(bytes32, address) external returns (uint256) envfree;
+    function lastAccrual(bytes32, address) external returns (uint256) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
     // Over-approximate view functions.

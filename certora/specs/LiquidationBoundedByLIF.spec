@@ -7,7 +7,7 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint256) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.

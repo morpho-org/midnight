@@ -10,8 +10,8 @@ methods {
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function pendingFee(bytes32 id, address user) external returns (uint256) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint256) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
@@ -101,9 +101,9 @@ rule marketLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldat
 
 rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, env e, calldataarg args) {
     requireInvariant lastLossFactorLeqMarketLossFactor(id, user);
-    uint128 lastLossFactorBefore = lastLossFactor(id, user);
+    uint256 lastLossFactorBefore = lastLossFactor(id, user);
     f(e, args);
-    uint128 lastLossFactorAfter = lastLossFactor(id, user);
+    uint256 lastLossFactorAfter = lastLossFactor(id, user);
     assert lastLossFactorAfter >= lastLossFactorBefore;
 }
 

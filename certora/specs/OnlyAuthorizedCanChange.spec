@@ -6,7 +6,7 @@ methods {
     function toId(Midnight.Market market) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint256) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
