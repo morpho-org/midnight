@@ -64,19 +64,19 @@ rule claimDecreasesClaimableSettlementFee(env e, address token, uint256 amount, 
     assert claimableSettlementFee(token) == before - amount;
 }
 
-rule takeIncreasesClaimableSettlementFee(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData, address anyToken) {
+rule takeIncreasesClaimableSettlementFee(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, address anyToken) {
     uint256 before = claimableSettlementFee(anyToken);
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     // We know that buyerAssets - sellerAssets >= 0, see rule settlementFeeSpreadBounds.
     assert anyToken == offer.market.loanToken => claimableSettlementFee(anyToken) == before + buyerAssets - sellerAssets;
     assert anyToken != offer.market.loanToken => claimableSettlementFee(anyToken) == before;
 }
 
-rule claimableSettlementFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector && f.selector != sig:claimSettlementFee(address, uint256, address).selector } {
+rule claimableSettlementFeeUnchanged(method f, env e, calldataarg args, address token) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:claimSettlementFee(address, uint256, address).selector } {
     uint256 before = claimableSettlementFee(token);
     f(e, args);
     assert claimableSettlementFee(token) == before;

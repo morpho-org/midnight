@@ -58,7 +58,7 @@ invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes data) with (env e) {
             requireInvariant defaultSettlementFeePerIndexBound(market.loanToken, index);
         }
-        preserved take(Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) with (env e) {
             requireInvariant defaultSettlementFeePerIndexBound(offer.market.loanToken, index);
         }
     }

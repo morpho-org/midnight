@@ -18,7 +18,7 @@ methods {
 }
 
 ///  Only setConsumed and take can modify the consumed mapping.
-rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint256, address).selector && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
+rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint256, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     uint256 consumedBefore = consumed(user, group);
 
     f(e, args);
@@ -37,10 +37,10 @@ rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint256 amount, addres
 }
 
 /// Calling take only affects the maker's consumed value for the offer's group. No other (user, group) pair is modified.
-rule takeOnlyAffectsMakerConsumed(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, address user, bytes32 group) {
+rule takeOnlyAffectsMakerConsumed(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user, bytes32 group) {
     uint256 consumedBefore = consumed(user, group);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     // Any pair that is not exactly (offer.maker, offer.group) must be unchanged.
     assert (user != offer.maker || group != offer.group) => consumed(user, group) == consumedBefore;
@@ -56,55 +56,55 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
 }
 
 /// After a successful take, consumed[offer.maker][offer.group] does not exceed the effective max.
-rule takeConsumedBoundedByMax(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+rule takeConsumedBoundedByMax(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert offer.maxAssets > 0 => consumed(offer.maker, offer.group) <= offer.maxAssets;
     assert offer.maxAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
 /// After a successful take in units mode, the change in consumed equals the units taken.
-rule takeConsumedDelta(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeConsumedDelta(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert consumed(offer.maker, offer.group) == consumedBefore + units;
 }
 
 /// If consumed[offer.maker][offer.group] is already at or above maxUnits before a take in units mode, it remains unchanged.
-rule takeConsumedAtMaxUnchangedUnits(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeConsumedAtMaxUnchangedUnits(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert consumedBefore >= offer.maxUnits => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
 /// If consumed is already at or above maxAssets before a take in assets mode, it remains unchanged.
-rule takeConsumedAtMaxUnchangedAssets(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeConsumedAtMaxUnchangedAssets(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxUnits == 0;
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert consumedBefore >= offer.maxAssets => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
 /// A fully-consumed offer in units mode only allows no-op takes.
-rule fullyConsumedOfferRevertsOnNonTrivialTake(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule fullyConsumedOfferRevertsOnNonTrivialTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 
     uint256 consumedBefore = consumed(offer.maker, offer.group);
 
     require offer.maxUnits > 0 && consumedBefore >= offer.maxUnits, "assume the offer is fully consumed";
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     // If take does not revert, its input has to be zero.
     assert units == 0;
