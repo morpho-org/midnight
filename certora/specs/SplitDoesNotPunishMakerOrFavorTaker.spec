@@ -90,7 +90,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     // Path 1: take the full amount A.
     uint256 buyerAssetsA;
     uint256 sellerAssetsA;
-    buyerAssetsA, sellerAssetsA = take(e, offer, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    buyerAssetsA, sellerAssetsA = take(e, offer, ratifierData, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     // Maker's offer cap consumed after path 1.
     uint256 consumedAfterA = currentContract.consumed[offer.maker][offer.group];
@@ -101,11 +101,11 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     // Path 2: take B then C from the initial state.
     uint256 buyerAssetsB;
     uint256 sellerAssetsB;
-    buyerAssetsB, sellerAssetsB = take(e, offer, unitsB, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData) at initState;
+    buyerAssetsB, sellerAssetsB = take(e, offer, ratifierData, unitsB, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData) at initState;
 
     uint256 buyerAssetsC;
     uint256 sellerAssetsC;
-    buyerAssetsC, sellerAssetsC = take(e, offer, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    buyerAssetsC, sellerAssetsC = take(e, offer, ratifierData, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     // Maker's offer cap consumed after path 2.
     uint256 consumedAfterBC = currentContract.consumed[offer.maker][offer.group];
