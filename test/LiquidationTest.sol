@@ -831,7 +831,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.creditOf(id, borrower), 0, "no credit before");
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        uint128 oblLossFactor = midnight.lossFactor(id);
+        uint256 oblLossFactor = midnight.lossFactor(id);
         assertGt(oblLossFactor, midnight.lastLossFactor(id, borrower), "last loss factor stale before");
 
         midnight.updatePosition(market, borrower);
@@ -852,7 +852,7 @@ contract LiquidationTest is BaseTest {
         uint256 creditBeforeSlash = midnight.creditOf(id, lender);
         midnight.updatePosition(market, lender);
         uint256 creditAfterFirstSlash = midnight.creditOf(id, lender);
-        uint128 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
+        uint256 lastLossFactorAfterFirstSlash = midnight.lastLossFactor(id, lender);
         assertLt(creditAfterFirstSlash, creditBeforeSlash, "first slash reduced credit");
 
         midnight.updatePosition(market, lender);
@@ -873,7 +873,7 @@ contract LiquidationTest is BaseTest {
 
         assertEq(midnight.debtOf(id, borrower), 0, "debt");
         assertEq(midnight.totalUnits(id), 0, "total units");
-        uint128 _lossFactor = midnight.lossFactor(id);
+        uint256 _lossFactor = midnight.lossFactor(id);
         assertEq(_lossFactor, type(uint128).max, "loss factor");
         midnight.updatePosition(market, lender);
         assertEq(midnight.creditOf(id, lender), 0, "credit after slashing");
@@ -892,7 +892,7 @@ contract LiquidationTest is BaseTest {
     /// @dev Bad debt as computed in liquidate
     function _badDebt() internal view returns (uint256) {
         uint256 badDebt = midnight.debtOf(id, borrower);
-        uint128 collateralBitmap = midnight.collateralBitmap(id, borrower);
+        uint128 collateralBitmap = midnight.collateralBitmap(id, borrower).toUint128();
         while (collateralBitmap != 0) {
             uint256 i = UtilsLib.msb(collateralBitmap);
             CollateralParams memory _collateral = market.collateralParams[i];

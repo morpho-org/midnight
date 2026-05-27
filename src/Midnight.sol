@@ -852,15 +852,15 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
+    function lastLossFactor(bytes32 id, address user) external view returns (uint256) {
         return position[id][user].lastLossFactor;
     }
 
-    function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
+    function collateralBitmap(bytes32 id, address user) external view returns (uint256) {
         return position[id][user].collateralBitmap;
     }
 
-    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
+    function collateral(bytes32 id, address user, uint256 index) external view returns (uint256) {
         return position[id][user].collateral[index];
     }
 
@@ -888,7 +888,7 @@ contract Midnight is IMidnight {
         return marketState[id].totalUnits;
     }
 
-    function lossFactor(bytes32 id) external view returns (uint128) {
+    function lossFactor(bytes32 id) external view returns (uint256) {
         return marketState[id].lossFactor;
     }
 
@@ -922,11 +922,11 @@ contract Midnight is IMidnight {
         return marketState[id].continuousFeeCredit;
     }
 
-    function pendingFee(bytes32 id, address user) external view returns (uint128) {
+    function pendingFee(bytes32 id, address user) external view returns (uint256) {
         return position[id][user].pendingFee;
     }
 
-    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
+    function lastAccrual(bytes32 id, address user) external view returns (uint256) {
         return position[id][user].lastAccrual;
     }
 
