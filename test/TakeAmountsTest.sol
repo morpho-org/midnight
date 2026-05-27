@@ -54,18 +54,21 @@ contract TakeAmountsTest is BaseTest {
         createBadDebt(market); // to create non trivial lossFactor.
     }
 
-    function _setTradingFees(uint256 tradingFee0, uint256 tradingFee1) internal returns (uint256 tradingFee) {
-        tradingFee0 = bound(tradingFee0, 0, maxTradingFee(0)) / 1e12 * 1e12;
-        tradingFee1 = bound(tradingFee1, 0, maxTradingFee(1)) / 1e12 * 1e12;
+    function _setSettlementFees(uint256 settlementFee0, uint256 settlementFee1)
+        internal
+        returns (uint256 settlementFee)
+    {
+        settlementFee0 = bound(settlementFee0, 0, maxSettlementFee(0)) / 1e12 * 1e12;
+        settlementFee1 = bound(settlementFee1, 0, maxSettlementFee(1)) / 1e12 * 1e12;
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 0, tradingFee0);
-        midnight.setMarketTradingFee(id, 1, tradingFee1);
-        tradingFee = midnight.tradingFee(id, market.maturity - block.timestamp);
+        midnight.setMarketSettlementFee(id, 0, settlementFee0);
+        midnight.setMarketSettlementFee(id, 1, settlementFee1);
+        settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
     }
 
-    /// @dev Returns the highest tick such that tickToPrice(tick) + tradingFee <= WAD.
-    function _maxTick(uint256 tradingFee) internal pure returns (uint256) {
-        uint256 maxPrice = WAD - tradingFee;
+    /// @dev Returns the highest tick such that tickToPrice(tick) + settlementFee <= WAD.
+    function _maxTick(uint256 settlementFee) internal pure returns (uint256) {
+        uint256 maxPrice = WAD - settlementFee;
         uint256 t = TickLib.priceToTick(maxPrice, 1);
         return TickLib.tickToPrice(t) > maxPrice ? t - 1 : t;
     }
@@ -88,12 +91,12 @@ contract TakeAmountsTest is BaseTest {
     function testBuyerAssetsToUnitsBuyerIsLender(
         uint256 targetBuyerAssets,
         uint256 tick,
-        uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 settlementFee0,
+        uint256 settlementFee1
     ) public {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.buyerAssetsToUnits(address(midnight), id, offer, targetBuyerAssets);
@@ -110,12 +113,12 @@ contract TakeAmountsTest is BaseTest {
     function testSellerAssetsToUnitsBuyerIsLender(
         uint256 targetSellerAssets,
         uint256 tick,
-        uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 settlementFee0,
+        uint256 settlementFee1
     ) public {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         offer.tick = tick;
         uint256 units = TakeAmountsLib.sellerAssetsToUnits(address(midnight), id, offer, targetSellerAssets);
@@ -134,12 +137,12 @@ contract TakeAmountsTest is BaseTest {
     function testBuyerAssetsToUnitsBuyerIsBorrower(
         uint256 targetBuyerAssets,
         uint256 tick,
-        uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 settlementFee0,
+        uint256 settlementFee1
     ) public {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         _createPosition(1e36);
 
@@ -157,12 +160,12 @@ contract TakeAmountsTest is BaseTest {
     function testSellerAssetsToUnitsBuyerIsBorrower(
         uint256 targetSellerAssets,
         uint256 tick,
-        uint256 tradingFee0,
-        uint256 tradingFee1
+        uint256 settlementFee0,
+        uint256 settlementFee1
     ) public {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
-        tick = bound(tick, 4, _maxTick(tradingFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
+        tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
         _createPosition(1e36);
 
@@ -179,13 +182,15 @@ contract TakeAmountsTest is BaseTest {
 
     // buyerPrice >= WAD: not all buyerAssets are reachable, but snapped values are.
 
-    function testSnappedBuyerAssetsBuyerIsLender(uint256 targetBuyerAssets, uint256 tradingFee0, uint256 tradingFee1)
-        public
-    {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+    function testSnappedBuyerAssetsBuyerIsLender(
+        uint256 targetBuyerAssets,
+        uint256 settlementFee0,
+        uint256 settlementFee1
+    ) public {
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
-        uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
+        uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + settlementFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
 
         deal(address(loanToken), lender, type(uint256).max);
@@ -199,15 +204,17 @@ contract TakeAmountsTest is BaseTest {
         assertEq(buyerAssets, targetBuyerAssets.mulDivUp(WAD, buyerPrice).mulDivUp(buyerPrice, WAD), "e2e buyerAssets");
     }
 
-    function testSnappedBuyerAssetsBuyerIsBorrower(uint256 targetBuyerAssets, uint256 tradingFee0, uint256 tradingFee1)
-        public
-    {
-        uint256 tradingFee = _setTradingFees(tradingFee0, tradingFee1);
+    function testSnappedBuyerAssetsBuyerIsBorrower(
+        uint256 targetBuyerAssets,
+        uint256 settlementFee0,
+        uint256 settlementFee1
+    ) public {
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
         _createPosition(1e36);
 
-        uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + tradingFee;
+        uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + settlementFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);
 
         deal(address(loanToken), borrower, type(uint256).max);

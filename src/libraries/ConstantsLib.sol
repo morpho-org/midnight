@@ -8,13 +8,13 @@ import {UtilsLib} from "./UtilsLib.sol";
 uint256 constant WAD = 1e18;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
 uint256 constant CBP = 1e12;
-uint256 constant MAX_TRADING_FEE_0_DAYS = 0.000014e18;
-uint256 constant MAX_TRADING_FEE_1_DAY = 0.000014e18;
-uint256 constant MAX_TRADING_FEE_7_DAYS = 0.000098e18;
-uint256 constant MAX_TRADING_FEE_30_DAYS = 0.000417e18;
-uint256 constant MAX_TRADING_FEE_90_DAYS = 0.00125e18;
-uint256 constant MAX_TRADING_FEE_180_DAYS = 0.0025e18;
-uint256 constant MAX_TRADING_FEE_360_DAYS = 0.005e18;
+uint256 constant MAX_SETTLEMENT_FEE_0_DAYS = 0.000014e18;
+uint256 constant MAX_SETTLEMENT_FEE_1_DAY = 0.000014e18;
+uint256 constant MAX_SETTLEMENT_FEE_7_DAYS = 0.000098e18;
+uint256 constant MAX_SETTLEMENT_FEE_30_DAYS = 0.000417e18;
+uint256 constant MAX_SETTLEMENT_FEE_90_DAYS = 0.00125e18;
+uint256 constant MAX_SETTLEMENT_FEE_180_DAYS = 0.0025e18;
+uint256 constant MAX_SETTLEMENT_FEE_360_DAYS = 0.005e18;
 uint32 constant MAX_CONTINUOUS_FEE = uint32(uint256(0.01e18) / uint256(365 days));
 uint256 constant TIME_TO_MAX_LIF = 15 minutes;
 uint256 constant MAX_COLLATERALS = 128;
@@ -41,9 +41,9 @@ function isLltvAllowed(uint256 lltv) pure returns (bool) {
     return lltv == LLTV_0 || lltv == LLTV_1 || lltv == LLTV_2 || lltv == LLTV_3 || lltv == LLTV_4 || lltv == LLTV_5 || lltv == LLTV_6 || lltv == LLTV_7 || lltv == LLTV_8;
 }
 
-/// @dev Returns the max trading fee for the given index.
-function maxTradingFee(uint256 index) pure returns (uint256) {
-    return [MAX_TRADING_FEE_0_DAYS, MAX_TRADING_FEE_1_DAY, MAX_TRADING_FEE_7_DAYS, MAX_TRADING_FEE_30_DAYS, MAX_TRADING_FEE_90_DAYS, MAX_TRADING_FEE_180_DAYS, MAX_TRADING_FEE_360_DAYS][index];
+/// @dev Returns the max settlement fee for the given index.
+function maxSettlementFee(uint256 index) pure returns (uint256) {
+    return [MAX_SETTLEMENT_FEE_0_DAYS, MAX_SETTLEMENT_FEE_1_DAY, MAX_SETTLEMENT_FEE_7_DAYS, MAX_SETTLEMENT_FEE_30_DAYS, MAX_SETTLEMENT_FEE_90_DAYS, MAX_SETTLEMENT_FEE_180_DAYS, MAX_SETTLEMENT_FEE_360_DAYS][index];
 }
 
 /// @dev Returns the max LIF for the given lltv and cursor.
