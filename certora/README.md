@@ -1,16 +1,15 @@
 This folder contains the verification of the Midnight protocol using CVL, Certora's Verification Language.
 
-Midnight is a fixed-rate, peer-to-peer lending protocol based on zero-coupon obligations (fixed-term debt redeemable at maturity); see the repository [`README`](../README.md) and [`src/Midnight.sol`](../src/Midnight.sol) for the protocol itself. The verification is described below theme by theme, grouped together with the folder and file structure.
+Midnight is a fixed-rate lending protocol, see the repository [`README`](../README.md) and [`src/Midnight.sol`](../src/Midnight.sol) for the protocol itself.
+The verified properties are listed below by theme, followed by the verification setup.
 
 # Verified properties
-
-Each `.spec` file is a set of CVL rules and invariants. They share a few modeling conventions: `multicall` is removed so each rule reasons about a single entry point; `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec); ERC20 tokens are assumed well-behaved (no fee-on-transfer, rebasing, blacklisting or transfer limits); and, unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
 
 ## Core state and invariants
 
 Global invariants on positions, markets and accounting.
 
-- [`Midnight.spec`](specs/Midnight.spec) checks core invariants: `take`/`liquidate` input-output consistency, monotonic loss factors, that a user never has both credit and debt, and that there is no continuous fee without credit.
+- [`Midnight.spec`](specs/Midnight.spec) checks core invariants: `take`/`liquidate` input-output consistency, monotonicity of the loss factor, that a user never has both credit and debt, and that there is no continuous fee without credit.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) checks the exact credit/debt/collateral effect of each entry point, and that the other functions leave them unchanged.
 - [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the invariants of a created market (non-empty sorted collaterals, valid LLTV tier and `maxLif`) and that markets are created on first interaction and never deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks that every state field of a non-created market is empty.
@@ -65,22 +64,24 @@ The per-borrower collateral bitmap is consistent and bounded.
 
 - [`CollateralBitmap.spec`](specs/CollateralBitmap.spec) checks that a collateral bit is set exactly when collateral exists at that index, bounds the number of activated collaterals, and proves the bitmap-optimized `isHealthy` matches the bitmap-less one.
 - [`Bitmap.spec`](specs/Bitmap.spec) checks the low-level 128-bit bitmap operations (`setBit`, `clearBit`, `countBits`, `msb`).
-- [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) provides the bitmap ghost summaries (justified by `Bitmap.spec`) that other specs import; it has no conf of its own.
 
 ## Fixed-point math
 
 Correctness and safety of the fixed-point primitives the protocol relies on.
 
-- [`MulDiv.spec`](specs/MulDiv.spec) checks `mulDivDown`/`mulDivUp` correctness — rounding direction, monotonicity, tight bounds and composition — i.e. the axioms summarized in the other specs.
-- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds (`lif * lltv <= WAD^2`, `WAD <= maxLif <= 2 * WAD`) relied on elsewhere.
+- [`MulDiv.spec`](specs/MulDiv.spec) checks `mulDivDown`/`mulDivUp` correctness: rounding direction, monotonicity, tight bounds and composition.
+- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds (`lif * lltv <= WAD^2` and `WAD <= maxLif <= 2 * WAD`).
 - [`NoDivisionByZero.spec`](specs/NoDivisionByZero.spec) checks that no reachable protocol path divides by zero.
 - [`NoMultiplicationOverflow.spec`](specs/NoMultiplicationOverflow.spec) checks that the fixed-point multiplications never overflow, given a bounded oracle price.
 
-# `certora/confs`
+# Verification setup
 
-One configuration file per verified spec (29 confs, named to match the specs). Each points `certoraRun` at the spec and the contract under verification — usually [`src/Midnight.sol`](../src/Midnight.sol), sometimes another source contract or a helper wrapper (`MidnightWrapper.sol`, `Utils.sol`, `MulDiv.sol`) — together with the shared compiler and prover settings (`solc-0.8.34`, `via_ir`, EVM `osaka`). `BitmapSummaries.spec` has no conf, as it is only imported by other specs.
+The [`certora/confs`](confs) folder holds one configuration file per verified spec, named to match the spec.
+There are 29: every spec has one except the imported-only [`BitmapSummaries.spec`](specs/BitmapSummaries.spec).
+Each points `certoraRun` at the spec and the contract under verification — usually [`src/Midnight.sol`](../src/Midnight.sol), sometimes another source contract or a helper wrapper.
+They all share the compiler and prover settings (`solc-0.8.34`, `via_ir`, EVM `osaka`).
 
-# `certora/helpers`
+The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs link against:
 
 - [`Utils.sol`](helpers/Utils.sol) exposes `UtilsLib` bitmap operations and protocol constants to the specs.
 - [`MulDiv.sol`](helpers/MulDiv.sol) exposes `UtilsLib.mulDivDown`/`mulDivUp` for `MulDiv.spec`.
@@ -88,16 +89,24 @@ One configuration file per verified spec (29 confs, named to match the specs). E
 - [`FlashLiquidateCallback.sol`](helpers/FlashLiquidateCallback.sol) is a mock flash-loan / repay / liquidate callback used to model those callbacks.
 - [`Havoc.sol`](helpers/Havoc.sol) is a minimal contract whose `havocAll()` lets a callback havoc all state, modeling arbitrary re-entrant behavior.
 
+## Modeling conventions
+
+All specs share a few modeling conventions:
+
+- `multicall` is removed, so each rule reasons about a single entry point.
+- `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec).
+- bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) (justified by [`Bitmap.spec`](specs/Bitmap.spec)), which other specs import and which is therefore not verified on its own.
+- ERC20 tokens are assumed well-behaved: no fee-on-transfer, rebasing, blacklisting or transfer limits.
+- unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
+
 # Getting started
 
 Install the `certora-cli` package with `pip install certora-cli`.
 To verify a spec, pass its configuration file in the [`certora/confs`](confs) folder to `certoraRun`.
-It requires having set the `CERTORAKEY` environment variable to a valid Certora key.
+It requires having set the `CERTORAKEY` environment variable to a valid Certora key, and to have `solc-0.8.34` in the PATH.
 You can also pass additional arguments, notably to verify a specific rule.
 For example, at the root of the repository:
 
 ```
 certoraRun certora/confs/Healthiness.conf --rule stayHealthy
 ```
-
-All configurations also run in CI via [`.github/workflows/certora.yml`](../.github/workflows/certora.yml), as a matrix over `certora/confs/*.conf` using `solc-0.8.34`.
