@@ -19,6 +19,18 @@ contract TickLibTest is BaseTest {
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
+    function expR(int256 r) internal pure returns (int256) {
+        int256 secondTerm = r * r / (2 * 1e18);
+        int256 thirdTerm = secondTerm * r / (3 * 1e18);
+        return 1e18 + r + secondTerm + thirdTerm;
+    }
+
+    function testWExpOffsetProperty() public pure {
+        int256 ln2 = 0.693147180559945309e18;
+        int256 offset = 0.32261121498945987e18;
+        assertEq(2 * expR(-offset), expR(ln2 - offset - 1));
+    }
+
     function testTickMonotonicity() public pure {
         for (uint256 i = 0; i < MAX_TICK; i++) {
             assertGe(TickLib.tickToPrice(i + 1), TickLib.tickToPrice(i));

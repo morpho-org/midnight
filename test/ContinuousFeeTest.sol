@@ -260,6 +260,8 @@ contract ContinuousFeeTest is BaseTest {
         // Lender exits via take (lender is seller, otherLender is buyer)
         deal(address(loanToken), otherLender, exitAmount);
 
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        uint256 takeAssets = exitAmount.mulDivDown(price, WAD);
         uint256 buyerPendingFeeIncrease = exitAmount.mulDivDown(feeRate * (ttm - elapsed), WAD);
         uint256 sellerPendingFeeDecrease =
             creditAfterAccrual > 0 ? remainingAfterAccrual.mulDivUp(exitAmount, creditAfterAccrual) : 0;
@@ -271,6 +273,25 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.UpdatePosition(
             id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
+        );
+        vm.expectEmit();
+        emit EventsLib.Take(
+            lender,
+            id,
+            exitAmount,
+            lender,
+            otherLender,
+            true,
+            keccak256("lender-exit"),
+            takeAssets,
+            takeAssets,
+            exitAmount,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            exitAmount,
+            exitAmount,
+            lender,
+            otherLender
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 

@@ -84,7 +84,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same max values and loan token.
+/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
+/// loan token.
 ///
 /// OFFER CAPS
 /// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
@@ -330,12 +331,12 @@ contract Midnight is IMidnight {
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
         Offer memory offer,
+        bytes memory ratifierData,
         uint256 units,
         address taker,
         address receiverIfTakerIsSeller,
         address takerCallback,
-        bytes memory takerCallbackData,
-        bytes memory ratifierData
+        bytes memory takerCallbackData
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchMarket(offer.market);
@@ -738,7 +739,7 @@ contract Midnight is IMidnight {
             SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
         }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, msg.sender, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(msg.sender, tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         for (uint256 i = 0; i < tokens.length; i++) {
