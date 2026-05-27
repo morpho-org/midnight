@@ -5,7 +5,6 @@ It is organized around isolated, immutable, permissionlessly created market with
 Lending and borrowing are implemented through the trading of credit and debt units, which behave like zero-coupon obligations settling at the market's maturity.
 Participants trade by posting or consuming offers that do not lock capital and source liquidity only at settlement, allowing makers to quote across multiple markets at once.
 Markets can range from single to multi-collateral configurations, and gates can be used to implement access-control policies.
-Health-bounded liquidation and soft post maturity closure limit penalty on borrowers during liquidations while preserving strong lender protections on solvency and recoverability.
 
 ## Whitepaper
 
