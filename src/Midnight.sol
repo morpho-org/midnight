@@ -651,7 +651,7 @@ contract Midnight is IMidnight {
 
             if (!healthyPath) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
-                // Note that debt >= maxDebt in this branch.
+                // Note that debt > maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
                     : type(uint256).max;
