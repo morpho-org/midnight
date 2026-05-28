@@ -15,7 +15,7 @@ Global invariants on positions, markets and accounting.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable trading fee by exactly the buyer/seller spread.
   It also shows that neither credit nor debt can grow once a market's loss factor is maxed out.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
-- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an LLTV `<= WAD` from an allowed tier and an allowed `maxLif`.
+- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an `LLTV <= WAD` from an allowed tier and an allowed `maxLif`.
   Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
 - [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
@@ -26,7 +26,7 @@ Global invariants on positions, markets and accounting.
 
 Healthy positions stay healthy, and liquidations only touch liquidatable positions within the incentive bound.
 
-- [`Healthiness.spec`](specs/Healthiness.spec) checks that no action can turn a healthy borrower unhealthy.
+- [`Healthiness.spec`](specs/Healthiness.spec) checks that no action (except oracle update) can turn a healthy borrower unhealthy.
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable, either using the unhealthy path or using the healthy path sufficiently long after maturity.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
@@ -71,7 +71,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
   The liquidator (resp. enter) gate blocks liquidation (resp. credit increase and debt increase).
   A reverting `transfer`/`transferFrom` or callback (including a wrong return value) makes the calling entry point revert.
 
-## Token value safety
+## Token transfers
 
 Value cannot leak to unauthorized parties.
 
