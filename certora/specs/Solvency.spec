@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function claimableTradingFee(address token) external returns (uint256) envfree;
+    function claimableSettlementFee(address token) external returns (uint256) envfree;
 
     // Summarize mulDivUp and mulDivDown by ghost functions. This is for performance of the prover.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
@@ -17,7 +17,7 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
     // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
@@ -51,7 +51,7 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
     
-        // Settle pending trading fee receipts only on the exact fee transfer expected by take().
+        // Settle pending settlement fee receipts only on the exact fee transfer expected by take().
         if (dest == currentContract && pendingFeeReceipt[token] == to_mathint(value)) {
             pendingFeeReceipt[token] = 0;
         }
@@ -137,14 +137,14 @@ hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (ui
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
-// Trading fee receipts pending settlement: claimableTradingFee is incremented in take before
+// Settlement fee receipts pending settlement: claimableSettlementFee is incremented in take before
 // the inbound fee transfer happens, so we track the gap and clear it in CVL_transferFrom.
 persistent ghost mapping(address => mathint) pendingFeeReceipt {
     init_state axiom (forall address token. pendingFeeReceipt[token] == 0);
 }
 
-hook Sstore claimableTradingFee[KEY address token] uint256 newVal (uint256 oldVal) {
-    // Except for claimTradingFee, the claimableTradingFee is non-decreasing, see WithdrawableMonotonicity.spec.
+hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 oldVal) {
+    // Except for claimSettlementFee, the claimableSettlementFee is non-decreasing, see WithdrawableMonotonicity.spec.
     if (newVal > oldVal) {
         pendingFeeReceipt[token] = pendingFeeReceipt[token] + newVal - oldVal;
     }
@@ -152,15 +152,15 @@ hook Sstore claimableTradingFee[KEY address token] uint256 newVal (uint256 oldVa
 
 /// INVARIANTS AND RULES ///
 
-// For any token, the pending trading fee receipt after a transaction is 0: every claimableTradingFee
+// For any token, the pending settlement fee receipt after a transaction is 0: every claimableSettlementFee
 // increment in take is paid back in by the same-function inbound transfer.
 weak invariant pendingFeeReceiptZero(address token)
     pendingFeeReceipt[token] == 0;
 
-// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable trading fee amounts for that token minus the flash loaned amount.
+// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token minus the flash loaned amount.
 // Note: this invariant is strong, so it also holds before each external call.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableTradingFee(token) - flashloans[token] - pendingFeeReceipt[token]
+    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token) - flashloans[token] - pendingFeeReceipt[token]
     {
         preserved with (env e) {
             requireInvariant pendingFeeReceiptZero(token);
@@ -169,8 +169,8 @@ strong invariant tokenBalanceCorrect(address token)
         preserved take(Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) with (env e) {
             requireInvariant pendingFeeReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
-            require taker != currentContract, "no trading with contract";
-            require offer.maker != currentContract, "no trading with contract";
+            require taker != currentContract, "no settlement with contract";
+            require offer.maker != currentContract, "no settlement with contract";
             require offer.callback != currentContract, "midnight reverts on callbacks";
             require takerCallback != currentContract, "midnight reverts on callbacks";
         }

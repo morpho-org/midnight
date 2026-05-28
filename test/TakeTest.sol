@@ -30,7 +30,7 @@ contract TakeTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -60,7 +60,7 @@ contract TakeTest is BaseTest {
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = market;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         otherLenderOffer.buy = false;
@@ -69,7 +69,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.market = market;
-        otherLenderOffer.expiry = block.timestamp + 200;
+        otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
 
         borrowerOffer.buy = false;
@@ -78,7 +78,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.market = market;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
 
         otherBorrowerOffer.buy = true;
@@ -86,7 +86,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.market = market;
-        otherBorrowerOffer.expiry = block.timestamp + 200;
+        otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
     }
 
@@ -718,7 +718,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeOfferNotStarted(uint256 start) public {
-        start = bound(start, block.timestamp + 1, type(uint256).max);
+        start = bound(start, vm.getBlockTimestamp() + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
         vm.expectRevert(IMidnight.OfferNotStarted.selector);
@@ -1028,7 +1028,7 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
         assertEq(
             BorrowCallback(borrowerOffer.callback).recordedPendingFeeDecrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeDecrease"
         );
     }
@@ -1063,7 +1063,7 @@ contract TakeTest is BaseTest {
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral, data));
         assertEq(
             BorrowCallback(callback).recordedPendingFeeDecrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeDecrease"
         );
     }
@@ -1166,7 +1166,7 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(lenderOffer.callback).recordedData(), lenderOffer.callbackData);
         assertEq(
             LendCallback(lenderOffer.callback).recordedPendingFeeIncrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeIncrease"
         );
     }
@@ -1193,22 +1193,22 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedData(), data);
         assertEq(
             LendCallback(callback).recordedPendingFeeIncrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeIncrease"
         );
     }
 
     // Summary of zero price tests:
     //
-    // Trading at 0 succeeds in those cases:
-    // - any offer / unit take input / 0 trading fee.
-    // - sell offer / unit take input / > 0 trading fee.
+    // Settlement at 0 succeeds in those cases:
+    // - any offer / unit take input / 0 settlement fee.
+    // - sell offer / unit take input / > 0 settlement fee.
     //
     // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by underflow when the settlement fee is > 0, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZeroNoTradingFeeSell() public {
+    function testPriceZeroNoSettlementFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1221,9 +1221,9 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZeroWithTradingFeeBuy() public {
+    function testPriceZeroWithSettlementFeeBuy() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
@@ -1233,10 +1233,10 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZeroWithTradingFeeSell() public {
+    function testPriceZeroWithSettlementFeeSell() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
-        uint256 fee = midnight.tradingFee(id, market.maturity - block.timestamp);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
+        uint256 fee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1250,7 +1250,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
 
-    function testTradeWithAddressZero(uint256 units) public {
+    function testTakeWithAddressZero(uint256 units) public {
         units = bound(units, 1, maxAssets);
 
         // address(0) as maker cannot authorize the ratifier
@@ -1260,7 +1260,7 @@ contract TakeTest is BaseTest {
         zeroOffer.ratifier = address(dummyRatifier);
         zeroOffer.maxUnits = units;
         zeroOffer.market = market;
-        zeroOffer.expiry = block.timestamp + 200;
+        zeroOffer.expiry = vm.getBlockTimestamp() + 200;
         zeroOffer.tick = 0; // 0 price so any units transfer 0 assets
 
         // taker = borrower, needs collateral

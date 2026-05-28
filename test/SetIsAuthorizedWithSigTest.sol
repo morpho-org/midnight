@@ -34,7 +34,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
             authorized: authorized,
             isAuthorized: isAuth,
             nonce: ecrecoverAuthorizer.nonce(authorizer),
-            deadline: block.timestamp + 1 days
+            deadline: vm.getBlockTimestamp() + 1 days
         });
     }
 
@@ -98,7 +98,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizerExpired() public {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
-        auth.deadline = block.timestamp - 1;
+        auth.deadline = vm.getBlockTimestamp() - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
         vm.expectRevert(IEcrecoverAuthorizer.Expired.selector);
