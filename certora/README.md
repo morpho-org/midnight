@@ -15,6 +15,8 @@ Global invariants on positions, markets and accounting.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable trading fee by exactly the buyer/seller spread.
   It also shows that neither credit nor debt can grow once a market's loss factor is maxed out.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
+- [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
+  It checks the claimable trading fee the same way: up on `take`, down on `claimTradingFee`, and unchanged otherwise.
 - [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an `LLTV <= WAD` from an allowed tier and an allowed `maxLif`.
   Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
@@ -51,8 +53,6 @@ Continuous-fee accrual and trading-fee rounding stay within their expected bound
 - [`TradingFeeSpread.spec`](specs/TradingFeeSpread.spec) checks that take rounding always favors the maker (a buyer-maker pays at most `floor(units * offerPrice / WAD)`, a seller-maker receives at least the ceil) and that the buyer/seller spread stays between `floor` and `ceil` of `units * fee / WAD`.
 - [`TradingFeeBoundaries.spec`](specs/TradingFeeBoundaries.spec) checks that every default and per-market trading fee stays within its per-index cap.
   A new market inherits its loan token's default fees, only the fee setter can change them, and the fee for any time-to-maturity is enclosed by its two adjacent breakpoint values.
-- [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
-  It checks the claimable trading fee the same way: up on `take`, down on `claimTradingFee`, and unchanged otherwise.
 
 ## Authorization, roles and reverts
 
@@ -99,25 +99,6 @@ Properties of the fixed-point primitives the protocol relies on.
 - [`NoMultiplicationOverflow.spec`](specs/NoMultiplicationOverflow.spec) checks that overflows never occur, assuming that the oracles return bounded prices.
 
 # Verification setup
-
-## Configuration files
-
-The [`certora/confs`](confs) folder holds one configuration file per verified spec, named to match the spec.
-There are 29 `.conf` files: [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) is only imported.
-Each points `certoraRun` at the spec and the contract under verification, which is usually [`src/Midnight.sol`](../src/Midnight.sol) but sometimes another source contract or a helper wrapper.
-They all share the compiler and prover settings (`solc-0.8.34`, `via_ir`, EVM `osaka`).
-
-## Helper files
-
-The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs link against:
-
-- [`Utils.sol`](helpers/Utils.sol) exposes `UtilsLib` bitmap operations, hash function and protocol constants to the specs.
-- [`MulDiv.sol`](helpers/MulDiv.sol) exposes `UtilsLib.mulDivDown`/`mulDivUp` for `MulDiv.spec`.
-- [`MidnightWrapper.sol`](helpers/MidnightWrapper.sol) extends `Midnight` with `isHealthyNoBitmap`, the bitmap-less health check used to validate the bitmap optimization.
-- [`FlashLiquidateCallback.sol`](helpers/FlashLiquidateCallback.sol) is a mock flash-loan / repay / liquidate callback used to model those callbacks.
-- [`Havoc.sol`](helpers/Havoc.sol) is a minimal contract whose `havocAll()` lets a callback havoc all state, modeling arbitrary re-entrant behavior.
-
-## Modeling conventions
 
 Verification is performed according to the following modeling conventions:
 
