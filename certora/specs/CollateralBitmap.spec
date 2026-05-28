@@ -5,7 +5,7 @@ import "BitmapSummaries.spec";
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function collateral(bytes32 id, address user, uint256) external returns (uint256) envfree;
+    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
 

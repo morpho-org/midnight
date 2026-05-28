@@ -160,22 +160,22 @@ interface IMidnight {
     function updatePosition(Market memory market, address user) external returns (uint128, uint128, uint128);
 
     /// OTHER VIEW FUNCTIONS ///
-    function lastLossFactor(bytes32 id, address user) external view returns (uint256);
-    function collateralBitmap(bytes32 id, address user) external view returns (uint256);
-    function collateral(bytes32 id, address user, uint256 index) external view returns (uint256);
+    function lastLossFactor(bytes32 id, address user) external view returns (uint128);
+    function collateralBitmap(bytes32 id, address user) external view returns (uint128);
+    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
-    function creditOf(bytes32 id, address user) external view returns (uint256);
-    function debtOf(bytes32 id, address user) external view returns (uint256);
-    function totalUnits(bytes32 id) external view returns (uint256);
-    function lossFactor(bytes32 id) external view returns (uint256);
+    function creditOf(bytes32 id, address user) external view returns (uint128);
+    function debtOf(bytes32 id, address user) external view returns (uint128);
+    function totalUnits(bytes32 id) external view returns (uint128);
+    function lossFactor(bytes32 id) external view returns (uint128);
     function tickSpacing(bytes32 id) external view returns (uint8);
-    function withdrawable(bytes32 id) external view returns (uint256);
+    function withdrawable(bytes32 id) external view returns (uint128);
     function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
-    function continuousFeeCredit(bytes32 id) external view returns (uint256);
-    function pendingFee(bytes32 id, address user) external view returns (uint256);
-    function lastAccrual(bytes32 id, address user) external view returns (uint256);
+    function continuousFeeCredit(bytes32 id) external view returns (uint128);
+    function pendingFee(bytes32 id, address user) external view returns (uint128);
+    function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
     function isHealthy(Market memory market, bytes32 id, address borrower) external view returns (bool);
     function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);

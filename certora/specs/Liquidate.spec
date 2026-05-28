@@ -3,9 +3,9 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function collateral(bytes32 id, address user, uint256 index) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
 

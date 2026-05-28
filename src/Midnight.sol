@@ -852,15 +852,15 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
-    function lastLossFactor(bytes32 id, address user) external view returns (uint256) {
+    function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].lastLossFactor;
     }
 
-    function collateralBitmap(bytes32 id, address user) external view returns (uint256) {
+    function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].collateralBitmap;
     }
 
-    function collateral(bytes32 id, address user, uint256 index) external view returns (uint256) {
+    function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
         return position[id][user].collateral[index];
     }
 
@@ -876,19 +876,19 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Market));
     }
 
-    function creditOf(bytes32 id, address user) external view returns (uint256) {
+    function creditOf(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].credit;
     }
 
-    function debtOf(bytes32 id, address user) external view returns (uint256) {
+    function debtOf(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].debt;
     }
 
-    function totalUnits(bytes32 id) external view returns (uint256) {
+    function totalUnits(bytes32 id) external view returns (uint128) {
         return marketState[id].totalUnits;
     }
 
-    function lossFactor(bytes32 id) external view returns (uint256) {
+    function lossFactor(bytes32 id) external view returns (uint128) {
         return marketState[id].lossFactor;
     }
 
@@ -896,7 +896,7 @@ contract Midnight is IMidnight {
         return marketState[id].tickSpacing;
     }
 
-    function withdrawable(bytes32 id) external view returns (uint256) {
+    function withdrawable(bytes32 id) external view returns (uint128) {
         return marketState[id].withdrawable;
     }
 
@@ -918,15 +918,15 @@ contract Midnight is IMidnight {
         return marketState[id].continuousFee;
     }
 
-    function continuousFeeCredit(bytes32 id) external view returns (uint256) {
+    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
         return marketState[id].continuousFeeCredit;
     }
 
-    function pendingFee(bytes32 id, address user) external view returns (uint256) {
+    function pendingFee(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].pendingFee;
     }
 
-    function lastAccrual(bytes32 id, address user) external view returns (uint256) {
+    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].lastAccrual;
     }
 

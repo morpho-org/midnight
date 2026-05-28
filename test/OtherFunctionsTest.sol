@@ -500,7 +500,7 @@ contract OtherFunctionsTest is BaseTest {
         ERC20(token).approve(address(midnight), 1e18);
         midnight.supplyCollateral(_market, collateralIndex, 1e18, borrower);
 
-        uint128 collateralBitmap = midnight.collateralBitmap(toId(_market), borrower).toUint128();
+        uint128 collateralBitmap = midnight.collateralBitmap(toId(_market), borrower);
 
         assertEq(collateralBitmap, 1 << collateralIndex, "collateralBitmap should have only bit at collateralIndex");
         assertEq(UtilsLib.msb(collateralBitmap), collateralIndex, "msb should equal collateralIndex");
@@ -519,7 +519,7 @@ contract OtherFunctionsTest is BaseTest {
         }
 
         bytes32 _id = toId(_market);
-        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower).toUint128();
+        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower);
         assertEq(UtilsLib.countBits(collateralBitmap), k, "countBits should equal number of supplied collateralParams");
         assertEq(UtilsLib.msb(collateralBitmap), k - 1, "msb should equal number of supplied collateralParams - 1");
     }
@@ -538,15 +538,13 @@ contract OtherFunctionsTest is BaseTest {
         }
 
         bytes32 _id = toId(_market);
-        assertEq(
-            UtilsLib.countBits(midnight.collateralBitmap(_id, borrower).toUint128()), numCollaterals, "all bits set"
-        );
+        assertEq(UtilsLib.countBits(midnight.collateralBitmap(_id, borrower)), numCollaterals, "all bits set");
 
         // Withdraw one collateral fully.
         vm.prank(borrower);
         midnight.withdrawCollateral(_market, collateralIndex, 1e18, borrower, borrower);
 
-        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower).toUint128();
+        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower);
         assertEq(UtilsLib.countBits(collateralBitmap), numCollaterals - 1, "one bit cleared");
         assertEq(collateralBitmap & (1 << collateralIndex), 0, "withdrawn collateral bit should be cleared");
     }
@@ -568,9 +566,7 @@ contract OtherFunctionsTest is BaseTest {
         }
 
         bytes32 _id = toId(_market);
-        assertEq(
-            UtilsLib.countBits(midnight.collateralBitmap(_id, borrower).toUint128()), numCollaterals, "all bits set"
-        );
+        assertEq(UtilsLib.countBits(midnight.collateralBitmap(_id, borrower)), numCollaterals, "all bits set");
 
         setupMarket(_market, 1e18);
 
@@ -580,7 +576,7 @@ contract OtherFunctionsTest is BaseTest {
         deal(address(loanToken), address(this), 1e18);
         midnight.liquidate(_market, collateralIndex, 1e18, 0, borrower, true, address(this), address(0), "");
 
-        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower).toUint128();
+        uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower);
         assertEq(UtilsLib.countBits(collateralBitmap), numCollaterals - 1, "one bit cleared");
         assertEq(collateralBitmap & (1 << collateralIndex), 0, "liquidated collateral bit should be cleared");
     }

@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes32 id) external returns (uint256) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
     function claimableTradingFee(address token) external returns (uint256) envfree;
     function toId(Midnight.Market) external returns (bytes32);
 }
