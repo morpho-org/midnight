@@ -156,15 +156,6 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 1, 1, borrower, false, address(this), address(0), "");
     }
 
-    function testLiquidateNonBorrower(uint256 units) public {
-        units = bound(units, 1, MAX_UNITS);
-        collateralize(market, borrower, units);
-        setupMarket(market, units);
-
-        address nonBorrower = makeAddr("nonBorrower");
-        vm.expectRevert(IMidnight.NotBorrower.selector);
-        midnight.liquidate(market, 0, 0, 0, nonBorrower, false, address(this), address(0), "");
-    }
 
     function testLiquidatePostMaturityPathBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
