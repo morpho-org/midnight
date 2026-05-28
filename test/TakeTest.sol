@@ -1095,6 +1095,22 @@ contract TakeTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), collateral);
     }
 
+    function testSellSellerCallbackRevertsSellerIsLiquidatableAfterLiquidationUnlock() public {
+        uint256 units = 100e18;
+        uint256 timestamp = market.maturity + 1;
+        vm.warp(timestamp);
+        lenderOffer.expiry = timestamp;
+        lenderOffer.maxUnits = units;
+        lenderOffer.tick = MAX_TICK;
+        uint256 price = TickLib.tickToPrice(MAX_TICK);
+        address callback = address(new LiquidationLockedSellCallback());
+        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
+
+        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.prank(borrower);
+        midnight.take(lenderOffer, hex"", units, borrower, borrower, callback, hex"");
+    }
+
     // Show the effect of the wasLocked variable in take.
     // The variable is not necessary but makes the behavior easy to describe.
     // With wasLocked, a nested take does not restore liquidatability.
@@ -1335,6 +1351,18 @@ contract BorrowCallback is ISellCallback {
 
     function recordedMarket() external view returns (Market memory) {
         return _recordedMarket;
+    }
+}
+
+contract LiquidationLockedSellCallback is ISellCallback {
+    function onSell(bytes32 id, Market memory market, uint256, uint256, uint256, address seller, address, bytes memory)
+        external
+        view
+        returns (bytes32)
+    {
+        require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
+        require(Midnight(msg.sender).liquidationLocked(id, seller), "seller not locked");
+        return CALLBACK_SUCCESS;
     }
 }
 
