@@ -12,11 +12,11 @@ Global invariants on positions, markets and accounting.
 - [`Midnight.spec`](specs/Midnight.spec) collects the core accounting invariants.
   Total units always equal the sum of debt plus withdrawable, a user never holds both credit and debt, and a position's pending continuous fee never exceeds its credit.
   Continuous fees stay below `MAX_CONTINUOUS_FEE` at both the default and the market level, and loss factors only ever increase, with each user's bounded by its market's.
-  Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable trading fee by exactly the buyer/seller spread.
+  Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable settlement fee by exactly the buyer/seller spread.
   It also shows that neither credit nor debt can grow once a market's loss factor is maxed out.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
 - [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
-  It checks the claimable trading fee the same way: up on `take`, down on `claimTradingFee`, and unchanged otherwise.
+  It checks the claimable settlement fee the same way: up on `take`, down on `claimSettlementFee`, and unchanged otherwise.
 - [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an `LLTV <= WAD` from an allowed tier and an allowed `maxLif`.
   Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
@@ -45,13 +45,13 @@ How offers are consumed when taken.
 
 ## Fees
 
-Continuous-fee accrual and trading-fee rounding stay within their expected bounds.
+Continuous-fee accrual and settlement-fee rounding stay within their expected bounds.
 
 - [`ContinuousFee.spec`](specs/ContinuousFee.spec) checks continuous-fee changes on `take` and `withdraw`.
   A buyer's pending fee grows by at most `floor(creditIncrease * fee * timeToMaturity / WAD)`, and a seller's pending fee decreases proportionally to the credit it loses.
   The contract's `continuousFeeCredit` grows by exactly the buyer-plus-seller accrued fees, and a `take` leaves third parties' positions and fees unchanged.
-- [`TradingFeeSpread.spec`](specs/TradingFeeSpread.spec) checks that take rounding always favors the maker (a buyer-maker pays at most `floor(units * offerPrice / WAD)`, a seller-maker receives at least the ceil) and that the buyer/seller spread stays between `floor` and `ceil` of `units * fee / WAD`.
-- [`TradingFeeBoundaries.spec`](specs/TradingFeeBoundaries.spec) checks that every default and per-market trading fee stays within its per-index cap.
+- [`SettlementFeeSpread.spec`](specs/SettlementFeeSpread.spec) checks that take rounding always favors the maker (a buyer-maker pays at most `floor(units * offerPrice / WAD)`, a seller-maker receives at least the ceil) and that the buyer/seller spread stays between `floor` and `ceil` of `units * fee / WAD`.
+- [`SettlementFeeBoundaries.spec`](specs/SettlementFeeBoundaries.spec) checks that every default and per-market settlement fee stays within its per-index cap.
   A new market inherits its loan token's default fees, only the fee setter can change them, and the fee for any time-to-maturity is enclosed by its two adjacent breakpoint values.
 
 ## Authorization, roles and reverts
@@ -63,9 +63,9 @@ Who may change state, sign authorizations and hold roles, and how failures propa
 - [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
 - [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
   The role setter and only the role setter can reassign each role.
-  The fee setter can set market and default trading and continuous fees, and once a market is created only the fee setter can change the fees.
+  The fee setter can set market and default settlement and continuous fees, and once a market is created only the fee setter can change the fees.
   The tick-spacing setter and only the tick-spacing setter can set a market's tick spacing.
-  The fee claimer and only the fee claimer can claim trading and continuous fees.
+  The fee claimer and only the fee claimer can claim settlement and continuous fees.
 - [`Reverts.spec`](specs/Reverts.spec) checks some failures reasons.
   A reverting or zero-returning collateral oracle blocks `liquidate`, `withdrawCollateral`, `isHealthy` and `take` whenever the borrower has debt.
   The liquidator (resp. enter) gate blocks liquidation (resp. credit increase and debt increase).
@@ -75,7 +75,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
 
 Value cannot leak to unauthorized parties.
 
-- [`Solvency.spec`](specs/Solvency.spec) checks the central solvency invariant: for every token, the contract's balance always covers the sum of collateral, withdrawable and claimable trading fees.
+- [`Solvency.spec`](specs/Solvency.spec) checks the central solvency invariant: for every token, the contract's balance always covers the sum of collateral, withdrawable and claimable settlement fees.
 - [`OnlyExplicitPayerCanLoseTokens.spec`](specs/OnlyExplicitPayerCanLoseTokens.spec) checks that tokens are only ever pulled from an explicit payer.
   In `take`, the payer can only be the `buyerCallback` if it is passed, otherwise it is either the maker for a buy offer, or `msg.sender` for a sell offer.
   In every other entry point, the payer is `msg.sender` or the corresponding callback.
