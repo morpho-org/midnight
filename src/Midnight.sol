@@ -113,7 +113,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// defined rounding direction, which could lead to fees manipulations on chains with very cheap gas.
 /// @dev pendingFee updates are rounded in favor of the user. It could lead to fees manipulations too.
 /// @dev maxDebt is rounded down in isHealthy and liquidate.
-/// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
+/// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
 /// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
 /// reverts when the loss factor is maxed out.
