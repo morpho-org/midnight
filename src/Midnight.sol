@@ -117,7 +117,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
 /// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
 /// reverts when the loss factor is maxed out.
-/// @dev updatePosition rounds the credit down, so each lender lose a bit at their next interaction after a bad debt realization.
+/// @dev updatePosition rounds the credit down, so each lender lose a bit at their next interaction after a bad debt
+/// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
 /// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
 /// healthy after a liquidation.
