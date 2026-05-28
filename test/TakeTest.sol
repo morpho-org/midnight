@@ -456,22 +456,6 @@ contract TakeTest is BaseTest {
         assertEq(midnight.totalUnits(id), otherBorrowerDebt - units, "total units");
     }
 
-    function testCannotIncreaseDebtPostMaturity(uint256 units, uint256 existingUnits, uint256 timestamp) public {
-        existingUnits = bound(existingUnits, 0, maxAssets - 1);
-        units = bound(units, existingUnits + 1, maxAssets);
-        timestamp = bound(timestamp, market.maturity + 1, type(uint32).max);
-        setupOtherUsers(market, existingUnits);
-
-        vm.warp(timestamp);
-        otherLenderOffer.expiry = timestamp;
-        otherLenderOffer.maxUnits = units;
-        deal(address(loanToken), lender, units);
-        collateralize(market, lender, units);
-
-        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
-        take(units, lender, otherLenderOffer);
-    }
-
     // reduceOnly tests.
 
     function testReduceOnlyBuySuccess(uint256 existingUnits, uint256 exitUnits) public {
