@@ -67,8 +67,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
-/// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
-/// healthy after a liquidation.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
@@ -111,13 +109,19 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
-/// @dev Because of roundings, settlement and continuous fees might charge less than expected, which can become
-/// problematic for chains where the gas is cheaper than 1 asset of the loan token.
-/// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
-/// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a bad debt realization.
+/// @dev assets are rounded against the taker and in favor of the maker in take. Therefore, the settlement fee has no
+/// defined rounding direction, which could lead to fees manipulations on chains with very cheap gas.
+/// @dev pendingFee updates are rounded in favor of the user. It could lead to fees manipulations too.
+/// @dev maxDebt is rounded down in isHealthy and liquidate.
+/// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
-/// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
-/// market doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
+/// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
+/// reverts when the loss factor is maxed out.
+/// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
+/// realization.
+/// @dev repaidUnits/seizedAssets computations round against the liquidator.
+/// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
+/// healthy after a liquidation on the unhealthy path.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
