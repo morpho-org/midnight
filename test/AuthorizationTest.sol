@@ -18,7 +18,7 @@ contract AuthorizationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -214,7 +214,7 @@ contract AuthorizationTest is BaseTest {
         offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
 
         deal(address(loanToken), lender, units);
@@ -238,7 +238,7 @@ contract AuthorizationTest is BaseTest {
         offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
 
         deal(address(loanToken), lender, units);
@@ -322,7 +322,7 @@ contract AuthorizationTest is BaseTest {
         offer.ratifier = address(dummyRatifier);
         offer.maxUnits = units;
         offer.market = market;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
 
         deal(address(loanToken), lender, units);

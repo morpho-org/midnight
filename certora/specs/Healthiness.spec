@@ -67,7 +67,7 @@ definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns 
 /* proved in mulDivInverseUpDown */
 definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => summaryMulDivUpM(summaryMulDivDownM(a, b, d), d, b) <= a;
 
-/* proved in mulDivLifLLTV */
+/* proved in ExactMath.spec (mulDivLifLLTV) */
 definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {

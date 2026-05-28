@@ -42,7 +42,7 @@ contract OtherFunctionsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -237,14 +237,14 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_market.loanToken, MAX_CONTINUOUS_FEE);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_market.loanToken, i, maxTradingFee(i));
+            midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
         }
 
         bytes32 _id = midnight.touchMarket(_market);
         assertEq(midnight.tickSpacing(_id) > 0, true, "market created");
-        uint16[7] memory fees = midnight.tradingFeeCbps(_id);
+        uint16[7] memory fees = midnight.settlementFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {
-            assertEq(fees[i], midnight.defaultTradingFeeCbp(_market.loanToken, i), "fees");
+            assertEq(fees[i], midnight.defaultSettlementFeeCbp(_market.loanToken, i), "fees");
             assertGt(fees[i], 0, "fee nonzero");
         }
         assertEq(midnight.continuousFee(_id), MAX_CONTINUOUS_FEE, "continuousFee");
@@ -325,7 +325,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
-        marketWithRevertingOracle.maturity = block.timestamp + 100;
+        marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
         // Make the oracle revert.
@@ -349,7 +349,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
-        marketWithRevertingOracle.maturity = block.timestamp + 100;
+        marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
         deal(address(collateralToken1), address(this), collateral);
@@ -380,13 +380,13 @@ contract OtherFunctionsTest is BaseTest {
         }
         collateralParams = sortCollateralParams(collateralParams);
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = collateralParams;
         _market.rcfThreshold = 0;
     }
 
     function testMaturityTooFar(uint256 maturity) public {
-        maturity = bound(maturity, block.timestamp + 100 * 365 days + 1, type(uint256).max);
+        maturity = bound(maturity, vm.getBlockTimestamp() + 100 * 365 days + 1, type(uint256).max);
         Market memory longMarket;
         longMarket.loanToken = address(loanToken);
         longMarket.maturity = maturity;
@@ -399,7 +399,7 @@ contract OtherFunctionsTest is BaseTest {
     function testZeroCollaterals() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = new CollateralParams[](0);
         vm.expectRevert(IMidnight.NoCollateralParams.selector);
         midnight.touchMarket(_market);
@@ -429,7 +429,7 @@ contract OtherFunctionsTest is BaseTest {
     function testCollateralsNotSorted() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
             token: address(uint160(2)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -446,7 +446,7 @@ contract OtherFunctionsTest is BaseTest {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -461,7 +461,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.5e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -597,7 +597,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] =
             CollateralParams({token: address(collateralToken1), lltv: lltv, maxLif: lif, oracle: address(oracle1)});
@@ -611,7 +611,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle1)
@@ -626,7 +626,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 200;
+        _market.maturity = vm.getBlockTimestamp() + 200;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.5e18), oracle: address(oracle1)
@@ -644,7 +644,7 @@ contract OtherFunctionsTest is BaseTest {
 
         midnight.setDefaultContinuousFee(_market.loanToken, _defaultContinuousFee);
         for (uint256 i = 0; i < 7; i++) {
-            midnight.setDefaultTradingFee(_market.loanToken, i, maxTradingFee(i));
+            midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
         }
 
         bytes32 _id = midnight.touchMarket(_market);
@@ -654,13 +654,13 @@ contract OtherFunctionsTest is BaseTest {
             uint128 _lossFactor,
             uint128 _withdrawable,
             uint128 _continuousFeeCredit,
-            uint16 tradingFeeCbp0,
-            uint16 tradingFeeCbp1,
-            uint16 tradingFeeCbp2,
-            uint16 tradingFeeCbp3,
-            uint16 tradingFeeCbp4,
-            uint16 tradingFeeCbp5,
-            uint16 tradingFeeCbp6,
+            uint16 settlementFeeCbp0,
+            uint16 settlementFeeCbp1,
+            uint16 settlementFeeCbp2,
+            uint16 settlementFeeCbp3,
+            uint16 settlementFeeCbp4,
+            uint16 settlementFeeCbp5,
+            uint16 settlementFeeCbp6,
             uint32 _continuousFee,
             uint8 tickSpacing
         ) = midnight.marketState(_id);
@@ -673,16 +673,16 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
         assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
         assertEq(tickSpacing, expectedTickSpacing, "tickSpacing");
-        assertEq(tradingFeeCbp0, midnight.defaultTradingFeeCbp(_market.loanToken, 0), "tradingFeeCbp0");
-        assertEq(tradingFeeCbp1, midnight.defaultTradingFeeCbp(_market.loanToken, 1), "tradingFeeCbp1");
-        assertEq(tradingFeeCbp2, midnight.defaultTradingFeeCbp(_market.loanToken, 2), "tradingFeeCbp2");
-        assertEq(tradingFeeCbp3, midnight.defaultTradingFeeCbp(_market.loanToken, 3), "tradingFeeCbp3");
-        assertEq(tradingFeeCbp4, midnight.defaultTradingFeeCbp(_market.loanToken, 4), "tradingFeeCbp4");
-        assertEq(tradingFeeCbp5, midnight.defaultTradingFeeCbp(_market.loanToken, 5), "tradingFeeCbp5");
-        assertEq(tradingFeeCbp6, midnight.defaultTradingFeeCbp(_market.loanToken, 6), "tradingFeeCbp6");
+        assertEq(settlementFeeCbp0, midnight.defaultSettlementFeeCbp(_market.loanToken, 0), "settlementFeeCbp0");
+        assertEq(settlementFeeCbp1, midnight.defaultSettlementFeeCbp(_market.loanToken, 1), "settlementFeeCbp1");
+        assertEq(settlementFeeCbp2, midnight.defaultSettlementFeeCbp(_market.loanToken, 2), "settlementFeeCbp2");
+        assertEq(settlementFeeCbp3, midnight.defaultSettlementFeeCbp(_market.loanToken, 3), "settlementFeeCbp3");
+        assertEq(settlementFeeCbp4, midnight.defaultSettlementFeeCbp(_market.loanToken, 4), "settlementFeeCbp4");
+        assertEq(settlementFeeCbp5, midnight.defaultSettlementFeeCbp(_market.loanToken, 5), "settlementFeeCbp5");
+        assertEq(settlementFeeCbp6, midnight.defaultSettlementFeeCbp(_market.loanToken, 6), "settlementFeeCbp6");
     }
 
-    function testMarketStateAfterTrade() public {
+    function testMarketStateAfterTake() public {
         midnight.setDefaultContinuousFee(address(loanToken), MAX_CONTINUOUS_FEE);
 
         uint256 units = 1e18;
@@ -691,9 +691,9 @@ contract OtherFunctionsTest is BaseTest {
 
         (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, uint8 tickSpacing) = midnight.marketState(id);
 
-        assertEq(totalUnits, units, "totalUnits after trade");
-        assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after trade");
-        assertEq(tickSpacing, 4, "tickSpacing after trade");
+        assertEq(totalUnits, units, "totalUnits after take");
+        assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after take");
+        assertEq(tickSpacing, 4, "tickSpacing after take");
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {
