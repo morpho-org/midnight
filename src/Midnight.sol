@@ -61,7 +61,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
 /// @dev There are two liquidation paths: The "healthy path", available after the market's maturity and the "normal
 /// path", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the liquidator can
-/// choose between both modes.
+/// choose between both paths.
 /// @dev In the "normal path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
