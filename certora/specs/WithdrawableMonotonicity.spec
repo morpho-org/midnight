@@ -16,12 +16,12 @@ rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, ad
     assert withdrawableAfter == withdrawableBefore + units;
 }
 
-rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     bytes32 id = toId(e, market);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore + repaidResult;
 }

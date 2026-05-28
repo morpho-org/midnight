@@ -59,12 +59,12 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev There are two liquidation paths: The "healthy path", available after the market's maturity and the
-/// "unhealthy path", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the
+/// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity and the
+/// "unhealthy mode", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the
 /// liquidator can choose between both modes.
-/// @dev In the "healthy path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
-/// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// @dev In the "unhealthy mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
@@ -582,7 +582,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
-        bool healthyPath,
+        bool postMaturityMode,
         address receiver,
         address callback,
         bytes calldata data
@@ -616,7 +616,7 @@ contract Midnight is IMidnight {
 
         require(
             originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (healthyPath ? block.timestamp > market.maturity : originalDebt > maxDebt),
+                && (postMaturityMode ? block.timestamp > market.maturity : originalDebt > maxDebt),
             NotLiquidatable()
         );
 
@@ -639,7 +639,7 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = healthyPath
+            uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
 
@@ -649,7 +649,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (!healthyPath) {
+            if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
@@ -681,7 +681,7 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
-            healthyPath,
+            postMaturityMode,
             receiver,
             payer,
             badDebt,
