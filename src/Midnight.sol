@@ -472,10 +472,7 @@ contract Midnight is IMidnight {
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(
-            liquidationLocked(id, seller) || isHealthy(offer.market, id, seller),
-            SellerIsLiquidatable()
-        );
+        require(liquidationLocked(id, seller) || isHealthy(offer.market, id, seller), SellerIsLiquidatable());
 
         return (buyerAssets, sellerAssets);
     }
