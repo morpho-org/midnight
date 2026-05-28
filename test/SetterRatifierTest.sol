@@ -21,7 +21,7 @@ contract SetterRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         Market memory market;
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams = new CollateralParams[](1);
         market.collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -32,7 +32,7 @@ contract SetterRatifierTest is BaseTest {
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);
         offer.maxUnits = type(uint256).max;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
     }
 

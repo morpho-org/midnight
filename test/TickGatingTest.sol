@@ -20,7 +20,7 @@ contract TickGatingTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -51,7 +51,7 @@ contract TickGatingTest is BaseTest {
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
         offer.maxUnits = type(uint256).max;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = tick;
     }
 

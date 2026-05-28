@@ -56,7 +56,7 @@ contract MidnightBundles is IMidnightBundles {
         require(taker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.market.loanToken;
-        // touchMarket to have the correct trading fees.
+        // touchMarket to have the correct settlement fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
         _pullToken(loanToken, msg.sender, maxBuyerAssets, loanTokenPermit);
@@ -122,7 +122,7 @@ contract MidnightBundles is IMidnightBundles {
         require(taker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.market.loanToken;
-        // touchMarket to have the correct trading fees.
+        // touchMarket to have the correct settlement fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
         Market memory market = takes[0].offer.market;
@@ -186,7 +186,7 @@ contract MidnightBundles is IMidnightBundles {
         require(taker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.market.loanToken;
-        // touchMarket to have the correct trading fees.
+        // touchMarket to have the correct settlement fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
         _pullToken(loanToken, msg.sender, targetBuyerAssets, loanTokenPermit);
@@ -257,7 +257,7 @@ contract MidnightBundles is IMidnightBundles {
         require(taker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(taker, msg.sender), Unauthorized());
         require(referralFeePct < WAD, PctExceeded());
         address loanToken = takes[0].offer.market.loanToken;
-        // touchMarket to have the correct trading fees.
+        // touchMarket to have the correct settlement fees.
         bytes32 id = IMidnight(MIDNIGHT).touchMarket(takes[0].offer.market);
 
         Market memory market = takes[0].offer.market;
