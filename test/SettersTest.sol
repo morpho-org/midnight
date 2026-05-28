@@ -112,13 +112,30 @@ contract SettersTest is BaseTest {
 
         vm.expectEmit();
         emit EventsLib.SetMarketSettlementFee(id, 0, postMaturityFee);
-
         midnight.setMarketSettlementFee(id, 0, postMaturityFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 1, oneDayFee);
         midnight.setMarketSettlementFee(id, 1, oneDayFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 2, sevenDaysFee);
         midnight.setMarketSettlementFee(id, 2, sevenDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 3, thirtyDaysFee);
         midnight.setMarketSettlementFee(id, 3, thirtyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 4, ninetyDaysFee);
         midnight.setMarketSettlementFee(id, 4, ninetyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 5, oneEightyDaysFee);
         midnight.setMarketSettlementFee(id, 5, oneEightyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketSettlementFee(id, 6, threeSixtyDaysFee);
         midnight.setMarketSettlementFee(id, 6, threeSixtyDaysFee);
 
         assertEq(midnight.settlementFee(id, 0), postMaturityFee, "post maturity settlement fee");
@@ -225,13 +242,30 @@ contract SettersTest is BaseTest {
 
         vm.expectEmit();
         emit EventsLib.SetDefaultSettlementFee(loanToken, 0, postMaturityFee);
-
         midnight.setDefaultSettlementFee(loanToken, 0, postMaturityFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 1, oneDayFee);
         midnight.setDefaultSettlementFee(loanToken, 1, oneDayFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 2, sevenDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 2, sevenDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 3, thirtyDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 3, thirtyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 4, ninetyDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 4, ninetyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 5, oneEightyDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 5, oneEightyDaysFee);
+
+        vm.expectEmit();
+        emit EventsLib.SetDefaultSettlementFee(loanToken, 6, threeSixtyDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 6, threeSixtyDaysFee);
 
         // touch market with this loan token
