@@ -66,7 +66,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
   The fee setter can set market and default trading and continuous fees, and once a market is created only the fee setter can change the fees.
   The tick-spacing setter and only the tick-spacing setter can set a market's tick spacing.
   The fee claimer and only the fee claimer can claim trading and continuous fees.
-- [`Reverts.spec`](specs/Reverts.spec) checks that functions properly revert on failures.
+- [`Reverts.spec`](specs/Reverts.spec) checks some failures reasons.
   A reverting or zero-returning collateral oracle blocks `liquidate`, `withdrawCollateral`, `isHealthy` and `take` whenever the borrower has debt.
   The liquidator (resp. enter) gate blocks liquidation (resp. credit increase and debt increase).
   A reverting `transfer`/`transferFrom` or callback (including a wrong return value) makes the calling entry point revert.
