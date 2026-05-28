@@ -8,7 +8,7 @@ Markets can range from single to multi-collateral configurations, and gates can 
 
 ## Whitepaper
 
-The protocol is described in detail in the [Midnight Whitepaper](https://morpho.org/resources/whitepapers/midnight-whitepaper.pdf).
+The protocol is described in detail in the [Midnight Whitepaper](https://morpho.org/resources/midnight-whitepaper.pdf).
 
 ## Developers
 
