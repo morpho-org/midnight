@@ -1200,15 +1200,15 @@ contract TakeTest is BaseTest {
 
     // Summary of zero price tests:
     //
-    // Trading at 0 succeeds in those cases:
-    // - any offer / unit take input / 0 trading fee.
-    // - sell offer / unit take input / > 0 trading fee.
+    // Settlement at 0 succeeds in those cases:
+    // - any offer / unit take input / 0 settlement fee.
+    // - sell offer / unit take input / > 0 settlement fee.
     //
     // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by underflow when the settlement fee is > 0, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZeroNoTradingFeeSell() public {
+    function testPriceZeroNoSettlementFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1221,9 +1221,9 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZeroWithTradingFeeBuy() public {
+    function testPriceZeroWithSettlementFeeBuy() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
@@ -1233,10 +1233,10 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZeroWithTradingFeeSell() public {
+    function testPriceZeroWithSettlementFeeSell() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
-        uint256 fee = midnight.tradingFee(id, market.maturity - block.timestamp);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
+        uint256 fee = midnight.settlementFee(id, market.maturity - block.timestamp);
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1250,7 +1250,7 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
 
-    function testTradeWithAddressZero(uint256 units) public {
+    function testTakeWithAddressZero(uint256 units) public {
         units = bound(units, 1, maxAssets);
 
         // address(0) as maker cannot authorize the ratifier
