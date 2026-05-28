@@ -29,7 +29,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -58,7 +58,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         lenderOffer.ratifier = address(ecrecoverRatifier);
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = market;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
     }
 
