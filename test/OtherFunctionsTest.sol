@@ -569,11 +569,11 @@ contract OtherFunctionsTest is BaseTest {
 
         setupMarket(_market, 1e18);
 
-        // Warp to maturity + TIME_TO_MAX_LIF to bypass recovery close factor.
+        // Warp to maturity + TIME_TO_MAX_LIF and use the post-maturity path.
         vm.warp(_market.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
-        midnight.liquidate(_market, collateralIndex, 1e18, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(_market, collateralIndex, 1e18, 0, borrower, true, address(this), address(0), "");
 
         uint128 collateralBitmap = midnight.collateralBitmap(_id, borrower);
         assertEq(UtilsLib.countBits(collateralBitmap), numCollaterals - 1, "one bit cleared");
