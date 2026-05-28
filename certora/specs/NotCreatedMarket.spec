@@ -5,7 +5,7 @@ methods {
 
     function totalUnits(bytes32) external returns (uint256) envfree;
     function withdrawable(bytes32) external returns (uint256) envfree;
-    function tradingFeeCbps(bytes32) external returns (uint16[7]) envfree;
+    function settlementFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function continuousFee(bytes32) external returns (uint32) envfree;
     function creditOf(bytes32, address) external returns (uint256) envfree;
     function debtOf(bytes32, address) external returns (uint256) envfree;
@@ -28,8 +28,8 @@ function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
 }
 
-function noTradingFeesAreSet(bytes32 id) returns (bool) {
-    uint16[7] fees = tradingFeeCbps(id);
+function noSettlementFeesAreSet(bytes32 id) returns (bool) {
+    uint16[7] fees = settlementFeeCbps(id);
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
@@ -50,8 +50,8 @@ strong invariant marketTotalUnitsIsEmptyIfNotCreated(bytes32 id)
 strong invariant marketWithdrawableIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => withdrawable(id) == 0;
 
-strong invariant marketTradingFeesAreEmptyIfNotCreated(bytes32 id)
-    !marketIsCreated(id) => noTradingFeesAreSet(id);
+strong invariant marketSettlementFeesAreEmptyIfNotCreated(bytes32 id)
+    !marketIsCreated(id) => noSettlementFeesAreSet(id);
 
 strong invariant marketContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => continuousFee(id) == 0;

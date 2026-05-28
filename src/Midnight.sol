@@ -37,16 +37,16 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
-/// TRADING FEES
-/// @dev A default trading fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
+/// SETTLEMENT FEES
+/// @dev A default settlement fee (per loan token) is set on new markets. Then, the fee setter can override it.
+/// @dev The settlement fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
 /// approximation between breakpoints.
-/// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
-/// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
-/// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
-/// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
+/// @dev Settlement fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
+/// @dev For TTM > 360d, the settlement fee is the fee at the 360d breakpoint.
+/// @dev Post-maturity, the settlement fee is the fee at the 0d breakpoint.
+/// @dev Settlement fees are stored in cbp (centi-basis-points): settlementFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
-/// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly (except for 0d, 0.14 bps).
+/// @dev Max settlement fee is defined per index: 50 bps for ttm=360 days, scaled linearly (except for 0d, 0.14 bps).
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
@@ -111,8 +111,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
-/// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
-/// for chains where the gas is cheaper than 1 asset of the loan token.
+/// @dev Because of roundings, settlement and continuous fees might charge less than expected, which can become
+/// problematic for chains where the gas is cheaper than 1 asset of the loan token.
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
 /// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a bad debt realization.
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
@@ -154,8 +154,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter.
-/// @dev The fee setter can set the default and per-market trading fee and continuous fee.
-/// @dev The fee claimer can claim the trading fee and continuous fee.
+/// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
+/// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 /// @dev The tick spacing setter can decrease the tick spacing of a market.
 ///
@@ -185,9 +185,9 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => MarketState) public marketState;
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
-    mapping(address loanToken => uint16[7]) public defaultTradingFeeCbp;
+    mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
-    mapping(address token => uint256) public claimableTradingFee;
+    mapping(address token => uint256) public claimableSettlementFee;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -250,33 +250,33 @@ contract Midnight is IMidnight {
         emit EventsLib.SetMarketTickSpacing(id, newTickSpacing);
     }
 
-    function setMarketTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
+    function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external {
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         require(_marketState.tickSpacing > 0, MarketNotCreated());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
-        uint16 newTradingFeeCbp = uint16(newTradingFee / CBP);
-        if (index == 0) _marketState.tradingFeeCbp0 = newTradingFeeCbp;
-        else if (index == 1) _marketState.tradingFeeCbp1 = newTradingFeeCbp;
-        else if (index == 2) _marketState.tradingFeeCbp2 = newTradingFeeCbp;
-        else if (index == 3) _marketState.tradingFeeCbp3 = newTradingFeeCbp;
-        else if (index == 4) _marketState.tradingFeeCbp4 = newTradingFeeCbp;
-        else if (index == 5) _marketState.tradingFeeCbp5 = newTradingFeeCbp;
-        else if (index == 6) _marketState.tradingFeeCbp6 = newTradingFeeCbp;
-        emit EventsLib.SetMarketTradingFee(id, index, newTradingFee);
+        // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
+        uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
+        if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
+        else if (index == 1) _marketState.settlementFeeCbp1 = newSettlementFeeCbp;
+        else if (index == 2) _marketState.settlementFeeCbp2 = newSettlementFeeCbp;
+        else if (index == 3) _marketState.settlementFeeCbp3 = newSettlementFeeCbp;
+        else if (index == 4) _marketState.settlementFeeCbp4 = newSettlementFeeCbp;
+        else if (index == 5) _marketState.settlementFeeCbp5 = newSettlementFeeCbp;
+        else if (index == 6) _marketState.settlementFeeCbp6 = newSettlementFeeCbp;
+        emit EventsLib.SetMarketSettlementFee(id, index, newSettlementFee);
     }
 
-    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
+    function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
-        defaultTradingFeeCbp[loanToken][index] = uint16(newTradingFee / CBP);
-        emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+        // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
+        defaultSettlementFeeCbp[loanToken][index] = uint16(newSettlementFee / CBP);
+        emit EventsLib.SetDefaultSettlementFee(loanToken, index, newSettlementFee);
     }
 
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {
@@ -297,10 +297,10 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
-    function claimTradingFee(address token, uint256 amount, address receiver) external {
+    function claimSettlementFee(address token, uint256 amount, address receiver) external {
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        claimableTradingFee[token] -= amount;
-        emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
+        claimableSettlementFee[token] -= amount;
+        emit EventsLib.ClaimSettlementFee(msg.sender, token, amount, receiver);
         SafeTransferLib.safeTransfer(token, receiver, amount);
     }
 
@@ -321,10 +321,10 @@ contract Midnight is IMidnight {
 
     /// ENTRY-POINTS ///
 
-    /// @dev The taker might not get the price they expected if the trading fee was just changed. A smart-contract can
-    /// be used to perform atomic price checks.
-    /// @dev Taking buy offers with price < trading fee will revert.
-    /// @dev In particular, if the trading fee gets increased, it might implicitly cancel offers with very low price.
+    /// @dev The taker might not get the price they expected if the settlement fee was just changed. A smart-contract
+    /// can be used to perform atomic price checks.
+    /// @dev Taking buy offers with price < settlement fee will revert.
+    /// @dev In particular, if the settlement fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
@@ -352,9 +352,9 @@ contract Midnight is IMidnight {
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
+        uint256 _settlementFee = settlementFee(id, timeToMaturity);
+        uint256 sellerPrice = offer.buy ? offerPrice - _settlementFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _settlementFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
@@ -409,7 +409,7 @@ contract Midnight is IMidnight {
 
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
-        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+        claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -770,14 +770,14 @@ contract Midnight is IMidnight {
 
             MarketState storage _marketState = marketState[id];
             _marketState.tickSpacing = DEFAULT_TICK_SPACING;
-            uint16[7] memory _defaultTradingFeeCbp = defaultTradingFeeCbp[market.loanToken];
-            _marketState.tradingFeeCbp0 = _defaultTradingFeeCbp[0];
-            _marketState.tradingFeeCbp1 = _defaultTradingFeeCbp[1];
-            _marketState.tradingFeeCbp2 = _defaultTradingFeeCbp[2];
-            _marketState.tradingFeeCbp3 = _defaultTradingFeeCbp[3];
-            _marketState.tradingFeeCbp4 = _defaultTradingFeeCbp[4];
-            _marketState.tradingFeeCbp5 = _defaultTradingFeeCbp[5];
-            _marketState.tradingFeeCbp6 = _defaultTradingFeeCbp[6];
+            uint16[7] memory _defaultSettlementFeeCbp = defaultSettlementFeeCbp[market.loanToken];
+            _marketState.settlementFeeCbp0 = _defaultSettlementFeeCbp[0];
+            _marketState.settlementFeeCbp1 = _defaultSettlementFeeCbp[1];
+            _marketState.settlementFeeCbp2 = _defaultSettlementFeeCbp[2];
+            _marketState.settlementFeeCbp3 = _defaultSettlementFeeCbp[3];
+            _marketState.settlementFeeCbp4 = _defaultSettlementFeeCbp[4];
+            _marketState.settlementFeeCbp5 = _defaultSettlementFeeCbp[5];
+            _marketState.settlementFeeCbp6 = _defaultSettlementFeeCbp[6];
             _marketState.continuousFee = defaultContinuousFee[market.loanToken];
             IdLib.storeInCode(market, INITIAL_CHAIN_ID);
 
@@ -900,16 +900,16 @@ contract Midnight is IMidnight {
         return marketState[id].withdrawable;
     }
 
-    /// @dev The trading fee cbp values are 0 until the market is created, then set to the default value.
-    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
+    /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
+    function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
         return [
-            marketState[id].tradingFeeCbp0,
-            marketState[id].tradingFeeCbp1,
-            marketState[id].tradingFeeCbp2,
-            marketState[id].tradingFeeCbp3,
-            marketState[id].tradingFeeCbp4,
-            marketState[id].tradingFeeCbp5,
-            marketState[id].tradingFeeCbp6
+            marketState[id].settlementFeeCbp0,
+            marketState[id].settlementFeeCbp1,
+            marketState[id].settlementFeeCbp2,
+            marketState[id].settlementFeeCbp3,
+            marketState[id].settlementFeeCbp4,
+            marketState[id].settlementFeeCbp5,
+            marketState[id].settlementFeeCbp6
         ];
     }
 
@@ -955,21 +955,21 @@ contract Midnight is IMidnight {
         return maxDebt >= debt;
     }
 
-    /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
-    function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
+    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         MarketState storage _marketState = marketState[id];
         require(_marketState.tickSpacing > 0, MarketNotCreated());
 
-        if (timeToMaturity >= 360 days) return _marketState.tradingFeeCbp6 * CBP;
+        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.tradingFeeCbp0 * CBP, _marketState.tradingFeeCbp1 * CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.tradingFeeCbp1 * CBP, _marketState.tradingFeeCbp2 * CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.tradingFeeCbp2 * CBP, _marketState.tradingFeeCbp3 * CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.tradingFeeCbp3 * CBP, _marketState.tradingFeeCbp4 * CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.tradingFeeCbp4 * CBP, _marketState.tradingFeeCbp5 * CBP) :
-                                        (180 days, 360 days, _marketState.tradingFeeCbp5 * CBP, _marketState.tradingFeeCbp6 * CBP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
+                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);

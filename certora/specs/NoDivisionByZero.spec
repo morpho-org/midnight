@@ -3,8 +3,8 @@
 // Proves that no division by zero occurs in mulDivDown or mulDivUp.
 //
 // All other Solidity divisions in the codebase use non-zero denominators:
-// - tradingFee: divides by (end - start), always a positive constant from the breakpoint table.
-// - setMarketTradingFee / setDefaultTradingFee: divide by CBP (1e12).
+// - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
+// - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
 // - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
