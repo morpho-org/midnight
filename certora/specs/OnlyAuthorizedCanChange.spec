@@ -14,7 +14,7 @@ methods {
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
     // Summarize complex internal functions irrelevant to authorization checks.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Summarize TickLib functions.

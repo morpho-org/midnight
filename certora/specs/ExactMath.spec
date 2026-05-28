@@ -22,7 +22,7 @@ rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
 /// Proof: the denominator WAD - cursor*(WAD-lltv)/WAD is minimized at cursor=0.5e18, lltv=0,
 /// giving WAD - 0.5*WAD = 0.5*WAD, so the maximum result is WAD^2/(0.5*WAD) = 2*WAD.
 rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 cursor) {
-    require lltv <= WAD(), "see rule createdObligationsHaveLltvLessThanOrEqualToOne";
+    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
     require cursor <= WAD() / 2, "see LIQUIDATION_CURSOR_HIGH in ConstantsLib";
     assert maxLif(lltv, cursor) <= 2 * WAD();
 }

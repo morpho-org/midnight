@@ -26,7 +26,7 @@ methods {
 
 /// SUMMARY ///
 
-definition MAX_COLLATERALS_PER_BORROWER() returns uint256 = 10;
+definition MAX_COLLATERALS_PER_BORROWER() returns uint256 = 16;
 
 persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivZero in MulDiv.spec */

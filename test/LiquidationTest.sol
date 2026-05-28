@@ -31,9 +31,11 @@ contract LiquidationTest is BaseTest {
     Market internal market;
     bytes32 internal id;
 
+    address internal recordedCaller;
     bytes32 internal recordedId;
     Market internal recordedMarket;
     address internal recordedBorrower;
+    address internal recordedReceiver;
     uint256 internal recordedCollateralIndex;
     uint256 internal recordedSeizedAssets;
     uint256 internal recordedRepaidUnits;
@@ -275,9 +277,11 @@ contract LiquidationTest is BaseTest {
         vm.prank(caller);
         midnight.liquidate(market, collateralIndex, 0, repaid, borrower, true, address(this), address(this), data);
 
+        assertEq(recordedCaller, caller, "caller");
         assertEq(recordedId, id, "id");
         assertEq(toId(recordedMarket), id, "market");
         assertEq(recordedBorrower, borrower, "borrower");
+        assertEq(recordedReceiver, address(this), "receiver");
         assertEq(recordedCollateralIndex, collateralIndex, "collateral index");
         assertEq(recordedSeizedAssets, expectedSeizedAssets, "seized assets");
         assertEq(recordedRepaidUnits, repaid, "repaid units");
@@ -979,21 +983,23 @@ contract LiquidationTest is BaseTest {
     }
 
     function onLiquidate(
-        address,
+        address _caller,
         bytes32 _id,
         Market memory _market,
         uint256 _collateralIndex,
         uint256 _seizedAssets,
         uint256 _repaidUnits,
         address _borrower,
-        address,
+        address _receiver,
         bytes memory data,
         uint256 badDebt
     ) public returns (bytes32) {
         require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
+        recordedCaller = _caller;
         recordedId = _id;
         recordedMarket = _market;
         recordedBorrower = _borrower;
+        recordedReceiver = _receiver;
         recordedCollateralIndex = _collateralIndex;
         recordedSeizedAssets = _seizedAssets;
         recordedRepaidUnits = _repaidUnits;
