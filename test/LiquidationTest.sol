@@ -177,7 +177,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
     }
 
-    function testLiquidateUnhealthyModeRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
+    function testLiquidateUnpostMaturityModeRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, ORACLE_PRICE_SCALE, 10 * ORACLE_PRICE_SCALE);
         collateralize(market, borrower, units);

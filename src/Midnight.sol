@@ -586,7 +586,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
-        bool healthyMode,
+        bool postMaturityMode,
         address receiver,
         address callback,
         bytes calldata data
@@ -620,7 +620,7 @@ contract Midnight is IMidnight {
 
         require(
             originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (healthyMode ? block.timestamp > market.maturity : originalDebt > maxDebt),
+                && (postMaturityMode ? block.timestamp > market.maturity : originalDebt > maxDebt),
             NotLiquidatable()
         );
 
@@ -643,7 +643,7 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = healthyMode
+            uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
 
@@ -653,7 +653,7 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (!healthyMode) {
+            if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 uint256 maxRepaid = lltv < WAD
@@ -685,7 +685,7 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
-            healthyMode,
+            postMaturityMode,
             receiver,
             payer,
             badDebt,
