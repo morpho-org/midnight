@@ -13,6 +13,8 @@ import {
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 
 /// @dev Generates a randomised scenario covering all Midnight event types, including liquidation.
@@ -77,7 +79,7 @@ contract SqlScenarioTest is BaseTest {
     bytes32 internal constant SEL_SET_FEE_CLAIMER = keccak256("SetFeeClaimer(address)");
     bytes32 internal constant SEL_SET_TS_SETTER   = keccak256("SetTickSpacingSetter(address)");
     bytes32 internal constant SEL_SET_DEF_CF      = keccak256("SetDefaultContinuousFee(address,uint256)");
-    bytes32 internal constant SEL_LIQUIDATE       = keccak256("Liquidate(address,bytes32,address,uint256,uint256,address,uint256,uint256,uint256,address,address)");
+    bytes32 internal constant SEL_LIQUIDATE       = keccak256("Liquidate(address,bytes32,address,uint256,uint256,address,bool,uint256,uint256,uint256,address,address)");
 
     // ── Per-event JSON accumulators ───────────────────────────────────────────
     string internal jTake; string internal jUpdatePos; string internal jWithdraw;
@@ -162,12 +164,13 @@ contract SqlScenarioTest is BaseTest {
         offer1.maxUnits = units1;
         offer1.group    = GROUP_A;
         offer1.ratifier = address(ecrecoverRatifier);
-        offer1.start    = block.timestamp;
-        offer1.expiry   = block.timestamp + 200;
+        offer1.start    = vm.getBlockTimestamp();
+        offer1.expiry   = vm.getBlockTimestamp() + 200;
         offer1.tick     = MAX_TICK;
+        bytes memory rd1 = merkleRatifierData([offer1]);
         _execAs(borrower, abi.encodeWithSelector(
             midnight.take.selector, offer1, units1, borrower, borrower,
-            address(0), hex"", merkleRatifierData([offer1])
+            address(0), hex"", rd1
         ));
 
         // Block 6: otherBorrower supplies collateral (liquidation victim setup)
@@ -191,12 +194,13 @@ contract SqlScenarioTest is BaseTest {
         offer2.maxUnits = otherUnits;
         offer2.group    = GROUP_B;
         offer2.ratifier = address(ecrecoverRatifier);
-        offer2.start    = block.timestamp;
-        offer2.expiry   = block.timestamp + 200;
+        offer2.start    = vm.getBlockTimestamp();
+        offer2.expiry   = vm.getBlockTimestamp() + 200;
         offer2.tick     = MAX_TICK;
+        bytes memory rd2 = merkleRatifierData([offer2]);
         _execAs(otherBorrower, abi.encodeWithSelector(
             midnight.take.selector, offer2, otherUnits, otherBorrower, otherBorrower,
-            address(0), hex"", merkleRatifierData([offer2])
+            address(0), hex"", rd2
         ));
 
         // Block 8: borrower repays partial debt
@@ -241,7 +245,7 @@ contract SqlScenarioTest is BaseTest {
         vm.roll(16); vm.warp(20300);
         oracle1.setPrice(ORACLE_PRICE_SCALE / 4); // 75 % price drop → position deeply underwater
         _exec(abi.encodeCall(
-            midnight.liquidate, (market, 0, 0, 0, otherBorrower, address(this), address(0), hex"")
+            midnight.liquidate, (market, 0, 0, 0, otherBorrower, false, address(this), address(0), hex"")
         ));
         oracle1.setPrice(ORACLE_PRICE_SCALE); // restore for subsequent operations
 
@@ -286,7 +290,7 @@ contract SqlScenarioTest is BaseTest {
 
         (bool ok, bytes memory ret) = address(midnight).call(callData);
         if (!ok) {
-            assembly { revert(add(ret, 32), mload(ret)) }
+            assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -303,7 +307,7 @@ contract SqlScenarioTest is BaseTest {
         vm.prank(who);
         (bool ok, bytes memory ret) = address(midnight).call(callData);
         if (!ok) {
-            assembly { revert(add(ret, 32), mload(ret)) }
+            assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -344,22 +348,21 @@ contract SqlScenarioTest is BaseTest {
         bytes32 _id   = log.topics[1];
         address maker = address(uint160(uint256(log.topics[2])));
         address taker = address(uint160(uint256(log.topics[3])));
-        (, bool offerIsBuy, uint256 buyerAssets, uint256 sellerAssets, uint256 units,,, bytes32 grp,
-         uint256 consumed, uint256 buyerPFI, uint256 sellerPFD, uint256 buyerCI, uint256 sellerCD)
-            = abi.decode(log.data, (address, bool, uint256, uint256, uint256, address, address,
-                                    bytes32, uint256, uint256, uint256, uint256, uint256));
-        // Split across multiple string.concat calls to stay within stack depth limits.
+        // data slots (0-indexed): 0=caller, 1=offerIsBuy, 2=buyerAssets, 3=sellerAssets,
+        // 4=units, 5=payer, 6=receiver, 7=group, 8=consumed, 9=buyerPFI, 10=sellerPFD, 11=buyerCI, 12=sellerCD
+        bytes memory d = log.data;
         string memory body = string.concat(
             _sb("id_", _b32s(_id)), _c, _sb("maker", _as(maker)), _c,
             _sb("taker", _as(taker)), _c,
-            _nb("offerisbuy", offerIsBuy ? "true" : "false"), _c,
-            _sn("buyerassets", buyerAssets), _c, _sn("sellerassets", sellerAssets), _c,
-            _sn("units", units)
+            _nb("offerisbuy", _word(d, 1) != 0 ? "true" : "false"), _c,
+            _sn("buyerassets", uint256(_word(d, 2))), _c, _sn("sellerassets", uint256(_word(d, 3))), _c,
+            _sn("units", uint256(_word(d, 4)))
         );
         body = string.concat(body, _c,
-            _sb("group", _b32s(grp)), _c, _sn("consumed", consumed), _c,
-            _sn("buyerpendingfeeincrease", buyerPFI), _c, _sn("sellerpendingfeedecrease", sellerPFD), _c,
-            _sn("buyercreditincrease", buyerCI), _c, _sn("sellercreditdecrease", sellerCD)
+            _sb("group", _b32s(_word(d, 7))), _c, _sn("consumed", uint256(_word(d, 8))), _c,
+            _sn("buyerpendingfeeincrease", uint256(_word(d, 9))), _c,
+            _sn("sellerpendingfeedecrease", uint256(_word(d, 10))), _c,
+            _sn("buyercreditincrease", uint256(_word(d, 11))), _c, _sn("sellercreditdecrease", uint256(_word(d, 12)))
         );
         body = string.concat(body, _c, _sn("evt_block_number", bn), _c, _sn("evt_index", idx));
         jTake = _app(jTake, body);
@@ -435,21 +438,28 @@ contract SqlScenarioTest is BaseTest {
     function _decodeMarketCreated(Vm.Log memory log, uint256 bn, uint256 idx) internal {
         bytes32 _id = log.topics[1];
         Market memory mkt = abi.decode(log.data, (Market));
-        (, , , , uint16 tf0, uint16 tf1, uint16 tf2, uint16 tf3, uint16 tf4, uint16 tf5, uint16 tf6,
-         uint32 cf, ) = midnight.marketState(_id);
-        // Split across multiple string.concat calls to stay within stack depth limits.
-        string memory body = string.concat(
-            _sb("id_", _b32s(_id)), _c,
-            _sb("market_loantoken", _as(mkt.loanToken)), _c,
-            _sn("market_maturity", mkt.maturity), _c,
-            _sn("market_tradingfeecbp0", tf0), _c, _sn("market_tradingfeecbp1", tf1), _c,
-            _sn("market_tradingfeecbp2", tf2), _c, _sn("market_tradingfeecbp3", tf3)
-        );
-        body = string.concat(body, _c,
-            _sn("market_tradingfeecbp4", tf4), _c, _sn("market_tradingfeecbp5", tf5), _c,
-            _sn("market_tradingfeecbp6", tf6), _c, _sn("market_continuousfee", cf), _c,
-            _sn("evt_block_number", bn), _c, _sn("evt_index", idx)
-        );
+        string memory body;
+        // Split into two scoped blocks to keep live variables under the Yul stack limit.
+        {
+            uint16 tf0; uint16 tf1; uint16 tf2; uint16 tf3;
+            (, , , , tf0, tf1, tf2, tf3, , , , , ) = midnight.marketState(_id);
+            body = string.concat(
+                _sb("id_", _b32s(_id)), _c,
+                _sb("market_loantoken", _as(mkt.loanToken)), _c,
+                _sn("market_maturity", mkt.maturity), _c,
+                _sn("market_tradingfeecbp0", tf0), _c, _sn("market_tradingfeecbp1", tf1), _c,
+                _sn("market_tradingfeecbp2", tf2), _c, _sn("market_tradingfeecbp3", tf3)
+            );
+        }
+        {
+            uint16 tf4; uint16 tf5; uint16 tf6; uint32 cf;
+            (, , , , , , , , tf4, tf5, tf6, cf, ) = midnight.marketState(_id);
+            body = string.concat(body, _c,
+                _sn("market_tradingfeecbp4", tf4), _c, _sn("market_tradingfeecbp5", tf5), _c,
+                _sn("market_tradingfeecbp6", tf6), _c, _sn("market_continuousfee", cf), _c,
+                _sn("evt_block_number", bn), _c, _sn("evt_index", idx)
+            );
+        }
         jMarketCreated = _app(jMarketCreated, body);
     }
 
@@ -565,13 +575,14 @@ contract SqlScenarioTest is BaseTest {
         bytes32 _id      = log.topics[1];
         address collat   = address(uint160(uint256(log.topics[2])));
         address borrowerAddr = address(uint160(uint256(log.topics[3])));
-        // data: caller, seizedAssets, repaidUnits, badDebt, latestLossFactor, latestContinuousFeeCredit, payer, receiver
-        (, uint256 seized, uint256 repaid, uint256 bad, uint256 latestLF, uint256 latestCFC,,)
-            = abi.decode(log.data, (address, uint256, uint256, uint256, uint256, uint256, address, address));
+        // data: caller, seizedAssets, repaidUnits, healthyPath, badDebt, latestLossFactor, latestContinuousFeeCredit, payer, receiver
+        (, uint256 seized, uint256 repaid, bool hPath, uint256 bad, uint256 latestLF, uint256 latestCFC,,)
+            = abi.decode(log.data, (address, uint256, uint256, bool, uint256, uint256, uint256, address, address));
         string memory body = string.concat(
             _sb("id_", _b32s(_id)), _c, _sb("collateral", _as(collat)), _c,
             _sb("borrower", _as(borrowerAddr)), _c,
             _sn("seizedassets", seized), _c, _sn("repaidunits", repaid), _c,
+            _nb("healthypath", hPath ? "true" : "false"), _c,
             _sn("baddebt", bad), _c, _sn("latestlossfactor", latestLF)
         );
         body = string.concat(body, _c, _sn("latestcontinuousfeecredit", latestCFC),
@@ -718,6 +729,18 @@ contract SqlScenarioTest is BaseTest {
     // ── JSON helpers ──────────────────────────────────────────────────────────
 
     string internal constant _c = ",";
+
+    // Reads the i-th 32-byte ABI word (0-indexed) from ABI-encoded bytes memory.
+    function _word(bytes memory d, uint256 i) private pure returns (bytes32 v) {
+        assembly ("memory-safe") { v := mload(add(add(d, 32), mul(i, 32))) }
+    }
+
+    function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
+        bytes32 _root = HashLib.hashOffer(offers[0]);
+        bytes32[] memory _proof = new bytes32[](0);
+        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
+        return abi.encode(_sig, _root, 0, _proof);
+    }
 
     function _app(string memory arr, string memory obj) internal pure returns (string memory) {
         bool empty = bytes(arr).length == 1;

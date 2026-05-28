@@ -183,7 +183,7 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
         "liquidate.json",
         ["seizedassets", "repaidunits", "baddebt",
          "evt_block_number", "evt_index"],
-        [],
+        ["healthypath"],
         ["id_", "collateral", "borrower"],
         ["latestlossfactor", "latestcontinuousfeecredit"],  # uint128 — stored as UHUGEINT to hold values up to MAX_U128
     ),
