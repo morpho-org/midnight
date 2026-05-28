@@ -153,12 +153,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0)),
             100,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0))
+            hex""
         );
     }
 
@@ -168,12 +168,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            abi.encode(_sig, root([lenderOffer]), 0, new bytes32[](0)),
             100,
             borrower,
             borrower,
             address(0),
-            hex"",
-            abi.encode(_sig, root([lenderOffer]), 0, new bytes32[](0))
+            hex""
         );
     }
 
@@ -183,12 +183,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof),
             100,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof)
+            hex""
         );
     }
 
@@ -199,12 +199,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, _proof),
             100,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, _proof)
+            hex""
         );
     }
 
@@ -215,12 +215,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof),
             100,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof)
+            hex""
         );
     }
 
@@ -234,12 +234,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             lenderOffer,
+            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer])),
             units,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
+            hex""
         );
     }
 
@@ -267,63 +267,63 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(borrower);
         midnight.take(
             offer0,
+            merkleRatifierData(
+                offer0, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
+            ),
             units,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(
-                offer0, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
-            )
+            hex""
         );
 
         vm.revertToState(snapshot);
         vm.prank(borrower);
         midnight.take(
             offer1,
+            merkleRatifierData(
+                offer1, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
+            ),
             units,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(
-                offer1, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
-            )
+            hex""
         );
 
         vm.revertToState(snapshot);
         vm.prank(borrower);
         midnight.take(
             offer2,
+            merkleRatifierData(
+                offer2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
+            ),
             units,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(
-                offer2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
-            )
+            hex""
         );
 
         vm.revertToState(snapshot);
         vm.prank(borrower);
         midnight.take(
             offer3,
+            merkleRatifierData(
+                offer3, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
+            ),
             units,
             borrower,
             borrower,
             address(0),
-            hex"",
-            merkleRatifierData(
-                offer3, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
-            )
+            hex""
         );
     }
 
     function testTakeNotRatified() public {
         vm.expectRevert();
         vm.prank(borrower);
-        midnight.take(lenderOffer, 100, borrower, borrower, address(0), hex"", emptySig);
+        midnight.take(lenderOffer, emptySig, 100, borrower, borrower, address(0), hex"");
     }
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
@@ -335,7 +335,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(vm.addr(makerSecretKey));
         midnight.setIsAuthorized(address(ecrecoverRatifier), true, vm.addr(makerSecretKey));
         vm.prank(sender);
-        midnight.take(lenderOffer, 0, sender, sender, address(0), hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, merkleRatifierData([lenderOffer]), 0, sender, sender, address(0), hex"");
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
@@ -353,12 +353,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(sender);
         midnight.take(
             lenderOffer,
+            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey)),
             100,
             sender,
             sender,
             address(0),
-            hex"",
-            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
+            hex""
         );
     }
 
@@ -382,12 +382,12 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.prank(sender);
         midnight.take(
             lenderOffer,
+            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey)),
             0,
             sender,
             sender,
             address(0),
-            hex"",
-            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
+            hex""
         );
     }
 }
