@@ -59,9 +59,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev There are two liquidation modes: The "healthy mode", available after the market's maturity and the "normal
-/// mode", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the liquidator can
-/// choose between both modes.
+/// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
+/// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
+/// between both modes.
 /// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
@@ -73,7 +73,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev In the "healthy mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 ///
 /// SLASHING
@@ -121,7 +121,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
 /// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
-/// healthy after a liquidation on the normal mode.
+/// healthy after a liquidation in the normal mode.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
