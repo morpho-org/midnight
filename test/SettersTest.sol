@@ -78,7 +78,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
+            maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
@@ -209,7 +209,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: loanToken,
-            maturity: block.timestamp + 1 days,
+            maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
@@ -266,7 +266,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: address(0),
-            maturity: block.timestamp + 1 days,
+            maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: cols,
             rcfThreshold: 0,
             enterGate: address(0),
@@ -320,7 +320,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: address(loanToken),
-            maturity: block.timestamp + 100 days,
+            maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
@@ -347,7 +347,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: address(loanToken),
-            maturity: block.timestamp + 100 days,
+            maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),
@@ -377,7 +377,7 @@ contract SettersTest is BaseTest {
         });
         Market memory market = Market({
             loanToken: address(loanToken),
-            maturity: block.timestamp + 100 days,
+            maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
             rcfThreshold: 0,
             enterGate: address(0),

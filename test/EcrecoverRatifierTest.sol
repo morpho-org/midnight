@@ -21,7 +21,7 @@ contract EcrecoverRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         offer.maker = maker;
         offer.ratifier = address(ecrecoverRatifier);
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
     }
 
     function testDomainSeparator() public view {

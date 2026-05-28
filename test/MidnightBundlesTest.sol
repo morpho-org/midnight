@@ -46,7 +46,7 @@ contract MidnightBundlesTest is BaseTest {
         }
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -75,7 +75,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maker = lender;
         offers[0].market = market;
         offers[0].ratifier = address(dummyRatifier);
-        offers[0].expiry = block.timestamp + 200;
+        offers[0].expiry = vm.getBlockTimestamp() + 200;
         offers[0].tick = MAX_TICK;
 
         offers.push();
@@ -83,7 +83,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].maker = lender;
         offers[1].market = market;
         offers[1].ratifier = address(dummyRatifier);
-        offers[1].expiry = block.timestamp + 200;
+        offers[1].expiry = vm.getBlockTimestamp() + 200;
         offers[1].tick = MAX_TICK;
         offers[1].group = bytes32(uint256(1));
 
@@ -274,7 +274,8 @@ contract MidnightBundlesTest is BaseTest {
         loanToken.approve(PERMIT2, targetBuyerAssets);
         vm.stopPrank();
 
-        TokenPermit memory permit = _permit2(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
+        TokenPermit memory permit =
+            _permit2(address(loanToken), lender, targetBuyerAssets, 0, vm.getBlockTimestamp() + 1);
         vm.prank(lender);
         midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
             targetBuyerAssets, 0, lender, permit, takes, new CollateralWithdrawal[](0), address(0), 0, address(0)
@@ -306,7 +307,8 @@ contract MidnightBundlesTest is BaseTest {
         Take[] memory takes = new Take[](1);
         takes[0] = Take({offer: offers[0], units: units, ratifierData: hex""});
 
-        TokenPermit memory permit = _erc2612(address(loanToken), lender, targetBuyerAssets, 0, block.timestamp + 1);
+        TokenPermit memory permit =
+            _erc2612(address(loanToken), lender, targetBuyerAssets, 0, vm.getBlockTimestamp() + 1);
         vm.prank(lender);
         midnightBundles.buyWithAssetsTargetAndWithdrawCollateral(
             targetBuyerAssets, 0, lender, permit, takes, new CollateralWithdrawal[](0), address(0), 0, address(0)
@@ -339,7 +341,7 @@ contract MidnightBundlesTest is BaseTest {
         loanToken.approve(PERMIT2, maxBuyerAssets);
         vm.stopPrank();
 
-        TokenPermit memory permit = _permit2(address(loanToken), lender, maxBuyerAssets, 0, block.timestamp + 1);
+        TokenPermit memory permit = _permit2(address(loanToken), lender, maxBuyerAssets, 0, vm.getBlockTimestamp() + 1);
         vm.prank(lender);
         midnightBundles.buyWithUnitsTargetAndWithdrawCollateral(
             units, maxBuyerAssets, lender, permit, takes, new CollateralWithdrawal[](0), address(0), 0, address(0)
@@ -353,7 +355,7 @@ contract MidnightBundlesTest is BaseTest {
 
     function testBuyUnitsTargetInconsistentMarket() public {
         Market memory otherMarket = market;
-        otherMarket.maturity = block.timestamp + 360 days;
+        otherMarket.maturity = vm.getBlockTimestamp() + 360 days;
 
         offers[0].buy = false;
         offers[0].maker = borrower;
@@ -378,7 +380,7 @@ contract MidnightBundlesTest is BaseTest {
 
     function testSellUnitsTargetInconsistentMarket() public {
         Market memory otherMarket = market;
-        otherMarket.maturity = block.timestamp + 360 days;
+        otherMarket.maturity = vm.getBlockTimestamp() + 360 days;
 
         offers[0].maxUnits = 1;
         offers[1].market = otherMarket;
@@ -401,7 +403,7 @@ contract MidnightBundlesTest is BaseTest {
         }
 
         Market memory otherMarket = market;
-        otherMarket.maturity = block.timestamp + 360 days;
+        otherMarket.maturity = vm.getBlockTimestamp() + 360 days;
 
         offers[0].buy = false;
         offers[0].maker = borrower;
@@ -434,7 +436,7 @@ contract MidnightBundlesTest is BaseTest {
         {
             uint256 price = TickLib.tickToPrice(MAX_TICK);
             midnight.touchMarket(market);
-            uint256 sellerPrice = price - midnight.settlementFee(id, market.maturity - block.timestamp);
+            uint256 sellerPrice = price - midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
             uint256 units = targetSellerAssets.mulDivUp(WAD, sellerPrice);
             fromOffer0 = UtilsLib.min(units, offerUnits0);
             // Extra collateral headroom for the potential extra unit of debt.
@@ -486,7 +488,7 @@ contract MidnightBundlesTest is BaseTest {
 
     function testSellSellerAssetsTargetInconsistentMarket() public {
         Market memory otherMarket = market;
-        otherMarket.maturity = block.timestamp + 360 days;
+        otherMarket.maturity = vm.getBlockTimestamp() + 360 days;
 
         offers[0].maxUnits = 1;
         offers[1].market = otherMarket;
@@ -560,7 +562,7 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 sellerPrice = price - _settlementFee;
         uint256 expectedFilledSellerAssets = units.mulDivDown(sellerPrice, WAD);
         uint256 expectedFee = expectedFilledSellerAssets.mulDivDown(referralFeePct, WAD);
@@ -639,7 +641,7 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 sellerPrice = price - _settlementFee;
         uint256 units = preFeeTarget.mulDivUp(WAD, sellerPrice);
 
@@ -931,7 +933,7 @@ contract MidnightBundlesTest is BaseTest {
         supplies[0] = CollateralSupply({
             collateralIndex: 0,
             assets: amount,
-            permit: _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1)
+            permit: _permit2(collateralToken, borrower, amount, 0, vm.getBlockTimestamp() + 1)
         });
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndSellWithUnitsTarget(
@@ -1001,7 +1003,7 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 sellerPrice = price - _settlementFee;
         uint256 targetSellerAssets = units.mulDivDown(sellerPrice, WAD);
 
@@ -1036,7 +1038,7 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 targetSellerAssets = units.mulDivDown(price - _settlementFee, WAD);
 
         uint256 amount = _collateralAmount(0, units);
@@ -1055,7 +1057,7 @@ contract MidnightBundlesTest is BaseTest {
         supplies[0] = CollateralSupply({
             collateralIndex: 0,
             assets: amount,
-            permit: _permit2(collateralToken, borrower, amount, 0, block.timestamp + 1)
+            permit: _permit2(collateralToken, borrower, amount, 0, vm.getBlockTimestamp() + 1)
         });
         vm.prank(borrower);
         midnightBundles.supplyCollateralAndSellWithAssetsTarget(
@@ -1211,7 +1213,7 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 sellerPrice = price - _settlementFee;
         uint256 targetSellerAssets = uint256(100).mulDivDown(sellerPrice, WAD);
 

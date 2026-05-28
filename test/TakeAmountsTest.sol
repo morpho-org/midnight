@@ -20,7 +20,7 @@ contract TakeAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -48,7 +48,7 @@ contract TakeAmountsTest is BaseTest {
         offer.maxUnits = type(uint256).max;
         offer.market = market;
         offer.ratifier = address(dummyRatifier);
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
 
         createBadDebt(market); // to create non trivial lossFactor.
@@ -63,7 +63,7 @@ contract TakeAmountsTest is BaseTest {
         midnight.touchMarket(market);
         midnight.setMarketSettlementFee(id, 0, settlementFee0);
         midnight.setMarketSettlementFee(id, 1, settlementFee1);
-        settlementFee = midnight.settlementFee(id, market.maturity - block.timestamp);
+        settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
     }
 
     /// @dev Returns the highest tick such that tickToPrice(tick) + settlementFee <= WAD.

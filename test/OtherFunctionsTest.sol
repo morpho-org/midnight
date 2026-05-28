@@ -42,7 +42,7 @@ contract OtherFunctionsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -322,7 +322,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
-        marketWithRevertingOracle.maturity = block.timestamp + 100;
+        marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
         // Make the oracle revert.
@@ -346,7 +346,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
-        marketWithRevertingOracle.maturity = block.timestamp + 100;
+        marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
         deal(address(collateralToken1), address(this), collateral);
@@ -374,13 +374,13 @@ contract OtherFunctionsTest is BaseTest {
         }
         collateralParams = sortCollateralParams(collateralParams);
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = collateralParams;
         _market.rcfThreshold = 0;
     }
 
     function testMaturityTooFar(uint256 maturity) public {
-        maturity = bound(maturity, block.timestamp + 100 * 365 days + 1, type(uint256).max);
+        maturity = bound(maturity, vm.getBlockTimestamp() + 100 * 365 days + 1, type(uint256).max);
         Market memory longMarket;
         longMarket.loanToken = address(loanToken);
         longMarket.maturity = maturity;
@@ -393,7 +393,7 @@ contract OtherFunctionsTest is BaseTest {
     function testZeroCollaterals() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = new CollateralParams[](0);
         vm.expectRevert(IMidnight.NoCollateralParams.selector);
         midnight.touchMarket(_market);
@@ -423,7 +423,7 @@ contract OtherFunctionsTest is BaseTest {
     function testCollateralsNotSorted() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
             token: address(uint160(2)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -440,7 +440,7 @@ contract OtherFunctionsTest is BaseTest {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -455,7 +455,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.5e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
@@ -591,7 +591,7 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] =
             CollateralParams({token: address(collateralToken1), lltv: lltv, maxLif: lif, oracle: address(oracle1)});
@@ -605,7 +605,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 100;
+        _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle1)
@@ -620,7 +620,7 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = block.timestamp + 200;
+        _market.maturity = vm.getBlockTimestamp() + 200;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.5e18), oracle: address(oracle1)

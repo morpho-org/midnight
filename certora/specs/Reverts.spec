@@ -265,7 +265,7 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Market market, address
 }
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
-rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+rule oracleZeroPreventsWithdrawCollateralWhenBorrowerHasDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(market);
