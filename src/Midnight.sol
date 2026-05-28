@@ -657,8 +657,9 @@ contract Midnight is IMidnight {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 // The imprecision in this computation is at most a few hundreds WEI of collateral or loan token.
-                uint256 maxRepaid =
-                    lltv < WAD ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD - lif * lltv) : type(uint256).max;
+                uint256 maxRepaid = lltv < WAD
+                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
+                    : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
