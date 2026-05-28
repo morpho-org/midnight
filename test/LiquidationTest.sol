@@ -156,14 +156,14 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 1, 1, borrower, false, address(this), address(0), "");
     }
 
-    function testLiquidatePostMaturityPathBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
+    function testLiquidatePostMaturityModeBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, 0, ORACLE_PRICE_SCALE - 1);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        // Pre-maturity: the post-maturity path is not available.
+        // Pre-maturity: the post-maturity mode is not available.
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
 
@@ -177,7 +177,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
     }
 
-    function testLiquidateUnhealthyPathRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
+    function testLiquidateUnhealthyModeRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, ORACLE_PRICE_SCALE, 10 * ORACLE_PRICE_SCALE);
         collateralize(market, borrower, units);
@@ -185,7 +185,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + 1);
 
-        // Post-maturity but borrower is healthy: the unhealthy path is rejected.
+        // Post-maturity but borrower is healthy: the normal mode is rejected.
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
@@ -971,7 +971,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
 
         uint256 debtBefore = midnight.debtOf(id, borrower);
-        // Non-zero seizedAssets exercises the recovery close factor path.
+        // Non-zero seizedAssets exercises the recovery close factor mode.
         midnight.liquidate(market, 0, 1, 0, borrower, false, address(this), address(0), "");
         assertLt(midnight.debtOf(id, borrower), debtBefore, "debt should decrease after liquidation");
     }
