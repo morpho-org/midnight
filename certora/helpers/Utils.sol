@@ -9,7 +9,7 @@ import {
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
     MAX_COLLATERALS_PER_BORROWER,
-    maxTradingFee as _maxTradingFee,
+    maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../../src/libraries/ConstantsLib.sol";
 
