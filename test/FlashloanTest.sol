@@ -11,7 +11,7 @@ import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     address[] internal recordedTokens;
     uint256[] internal recordedAmounts;
-    address internal recordedInitiator;
+    address internal recordedCaller;
     bytes internal recordedData;
     bool internal discardToken = false;
 
@@ -46,7 +46,7 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
             assertEq(ERC20(tokens[i]).balanceOf(address(this)), 0, "balanceOf(this)");
             assertEq(ERC20(tokens[i]).balanceOf(address(midnight)), amounts[i], "balanceOf(midnight)");
         }
-        assertEq(recordedInitiator, caller, "recorded initiator");
+        assertEq(recordedCaller, caller, "recorded caller");
         assertEq(recordedData, data, "recorded data");
     }
 
@@ -74,13 +74,13 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(tokens, amounts, address(this), data);
     }
 
-    function onFlashLoan(address[] memory tokens, uint256[] memory amounts, address initiator, bytes memory data)
+    function onFlashLoan(address caller, address[] memory tokens, uint256[] memory amounts, bytes memory data)
         external
         returns (bytes32)
     {
         recordedTokens = tokens;
         recordedAmounts = amounts;
-        recordedInitiator = initiator;
+        recordedCaller = caller;
         recordedData = data;
         if (discardToken) {
             for (uint256 i = 0; i < tokens.length; i++) {

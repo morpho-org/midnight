@@ -170,7 +170,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(offer, units, taker, taker, address(0), hex"", hex"");
+        return midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -303,7 +303,7 @@ abstract contract BaseTest is Test {
         Offer memory borrowerOffer = _setupMarketOffer(market, units);
 
         vm.prank(lender);
-        midnight.take(borrowerOffer, units, lender, borrower, address(0), hex"", hex"");
+        midnight.take(borrowerOffer, hex"", units, lender, borrower, address(0), hex"");
     }
 
     function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
