@@ -59,7 +59,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev There are two liquidation modes: The "healthy path", available after the market's maturity and the "normal
+/// @dev There are two liquidation paths: The "healthy path", available after the market's maturity and the "normal
 /// path", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the liquidator can
 /// choose between both modes.
 /// @dev In the "normal path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
