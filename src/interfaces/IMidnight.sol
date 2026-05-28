@@ -67,6 +67,7 @@ interface IMidnight {
     /// ERRORS ///
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
+    error CannotIncreaseDebtPostMaturity();
     error CollateralParamsNotSorted();
     error ConsumedAssets();
     error ConsumedUnits();

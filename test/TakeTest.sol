@@ -321,7 +321,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -334,7 +334,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -395,7 +395,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, otherBorrower, borrowerOffer);
     }
 
@@ -410,7 +410,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, otherBorrowerOffer);
     }
 
@@ -454,6 +454,22 @@ contract TakeTest is BaseTest {
         assertEq(midnight.creditOf(id, otherLender), 0, "otherLender units");
         assertEq(midnight.debtOf(id, otherBorrower), otherBorrowerDebt - units, "otherBorrower debt");
         assertEq(midnight.totalUnits(id), otherBorrowerDebt - units, "total units");
+    }
+
+    function testCannotIncreaseDebtPostMaturity(uint256 units, uint256 existingUnits, uint256 timestamp) public {
+        existingUnits = bound(existingUnits, 0, maxAssets - 1);
+        units = bound(units, existingUnits + 1, maxAssets);
+        timestamp = bound(timestamp, market.maturity + 1, type(uint32).max);
+        setupOtherUsers(market, existingUnits);
+
+        vm.warp(timestamp);
+        otherLenderOffer.expiry = timestamp;
+        otherLenderOffer.maxUnits = units;
+        deal(address(loanToken), lender, units);
+        collateralize(market, lender, units);
+
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
+        take(units, lender, otherLenderOffer);
     }
 
     // reduceOnly tests.
@@ -672,7 +688,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, lender, borrowerOffer);
     }
 
@@ -685,7 +701,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, borrower, lenderOffer);
     }
 
