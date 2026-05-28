@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using MulDiv as MulDiv;
+
 methods {
     function maxLif(uint256, uint256) external returns (uint256) envfree;
+    function MulDiv.mulDivUp(uint256, uint256, uint256) external returns (uint256) envfree;
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -32,5 +35,5 @@ rule lifTimesLltvStrictBound(uint256 lltv, uint256 cursor) {
 
 /// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)
 rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv) {
-    assert lltv * lif <= WAD() * WAD() => mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif);
+    assert lltv * lif <= WAD() * WAD() => MulDiv.mulDivUp(a, lltv, WAD()) <= MulDiv.mulDivUp(a, WAD(), lif);
 }
