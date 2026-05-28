@@ -94,16 +94,20 @@ The collateral bitmap is an optimization: no functional changes compared to the 
 Properties of the fixed-point primitives the protocol relies on.
 
 - [`MulDiv.spec`](specs/MulDiv.spec) proves the algebra of `mulDivDown`/`mulDivUp` that the other specs assume as axioms: correct rounding direction and tight bounds, monotonicity in each argument, behavior on zero, additivity, the down/up inverse relations, and the argument-below-denominator bound.
-- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds used elsewhere.
+- [`ExactMath.spec`](specs/ExactMath.spec) checks the LIF/LLTV bounds and inequalities used elsewhere.
 - [`NoDivisionByZero.spec`](specs/NoDivisionByZero.spec) checks that division by zero never occur, except for `liquidate` if the liquidated collateral is not activated or has a price of 0.
 - [`NoMultiplicationOverflow.spec`](specs/NoMultiplicationOverflow.spec) checks that overflows never occur, assuming that the oracles return bounded prices.
 
 # Verification setup
 
+## Configuration files
+
 The [`certora/confs`](confs) folder holds one configuration file per verified spec, named to match the spec.
 There are 29 `.conf` files: [`BitmapSummaries.spec`](specs/BitmapSummaries.spec) is only imported.
-Each points `certoraRun` at the spec and the contract under verification — usually [`src/Midnight.sol`](../src/Midnight.sol), sometimes another source contract or a helper wrapper.
+Each points `certoraRun` at the spec and the contract under verification, which is usually [`src/Midnight.sol`](../src/Midnight.sol) but sometimes another source contract or a helper wrapper.
 They all share the compiler and prover settings (`solc-0.8.34`, `via_ir`, EVM `osaka`).
+
+## Helper files
 
 The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs link against:
 
@@ -115,8 +119,10 @@ The [`certora/helpers`](helpers) folder holds the auxiliary contracts the specs 
 
 ## Modeling conventions
 
-All specs share a few modeling conventions:
+Verification is performed according to the following modeling conventions:
 
+- loops are modeled as bounded, see the respective configuration files for the specific bounds used.
+  This includes the `for` and `while` loops with the `optimistic_loop` flag, but also the hashing loops with the `optimitic_hashing` flag.
 - `multicall` is removed, so each rule reasons about a single entry point.
   This is sound because `multicall` can only call functions of the current contract.
   So if all other functions respect an invariant, by induction `multicall` also respects it.
