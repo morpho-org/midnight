@@ -34,7 +34,7 @@ import {
     LLTV_6,
     LLTV_7,
     LLTV_8,
-    maxTradingFee as _maxTradingFee,
+    maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -334,7 +334,7 @@ abstract contract BaseTest is Test {
         return _maxLif(lltv, cursor);
     }
 
-    function maxTradingFee(uint256 index) internal pure returns (uint256) {
-        return _maxTradingFee(index);
+    function maxSettlementFee(uint256 index) internal pure returns (uint256) {
+        return _maxSettlementFee(index);
     }
 }

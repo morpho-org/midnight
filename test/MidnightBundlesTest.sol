@@ -39,10 +39,10 @@ contract MidnightBundlesTest is BaseTest {
         assertEq(midnightBundles.MIDNIGHT(), address(midnight));
         deployCodeTo("Permit2", PERMIT2);
 
-        // Set trading fees to max for all breakpoints.
+        // Set settlement fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
         for (uint256 i; i <= 6; i++) {
-            midnight.setDefaultTradingFee(address(loanToken), i, maxTradingFee(i));
+            midnight.setDefaultSettlementFee(address(loanToken), i, maxSettlementFee(i));
         }
 
         market.loanToken = address(loanToken);
@@ -198,9 +198,9 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].receiverIfMakerIsSeller = borrower;
         offers[1].maxUnits = offerUnits1;
 
-        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        // Reset settlement fees so buyerPrice = price <= WAD at MAX_TICK.
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -258,7 +258,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         offers[0].buy = false;
@@ -295,7 +295,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 units = targetBuyerAssets.mulDivUp(WAD, price);
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         offers[0].buy = false;
@@ -324,7 +324,7 @@ contract MidnightBundlesTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 maxBuyerAssets = units.mulDivUp(price, WAD);
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         offers[0].buy = false;
@@ -399,7 +399,7 @@ contract MidnightBundlesTest is BaseTest {
 
     function testBuyBuyerAssetsTargetInconsistentMarket() public {
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         Market memory otherMarket = market;
@@ -436,7 +436,7 @@ contract MidnightBundlesTest is BaseTest {
         {
             uint256 price = TickLib.tickToPrice(MAX_TICK);
             midnight.touchMarket(market);
-            uint256 sellerPrice = price - midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
+            uint256 sellerPrice = price - midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
             uint256 units = targetSellerAssets.mulDivUp(WAD, sellerPrice);
             fromOffer0 = UtilsLib.min(units, offerUnits0);
             // Extra collateral headroom for the potential extra unit of debt.
@@ -518,7 +518,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = type(uint256).max;
 
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -562,8 +562,8 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
-        uint256 sellerPrice = price - _tradingFee;
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
+        uint256 sellerPrice = price - _settlementFee;
         uint256 expectedFilledSellerAssets = units.mulDivDown(sellerPrice, WAD);
         uint256 expectedFee = expectedFilledSellerAssets.mulDivDown(referralFeePct, WAD);
 
@@ -594,7 +594,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = type(uint256).max;
 
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         uint256 expectedFee = targetBuyerAssets.mulDivDown(referralFeePct, WAD);
@@ -641,8 +641,8 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
-        uint256 sellerPrice = price - _tradingFee;
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
+        uint256 sellerPrice = price - _settlementFee;
         uint256 units = preFeeTarget.mulDivUp(WAD, sellerPrice);
 
         // Extra headroom for per-leg rounding of seller assets.
@@ -675,9 +675,9 @@ contract MidnightBundlesTest is BaseTest {
 
         offers[0].maxUnits = units;
 
-        // Zero trading fees so the borrower receives exactly units loan tokens for the sale.
+        // Zero settlement fees so the borrower receives exactly units loan tokens for the sale.
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         Take[] memory sellTakes = new Take[](1);
@@ -719,7 +719,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = debt;
 
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         Take[] memory sellTakes = new Take[](1);
@@ -816,7 +816,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
 
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         collateralize(market, borrower, units);
@@ -855,7 +855,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
 
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         collateralize(market, borrower, units);
@@ -952,10 +952,10 @@ contract MidnightBundlesTest is BaseTest {
 
         offers[0].maxUnits = units;
 
-        // Zero trading fees so the borrower receives exactly `units` loan tokens for the sale,
+        // Zero settlement fees so the borrower receives exactly `units` loan tokens for the sale,
         // covering any `repayUnits <= units`.
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         // Borrower sells units to get loan token + accumulate debt and collateral on Midnight.
@@ -1003,8 +1003,8 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
-        uint256 sellerPrice = price - _tradingFee;
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
+        uint256 sellerPrice = price - _settlementFee;
         uint256 targetSellerAssets = units.mulDivDown(sellerPrice, WAD);
 
         CollateralSupply[] memory supplies = new CollateralSupply[](numCollaterals);
@@ -1038,8 +1038,8 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
-        uint256 targetSellerAssets = units.mulDivDown(price - _tradingFee, WAD);
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
+        uint256 targetSellerAssets = units.mulDivDown(price - _settlementFee, WAD);
 
         uint256 amount = _collateralAmount(0, units);
         deal(market.collateralParams[0].token, borrower, amount);
@@ -1082,7 +1082,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
         offers[0].tick = tick;
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
         uint256 price = TickLib.tickToPrice(tick);
 
@@ -1105,7 +1105,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
         offers[0].tick = tick;
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
         uint256 price = TickLib.tickToPrice(tick);
 
@@ -1132,7 +1132,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
         offers[0].tick = tick;
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
         uint256 price = TickLib.tickToPrice(tick);
 
@@ -1163,7 +1163,7 @@ contract MidnightBundlesTest is BaseTest {
         offers[0].maxUnits = units;
         offers[0].tick = tick;
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
         uint256 price = TickLib.tickToPrice(tick);
         uint256 targetSellerAssets = units.mulDivDown(price, WAD);
@@ -1213,8 +1213,8 @@ contract MidnightBundlesTest is BaseTest {
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         midnight.touchMarket(market);
-        uint256 _tradingFee = midnight.tradingFee(id, market.maturity - vm.getBlockTimestamp());
-        uint256 sellerPrice = price - _tradingFee;
+        uint256 _settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
+        uint256 sellerPrice = price - _settlementFee;
         uint256 targetSellerAssets = uint256(100).mulDivDown(sellerPrice, WAD);
 
         // Extra collateral headroom for the potential extra unit of debt.
@@ -1252,9 +1252,9 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].receiverIfMakerIsSeller = borrower;
         offers[1].maxUnits = 100;
 
-        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        // Reset settlement fees so buyerPrice = price <= WAD at MAX_TICK.
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         collateralize(market, borrower, 100);
@@ -1290,9 +1290,9 @@ contract MidnightBundlesTest is BaseTest {
         offers[1].receiverIfMakerIsSeller = borrower;
         offers[1].maxUnits = 100;
 
-        // Reset trading fees so buyerPrice = price <= WAD at MAX_TICK.
+        // Reset settlement fees so buyerPrice = price <= WAD at MAX_TICK.
         for (uint256 i; i <= 6; i++) {
-            midnight.setMarketTradingFee(id, i, 0);
+            midnight.setMarketSettlementFee(id, i, 0);
         }
 
         uint256 price = TickLib.tickToPrice(MAX_TICK);
