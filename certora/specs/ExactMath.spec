@@ -35,5 +35,6 @@ rule lifTimesLltvStrictBound(uint256 lltv, uint256 cursor) {
 
 /// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)
 rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv) {
+    // lif > 0, see rule maxLifIsAtLeastWad.
     assert lltv * lif <= WAD() * WAD() => MulDiv.mulDivUp(a, lltv, WAD()) <= MulDiv.mulDivUp(a, WAD(), lif);
 }
