@@ -104,7 +104,9 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     uint128 lastLossFactorAfterFirst = lastLossFactor(id, user);
     uint128 lastAccrualAfterFirst = currentContract.position[id][user].lastAccrual;
 
-    uint128 newCredit; uint128 newPendingFee; uint128 accruedFee;
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
     newCredit, newPendingFee, accruedFee = updatePosition(e, market, user);
 
     // Second call's return values match the first call's resulting state and no new fee accrues.
@@ -135,7 +137,9 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     mathint creditBefore = creditOf(id, user);
     mathint pendingFeeBefore = pendingFee(id, user);
 
-    uint128 newCredit; uint128 newPendingFee; uint128 accruedFee;
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
     newCredit, newPendingFee, accruedFee = updatePosition(e, market, user);
 
     // Credit and pendingFee only decrease by the accrued fee (no slashing).
@@ -143,6 +147,7 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     assert newPendingFee + accruedFee == pendingFeeBefore;
     assert creditOf(id, user) + accruedFee == creditBefore;
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
+
     // The sync with the market's lossFactor is preserved.
     assert lastLossFactor(id, user) == currentContract.marketState[id].lossFactor;
 }
