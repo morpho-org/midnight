@@ -9,6 +9,7 @@ The protocol is described in detail in the [Midnight Whitepaper](https://morpho.
 ## Developers
 
 Compilation, testing and formatting are done with [forge](https://book.getfoundry.sh/getting-started/installation).
+Formal verification is done with [CVL](https://docs.certora.com/en/latest/docs/cvl/index.html).
 
 ## Licences
 
