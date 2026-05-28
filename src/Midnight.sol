@@ -121,7 +121,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
 /// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
-/// healthy after a liquidation.
+/// healthy after a liquidation on the unhealthy path.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
