@@ -28,7 +28,7 @@ Healthy positions stay healthy, and liquidations only touch liquidatable positio
 
 - [`Healthiness.spec`](specs/Healthiness.spec) checks that no action can turn a healthy borrower unhealthy.
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
-- [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable, either using the unhealthy path or with the unhealthy path enough time after maturity.
+- [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable, either using the unhealthy path or using the healthy path sufficiently long after maturity.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
 
 ## Offers and consumption
