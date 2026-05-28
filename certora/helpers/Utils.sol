@@ -47,8 +47,8 @@ contract Utils {
         return CALLBACK_SUCCESS;
     }
 
-    function maxTradingFee(uint256 index) external pure returns (uint256) {
-        return _maxTradingFee(index);
+    function maxSettlementFee(uint256 index) external pure returns (uint256) {
+        return _maxSettlementFee(index);
     }
 
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {

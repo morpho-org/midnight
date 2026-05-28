@@ -7,7 +7,7 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint256) envfree;
     function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
+    function claimableSettlementFee(address token) external returns (uint256) envfree;
     function creditOf(bytes32 id, address user) external returns (uint256) envfree;
     function debtOf(bytes32 id, address user) external returns (uint256) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -17,7 +17,7 @@ methods {
 
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Over-approximate view functions.
@@ -60,19 +60,19 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, Midnight.Offer offer, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) {
+rule takeInputOutputConsistency(env e, Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
 
-    uint256 claimableBefore = claimableTradingFee(offer.market.loanToken);
+    uint256 claimableBefore = claimableSettlementFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData, ratifierData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
 
-    // The claimable trading fee increases by exactly the spread.
-    assert claimableTradingFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
+    // The claimable settlement fee increases by exactly the spread.
+    assert claimableSettlementFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
@@ -141,7 +141,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
         }
-        preserved take(Midnight.Offer offer, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
