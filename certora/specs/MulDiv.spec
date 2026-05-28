@@ -7,9 +7,11 @@ methods {
 
 /* these proves the axiom used in the other specs */
 
-rule mulDivZero(uint256 b, uint256 d) {
+rule mulDivZero(uint256 a, uint256 b, uint256 d) {
     assert mulDivDown(0, b, d) == 0;
     assert mulDivUp(0, b, d) == 0;
+    assert mulDivDown(a, 0, d) == 0;
+    assert mulDivUp(a, 0, d) == 0;
 }
 
 rule mulDivMonotoneA(uint256 a1, uint256 a2, uint256 b, uint256 d) {

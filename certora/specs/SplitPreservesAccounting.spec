@@ -47,7 +47,7 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     // Identity (b=d=x): floor(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivDown(a, x, x) == a;
 
-    // floor(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
+    // floor(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
     axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivDown(a, 0, c) == 0;
 
     // floor(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
@@ -62,7 +62,7 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     // Identity (b=d=x): ceil(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
     axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
 
-    // ceil(a*0/c) = 0. Trivial (a*0 = 0); symmetric to mulDivZero in MulDiv.spec.
+    // ceil(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
     axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivUp(a, 0, c) == 0;
 
     // ceil(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
