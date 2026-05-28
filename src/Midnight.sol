@@ -59,10 +59,10 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev There are two liquidation modes: The "unhealthy path", available if the borrower is unhealthy and the
-/// "post-maturity path", available after the market's maturity. For an unhealthy borrower after the maturity, the
-/// liquidator can choose between both modes.
-/// @dev In the "unhealthy path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// @dev There are two liquidation paths: The "healthy path", available after the market's maturity and the "normal
+/// path", available if the borrower is unhealthy. For an unhealthy borrower after the maturity, the liquidator can
+/// choose between both paths.
+/// @dev In the "normal path", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
@@ -73,7 +73,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev In the "post-maturity path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// @dev In the "healthy path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 ///
 /// SLASHING
