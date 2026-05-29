@@ -103,6 +103,6 @@ rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collatera
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits) at the oracle price.
     assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 
-    // lif == maxLif when the normal mode is taken or >= 15 min post-maturity: full liquidation incentive factor applies.
+    // lif == maxLif when in normal mode or when >= 15 min post-maturity: full liquidation incentive factor applies.
     assert maxLifReached => seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
 }
