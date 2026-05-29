@@ -3,12 +3,12 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function totalUnits(bytes32) external returns (uint256) envfree;
-    function withdrawable(bytes32) external returns (uint256) envfree;
+    function totalUnits(bytes32) external returns (uint128) envfree;
+    function withdrawable(bytes32) external returns (uint128) envfree;
     function settlementFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function continuousFee(bytes32) external returns (uint32) envfree;
-    function creditOf(bytes32, address) external returns (uint256) envfree;
-    function debtOf(bytes32, address) external returns (uint256) envfree;
+    function creditOf(bytes32, address) external returns (uint128) envfree;
+    function debtOf(bytes32, address) external returns (uint128) envfree;
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
