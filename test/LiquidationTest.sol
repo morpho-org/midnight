@@ -978,7 +978,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateNoDebtReverts() public {
         midnight.touchMarket(market);
-        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        vm.expectRevert(IMidnight.NotBorrower.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
