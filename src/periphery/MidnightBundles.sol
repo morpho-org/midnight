@@ -22,6 +22,8 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
+/// @dev No-ops are allowed.
+/// @dev Zero checks are not systematically performed.
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
@@ -38,7 +40,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same market for all takes.
     /// @dev The collateral transfers always use the first offer's market.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
+    /// @dev Reverts if ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
@@ -105,7 +107,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev This function should only be called with the same market for all takes.
     /// @dev The collateral transfers always use the first offer's market.
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
+    /// @dev Reverts if ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.

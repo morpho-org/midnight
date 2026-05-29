@@ -12,8 +12,8 @@ methods {
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function withdrawable(bytes32 id) external returns (uint256) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
     function Utils.maxSettlementFee(uint256 index) external returns (uint256) envfree;
 
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.

@@ -321,7 +321,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -334,7 +334,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -395,7 +395,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, otherBorrower, borrowerOffer);
     }
 
@@ -410,7 +410,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, otherBorrowerOffer);
     }
 
@@ -672,7 +672,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, lender, borrowerOffer);
     }
 
@@ -685,7 +685,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, borrower, lenderOffer);
     }
 
