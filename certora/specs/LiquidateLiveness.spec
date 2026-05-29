@@ -184,19 +184,7 @@ rule unhealthyLltvFullCanBeLiquidated(env e, Midnight.Market market, address bor
 }
 
 /// Unhealthy, lltv < WAD: healthyPath = false.
-/// Closes the partition left open by unhealthyCanBeLiquidated (rcfThreshold escape may fail).
-///
-/// Proof sketch (relies on the new `b >= d => ghostMulDivUp(a,b,d) >= a` axiom):
-///   inner := mulDivUp(maxLif, lltv, WAD).
-///   From validCollateralAt: lltv*maxLif <= WAD*(WAD-1), and axiom 2 gives inner <= WAD-1.
-///   Hence d := WAD - inner >= 1, so maxRepaid := mulDivUp(debt - maxDebt, WAD, d) is well-defined.
-///   With WAD >= d, the new axiom gives maxRepaid >= debt - maxDebt.
-///   From !isHealthy: debt - maxDebt >= 1, so maxRepaid >= 1 >= repaidUnits. RCF first disjunct holds.
-///
-/// Without the scaffold below, the prover reaches ~95% proved at depth 20 but the
-/// final ~5% of branches each contain an atomic nonlinear query that no solver
-/// dispatches within smt_timeout (run hits the 2h global timeout). Pre-stating each
-/// derivable lemma as a sound `require` makes the search trivial.
+/// Sound scaffolding lemmas help the solver with NIA chains (bad-debt path, RCF denominator).
 rule unhealthyLowLltvCanBeLiquidated(env e, Midnight.Market market, address borrower, address receiver) {
     bytes32 id = summaryToId(market);
     preamble(e, market, id, borrower);
@@ -204,10 +192,7 @@ rule unhealthyLowLltvCanBeLiquidated(env e, Midnight.Market market, address borr
     uint256 lltv = market.collateralParams[0].lltv;
     require lltv < WAD(), "lltv < WAD partition";
 
-    // === Sound proof scaffolding (each `require` is derivable from preceding axioms) ===
-    //
-    // (a) Replace `require !isHealthy(market, id, borrower)` with the equivalent direct condition, computed via the same ghost functions liquidate uses internally. 
-    //     Avoids the SMT having to relate isHealthy's while-loop maxDebt to liquidate's by commutativity under symbolic inputs.
+    // (a) Direct maxDebt computation (avoids isHealthy's loop/liquidate commutativity).
     uint256 maxLif = market.collateralParams[0].maxLif;
     uint256 lltv1 = market.collateralParams[1].lltv;
     uint128 collat0 = collateral(id, borrower, 0);
@@ -218,10 +203,17 @@ rule unhealthyLowLltvCanBeLiquidated(env e, Midnight.Market market, address borr
     uint256 _debt = debtOf(id, borrower);
     require to_mathint(_debt) > maxDebt, "unhealthy: debt > maxDebt (replaces isHealthy)";
 
-    // (b) Lemma: inner := mulDivUp(maxLif, lltv, WAD) <= WAD - 1.
-    //     Derivable from validCollateralAt (lltv*maxLif <= WAD*(WAD-1) when lltv<WAD) and ghostMulDivUp axiom 2 ((inner-1)*WAD < maxLif*lltv).
+    // (b) inner := mulDivUp(maxLif, lltv, WAD) <= WAD - 1 (from validCollateralAt + axiom 2).
     require to_mathint(ghostMulDivUp(maxLif, lltv, WAD())) <= to_mathint(WAD()) - 1, "lemma: mulDivUp(maxLif, lltv, WAD) <= WAD - 1 (from validCollateralAt + axiom 2)";
-    // ===================================================================================
+
+    // (c) WAD - inner >= 1 (maxRepaid denominator is positive, from (b)).
+    require to_mathint(WAD()) - to_mathint(ghostMulDivUp(maxLif, lltv, WAD())) >= 1, "from (b): WAD - inner >= 1";
+
+    // (d) Per-collateral recovery > maxDebt contribution (from lltv*maxLif < WAD^2 + ghost axioms).
+    //     Bridges the bad-debt path: ensures _position.debt > maxDebt after bad-debt realization.
+    uint256 maxLif1 = market.collateralParams[1].maxLif;
+    require to_mathint(ghostMulDivUp(ghostMulDivUp(collat0, price0, ORACLE_PRICE_SCALE()), WAD(), maxLif)) > to_mathint(ghostMulDivDown(ghostMulDivDown(collat0, price0, ORACLE_PRICE_SCALE()), lltv, WAD())), "lemma: recovery[0] > maxDebtContrib[0] (from lltv*maxLif < WAD^2, collat0*price0 > 0)";
+    require to_mathint(ghostMulDivUp(ghostMulDivUp(collat1, price1, ORACLE_PRICE_SCALE()), WAD(), maxLif1)) >= to_mathint(ghostMulDivDown(ghostMulDivDown(collat1, price1, ORACLE_PRICE_SCALE()), lltv1, WAD())), "lemma: recovery[1] >= maxDebtContrib[1] (from lltv1*maxLif1 <= WAD^2)";
 
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 1, borrower, false, receiver, 0, data);
