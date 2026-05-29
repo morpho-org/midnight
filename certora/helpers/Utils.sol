@@ -15,15 +15,20 @@ import {
 
 contract Utils {
     function hashMarket(Market memory market) external pure returns (bytes32) {
-        return keccak256(abi.encode(market));
+        return HashLib.hashMarket(market);
     }
 
+    // Wraps `HashLib.hashOffer` directly so CVL specs can expose the real EIP-712 offer hash
+    // envfree. Avoids the prior `keccak256(abi.encode(offer))` reimplementation, which is a
+    // *different* hash than `HashLib.hashOffer` (no typehash prefix, no inner hashing of
+    // market/callbackData) and broke keccak unification across summary boundaries when the
+    // prover had to forward-compute the merkle chain (completeness direction).
     function hashOffer(Offer memory offer) external pure returns (bytes32) {
-        return keccak256(abi.encode(offer));
+        return HashLib.hashOffer(offer);
     }
 
     function hashNode(bytes32 a, bytes32 b) external pure returns (bytes32) {
-        return keccak256(abi.encode(a, b));
+        return HashLib.hashNode(a, b);
     }
 
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)

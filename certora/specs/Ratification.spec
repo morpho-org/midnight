@@ -86,3 +86,12 @@ rule isRatifiedRequiresIsLeaf(env e, address ratifierAddr, Midnight.Offer offer,
 
     assert isLeafReturnedTrue, "ratifier must have called HashLib.isLeaf that returned true";
 }
+
+/// Every successful Midnight.take implies HashLib.isLeaf was invoked and returned true.
+rule takeRequiresIsLeaf(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+    require !isLeafReturnedTrue, "fresh capture state";
+
+    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+
+    assert isLeafReturnedTrue, "take must have triggered a ratifier that called HashLib.isLeaf returning true";
+}
