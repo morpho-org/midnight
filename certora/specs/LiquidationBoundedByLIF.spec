@@ -75,14 +75,14 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 
 /// Liquidation profit is bounded by maxLif (repaidUnits input).
 /// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
-rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     mathint maxLif = market.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchMarket validation and ExactMath.spec)";
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, healthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
@@ -90,7 +90,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uin
 }
 
 /// Liquidation profit is bounded by maxLif (seizedAssets input)
-rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     mathint maxLif = market.collateralParams[collateralIndex].maxLif;
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchMarket validation and ExactMath.spec)";
@@ -101,7 +101,7 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, healthyPath, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, postMaturityMode, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 

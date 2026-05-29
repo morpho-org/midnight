@@ -570,7 +570,7 @@ contract OtherFunctionsTest is BaseTest {
 
         setupMarket(_market, 1e18);
 
-        // Warp to maturity + TIME_TO_MAX_LIF and use the post-maturity path.
+        // Warp to maturity + TIME_TO_MAX_LIF and use the post-maturity mode.
         vm.warp(_market.maturity + TIME_TO_MAX_LIF);
 
         deal(address(loanToken), address(this), 1e18);
