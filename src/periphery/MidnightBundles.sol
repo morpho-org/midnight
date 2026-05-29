@@ -41,7 +41,8 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
-    /// @dev Total loan assets transfered from msg.sender is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
+    /// @dev Total loan assets transfered from msg.sender is
+    /// filledBuyerAssets + filledBuyerAssets * referralFeePct / (WAD - referralFeePct).
     function buyWithUnitsTargetAndWithdrawCollateral(
         uint256 targetUnits,
         uint256 maxBuyerAssets,
