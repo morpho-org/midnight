@@ -109,7 +109,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.
-    /// @dev Total loan assets received by the receiver is 
+    /// @dev Total loan assets received by the receiver is
     /// filledSellerAssets - filledSellerAssets * referralFeePct / WAD.
     function supplyCollateralAndSellWithUnitsTarget(
         uint256 targetUnits,
