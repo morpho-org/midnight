@@ -13,7 +13,7 @@ library TakeAmountsLib {
     /// @dev Assumes that id and offer.market match.
     /// @dev Reverts if buyerPrice > WAD, because not all buyerAssets are reachable then.
     /// @dev Reverts if offerPrice < settlementFee in case of a buy offer (midnight reverts too).
-    /// @dev Returns a number of units for which take yields exactly targetBuyerAssetsAssets (not necessarily the biggest).
+    /// @dev Returns a number of units for which take yields exactly targetBuyerAssets (not necessarily the biggest).
     function buyerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         internal
         view
