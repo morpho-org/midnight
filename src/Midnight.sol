@@ -75,8 +75,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
 /// @dev In the "post-maturity path", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
-/// @dev In both paths, maxLif is used to determine if the account has some bad debt, so that the bad debt solvency
-/// guarantees are the same before and after maturity.
+/// @dev In both paths, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
 /// @dev When a borrower's bad debt is realized, it is socialized among lenders in this market.
