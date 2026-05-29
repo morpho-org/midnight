@@ -22,6 +22,8 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
+/// @dev No-ops are allowed.
+/// @dev Zero checks are not systematically performed.
 contract MidnightBundles is IMidnightBundles {
     using UtilsLib for uint256;
 
