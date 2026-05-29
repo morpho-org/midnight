@@ -656,7 +656,7 @@ contract Midnight is IMidnight {
             if (!healthyPath) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
-                // The imprecision in this computation is at most a few hundreds WEI of collateral or loan token.
+                // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
