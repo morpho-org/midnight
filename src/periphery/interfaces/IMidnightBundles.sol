@@ -44,6 +44,10 @@ interface IMidnightBundles {
     error UnitsTooHigh();
     error UnitsTooLow();
 
+    /// STORAGE GETTERS ///
+    function PERMIT2() external view returns (address);
+    function MIDNIGHT() external view returns (address);
+
     // forgefmt: disable-start
     /// FUNCTIONS ///
     function buyWithUnitsTargetAndWithdrawCollateral(uint256 targetUnits, uint256 maxBuyerAssets, address taker, TokenPermit memory loanTokenPermit, Take[] memory takes, CollateralWithdrawal[] memory collateralWithdrawals, address collateralReceiver, uint256 referralFeePct, address referralFeeRecipient) external;
