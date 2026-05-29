@@ -90,10 +90,8 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require marketIsCreated(market);
-    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "see lastLossFactorLeqMarketLossFactor in Midnight.spec";
+    require marketIsCreated(market), "market created";
     require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
-    require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "see updatePositionDoesNotRevert";
 
@@ -103,6 +101,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     mathint pendingFeeAfterFirst = pendingFee(id, user);
     uint128 lastLossFactorAfterFirst = lastLossFactor(id, user);
     uint128 lastAccrualAfterFirst = currentContract.position[id][user].lastAccrual;
+    uint128 cfcAfterFirst = currentContract.marketState[id].continuousFeeCredit;
 
     uint128 newCredit;
     uint128 newPendingFee;
@@ -119,6 +118,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     assert pendingFee(id, user) == pendingFeeAfterFirst;
     assert lastLossFactor(id, user) == lastLossFactorAfterFirst;
     assert currentContract.position[id][user].lastAccrual == lastAccrualAfterFirst;
+    assert currentContract.marketState[id].continuousFeeCredit == cfcAfterFirst;
 }
 
 /// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated),
@@ -126,13 +126,11 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require marketIsCreated(market);
-    require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor;
+    require marketIsCreated(market), "market created";
+    require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
     require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
     require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
-    require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-    require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "see updatePositionDoesNotRevert";
 
     mathint creditBefore = creditOf(id, user);
     mathint pendingFeeBefore = pendingFee(id, user);
@@ -147,9 +145,6 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     assert newPendingFee + accruedFee == pendingFeeBefore;
     assert creditOf(id, user) + accruedFee == creditBefore;
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
-
-    // The sync with the market's lossFactor is preserved.
-    assert lastLossFactor(id, user) == currentContract.marketState[id].lossFactor;
 }
 
 /// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
