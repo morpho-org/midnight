@@ -67,7 +67,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// LIF CHARACTERIZATION ///
 
-/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when the normal mode is taken or the call is >= 15 min post-maturity (profitability).
+/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 15 min post-maturity (profitability).
 rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
