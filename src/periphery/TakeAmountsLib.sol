@@ -32,7 +32,7 @@ library TakeAmountsLib {
     /// @dev Forward: sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD).
     /// @dev Assumes that id and offer.market match.
     /// @dev Reverts if offerPrice < settlementFee in case of a buy offer (midnight reverts too).
-    /// @dev Returns a number of units for which take yields exactly targetSellerAssets (not necessarily the smallest).
+    /// @dev Returns units (not necessarily the smallest/biggest) for which take yields exactly targetSellerAssets.
     function sellerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetSellerAssets)
         internal
         view
