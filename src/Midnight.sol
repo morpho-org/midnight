@@ -413,6 +413,7 @@ contract Midnight is IMidnight {
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
+        require(block.timestamp <= offer.market.maturity || sellerDebtIncrease == 0, CannotIncreaseDebtPostMaturity());
         require(
             !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
             MakerCreditOrDebtIncreased()
@@ -497,11 +498,7 @@ contract Midnight is IMidnight {
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(
-            position[id][seller].debt == 0 || liquidationLocked(id, seller)
-                || (block.timestamp <= offer.market.maturity && isHealthy(offer.market, id, seller)),
-            SellerIsLiquidatable()
-        );
+        require(liquidationLocked(id, seller) || isHealthy(offer.market, id, seller), SellerIsLiquidatable());
 
         // MVP limits.
         require(buyerAssets <= maxTakeableAssets[offer.market.loanToken], MaxTakeableAssetsExceeded());
@@ -691,8 +688,9 @@ contract Midnight is IMidnight {
             if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
+                // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
+                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
