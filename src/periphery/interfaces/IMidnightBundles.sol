@@ -34,6 +34,7 @@ struct CollateralSupply {
 
 interface IMidnightBundles {
     /// ERRORS ///
+    error ApproveReturnedFalse();
     error InconsistentMarket();
     error InconsistentSide();
     error OutOfOffers();
