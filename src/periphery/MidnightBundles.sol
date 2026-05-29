@@ -43,7 +43,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
-    /// @dev Total loan assets transfered from msg.sender is
+    /// @dev Total loan assets transferred from msg.sender is
     /// filledBuyerAssets + filledBuyerAssets * referralFeePct / (WAD - referralFeePct).
     function buyWithUnitsTargetAndWithdrawCollateral(
         uint256 targetUnits,
@@ -173,7 +173,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev Total loan assets transfered from msg.sender is targetBuyerAssets.
+    /// @dev Total loan assets transferred from msg.sender is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyWithAssetsTargetAndWithdrawCollateral(
