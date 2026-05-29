@@ -87,7 +87,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
     assert maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
 }
 
-/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when the normal mode is taken or the call is >= 15 min post-maturity (profitability).
+/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 15 min post-maturity (profitability).
 rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
