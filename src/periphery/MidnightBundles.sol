@@ -41,7 +41,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
-    /// @dev Total loan-token cost is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
+    /// @dev Total loan assets transfered from msg.sender is filledBuyerAssets + filledBuyerAssets * pct / (WAD - pct).
     function buyWithUnitsTargetAndWithdrawCollateral(
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -108,7 +108,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.
-    /// @dev Total receipt is filledSellerAssets - filledSellerAssets * pct / WAD.
+    /// @dev Total loan assets received by the receiver is filledSellerAssets - filledSellerAssets * pct / WAD.
     function supplyCollateralAndSellWithUnitsTarget(
         uint256 targetUnits,
         uint256 minSellerAssets,
@@ -169,7 +169,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
     /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev Total cost is targetBuyerAssets.
+    /// @dev Total loan assets transfered from msg.sender is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function buyWithAssetsTargetAndWithdrawCollateral(
@@ -241,7 +241,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
     /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
-    /// @dev Total receipt is targetSellerAssets.
+    /// @dev Total loan assets received by the receiver is targetSellerAssets.
     /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
     function supplyCollateralAndSellWithAssetsTarget(
