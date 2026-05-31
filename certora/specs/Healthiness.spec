@@ -29,8 +29,8 @@ methods {
     function _.onBuy(bytes32 id, Midnight.Market market, uint256 buyerAssets, uint256 units, uint256 pendingFeeIncrease, address buyer, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onSell(bytes32 id, Midnight.Market market, uint256 sellerAssets, uint256 units, uint256 pendingFeeDecrease, address seller, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, uint256 badDebt, address liquidator, address borrower, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[] tokens, uint256[] amounts, address initiator, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => genericCallbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///
@@ -67,7 +67,7 @@ definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns 
 /* proved in mulDivInverseUpDown */
 definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => summaryMulDivUpM(summaryMulDivDownM(a, b, d), d, b) <= a;
 
-/* proved in mulDivLifLLTV */
+/* proved in ExactMath.spec (mulDivLifLLTV) */
 definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -196,7 +196,7 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data, bool healthyPath) {
+rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     useIsHealthyNoBitmap = false;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -214,7 +214,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, healthyPath, receiver, callbackAddr, data);
+    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, postMaturityMode, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
@@ -237,7 +237,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or market differs.
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data, bool healthyPath) {
+rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     useIsHealthyNoBitmap = true;
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
@@ -250,14 +250,14 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 
     require callIsHealthy(globalMarket, globalId, globalBorrower), "user is healthy before call";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callbackAddr, data);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callbackAddr, data);
 
     assert healthyBeforeCallback, "user is healthy before callbacks";
     assert callIsHealthy(globalMarket, globalId, globalBorrower), "user is healthy after call";
 }
 
 // Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
+rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector);
 
