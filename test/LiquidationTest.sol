@@ -156,14 +156,14 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 1, 1, borrower, false, address(this), address(0), "");
     }
 
-    function testLiquidatePostMaturityPathBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
+    function testLiquidatePostMaturityModeBeforeMaturity(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, 0, ORACLE_PRICE_SCALE - 1);
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        // Pre-maturity: the post-maturity path is not available.
+        // Pre-maturity: the post-maturity mode is not available.
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
 
@@ -177,7 +177,7 @@ contract LiquidationTest is BaseTest {
         midnight.liquidate(market, 0, 0, 0, borrower, true, address(this), address(0), "");
     }
 
-    function testLiquidateUnhealthyPathRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
+    function testLiquidateNormalModeRequiresUnhealthy(uint256 units, uint256 liquidationOraclePrice) public {
         units = bound(units, 1, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, ORACLE_PRICE_SCALE, 10 * ORACLE_PRICE_SCALE);
         collateralize(market, borrower, units);
@@ -185,7 +185,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + 1);
 
-        // Post-maturity but borrower is healthy: the unhealthy path is rejected.
+        // Post-maturity but borrower is healthy: the normal mode is rejected.
         vm.expectRevert(IMidnight.NotLiquidatable.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
@@ -371,7 +371,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(badDebtPriceDown(units));
 
         uint256 expectedBadDebt = _badDebt();
-        uint128 oldTotalUnits = midnight.totalUnits(id).toUint128();
+        uint128 oldTotalUnits = midnight.totalUnits(id);
         uint256 previousLossFactor = midnight.lossFactor(id);
         uint256 previousContinuousFeeCredit = midnight.continuousFeeCredit(id);
         uint256 expectedLossFactor = expectedBadDebt == 0
@@ -754,7 +754,7 @@ contract LiquidationTest is BaseTest {
         + otherCollat.mulDivDown(market.collateralParams[otherIdx].lltv, WAD);
 
         uint256 maxR = (units - _maxDebt)
-        .mulDivUp(WAD, WAD - market.collateralParams[liqIdx].maxLif.mulDivUp(market.collateralParams[liqIdx].lltv, WAD));
+        .mulDivUp(WAD * WAD, WAD * WAD - market.collateralParams[liqIdx].maxLif * market.collateralParams[liqIdx].lltv);
 
         midnight.liquidate(market, liqIdx, 0, maxR, borrower, false, address(this), address(0), "");
     }
@@ -932,7 +932,7 @@ contract LiquidationTest is BaseTest {
         uint256 lltv = market.collateralParams[0].lltv;
         uint256 collatAmount = units.mulDivUp(WAD, lltv);
         uint256 _maxDebt = collatAmount.mulDivDown(oraclePrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-        return (debt - _maxDebt).mulDivUp(WAD, WAD - market.collateralParams[0].maxLif.mulDivUp(lltv, WAD));
+        return (debt - _maxDebt).mulDivUp(WAD * WAD, WAD * WAD - market.collateralParams[0].maxLif * lltv);
     }
 
     function _setupUnhealthy(uint256 units, uint256 liquidationOraclePrice)
@@ -978,7 +978,7 @@ contract LiquidationTest is BaseTest {
 
     function testLiquidateNoDebtReverts() public {
         midnight.touchMarket(market);
-        vm.expectRevert(IMidnight.NotLiquidatable.selector);
+        vm.expectRevert(IMidnight.NotBorrower.selector);
         midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 

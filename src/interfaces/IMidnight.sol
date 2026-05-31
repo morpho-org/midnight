@@ -67,6 +67,7 @@ interface IMidnight {
     /// ERRORS ///
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
+    error CannotIncreaseDebtPostMaturity();
     error CollateralParamsNotSorted();
     error ConsumedAssets();
     error ConsumedUnits();
@@ -87,6 +88,7 @@ interface IMidnight {
     error MaturityTooFar();
     error MultipleNonZero();
     error NoCollateralParams();
+    error NotBorrower();
     error NotLiquidatable();
     error MarketLossFactorMaxedOut();
     error MarketNotCreated();
@@ -149,7 +151,7 @@ interface IMidnight {
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
+    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
@@ -165,15 +167,15 @@ interface IMidnight {
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
-    function creditOf(bytes32 id, address user) external view returns (uint256);
-    function debtOf(bytes32 id, address user) external view returns (uint256);
-    function totalUnits(bytes32 id) external view returns (uint256);
+    function creditOf(bytes32 id, address user) external view returns (uint128);
+    function debtOf(bytes32 id, address user) external view returns (uint128);
+    function totalUnits(bytes32 id) external view returns (uint128);
     function lossFactor(bytes32 id) external view returns (uint128);
     function tickSpacing(bytes32 id) external view returns (uint8);
-    function withdrawable(bytes32 id) external view returns (uint256);
+    function withdrawable(bytes32 id) external view returns (uint128);
     function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
-    function continuousFeeCredit(bytes32 id) external view returns (uint256);
+    function continuousFeeCredit(bytes32 id) external view returns (uint128);
     function pendingFee(bytes32 id, address user) external view returns (uint128);
     function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);

@@ -214,7 +214,7 @@ contract SettlementFeeTest is BaseTest {
 
         collateralize(market, borrower, MAX_DEBT);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, lender, borrowerOffer);
     }
 
