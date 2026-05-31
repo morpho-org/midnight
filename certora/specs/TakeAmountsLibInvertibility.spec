@@ -7,7 +7,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
-    function tradingFee(bytes32, uint256) external returns (uint256) envfree;
+    function settlementFee(bytes32, uint256) external returns (uint256) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
     function TakeAmountsLibHarness.buyerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
@@ -19,9 +19,9 @@ methods {
     // Deterministic price: the same tick yields the same price for both the library and take().
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 
-    // Dispatch TakeAmountsLib's external call IMidnight(midnight).tradingFee(...) to currentContract,
+    // Dispatch TakeAmountsLib's external call IMidnight(midnight).settlementFee(...) to currentContract,
     // so the value the library reads matches the value take() reads internally.
-    function _.tradingFee(bytes32, uint256) external => DISPATCHER(true);
+    function _.settlementFee(bytes32, uint256) external => DISPATCHER(true);
 
     // Axiomatic mulDiv summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
@@ -119,7 +119,7 @@ rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAsse
     // Mirror the library's sellerPrice computation in CVL to express the WAD precondition.
     uint256 offerPrice = summaryTickToPrice(offer.tick);
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
-    uint256 fee = tradingFee(id, timeToMaturity);
+    uint256 fee = settlementFee(id, timeToMaturity);
     require !offer.buy || fee <= offerPrice, "library reverts otherwise";
     uint256 sellerPrice = offer.buy ? assert_uint256(offerPrice - fee) : offerPrice;
     require sellerPrice <= WAD(), "invertibility requires sellerPrice <= WAD";

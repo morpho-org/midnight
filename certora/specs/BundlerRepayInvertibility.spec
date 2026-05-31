@@ -5,7 +5,7 @@ using Midnight as midnight;
 
 methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
-    function midnight.debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function midnight.debtOf(bytes32 id, address user) external returns (uint128) envfree;
     function midnight.isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function midnight.tickSpacing(bytes32 id) external returns (uint8) envfree;
 
