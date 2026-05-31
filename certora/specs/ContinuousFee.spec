@@ -5,10 +5,10 @@ methods {
 
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => CVL_toId(market);
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
-    function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
