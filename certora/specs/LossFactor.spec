@@ -5,8 +5,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
@@ -45,14 +45,14 @@ rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataa
 }
 
 /// In liquidate, the market's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
-rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
     uint256 totalUnitsBefore = totalUnits(id);
 
     require lossFactorBefore < max_uint128, "market lossFactor must not be saturated";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     bool lossFactorChanged = currentContract.marketState[id].lossFactor != lossFactorBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;
