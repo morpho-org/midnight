@@ -12,7 +12,7 @@ methods {
     function Utils.liquidationCursorHigh() external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
@@ -117,8 +117,8 @@ rule marketIsCreatedAfterWithdrawCollateral(env e, Midnight.Market market, uint2
     assert marketIsCreated(market);
 }
 
-rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
+rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     assert marketIsCreated(market);
 }
 

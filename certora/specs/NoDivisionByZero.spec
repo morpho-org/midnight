@@ -3,8 +3,8 @@
 // Proves that no division by zero occurs in mulDivDown or mulDivUp.
 //
 // All other Solidity divisions in the codebase use non-zero denominators:
-// - tradingFee: divides by (end - start), always a positive constant from the breakpoint table.
-// - setMarketTradingFee / setDefaultTradingFee: divide by CBP (1e12).
+// - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
+// - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
 // - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
@@ -112,7 +112,7 @@ rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.selec
 }
 
 // Show that liquidate does not cause a division by zero, in case the oracle price is non-zero and the collateral is active.
-rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     require equalsGlobalMarket(market);
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
@@ -124,6 +124,6 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     assert true;
 }

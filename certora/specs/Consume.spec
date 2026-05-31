@@ -4,7 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
 
     // Summaries for complex internals irrelevant to consumed-mapping properties.
     function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
@@ -14,7 +14,7 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
 ///  Only setConsumed and take can modify the consumed mapping.
