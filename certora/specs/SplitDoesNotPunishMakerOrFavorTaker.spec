@@ -96,7 +96,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     uint256 consumedAfterA = currentContract.consumed[offer.maker][offer.group];
 
     // Protocol fee accrued in storage after path 1: incremented by buyerAssets - sellerAssets per take.
-    uint256 claimableAfterA = currentContract.claimableTradingFee[offer.market.loanToken];
+    uint256 claimableAfterA = currentContract.claimableSettlementFee[offer.market.loanToken];
 
     // Path 2: take B then C from the initial state.
     uint256 buyerAssetsB;
@@ -111,7 +111,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     uint256 consumedAfterBC = currentContract.consumed[offer.maker][offer.group];
 
     // Protocol fee accrued in storage after path 2.
-    uint256 claimableAfterBC = currentContract.claimableTradingFee[offer.market.loanToken];
+    uint256 claimableAfterBC = currentContract.claimableSettlementFee[offer.market.loanToken];
 
     // Maker is buyer: splitting should not make them pay more.
     assert offer.buy => buyerAssetsB + buyerAssetsC <= buyerAssetsA;
@@ -135,7 +135,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     assert consumedAfterBC <= consumedAfterA + 1;
     assert offer.maxAssets == 0 => consumedAfterA == consumedAfterBC;
 
-    // Protocol fee storage delta (claimableTradingFee += buyerAssets - sellerAssets per take) can change by at most 1 wei across splits.
+    // Protocol fee storage delta (claimableSettlementFee += buyerAssets - sellerAssets per take) can change by at most 1 wei across splits.
     assert claimableAfterA <= claimableAfterBC + 1;
     assert claimableAfterBC <= claimableAfterA + 1;
 }
