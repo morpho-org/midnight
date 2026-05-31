@@ -5,9 +5,9 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
@@ -90,11 +90,11 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     // Path 1: take the full amount A.
     take(e, offer, ratifierData, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    uint256 creditOfBuyer1 = creditOf(id, buyer);
-    uint256 debtOfBuyer1 = debtOf(id, buyer);
-    uint256 creditOfSeller1 = creditOf(id, seller);
-    uint256 debtOfSeller1 = debtOf(id, seller);
-    uint256 totalUnits1 = totalUnits(id);
+    uint128 creditOfBuyer1 = creditOf(id, buyer);
+    uint128 debtOfBuyer1 = debtOf(id, buyer);
+    uint128 creditOfSeller1 = creditOf(id, seller);
+    uint128 debtOfSeller1 = debtOf(id, seller);
+    uint128 totalUnits1 = totalUnits(id);
     uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
     uint128 sellerLossFactor1 = lastLossFactor(id, seller);
     uint128 continuousFeeCredit1 = currentContract.marketState[id].continuousFeeCredit;
