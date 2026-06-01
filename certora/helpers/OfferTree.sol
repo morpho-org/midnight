@@ -114,6 +114,10 @@ contract OfferTree {
         return HashLib.hashOffer(offer);
     }
 
+    function hashNode(bytes32 left, bytes32 right) public pure returns (bytes32) {
+        return HashLib.hashNode(left, right);
+    }
+
     function _hashLeaf(bytes32 id) public view returns (bytes32) {
         return _hashLeaf(tree[id].leaf);
     }
