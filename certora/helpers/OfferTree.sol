@@ -3,13 +3,38 @@
 pragma solidity ^0.8.0;
 
 import {Offer} from "../../src/interfaces/IMidnight.sol";
-import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
+import {HashLib, OFFER_TYPEHASH} from "../../src/ratifiers/libraries/HashLib.sol";
+
+// A leaf's offer reaches `HashLib.hashOffer` only through fixed-size fields: every dynamic member of `Offer`
+// (`market.collateralParams` and `callbackData`) is already reduced to a single `bytes32` before the final
+// keccak (`hashMarket(market)` and `keccak256(callbackData)`). So we store that fixed-size pre-image instead
+// of the raw `Offer`. This keeps every `Node` fixed-size, so `isWellFormed` re-hashes a leaf with one bounded
+// keccak (no dynamic-array reads, no loops) — the property that lets the wellFormed invariant scale, exactly
+// as it does for URD's fixed-size leaves. `_hashLeaf` mirrors `hashOffer`'s outer keccak field-for-field, so a
+// leaf's id is the real `hashOffer` value; the wellFormed invariant's `newLeaf` case checks this mirror holds
+// (`id == hashOffer(offer)` and `id == _hashLeaf(leaf)`), so the correspondence is verified, not assumed.
+struct Leaf {
+    bytes32 marketHash; // = HashLib.hashMarket(offer.market)
+    bool buy;
+    address maker;
+    uint256 start;
+    uint256 expiry;
+    uint256 tick;
+    bytes32 group;
+    address callback;
+    bytes32 callbackDataHash; // = keccak256(offer.callbackData)
+    address receiverIfMakerIsSeller;
+    address ratifier;
+    bool reduceOnly;
+    uint256 maxUnits;
+    uint256 maxAssets;
+}
 
 contract OfferTree {
     struct Node {
         bytes32 left;
         bytes32 right;
-        Offer offer;
+        Leaf leaf;
         // hash of the offer for leaves, and of [left.hash, right.hash] for internal nodes.
         bytes32 hashNode;
     }
@@ -21,10 +46,11 @@ contract OfferTree {
     // This ensures that the same offer does not appear twice as a leaf in the tree.
     // For internal nodes the key is left arbitrary, so that the certificate generation can choose freely any bytes32
     // value (that is not already used).
-    // Leaves keep their offer payload so that `isWellFormed` can recompute `hashOffer` and pin a leaf's `hashNode` into
-    // the image of `hashOffer`. Because `hashOffer` and `hashNode` feed keccak distinct input shapes, this gives domain
-    // separation between leaves and internal nodes for free under Certora's keccak model.
-    // The tree is built only via `newLeaf` and `newInternalNode`, which preserve well-formedness by construction.
+    // Leaves keep the fixed-size pre-image of `hashOffer` (see `Leaf`) so `isWellFormed` can recompute a leaf's hash
+    // and pin its `hashNode` into the image of `hashOffer`. Because `hashOffer` and `hashNode` feed keccak distinct
+    // input shapes, this gives domain separation between leaves and internal nodes for free under Certora's keccak
+    // model. The tree is built only via `newLeaf` and `newInternalNode`, which preserve well-formedness by
+    // construction.
     mapping(bytes32 => Node) internal tree;
 
     /* MAIN FUNCTIONS */
@@ -34,7 +60,22 @@ contract OfferTree {
         require(id != 0, "id is the zero bytes");
         Node storage n = tree[id];
         require(_isEmpty(n), "leaf is not empty");
-        n.offer = offer;
+        // Store the fixed-size pre-image of `hashOffer`; the dynamic members are kept only as their sub-hashes.
+        Leaf storage l = n.leaf;
+        l.marketHash = HashLib.hashMarket(offer.market);
+        l.buy = offer.buy;
+        l.maker = offer.maker;
+        l.start = offer.start;
+        l.expiry = offer.expiry;
+        l.tick = offer.tick;
+        l.group = offer.group;
+        l.callback = offer.callback;
+        l.callbackDataHash = keccak256(offer.callbackData);
+        l.receiverIfMakerIsSeller = offer.receiverIfMakerIsSeller;
+        l.ratifier = offer.ratifier;
+        l.reduceOnly = offer.reduceOnly;
+        l.maxUnits = offer.maxUnits;
+        l.maxAssets = offer.maxAssets;
         n.hashNode = id;
     }
 
@@ -69,6 +110,38 @@ contract OfferTree {
         return tree[id].left == 0 && tree[id].right == 0 && tree[id].hashNode != 0;
     }
 
+    function hashOffer(Offer memory offer) public pure returns (bytes32) {
+        return HashLib.hashOffer(offer);
+    }
+
+    function _hashLeaf(bytes32 id) public view returns (bytes32) {
+        return _hashLeaf(tree[id].leaf);
+    }
+
+    // Recompute the leaf hash from its stored fixed-size pre-image. Mirrors `HashLib.hashOffer`'s outer keccak
+    // field-for-field, with `marketHash` standing in for `hashMarket(market)` and `callbackDataHash` for
+    // `keccak256(callbackData)`. Equals `HashLib.hashOffer(offer)` whenever the fields were extracted from `offer`.
+    function _hashLeaf(Leaf storage l) internal view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                OFFER_TYPEHASH,
+                l.marketHash,
+                l.buy,
+                l.maker,
+                l.start,
+                l.expiry,
+                l.tick,
+                l.group,
+                l.callback,
+                l.callbackDataHash,
+                l.receiverIfMakerIsSeller,
+                l.ratifier,
+                l.reduceOnly,
+                l.maxUnits,
+                l.maxAssets
+            )
+        );
+    }
 
     // The specification of a well-formed tree is the following:
     //   - empty nodes are well-formed
@@ -79,7 +152,7 @@ contract OfferTree {
         Node storage n = tree[id];
         if (_isEmpty(n)) return true;
         if (n.left == 0 && n.right == 0) {
-            bytes32 expected = HashLib.hashOffer(n.offer);
+            bytes32 expected = _hashLeaf(n.leaf);
             return n.hashNode == expected && id == expected;
         }
         if (n.left != 0 && n.right != 0) {

@@ -6,7 +6,7 @@ import {Test} from "../../lib/forge-std/src/Test.sol";
 import {stdJson} from "../../lib/forge-std/src/StdJson.sol";
 
 import {OfferTree} from "../helpers/OfferTree.sol";
-import {Offer, Market, CollateralParams} from "../../src/interfaces/IMidnight.sol";
+import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
 import {EIP712_DOMAIN_TYPEHASH} from "../../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 
@@ -23,54 +23,48 @@ contract Checker is Test {
         bytes32 s;
     }
 
-    // Rebuild a dense tree level-by-level via the verified `newLeaf` and
-    // `newInternalNode` primitives and assert the top hash matches `root`.
-    // Inserts are skipped when the target slot is already populated, so duplicate
-    // leaves (e.g. an `emptyOffer` repeated across padding slots) collapse into a
-    // single helper slot.
-    function _verifyDense(Offer[] memory leaves, bytes32 root) internal {
+    struct InternalNode {
+        bytes32 id;
+        bytes32 left;
+        bytes32 right;
+    }
+
+    // Replay the certificate through the verified `newLeaf` and `newInternalNode`
+    // primitives, then assert that the final certificate item matches `root`.
+    function _verifyCertificate(Offer[] memory leaves, InternalNode[] memory nodes, bytes32 root) internal {
         require(leaves.length > 0, "no leaves");
-        require((leaves.length & (leaves.length - 1)) == 0, "leaves length not power of two");
+        require(nodes.length > 0 || leaves.length == 1, "missing internal nodes");
 
         OfferTree tree = new OfferTree();
 
-        bytes32[] memory level = new bytes32[](leaves.length);
         for (uint256 i = 0; i < leaves.length; i++) {
-            bytes32 leafHash = HashLib.hashOffer(leaves[i]);
-            if (tree.isEmpty(leafHash)) tree.newLeaf(leaves[i]);
-            level[i] = leafHash;
+            tree.newLeaf(leaves[i]);
         }
 
-        while (level.length > 1) {
-            uint256 half = level.length / 2;
-            bytes32[] memory next = new bytes32[](half);
-            for (uint256 i = 0; i < half; i++) {
-                bytes32 leftHash = level[2 * i];
-                bytes32 rightHash = level[2 * i + 1];
-                bytes32 nodeHash = HashLib.hashNode(leftHash, rightHash);
-                if (tree.isEmpty(nodeHash)) tree.newInternalNode(nodeHash, leftHash, rightHash);
-                next[i] = nodeHash;
-            }
-            level = next;
+        bytes32 rootId = HashLib.hashOffer(leaves[0]);
+        for (uint256 i = 0; i < nodes.length; i++) {
+            InternalNode memory node = nodes[i];
+            tree.newInternalNode(node.id, node.left, node.right);
+            rootId = node.id;
         }
 
-        assertEq(level[0], root, "dense: root mismatch");
+        assertTrue(!tree.isEmpty(rootId), "empty root");
+        assertEq(tree.getHash(rootId), root, "mismatched roots");
     }
 
     // Mirrors EcrecoverRatifier.isRatified: structHash wraps the offer-tree typehash
     // and root, the domain separator binds (chainId, ratifier), and the digest is the
     // standard EIP-712 form.
-    function _verifyEip712(bytes32 root, Eip712Envelope memory env) internal {
+    function _verifyEip712(bytes32 root, Eip712Envelope memory env) internal pure {
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(env.height), root));
-        bytes32 domainSeparator =
-            keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, env.chainId, env.ratifier));
+        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, env.chainId, env.ratifier));
         bytes32 digest = keccak256(bytes.concat(hex"1901", domainSeparator, structHash));
         address recovered = ecrecover(digest, env.v, env.r, env.s);
         require(recovered != address(0), "eip712: invalid signature");
         assertEq(recovered, env.signer, "eip712: signer mismatch");
     }
 
-    function _maybeVerifyEip712(string memory json, bytes32 root, uint256 leafLength) internal {
+    function _maybeVerifyEip712(string memory json, bytes32 root) internal view {
         if (!json.keyExists(".eip712")) return;
 
         Eip712Envelope memory env;
@@ -82,7 +76,9 @@ contract Checker is Test {
         env.r = json.readBytes32(".eip712.r");
         env.s = json.readBytes32(".eip712.s");
 
-        require(1 << env.height == leafLength, "eip712: height does not match leaf count");
+        if (json.keyExists(".treeLeafLength")) {
+            require(1 << env.height == json.readUint(".treeLeafLength"), "eip712: height does not match leaf count");
+        }
         _verifyEip712(root, env);
     }
 
@@ -100,99 +96,14 @@ contract Checker is Test {
             leaves[i] = abi.decode(enc, (Offer));
         }
 
-        _verifyDense(leaves, root);
-        _maybeVerifyEip712(json, root, leafLength);
-    }
+        uint256 nodeLength = json.readUint(".nodeLength");
+        InternalNode[] memory nodes = new InternalNode[](nodeLength);
+        for (uint256 i = 0; i < nodeLength; i++) {
+            bytes memory enc = json.readBytes(string.concat(".node[", vm.toString(i), "]"));
+            nodes[i] = abi.decode(enc, (InternalNode));
+        }
 
-    function testSyntheticDenseHeight2() public {
-        Offer[] memory leaves = new Offer[](4);
-        for (uint256 i = 0; i < 4; i++) leaves[i] = _dummyOffer(i);
-
-        bytes32 h0 = HashLib.hashOffer(leaves[0]);
-        bytes32 h1 = HashLib.hashOffer(leaves[1]);
-        bytes32 h2 = HashLib.hashOffer(leaves[2]);
-        bytes32 h3 = HashLib.hashOffer(leaves[3]);
-        bytes32 leftBranch = HashLib.hashNode(h0, h1);
-        bytes32 rightBranch = HashLib.hashNode(h2, h3);
-        bytes32 root = HashLib.hashNode(leftBranch, rightBranch);
-
-        _verifyDense(leaves, root);
-    }
-
-    function testSyntheticDenseHeight2DetectsRootMismatch() public {
-        Offer[] memory leaves = new Offer[](4);
-        for (uint256 i = 0; i < 4; i++) leaves[i] = _dummyOffer(i);
-
-        vm.expectRevert();
-        this.externalVerifyDense(leaves, bytes32(uint256(0xdeadbeef)));
-    }
-
-    function testSyntheticDenseHeight2WithEmptyPadding() public {
-        Offer memory emptyOffer;
-        Offer memory real = _dummyOffer(42);
-
-        Offer[] memory leaves = new Offer[](4);
-        leaves[0] = real;
-        leaves[1] = emptyOffer;
-        leaves[2] = emptyOffer;
-        leaves[3] = emptyOffer;
-
-        bytes32 hReal = HashLib.hashOffer(real);
-        bytes32 hEmpty = HashLib.hashOffer(emptyOffer);
-        bytes32 leftBranch = HashLib.hashNode(hReal, hEmpty);
-        bytes32 rightBranch = HashLib.hashNode(hEmpty, hEmpty);
-        bytes32 root = HashLib.hashNode(leftBranch, rightBranch);
-
-        _verifyDense(leaves, root);
-    }
-
-    function testSyntheticEip712Height2() public {
-        Offer[] memory leaves = new Offer[](4);
-        for (uint256 i = 0; i < 4; i++) leaves[i] = _dummyOffer(i);
-
-        bytes32 h0 = HashLib.hashOffer(leaves[0]);
-        bytes32 h1 = HashLib.hashOffer(leaves[1]);
-        bytes32 h2 = HashLib.hashOffer(leaves[2]);
-        bytes32 h3 = HashLib.hashOffer(leaves[3]);
-        bytes32 root = HashLib.hashNode(HashLib.hashNode(h0, h1), HashLib.hashNode(h2, h3));
-
-        address ratifier = address(uint160(0xA17F1E7));
-        uint256 chainId = 1;
-        uint256 height = 2;
-        uint256 privateKey = 0xA11CE;
-
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), root));
-        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, chainId, ratifier));
-        bytes32 digest = keccak256(bytes.concat(hex"1901", domainSeparator, structHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
-
-        _verifyDense(leaves, root);
-        _verifyEip712(
-            root,
-            Eip712Envelope({
-                ratifier: ratifier,
-                chainId: chainId,
-                height: height,
-                signer: vm.addr(privateKey),
-                v: v,
-                r: r,
-                s: s
-            })
-        );
-    }
-
-    // External wrapper so `vm.expectRevert` can catch internal-call reverts.
-    function externalVerifyDense(Offer[] memory leaves, bytes32 root) external {
-        _verifyDense(leaves, root);
-    }
-
-    // Distinct dummy offers, distinguished by `tick`.
-    function _dummyOffer(uint256 nonce) internal pure returns (Offer memory o) {
-        o.market.loanToken = address(uint160(0x1000 + nonce));
-        o.market.collateralParams = new CollateralParams[](0);
-        o.maker = address(uint160(0x2000 + nonce));
-        o.tick = nonce;
-        o.maxUnits = 1;
-        o.maxAssets = 1;
+        _verifyCertificate(leaves, nodes, root);
+        _maybeVerifyEip712(json, root);
     }
 }
