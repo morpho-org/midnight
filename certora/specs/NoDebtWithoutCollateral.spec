@@ -21,16 +21,16 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    // Mirror the transient liquidation-lock slot into `ghostLocked`.
-    // This makes the persistent ghost the source of truth and sidesteps CVL's caveat that transient storage
-    // is only nullified in the base step of invariants (see https://docs.certora.com/en/latest/docs/cvl/transient.html).
+    // Mirror the transient liquidation-lock slot into the persistent ghost `ghostLocked`.
+    // The lock must be a persistent ghost rather than the raw transient slot for two reasons:
+    //  1. Invariants reset transient storage at the transaction boundary (only the base step
+    //     assumes it nullified, see https://docs.certora.com/en/latest/docs/cvl/transient.html),
+    //     which would clear the lock while the persistent debt/bitmap state remains.
+    //  2. Havoc (multicall's HAVOC_ALL, and unresolved external calls) havocs transient storage
+    //     just like regular storage; a persistent ghost survives havoc. This is sound because a
+    //     non-reentrant callee cannot write currentContract's transient storage.
     function UtilsLib.tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool) => summaryTExchange(key1, key2, value);
     function UtilsLib.tGet(uint256 baseSlot, bytes32 key1, address key2) internal returns (bool) => summaryTGet(key1, key2);
-
-    // NOTE: stateful external calls (`on*` callbacks and ERC20 `transfer`/`transferFrom`) are
-    // intentionally left unresolved. Combined with `-havocAllByDefault true`, this forces the
-    // strong-invariant boundary check on `lockedOrNoDebtWithoutCollateral` to fire at every such
-    // call site.
 }
 
 /// LIQUIDATION-LOCK GHOST ///
@@ -85,13 +85,13 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
         
             // Inlined axioms (proved in MulDiv.spec): mulDivUp monotonicity in a and d, and the up/down inverse.
             // mulDivMonotoneA
-            require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. a1 <= a2 && d > 0 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
+            require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. a1 <= a2 && d > 0 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "see mulDivMonotoneA";
         
             // mulDivMonotoneD
-            require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2);
+            require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2), "see mulDivMonotoneD";
         
             // mulDivInverseUpDown
-            require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
+            require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "see mulDivInverseUpDown";
         }
     }
 
