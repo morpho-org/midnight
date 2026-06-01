@@ -34,8 +34,8 @@ methods {
     function _.onBuy(bytes32 id, Midnight.Market market, uint256 buyerAssets, uint256 units, uint256 pendingFeeIncrease, address buyer, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onSell(bytes32 id, Midnight.Market market, uint256 sellerAssets, uint256 units, uint256 pendingFeeDecrease, address seller, address receiver, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bytes data) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
+    function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => genericCallbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 
     // View callbacks into user-supplied contracts: cannot change state, so we don't run them
     // through genericCallback (which would over-restrict by re-checking healthiness post-call).
@@ -43,8 +43,6 @@ methods {
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
     function _.canLiquidate(address) external => NONDET;
-    function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => genericCallbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
 /// SUMMARY ///
@@ -244,7 +242,6 @@ function genericCallbackBytes32() returns (bytes32) {
 // and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
-rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address liquidateCallback, bytes data) {
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     useIsHealthyNoBitmap = false;
 
@@ -263,7 +260,6 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     uint256 seizedAssetsOut;
     uint256 repaidUnitsOut;
 
-    seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, receiver, liquidateCallback, data);
     seizedAssetsOut, repaidUnitsOut = liquidate(e, globalMarket, collateralIndex, seizedAssetsIn, repaidUnitsIn, globalBorrower, postMaturityMode, receiver, callbackAddr, data);
 
     // we cannot use collateral, as it may already have been changed by the callbacks.
@@ -289,7 +285,6 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 }
 
 // Show that the user stays healthy on liquidate, if another user gets liquidated or market differs.
-rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address liquidateCallback, bytes data) {
 rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     useIsHealthyNoBitmap = true;
 
@@ -303,7 +298,6 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 
     require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked before call";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, liquidateCallback, data);
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callbackAddr, data);
 
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
@@ -313,16 +307,12 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
 // Show that the user stays healthy on any other function than liquidate.
 // We also allow the user to be liquidationLocked() (for callbacks from take(), where the seller
 // is not required to be healthy).
-rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
+rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     // for withdraw collateral and take we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector);
+    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector);
 
     // use 2 collaterals.
     mathint maxCollaterals = 2;
-// Show that the user stays healthy on any other function than liquidate or take.
-rule stayHealthy(env e, method f, calldataarg args) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
-    // for withdraw collateral we choose isHealthy() for all others the isHealthyNoBitmap function.
-    useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector);
 
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
@@ -358,12 +348,12 @@ weak invariant notLiquidationLocked()
 // Check that locked positions cannot be liquidated: for any liquidate() parameters
 // (other than the global market and borrower), the call must revert when the borrower
 // is liquidationLocked.
-rule notLiquidatableWhenLocked(env e, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address receiver, address liquidateCallback, bytes data) {
+rule notLiquidatableWhenLocked(env e, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     Midnight.Market globalMarket = getGlobalMarket();
 
     require liquidationLocked(globalId, globalBorrower), "borrower is locked";
 
-    liquidate@withrevert(e, globalMarket, collateralIndex, seizedAssets, repaidUnits, globalBorrower, receiver, liquidateCallback, data);
+    liquidate@withrevert(e, globalMarket, collateralIndex, seizedAssets, repaidUnits, globalBorrower, postMaturityMode, receiver, callbackAddr, data);
 
     assert lastReverted, "liquidate must revert on a locked borrower";
 }
