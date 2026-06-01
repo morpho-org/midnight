@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 using Utils as Utils;
-using Midnight as Midnight;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes32 id) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function claimableSettlementFee(address token) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
@@ -18,12 +17,10 @@ methods {
 
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
-    // Tokens are assumed to not reenter.
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    // Over-approximate view functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -63,26 +60,26 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     return r;
 }
 
-rule takeInputOutputConsistency(env e, uint256 unitsInput, address taker, address receiver, Midnight.Offer offer, bytes ratifierData, address takerCallbackAddress, bytes takerCallbackData) {
+rule takeInputOutputConsistency(env e, Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
 
-    uint256 claimableBefore = claimableTradingFee(offer.market.loanToken);
+    uint256 claimableBefore = claimableSettlementFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, unitsInput, taker, takerCallbackAddress, takerCallbackData, receiver, offer, ratifierData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
 
-    // The claimable trading fee increases by exactly the spread.
-    assert claimableTradingFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
+    // The claimable settlement fee increases by exactly the spread.
+    assert claimableSettlementFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
-rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
 
-    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     // At most one of the input arguments can be zero.
     assert seizedAssets == 0 || repaidUnits == 0;
@@ -144,7 +141,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
         }
-        preserved take(uint256 unitsInput, address taker, address takerCallbackAddress, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly

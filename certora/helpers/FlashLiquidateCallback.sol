@@ -19,13 +19,16 @@ contract FlashLiquidateCallback {
     }
 
     function onLiquidate(
+        address,
         bytes32,
         Market memory market,
         uint256,
         uint256,
         uint256 repaidUnits,
         address,
-        bytes memory data
+        address,
+        bytes memory data,
+        uint256
     ) external returns (bytes32) {
         startFlashloan(market.loanToken, repaidUnits);
         address account = abi.decode(data, (address));
@@ -45,7 +48,7 @@ contract FlashLiquidateCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
+    function onFlashLoan(address, address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
         external
         returns (bytes32)
     {

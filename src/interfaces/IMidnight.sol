@@ -35,20 +35,20 @@ struct Offer {
     uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
 }
 
-/// @dev Trading fee cbp values and the continuous fee are 0 until the market is created, then set to the default
+/// @dev Settlement fee cbp values and the continuous fee are 0 until the market is created, then set to the default
 /// values.
 struct MarketState {
     uint128 totalUnits;
     uint128 lossFactor;
     uint128 withdrawable;
     uint128 continuousFeeCredit;
-    uint16 tradingFeeCbp0;
-    uint16 tradingFeeCbp1;
-    uint16 tradingFeeCbp2;
-    uint16 tradingFeeCbp3;
-    uint16 tradingFeeCbp4;
-    uint16 tradingFeeCbp5;
-    uint16 tradingFeeCbp6;
+    uint16 settlementFeeCbp0;
+    uint16 settlementFeeCbp1;
+    uint16 settlementFeeCbp2;
+    uint16 settlementFeeCbp3;
+    uint16 settlementFeeCbp4;
+    uint16 settlementFeeCbp5;
+    uint16 settlementFeeCbp6;
     uint32 continuousFee;
     uint8 tickSpacing;
 }
@@ -67,6 +67,7 @@ interface IMidnight {
     /// ERRORS ///
     error AlreadyConsumed();
     error BuyerGatedFromIncreasingCredit();
+    error CannotIncreaseDebtPostMaturity();
     error CollateralParamsNotSorted();
     error ConsumedAssets();
     error ConsumedUnits();
@@ -87,6 +88,7 @@ interface IMidnight {
     error MaturityTooFar();
     error MultipleNonZero();
     error NoCollateralParams();
+    error NotBorrower();
     error NotLiquidatable();
     error MarketLossFactorMaxedOut();
     error MarketNotCreated();
@@ -106,7 +108,7 @@ interface IMidnight {
     error TickNotAccessible();
     error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
-    error TradingFeeTooHigh();
+    error SettlementFeeTooHigh();
     error Unauthorized();
     error UnhealthyBorrower();
 
@@ -116,12 +118,12 @@ interface IMidnight {
 
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
-    function marketState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 tradingFeeCbp0, uint16 tradingFeeCbp1, uint16 tradingFeeCbp2, uint16 tradingFeeCbp3, uint16 tradingFeeCbp4, uint16 tradingFeeCbp5, uint16 tradingFeeCbp6, uint32 continuousFee, uint8 tickSpacing);
+    function marketState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 settlementFeeCbp0, uint16 settlementFeeCbp1, uint16 settlementFeeCbp2, uint16 settlementFeeCbp3, uint16 settlementFeeCbp4, uint16 settlementFeeCbp5, uint16 settlementFeeCbp6, uint32 continuousFee, uint8 tickSpacing);
     function consumed(address user, bytes32 group) external view returns (uint256);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
-    function defaultTradingFeeCbp(address loanToken, uint256 index) external view returns (uint16);
+    function defaultSettlementFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
-    function claimableTradingFee(address token) external view returns (uint256);
+    function claimableSettlementFee(address token) external view returns (uint256);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
@@ -136,22 +138,22 @@ interface IMidnight {
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external;
-    function setMarketTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external;
-    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external;
+    function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external;
+    function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external;
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external;
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external;
-    function claimTradingFee(address token, uint256 amount, address receiver) external;
+    function claimSettlementFee(address token, uint256 amount, address receiver) external;
     function claimContinuousFee(Market memory market, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-    function take(uint256 units, address taker, address takerCallback, bytes memory takerCallbackData, address receiverIfTakerIsSeller, Offer memory offer, bytes memory ratifierData) external returns (uint256, uint256);
+    function take(Offer memory offer, bytes memory ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes memory takerCallbackData) external returns (uint256, uint256);
     function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external;
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
+    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
-    function setIsAuthorized(address onBehalf, address authorized, bool newIsAuthorized) external;
+    function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
     function touchMarket(Market memory market) external returns (bytes32);
 
@@ -165,19 +167,19 @@ interface IMidnight {
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
-    function creditOf(bytes32 id, address user) external view returns (uint256);
-    function debtOf(bytes32 id, address user) external view returns (uint256);
-    function totalUnits(bytes32 id) external view returns (uint256);
+    function creditOf(bytes32 id, address user) external view returns (uint128);
+    function debtOf(bytes32 id, address user) external view returns (uint128);
+    function totalUnits(bytes32 id) external view returns (uint128);
     function lossFactor(bytes32 id) external view returns (uint128);
     function tickSpacing(bytes32 id) external view returns (uint8);
-    function withdrawable(bytes32 id) external view returns (uint256);
-    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory);
+    function withdrawable(bytes32 id) external view returns (uint128);
+    function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory);
     function continuousFee(bytes32 id) external view returns (uint32);
-    function continuousFeeCredit(bytes32 id) external view returns (uint256);
+    function continuousFeeCredit(bytes32 id) external view returns (uint128);
     function pendingFee(bytes32 id, address user) external view returns (uint128);
     function lastAccrual(bytes32 id, address user) external view returns (uint128);
     function liquidationLocked(bytes32 id, address user) external view returns (bool);
     function isHealthy(Market memory market, bytes32 id, address borrower) external view returns (bool);
-    function tradingFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
+    function settlementFee(bytes32 id, uint256 timeToMaturity) external view returns (uint256);
     // forgefmt: disable-end
 }

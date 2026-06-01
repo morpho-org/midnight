@@ -3,9 +3,28 @@ pragma solidity ^0.8.0;
 
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
+import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
+import {
+    WAD,
+    LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
+    LLTV_0,
+    LLTV_1,
+    LLTV_2,
+    LLTV_3,
+    LLTV_4,
+    LLTV_5,
+    LLTV_6,
+    LLTV_7,
+    maxLif
+} from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
+    int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
+    int256 internal constant WEXP_OFFSET = 0.32261121498945987e18;
+    int256 internal constant WEXP_MONOTONICITY_STEP = 1e14;
+    int256 internal constant WEXP_MONOTONICITY_WINDOW = 32;
+
     function testFuzzCountBits(uint128 bitmap) public pure {
         uint256 actual = UtilsLib.countBits(bitmap);
         uint256 expected;
@@ -89,6 +108,53 @@ contract UtilsLibTest is Test {
         UtilsLib.mulDivUp(x, y, d);
     }
 
+    function testWExpNonDecreasing() public pure {
+        int256 start = -WEXP_OFFSET;
+        int256 end = WEXP_LN2 / 2 - WEXP_OFFSET - 1;
+
+        // Keep the range scan tractable, then pin one-wei windows around the requested points.
+        _assertWExpNonDecreasing(start, end, WEXP_MONOTONICITY_STEP);
+        _assertWExpNonDecreasingAround(start);
+        _assertWExpNonDecreasingAround(end);
+
+        // Also pin the old and new range-reduction boundaries, where jumps are most likely.
+        _assertWExpNonDecreasingAround(WEXP_LN2 / 2 - 1);
+        _assertWExpNonDecreasingAround(WEXP_LN2 - WEXP_OFFSET - 1);
+    }
+
+    function testWExpIncreasingAtTicks() public pure {
+        // MAX_TICK is a small constant, so casting it to int256 is safe.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 previous = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(MAX_TICK)));
+        for (uint256 tick = MAX_TICK; tick > 0; tick--) {
+            // tick - 1 is bounded by MAX_TICK - 1, so casting it to int256 is safe.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint256 current = TickLib.wExp(LN_ONE_PLUS_DELTA * (int256(MAX_TICK / 2) - int256(tick - 1)));
+            assertGt(current, previous);
+            previous = current;
+        }
+    }
+
+    function _assertWExpNonDecreasing(int256 start, int256 end, int256 step) internal pure {
+        uint256 previous = TickLib.wExp(start);
+        for (int256 x = start + step; x < end; x += step) {
+            uint256 current = TickLib.wExp(x);
+            assertGe(current, previous);
+            previous = current;
+        }
+        assertGe(TickLib.wExp(end), previous);
+    }
+
+    function _assertWExpNonDecreasingAround(int256 center) internal pure {
+        int256 start = center - WEXP_MONOTONICITY_WINDOW;
+        uint256 previous = TickLib.wExp(start);
+        for (int256 i = 1; i <= 2 * WEXP_MONOTONICITY_WINDOW + 1; i++) {
+            uint256 current = TickLib.wExp(start + i);
+            assertGe(current, previous);
+            previous = current;
+        }
+    }
+
     function testWExp() public pure {
         assertApproxEqRel(TickLib.wExp(-20 ether), 0.000000002061153622 ether, 0.001 ether, "exp(-20)");
         assertApproxEqRel(TickLib.wExp(-19 ether), 0.000000005602796438 ether, 0.001 ether, "exp(-19)");
@@ -131,5 +197,22 @@ contract UtilsLibTest is Test {
         assertApproxEqRel(TickLib.wExp(18 ether), 65659969.137330511139838976 ether, 0.001 ether, "exp(18)");
         assertApproxEqRel(TickLib.wExp(19 ether), 178482300.96318726092869632 ether, 0.001 ether, "exp(19)");
         assertApproxEqRel(TickLib.wExp(20 ether), 485165195.409790277969936384 ether, 0.001 ether, "exp(20)");
+    }
+
+    // This test makes sure that the computation of maxRepaid (for RCF) is not too imprecise.
+    function testRcfBound() public pure {
+        uint256[8] memory lltvs = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7];
+        uint256[2] memory cursors = [LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH];
+        for (uint256 i = 0; i < lltvs.length; i++) {
+            uint256 lltv = lltvs[i];
+            for (uint256 j = 0; j < cursors.length; j++) {
+                uint256 lif = maxLif(lltv, cursors[j]);
+                assertLt(lif * lltv, WAD * WAD);
+                assertLt(WAD * WAD / (WAD * WAD - lif * lltv), 100);
+            }
+        }
+        // Also ensure that the bound is close to the max bound.
+        uint256 lifHigh7 = maxLif(LLTV_7, LIQUIDATION_CURSOR_HIGH);
+        assertGt(WAD * WAD / (WAD * WAD - lifHigh7 * LLTV_7), 90);
     }
 }

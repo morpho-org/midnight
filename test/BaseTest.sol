@@ -10,8 +10,14 @@ import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
 import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {
+    IEcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
+import {DummyRatifier} from "./helpers/DummyRatifier.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {
@@ -28,12 +34,11 @@ import {
     LLTV_6,
     LLTV_7,
     LLTV_8,
-    maxTradingFee as _maxTradingFee,
+    maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
@@ -56,6 +61,7 @@ abstract contract BaseTest is Test {
     address internal liquidator = makeAddr("liquidator");
     EcrecoverRatifier internal ecrecoverRatifier;
     EcrecoverAuthorizer internal ecrecoverAuthorizer;
+    DummyRatifier internal dummyRatifier;
 
     bytes internal emptySig;
 
@@ -63,6 +69,7 @@ abstract contract BaseTest is Test {
         midnight = new Midnight();
         ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
+        dummyRatifier = new DummyRatifier();
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
@@ -77,15 +84,25 @@ abstract contract BaseTest is Test {
         (otherLender, _privateKey) = makeAddrAndKey("otherLender");
         privateKey[otherLender] = _privateKey;
 
+        // Authorize the dummy ratifier (used by default in Midnight integration tests).
         vm.prank(borrower);
-
-        midnight.setIsAuthorized(borrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, borrower);
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, lender);
         vm.prank(otherBorrower);
-        midnight.setIsAuthorized(otherBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, otherBorrower);
         vm.prank(otherLender);
-        midnight.setIsAuthorized(otherLender, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, otherLender);
+
+        // Authorize the ecrecover ratifier (used by ratifier-specific tests).
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, borrower);
+        vm.prank(lender);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, lender);
+        vm.prank(otherBorrower);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherBorrower);
+        vm.prank(otherLender);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, otherLender);
 
         uint256 tokenType = vm.envOr("TOKEN_TYPE", uint256(0));
         if (tokenType == 1) {
@@ -132,24 +149,28 @@ abstract contract BaseTest is Test {
     // helpers.
 
     function collateralize(Market memory market, address _borrower, uint256 debt) internal {
-        uint256 oraclePrice = Oracle(market.collateralParams[0].oracle).price();
+        collateralize(market, _borrower, debt, 0);
+    }
+
+    function collateralize(Market memory market, address _borrower, uint256 debt, uint256 collateralIndex) internal {
+        uint256 oraclePrice = Oracle(market.collateralParams[collateralIndex].oracle).price();
         uint256 collateral =
-            debt.mulDivUp(WAD, market.collateralParams[0].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
-        deal(address(market.collateralParams[0].token), _borrower, collateral);
+            debt.mulDivUp(WAD, market.collateralParams[collateralIndex].lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+        deal(address(market.collateralParams[collateralIndex].token), _borrower, collateral);
 
         vm.startPrank(_borrower);
-        ERC20(market.collateralParams[0].token).approve(address(midnight), 0);
-        ERC20(market.collateralParams[0].token).approve(address(midnight), collateral);
-        midnight.supplyCollateral(market, 0, collateral, _borrower);
+        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), 0);
+        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), collateral);
+        midnight.supplyCollateral(market, collateralIndex, collateral, _borrower);
         vm.stopPrank();
     }
 
-    // hardcodes the right root, signature, proof, and callback (no callback)
+    // Convenience wrapper for take with the dummy ratifier and no callbacks.
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
         vm.prank(taker);
-        return midnight.take(units, taker, address(0), hex"", taker, offer, merkleRatifierData([offer]));
+        return midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -163,8 +184,8 @@ abstract contract BaseTest is Test {
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = units;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
-        lenderOffer.ratifier = address(ecrecoverRatifier);
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.ratifier = address(dummyRatifier);
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         collateralize(market, otherBorrower, units);
@@ -183,33 +204,33 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.maker = badBorrower;
         badBorrowerOffer.receiverIfMakerIsSeller = badBorrower;
         badBorrowerOffer.maxUnits = 100;
-        badBorrowerOffer.ratifier = address(ecrecoverRatifier);
-        badBorrowerOffer.start = block.timestamp;
-        badBorrowerOffer.expiry = block.timestamp + 200;
+        badBorrowerOffer.ratifier = address(dummyRatifier);
+        badBorrowerOffer.start = vm.getBlockTimestamp();
+        badBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         badBorrowerOffer.tick = MAX_TICK;
 
         vm.prank(badBorrower);
 
-        midnight.setIsAuthorized(badBorrower, address(ecrecoverRatifier), true);
+        midnight.setIsAuthorized(address(dummyRatifier), true, badBorrower);
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
 
         deal(market.collateralParams[0].token, address(this), 135);
         midnight.supplyCollateral(market, 0, 135, badBorrower);
 
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), false);
+        midnight.setIsAuthorized(address(this), false, badBorrower);
 
         deal(address(loanToken), unluckyLender, 100);
 
         take(100, unluckyLender, badBorrowerOffer);
 
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE / 4);
-        midnight.liquidate(market, 0, 0, 0, badBorrower, address(this), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, badBorrower, false, address(this), address(0), "");
 
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
-        midnight.setIsAuthorized(badBorrower, address(this), true);
+        midnight.setIsAuthorized(address(this), true, badBorrower);
         deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
         midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
         assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
@@ -220,73 +241,6 @@ abstract contract BaseTest is Test {
 
     function toId(Market memory market) internal view returns (bytes32) {
         return IdLib.toId(market, block.chainid, address(midnight));
-    }
-
-    function merkleRatifierData(Offer[1] memory offers, address _signer) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[_signer], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
-    }
-
-    function proof(Offer[1] memory) internal pure returns (bytes32[] memory) {
-        return new bytes32[](0);
-    }
-
-    // assumes the offer is the first one!
-    function proof(Offer[2] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](1);
-        _path[0] = HashLib.hashOffer(offers[1]);
-        return _path;
-    }
-
-    // 4 leaves, assumes the offer is the first one
-    function proofFirstLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[1]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _path;
-    }
-
-    // 4 leaves, assumes the offer is the second one
-    function proofSecondLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[0]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return _path;
-    }
-
-    // 4 leaves, assumes the offer is the third one
-    function proofThirdLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[3]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _path;
-    }
-
-    // 4 leaves, assumes the offer is the fourth one
-    function proofFourthLeaf(Offer[4] memory offers) internal pure returns (bytes32[] memory) {
-        bytes32[] memory _path = new bytes32[](2);
-        _path[0] = HashLib.hashOffer(offers[2]);
-        _path[1] = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        return _path;
-    }
-
-    function root(Offer memory offer) internal pure returns (bytes32) {
-        return HashLib.hashOffer(offer);
-    }
-
-    function root(Offer[1] memory offers) internal pure returns (bytes32) {
-        return HashLib.hashOffer(offers[0]);
-    }
-
-    function root(Offer[2] memory offers) internal pure returns (bytes32) {
-        return HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-    }
-
-    function root(Offer[4] memory offers) internal pure returns (bytes32) {
-        bytes32 left = HashLib.commutativeHash(HashLib.hashOffer(offers[0]), HashLib.hashOffer(offers[1]));
-        bytes32 right = HashLib.commutativeHash(HashLib.hashOffer(offers[2]), HashLib.hashOffer(offers[3]));
-        return HashLib.commutativeHash(left, right);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -300,46 +254,9 @@ abstract contract BaseTest is Test {
     {
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(height), _root));
         bytes32 messageHash = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), structHash));
-        Signature memory _signature;
-        (_signature.v, _signature.r, _signature.s) = vm.sign(_privateKey, messageHash);
-        return _signature;
-    }
-
-    function _encodeMerkleRatifierData(Signature memory _sig, uint256 _height, bytes32 _root, bytes32[] memory _proof)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encode(_sig, _height, _root, _proof);
-    }
-
-    function merkleRatifierData(Offer[1] memory offers) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 0);
-        return _encodeMerkleRatifierData(_sig, 0, _root, proof(offers));
-    }
-
-    function merkleRatifierData(Offer[2] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 1);
-        return _encodeMerkleRatifierData(_sig, 1, _root, _proof);
-    }
-
-    function merkleRatifierData(Offer[4] memory offers, bytes32[] memory _proof) internal view returns (bytes memory) {
-        bytes32 _root = root(offers);
-        Signature memory _sig = signature(_root, privateKey[offers[0].maker], offers[0].ratifier, 2);
-        return _encodeMerkleRatifierData(_sig, 2, _root, _proof);
-    }
-
-    /// @dev Builds merkle ratifier data with explicit root, proof, and signer — useful for negative tests where
-    /// the signed root or the proof is intentionally inconsistent with the offer.
-    function merkleRatifierData(Offer memory offer, bytes32 _root, bytes32[] memory _proof, uint256 _height)
-        internal
-        view
-        returns (bytes memory)
-    {
-        Signature memory _sig = signature(_root, privateKey[offer.maker], offer.ratifier, _height);
-        return _encodeMerkleRatifierData(_sig, _height, _root, _proof);
+        Signature memory _sig;
+        (_sig.v, _sig.r, _sig.s) = vm.sign(_privateKey, messageHash);
+        return _sig;
     }
 
     function sortCollateralParams(CollateralParams[] memory arr) internal pure returns (CollateralParams[] memory) {
@@ -376,7 +293,7 @@ abstract contract BaseTest is Test {
         }
         collateralParams = sortCollateralParams(collateralParams);
         market.collateralParams = collateralParams;
-        market.maturity = bound(market.maturity, 0, block.timestamp + 100 * 365 days);
+        market.maturity = bound(market.maturity, 0, vm.getBlockTimestamp() + 100 * 365 days);
         return market;
     }
 
@@ -384,21 +301,20 @@ abstract contract BaseTest is Test {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
         Offer memory borrowerOffer = _setupMarketOffer(market, units);
-        bytes memory rd = merkleRatifierData([borrowerOffer]);
 
         vm.prank(lender);
-        midnight.take(units, lender, address(0), hex"", borrower, borrowerOffer, rd);
+        midnight.take(borrowerOffer, hex"", units, lender, borrower, address(0), hex"");
     }
 
-    function _setupMarketOffer(Market memory market, uint256 units) private view returns (Offer memory borrowerOffer) {
+    function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = units;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
-        borrowerOffer.start = block.timestamp;
-        borrowerOffer.expiry = block.timestamp;
+        borrowerOffer.ratifier = address(dummyRatifier);
+        borrowerOffer.start = vm.getBlockTimestamp();
+        borrowerOffer.expiry = vm.getBlockTimestamp();
         borrowerOffer.tick = MAX_TICK;
     }
 
@@ -418,7 +334,7 @@ abstract contract BaseTest is Test {
         return _maxLif(lltv, cursor);
     }
 
-    function maxTradingFee(uint256 index) internal pure returns (uint256) {
-        return _maxTradingFee(index);
+    function maxSettlementFee(uint256 index) internal pure returns (uint256) {
+        return _maxSettlementFee(index);
     }
 }

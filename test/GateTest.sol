@@ -43,7 +43,7 @@ contract GateTest is BaseTest {
         gate = new WhitelistGate();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -56,7 +56,7 @@ contract GateTest is BaseTest {
         market.collateralParams = sortCollateralParams(market.collateralParams);
 
         gatedMarket.loanToken = address(loanToken);
-        gatedMarket.maturity = block.timestamp + 100;
+        gatedMarket.maturity = vm.getBlockTimestamp() + 100;
         gatedMarket.collateralParams
             .push(
                 CollateralParams({
@@ -76,8 +76,8 @@ contract GateTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = gatedMarket;
-        lenderOffer.ratifier = address(ecrecoverRatifier);
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.ratifier = address(dummyRatifier);
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         borrowerOffer.buy = false;
@@ -85,8 +85,8 @@ contract GateTest is BaseTest {
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.market = gatedMarket;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.ratifier = address(dummyRatifier);
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
 
         deal(address(loanToken), lender, type(uint256).max);
@@ -174,8 +174,8 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.market = gatedMarket;
-        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
-        otherBorrowerOffer.expiry = block.timestamp + 200;
+        otherBorrowerOffer.ratifier = address(dummyRatifier);
+        otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
 
         collateralize(gatedMarket, otherBorrower, units);
@@ -201,8 +201,8 @@ contract GateTest is BaseTest {
         otherLenderOffer.maker = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.market = gatedMarket;
-        otherLenderOffer.ratifier = address(ecrecoverRatifier);
-        otherLenderOffer.expiry = block.timestamp + 200;
+        otherLenderOffer.ratifier = address(dummyRatifier);
+        otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
 
         take(units, otherBorrower, otherLenderOffer);
@@ -217,8 +217,8 @@ contract GateTest is BaseTest {
         exitOffer.receiverIfMakerIsSeller = otherLender;
         exitOffer.maxUnits = type(uint256).max;
         exitOffer.market = gatedMarket;
-        exitOffer.ratifier = address(ecrecoverRatifier);
-        exitOffer.expiry = block.timestamp + 200;
+        exitOffer.ratifier = address(dummyRatifier);
+        exitOffer.expiry = vm.getBlockTimestamp() + 200;
         exitOffer.tick = MAX_TICK;
 
         deal(address(loanToken), otherBorrower, units);
@@ -280,7 +280,7 @@ contract GateTest is BaseTest {
         deal(address(loanToken), liquidator, units);
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedMarket, 0, 1, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(gatedMarket, 0, 1, 0, borrower, false, address(this), address(0), "");
     }
 
     function testLiquidatorGateOnBadDebt(uint256 units, bool isWhitelisted) public {
@@ -296,7 +296,7 @@ contract GateTest is BaseTest {
 
         vm.prank(liquidator);
         if (!isWhitelisted) vm.expectRevert(IMidnight.LiquidatorGatedFromLiquidating.selector);
-        midnight.liquidate(gatedMarket, 0, 0, 0, borrower, address(this), address(0), "");
+        midnight.liquidate(gatedMarket, 0, 0, 0, borrower, false, address(this), address(0), "");
     }
 
     // --- Default (no gate) tests ---
@@ -310,8 +310,8 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.maker = lender;
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.market = market;
-        ungatedLenderOffer.ratifier = address(ecrecoverRatifier);
-        ungatedLenderOffer.expiry = block.timestamp + 200;
+        ungatedLenderOffer.ratifier = address(dummyRatifier);
+        ungatedLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         ungatedLenderOffer.tick = MAX_TICK;
 
         take(units, borrower, ungatedLenderOffer);

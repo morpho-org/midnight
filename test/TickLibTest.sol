@@ -19,6 +19,18 @@ contract TickLibTest is BaseTest {
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
+    function expR(int256 r) internal pure returns (int256) {
+        int256 secondTerm = r * r / (2 * 1e18);
+        int256 thirdTerm = secondTerm * r / (3 * 1e18);
+        return 1e18 + r + secondTerm + thirdTerm;
+    }
+
+    function testWExpOffsetProperty() public pure {
+        int256 ln2 = 0.693147180559945309e18;
+        int256 offset = 0.32261121498945987e18;
+        assertEq(2 * expR(-offset), expR(ln2 - offset - 1));
+    }
+
     function testTickMonotonicity() public pure {
         for (uint256 i = 0; i < MAX_TICK; i++) {
             assertGe(TickLib.tickToPrice(i + 1), TickLib.tickToPrice(i));
@@ -117,10 +129,10 @@ contract TickLibTest is BaseTest {
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
-            // 3-term Taylor in wExp yields max ~1.7 bps absolute error; 2 bps threshold leaves headroom.
-            assertLe(absErrorWad, 0.0002e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
+            // 3-term Taylor in wExp yields max ~1.4 bps absolute error; 2 bps threshold leaves headroom.
+            assertLe(absErrorWad, 0.00014e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
             if (solPrice > 0.01e18) {
-                assertLe(relErrorWad, 0.0015e18, string.concat("Tick ", vm.toString(tick), " error exceeds 0.15%"));
+                assertLe(relErrorWad, 0.0007e18, string.concat("Tick ", vm.toString(tick), " error exceeds 7 bps"));
             }
 
             // Check exact price is bracketed by adjacent sol prices in the bulk of the range,

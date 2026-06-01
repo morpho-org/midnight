@@ -7,8 +7,9 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
@@ -31,12 +32,12 @@ methods {
     // For gate rules, gate checks precede callbacks so re-entrant state changes cannot affect them.
     // For oracle rules, re-entrant callbacks cannot deactivate collaterals without calling
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => CVL_callbackBytes32() expect(bytes32);
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
 
     // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
     // (no balance tracking), which is sound for revert-propagation rules.
@@ -48,7 +49,6 @@ methods {
 
     // The function toMarket is not used by the protocol.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
@@ -180,14 +180,14 @@ function CVL_safeTransfer() {
 /// ORACLE REVERT PROPAGATION ///
 
 /// If any activated collateral oracle reverts on price, liquidate reverts.
-rule oracleRevertCausesLiquidateRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, uint256 revertingCollateralIndex) {
+rule oracleRevertCausesLiquidateRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, uint256 revertingCollateralIndex, bool postMaturityMode) {
     require singleRevertingOracle == market.collateralParams[revertingCollateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(market);
     uint128 bitmap = collateralBitmap(id, borrower);
     require summaryGetBit(bitmap, revertingCollateralIndex), "revertingCollateralIndex is activated";
 
-    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert lastReverted;
 }
@@ -222,7 +222,7 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Market market, bytes32 id
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
-rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, uint256 collateralIndex) {
+rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, uint256 collateralIndex) {
     require singleRevertingOracle == offer.market.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
     bytes32 id = summaryToId(offer.market);
@@ -235,7 +235,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
     uint128 bitmap = collateralBitmap(id, seller);
     require summaryGetBit(bitmap, collateralIndex), "collateralIndex is activated";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -243,11 +243,11 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, uint256 units, address tak
 /// ORACLE RETURNS ZERO ///
 
 /// If liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
-rule oracleZeroCausesLiquidateWithRepaidRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule oracleZeroCausesLiquidateWithRepaidRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     require singleZeroOracle == market.collateralParams[collateralIndex].oracle, "oracle returns zero";
     require repaidUnits > 0, "using repaid units as input";
 
-    liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, receiver, callback, data);
+    liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert lastReverted;
 }
@@ -265,7 +265,7 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Market market, address
 }
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
-rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
+rule oracleZeroPreventsWithdrawCollateralWhenBorrowerHasDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(market);
@@ -277,14 +277,14 @@ rule oracleZeroPreventsWithdrawWhenBorrowerHasDebt(env e, Midnight.Market market
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
-rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require forceOracleReturnZero, "all oracles return zero";
 
     bytes32 id = summaryToId(offer.market);
     address seller = offer.buy ? taker : offer.maker;
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) == 0;
 }
@@ -292,14 +292,14 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, uint256 units, address taker
 /// GATE BLOCKING ///
 
 /// If enterGate.canIncreaseCredit returns false and take succeeds, no user's credit increases.
-rule enterGateBlocksCreditIncrease(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, address user) {
+rule enterGateBlocksCreditIncrease(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
     require !ghostCanIncreaseCredit(offer.market.enterGate), "canIncreaseCredit blocked";
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
     uint256 creditBefore = creditOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     uint256 creditAfter = creditOf(id, user);
 
@@ -307,14 +307,14 @@ rule enterGateBlocksCreditIncrease(env e, uint256 units, address taker, address 
 }
 
 /// If enterGate.canIncreaseDebt returns false and take succeeds, no user's debt increases.
-rule enterGateBlocksDebtIncrease(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, address user) {
+rule enterGateBlocksDebtIncrease(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
     require !ghostCanIncreaseDebt(offer.market.enterGate), "canIncreaseDebt blocked";
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
     uint256 debtBefore = debtOf(id, user);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     uint256 debtAfter = debtOf(id, user);
 
@@ -322,11 +322,11 @@ rule enterGateBlocksDebtIncrease(env e, uint256 units, address taker, address ta
 }
 
 /// If the liquidator gate returns false on canLiquidate, liquidate reverts.
-rule liquidatorGateBlocksLiquidation(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule liquidatorGateBlocksLiquidation(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     require !ghostCanLiquidate(market.liquidatorGate), "canLiquidate blocked";
     require market.liquidatorGate != 0, "liquidator gate is set";
 
-    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert lastReverted;
 }
@@ -336,10 +336,10 @@ rule liquidatorGateBlocksLiquidation(env e, Midnight.Market market, uint256 coll
 /// If transferFrom reverts, take, repay, supplyCollateral, and liquidate all revert.
 rule transferFromRevertPropagation(method f, env e, calldataarg args)
 filtered {
-    f -> f.selector == sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+    f -> f.selector == sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
         || f.selector == sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         || f.selector == sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
-        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require forceTransferFromRevert, "transferFrom reverts";
     f@withrevert(e, args);
@@ -359,9 +359,9 @@ rule transferRevertPropagation(method f, env e, calldataarg args)
 filtered {
     f -> f.selector == sig:withdraw(Midnight.Market, uint256, address, address).selector
         || f.selector == sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-        || f.selector == sig:claimTradingFee(address, uint256, address).selector
+        || f.selector == sig:claimSettlementFee(address, uint256, address).selector
         || f.selector == sig:claimContinuousFee(Midnight.Market, uint256, address).selector
-        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        || f.selector == sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require forceTransferRevert, "transfer reverts";
     f@withrevert(e, args);
@@ -389,11 +389,11 @@ rule callbackRevertOrBadReturnCausesRepayRevert(env e, Midnight.Market market, u
 }
 
 /// If the callback reverts or returns something other than CALLBACK_SUCCESS, callback-enabled liquidate (non-zero callback) reverts.
-rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule callbackRevertOrBadReturnCausesLiquidateRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require callback != 0, "callback-enabled liquidate";
 
-    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate@withrevert(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert lastReverted;
 }
@@ -409,11 +409,11 @@ rule callbackRevertOrBadReturnCausesFlashLoanRevert(env e, address[] tokens, uin
 }
 
 /// If a buy/sell/isRatified callback reverts or returns something other than CALLBACK_SUCCESS, take reverts.
-rule callbackRevertOrBadReturnCausesTakeRevert(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule callbackRevertOrBadReturnCausesTakeRevert(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require forceCallbackRevert || forceCallbackBadReturn, "callback reverts or returns bad value";
     require takerCallback != 0 || offer.callback != 0 || offer.ratifier != 0, "callback-enabled take";
 
-    take@withrevert(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take@withrevert(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert lastReverted;
 }

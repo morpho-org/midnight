@@ -6,7 +6,9 @@ import {Offer, Market} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 import {
     CALLBACK_SUCCESS,
-    maxTradingFee as _maxTradingFee,
+    LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
+    maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../../src/libraries/ConstantsLib.sol";
 
@@ -44,11 +46,19 @@ contract Utils {
         return CALLBACK_SUCCESS;
     }
 
-    function maxTradingFee(uint256 index) external pure returns (uint256) {
-        return _maxTradingFee(index);
+    function maxSettlementFee(uint256 index) external pure returns (uint256) {
+        return _maxSettlementFee(index);
     }
 
     function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {
         return _maxLif(lltv, cursor);
+    }
+
+    function liquidationCursorLow() external pure returns (uint256) {
+        return LIQUIDATION_CURSOR_LOW;
+    }
+
+    function liquidationCursorHigh() external pure returns (uint256) {
+        return LIQUIDATION_CURSOR_HIGH;
     }
 }

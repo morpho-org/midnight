@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
-    function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
 
     // Summarize internals irrelevant to credit and debt tracking.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
@@ -21,13 +19,12 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
-    // This is justified because the properties we verify are about the effect of each function's own
-    // body on credit and debt, not the effect of the full transaction including callbacks.
-    function _.onBuy(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, address, uint256, uint256, bytes) external => NONDET;
-    function _.onLiquidate(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
+    // This is justified because the properties we verify are about the effect of each function's own body on credit and debt, not the effect of the full transaction including callbacks.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-    function _.onFlashLoan(address[], uint256[], bytes) external => NONDET;
+    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => NONDET;
     function _.transfer(address, uint256) external => NONDET;
 }
 
@@ -84,7 +81,7 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
 
 /// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
 /// and only changes credit of maker and taker and debt of maker and taker at the market id.
-rule takeEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData, bytes32 anyId, address anyUser) {
+rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, offer.market);
 
     uint128 makerCreditBefore;
@@ -96,7 +93,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
     uint256 otherCreditBefore = creditOf(anyId, anyUser);
     uint256 otherDebtBefore = debtOf(anyId, anyUser);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
     mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
@@ -112,7 +109,7 @@ rule takeEffects(env e, uint256 units, address taker, address takerCallback, byt
 /// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
 /// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
 /// Buyer's debt is non-increasing and can decrease by at most take units.
-rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = toId(e, offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
@@ -120,7 +117,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
     assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
@@ -132,7 +129,7 @@ rule takeBuyerEffects(env e, uint256 units, address taker, address takerCallback
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
 /// Seller's debt is non-decreasing, and can increase by at most take units.
 /// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
-rule takeSellerEffects(env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiver, Midnight.Offer offer, bytes ratifierData) {
+rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = toId(e, offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
@@ -140,7 +137,7 @@ rule takeSellerEffects(env e, uint256 units, address taker, address takerCallbac
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
 
-    take(e, units, taker, takerCallback, takerCallbackData, receiver, offer, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
     assert debtOf(id, seller) >= sellerDebtBefore;
@@ -170,7 +167,7 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
 
 /// Liquidate decreases the borrower's debt by at least repaidUnits,
 /// and only changes position[id][borrower].debt.
-rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser) {
+rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool postMaturityMode) {
     bytes32 id = toId(e, market);
 
     uint256 debtBefore = debtOf(id, borrower);
@@ -179,7 +176,7 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert debtOf(id, borrower) <= debtBefore - repaidResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
@@ -192,10 +189,10 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
-        && f.selector != sig:take(uint256, address, address, bytes, address, Midnight.Offer, bytes).selector
+        && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Market, address).selector
 } {
     uint256 creditBefore = creditOf(id, user);
@@ -241,14 +238,14 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 
 
 /// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
 /// and only changes position[id][borrower].collateral[collateralIndex].
-rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex) {
+rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex, bool postMaturityMode) {
     bytes32 id = toId(e, market);
 
     uint256 collateralBefore = collateral(id, borrower, collateralIndex);
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
@@ -262,7 +259,7 @@ filtered {
     f -> !f.isView
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     uint256 collateralBefore = collateral(id, user, colIdx);
     f(e, args);
