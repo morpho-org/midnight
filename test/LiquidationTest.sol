@@ -754,7 +754,7 @@ contract LiquidationTest is BaseTest {
         + otherCollat.mulDivDown(market.collateralParams[otherIdx].lltv, WAD);
 
         uint256 maxR = (units - _maxDebt)
-        .mulDivUp(WAD, WAD - market.collateralParams[liqIdx].maxLif.mulDivUp(market.collateralParams[liqIdx].lltv, WAD));
+        .mulDivUp(WAD * WAD, WAD * WAD - market.collateralParams[liqIdx].maxLif * market.collateralParams[liqIdx].lltv);
 
         midnight.liquidate(market, liqIdx, 0, maxR, borrower, false, address(this), address(0), "");
     }
@@ -932,7 +932,7 @@ contract LiquidationTest is BaseTest {
         uint256 lltv = market.collateralParams[0].lltv;
         uint256 collatAmount = units.mulDivUp(WAD, lltv);
         uint256 _maxDebt = collatAmount.mulDivDown(oraclePrice, ORACLE_PRICE_SCALE).mulDivDown(lltv, WAD);
-        return (debt - _maxDebt).mulDivUp(WAD, WAD - market.collateralParams[0].maxLif.mulDivUp(lltv, WAD));
+        return (debt - _maxDebt).mulDivUp(WAD * WAD, WAD * WAD - market.collateralParams[0].maxLif * lltv);
     }
 
     function _setupUnhealthy(uint256 units, uint256 liquidationOraclePrice)
