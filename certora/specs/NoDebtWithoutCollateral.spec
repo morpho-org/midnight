@@ -27,15 +27,6 @@ methods {
     function UtilsLib.tExchange(uint256 baseSlot, bytes32 key1, address key2, bool value) internal returns (bool) => summaryTExchange(key1, key2, value);
     function UtilsLib.tGet(uint256 baseSlot, bytes32 key1, address key2) internal returns (bool) => summaryTGet(key1, key2);
 
-    // Pure-view external callbacks: summarized as NONDET on the return value, no storage effect.
-    // NONDET is sound here because all five interfaces declare these methods `external view`
-    // We make the summaries explicit so they are not affected by `-havocAllByDefault true`, which would model these reads as HAVOC_ALL.
-    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
-    function _.price() external => NONDET;
-
     // NOTE: stateful external calls (`on*` callbacks and ERC20 `transfer`/`transferFrom`) are
     // intentionally left unresolved. Combined with `-havocAllByDefault true`, this forces the
     // strong-invariant boundary check on `lockedOrNoDebtWithoutCollateral` to fire at every such
@@ -90,9 +81,7 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes data) with (env e) {
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
-            // Scope restriction (not CVL-enforced): contract allows up to MAX_COLLATERALS (128) collateralParams, but a borrower has at most
-            // MAX_COLLATERALS_PER_BORROWER (10) activated (see `nonZeroCollateralsAreActivated`); we narrow the market shape to match, for loop-unrolling tractability.
-            require market.collateralParams.length <= Utils.maxCollateralsPerBorrower(), "scope restriction: market shape narrowed to <= MAX_COLLATERALS_PER_BORROWER";
+            require market.collateralParams.length <= Utils.maxCollateralsPerBorrower(), "assume less than 10 collaterals so that the loop can be bounded";
         
             // Inlined axioms (proved in MulDiv.spec): mulDivUp monotonicity in a and d, and the up/down inverse.
             // mulDivMonotoneA
@@ -109,10 +98,6 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
 weak invariant liquidationLockClearedAtBoundary(bytes32 id, address user)
     ghostLocked[id][user] == false;
 
-// Derived from `lockedOrNoDebtWithoutCollateral` and `liquidationLockClearedAtBoundary`:
-//   (ghostLocked[id][user] || (bitmap == 0 => debt == 0)) ∧ !ghostLocked[id][user] ⇒ (bitmap == 0 => debt == 0)
-// at every method boundary. The preserved block injects both invariants at the start of the
-// inductive step; the heavy mulDiv axioms and loop bound live on `lockedOrNoDebtWithoutCollateral`.
 weak invariant noDebtWithoutCollateral(bytes32 id, address user)
     currentContract.position[id][user].collateralBitmap == 0 => currentContract.position[id][user].debt == 0
     {
