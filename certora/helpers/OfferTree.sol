@@ -5,20 +5,26 @@ pragma solidity ^0.8.0;
 import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
 
-// Trees are built only via `newLeaf` and `newInternalNode`, which preserve well-formedness by construction.
-// Leaves carry the offer payload so `isWellFormed` can pin a leaf's `hashNode` into the image of
-// `hashOffer` (distinct keccak input shape from `hashNode`), giving domain separation against internal-node
-// hashes for free under Certora's keccak model.
 contract OfferTree {
     struct Node {
         bytes32 left;
         bytes32 right;
         Offer offer;
+        // hash of the offer for leaves, and of [left.hash, right.hash] for internal nodes.
         bytes32 hashNode;
     }
 
     /* STORAGE */
 
+    // The tree has no root because every node (and the nodes underneath) form an offer tree.
+    // We use bytes32 as keys of the mapping so that leaves can have an identifier that is the hash of the offer.
+    // This ensures that the same offer does not appear twice as a leaf in the tree.
+    // For internal nodes the key is left arbitrary, so that the certificate generation can choose freely any bytes32
+    // value (that is not already used).
+    // Leaves keep their offer payload so that `isWellFormed` can recompute `hashOffer` and pin a leaf's `hashNode` into
+    // the image of `hashOffer`. Because `hashOffer` and `hashNode` feed keccak distinct input shapes, this gives domain
+    // separation between leaves and internal nodes for free under Certora's keccak model.
+    // The tree is built only via `newLeaf` and `newInternalNode`, which preserve well-formedness by construction.
     mapping(bytes32 => Node) internal tree;
 
     /* MAIN FUNCTIONS */
@@ -63,11 +69,12 @@ contract OfferTree {
         return tree[id].left == 0 && tree[id].right == 0 && tree[id].hashNode != 0;
     }
 
+
     // The specification of a well-formed tree is the following:
-    //   - empty nodes (left == 0 && right == 0 && hashNode == 0) are well-formed
-    //   - leaves (left == 0 && right == 0 && hashNode != 0) require hashNode == hashOffer(offer) and id == hashNode
-    //   - internal nodes (left != 0 && right != 0) require non-empty children and hashNode = hashNode(left.hashNode,
-    // right.hashNode) - any other field combination is malformed
+    //   - empty nodes are well-formed
+    //   - leaves have the correct identifier and hashing
+    //   - internal nodes have the correct hashing
+    //   - internal nodes have exactly two non-empty children
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (_isEmpty(n)) return true;
