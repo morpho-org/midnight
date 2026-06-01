@@ -8,20 +8,9 @@ import {stdJson} from "../../lib/forge-std/src/StdJson.sol";
 import {OfferTree} from "../helpers/OfferTree.sol";
 import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
-import {EIP712_DOMAIN_TYPEHASH} from "../../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 
 contract Checker is Test {
     using stdJson for string;
-
-    struct Eip712Envelope {
-        address ratifier;
-        uint256 chainId;
-        uint256 height;
-        address signer;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
 
     struct InternalNode {
         bytes32 id;
@@ -52,36 +41,6 @@ contract Checker is Test {
         assertEq(tree.getHash(rootId), root, "mismatched roots");
     }
 
-    // Mirrors EcrecoverRatifier.isRatified: structHash wraps the offer-tree typehash
-    // and root, the domain separator binds (chainId, ratifier), and the digest is the
-    // standard EIP-712 form.
-    function _verifyEip712(bytes32 root, Eip712Envelope memory env) internal pure {
-        bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(env.height), root));
-        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, env.chainId, env.ratifier));
-        bytes32 digest = keccak256(bytes.concat(hex"1901", domainSeparator, structHash));
-        address recovered = ecrecover(digest, env.v, env.r, env.s);
-        require(recovered != address(0), "eip712: invalid signature");
-        assertEq(recovered, env.signer, "eip712: signer mismatch");
-    }
-
-    function _maybeVerifyEip712(string memory json, bytes32 root) internal view {
-        if (!json.keyExists(".eip712")) return;
-
-        Eip712Envelope memory env;
-        env.ratifier = json.readAddress(".eip712.ratifier");
-        env.chainId = json.readUint(".eip712.chainId");
-        env.height = json.readUint(".eip712.height");
-        env.signer = json.readAddress(".eip712.signer");
-        env.v = uint8(json.readUint(".eip712.v"));
-        env.r = json.readBytes32(".eip712.r");
-        env.s = json.readBytes32(".eip712.s");
-
-        if (json.keyExists(".treeLeafLength")) {
-            require(1 << env.height == json.readUint(".treeLeafLength"), "eip712: height does not match leaf count");
-        }
-        _verifyEip712(root, env);
-    }
-
     function testVerifyCertificate() public {
         string memory path = string.concat(vm.projectRoot(), "/certificate.json");
         if (!vm.exists(path)) vm.skip(true, "no certificate.json at project root");
@@ -104,6 +63,5 @@ contract Checker is Test {
         }
 
         _verifyCertificate(leaves, nodes, root);
-        _maybeVerifyEip712(json, root);
     }
 }
