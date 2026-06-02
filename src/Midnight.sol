@@ -25,8 +25,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 /// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
-/// is an incentive to take resting sell offers with price < 1 and withdraw instantly. Lenders (and the fee claimer)
-/// might also race to withdraw first.
+/// is an incentive to take resting sell offers with price < 1. (more precisely price < 1 - settlementFee) and withdraw
+/// instantly. Lenders (and the fee claimer) might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
@@ -168,11 +168,13 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
+/// @dev creditOf, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
+/// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing market ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
 /// there can be some market id clashes.
+/// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
 /// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
 /// (Shanghai).
 ///

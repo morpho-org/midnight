@@ -97,6 +97,21 @@ contract SetterRatifierTest is BaseTest {
         assertEq(result, CALLBACK_SUCCESS);
     }
 
+    function testIsRatifiedTreeTooHigh() public {
+        Offer memory offer = makeOffer(lender);
+        bytes32 _root = HashLib.hashOffer(offer);
+
+        // Height 20 passes the bound (and fails later on the invalid proof).
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRatifier.InvalidProof.selector);
+        setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](20)));
+
+        // Height 21 is rejected.
+        vm.prank(address(midnight));
+        vm.expectRevert(HashLib.TreeTooHigh.selector);
+        setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](21)));
+    }
+
     function testIsRatifiedNotMidnight() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
