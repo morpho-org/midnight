@@ -36,13 +36,6 @@ methods {
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => genericCallbackBytes32() expect(bytes32);
     function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => genericCallbackBytes32() expect(bytes32);
     function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
-
-    // View callbacks into user-supplied contracts: cannot change state, so we don't run them
-    // through genericCallback (which would over-restrict by re-checking healthiness post-call).
-    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
 }
 
 /// SUMMARY ///
