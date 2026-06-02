@@ -81,7 +81,7 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool healthyPath, address receiver, address callback, bytes data) with (env e) {
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
-            require market.collateralParams.length <= Utils.maxCollateralsPerBorrower(), "assume less than 10 collaterals so that the loop can be bounded";
+            require market.collateralParams.length <= 10, "assume less than 10 collaterals so that the loop can be bounded";
         
             // Inlined axioms (proved in MulDiv.spec): mulDivUp monotonicity in a and d, and the up/down inverse.
             // mulDivMonotoneA
