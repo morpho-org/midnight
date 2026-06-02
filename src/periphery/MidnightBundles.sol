@@ -21,11 +21,11 @@ import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
 /// @dev buy/sell functions take min("units needed to targetUnits", takes[i].units, "consumable units") units.
-/// @dev buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was 
+/// @dev buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was
 /// available in other offers passed as argument.
 /// @dev The taker/onBehalf must have authorized this bundler and the msg.sender (if different from the taker/onBehalf)
 /// on Midnight.
-/// @dev msg.sender is always the tokens payer (for buy, supplyCollateral and repay), and receiver is always the tokens 
+/// @dev msg.sender is always the tokens payer (for buy, supplyCollateral and repay), and receiver is always the tokens
 /// receiver (for sell and withdraw collateral).
 /// @dev msg.sender must have approved the bundler to pull enough tokens.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
