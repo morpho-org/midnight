@@ -609,4 +609,137 @@ contract UniswapV3GasTest is BaseTest {
 
         console.log("Gas Uniswap V3 liquidation max collaterals two hops per collat", gasUsed);
     }
+
+    /// forge-config: default.isolate = true
+    function testGasFullLiquidateMaxCollateralsOneHopPerCollat() public {
+        uint256 N = MAX_COLLATERALS_PER_BORROWER;
+        uint256 lltv = 0.77e18;
+        uint256 debtPerCollat = 100e18;
+        uint256 units = N * debtPerCollat;
+        // Supply enough collateral to exactly cover debtPerCollat at oracle price 1e36.
+        uint256 collateralAmount = (debtPerCollat * 1e18 + lltv - 1) / lltv;
+
+        CollateralParams[] memory params = new CollateralParams[](N);
+        for (uint256 i = 0; i < N; i++) {
+            params[i] = CollateralParams({
+                token: address(new ERC20NoRevert("c")),
+                lltv: lltv,
+                maxLif: maxLif(lltv, LIQUIDATION_CURSOR_LOW),
+                oracle: address(new Oracle())
+            });
+        }
+        params = sortCollateralParams(params);
+
+        Market memory _market;
+        _market.loanToken = address(loanToken);
+        _market.maturity = block.timestamp + 100;
+        _market.rcfThreshold = 0;
+        _market.collateralParams = params;
+
+        UniV3MultiCollateralLiquidator liquidator =
+            new UniV3MultiCollateralLiquidator(address(midnight), address(loanToken));
+        deal(address(loanToken), address(liquidator), 1e36);
+        for (uint256 i = 0; i < N; i++) {
+            address poolAddr = uniFactory.createPool(params[i].token, address(loanToken), 3000);
+            IUniswapV3Pool pool = IUniswapV3Pool(poolAddr);
+            pool.initialize(SQRT_PRICE_1_1);
+            liquidator.registerPool(params[i].token, poolAddr);
+            deal(params[i].token, address(liquidator), 1e36);
+            liquidator.provideLiquidity(pool, 1_000_000e18);
+        }
+
+        for (uint256 i = 0; i < N; i++) {
+            deal(params[i].token, borrower, collateralAmount);
+            vm.startPrank(borrower);
+            IERC20Minimal(params[i].token).approve(address(midnight), collateralAmount);
+            midnight.supplyCollateral(_market, i, collateralAmount, borrower);
+            vm.stopPrank();
+        }
+        setupMarket(_market, units);
+
+        // Drop oracle prices to 0.9: position is unhealthy but solvent (no bad debt).
+        for (uint256 i = 0; i < N; i++) {
+            Oracle(params[i].oracle).setPrice(0.9e36);
+        }
+        vm.warp(_market.maturity + TIME_TO_MAX_LIF);
+
+        // Each call repays debtPerCollat units (healthyPath=true bypasses RCF); n calls repay all debt.
+        uint256 gasBefore = gasleft();
+        for (uint256 i = 0; i < N; i++) {
+            midnight.liquidate(
+                _market, i, 0, debtPerCollat, borrower, true, address(liquidator), address(liquidator), ""
+            );
+        }
+        uint256 gasUsed = gasBefore - gasleft();
+
+        console.log("Gas full liquidation max collaterals one hop per collat", gasUsed);
+    }
+
+    /// forge-config: default.isolate = true
+    function testGasFullLiquidateMaxCollateralsTwoHopsPerCollat() public {
+        uint256 N = MAX_COLLATERALS_PER_BORROWER;
+        uint256 lltv = 0.77e18;
+        uint256 debtPerCollat = 100e18;
+        uint256 units = N * debtPerCollat;
+        uint256 collateralAmount = (debtPerCollat * 1e18 + lltv - 1) / lltv;
+
+        CollateralParams[] memory params = new CollateralParams[](N);
+        for (uint256 i = 0; i < N; i++) {
+            params[i] = CollateralParams({
+                token: address(new ERC20NoRevert("c")),
+                lltv: lltv,
+                maxLif: maxLif(lltv, LIQUIDATION_CURSOR_LOW),
+                oracle: address(new Oracle())
+            });
+        }
+        params = sortCollateralParams(params);
+
+        Market memory _market;
+        _market.loanToken = address(loanToken);
+        _market.maturity = block.timestamp + 100;
+        _market.rcfThreshold = 0;
+        _market.collateralParams = params;
+
+        // Two-hop path: collateral_i → collateralToken1 (poolAB_i) → loanToken (uniPool = poolBC).
+        UniV3MultiCollateralTwoHopLiquidator liquidator =
+            new UniV3MultiCollateralTwoHopLiquidator(address(midnight), address(uniPool), address(loanToken));
+
+        deal(uniPool.token0(), address(liquidator), 1e36);
+        deal(uniPool.token1(), address(liquidator), 1e36);
+        liquidator.provideLiquidityBC(1_000_000e18);
+
+        deal(address(collateralToken1), address(liquidator), 1e36);
+        for (uint256 i = 0; i < N; i++) {
+            address poolABAddr = uniFactory.createPool(params[i].token, address(collateralToken1), 3000);
+            IUniswapV3Pool poolAB = IUniswapV3Pool(poolABAddr);
+            poolAB.initialize(SQRT_PRICE_1_1);
+            liquidator.registerPoolAB(params[i].token, poolABAddr);
+            deal(params[i].token, address(liquidator), 1e36);
+            liquidator.provideLiquidityAB(params[i].token, 1_000_000e18);
+        }
+
+        for (uint256 i = 0; i < N; i++) {
+            deal(params[i].token, borrower, collateralAmount);
+            vm.startPrank(borrower);
+            IERC20Minimal(params[i].token).approve(address(midnight), collateralAmount);
+            midnight.supplyCollateral(_market, i, collateralAmount, borrower);
+            vm.stopPrank();
+        }
+        setupMarket(_market, units);
+
+        for (uint256 i = 0; i < N; i++) {
+            Oracle(params[i].oracle).setPrice(0.9e36);
+        }
+        vm.warp(_market.maturity + TIME_TO_MAX_LIF);
+
+        uint256 gasBefore = gasleft();
+        for (uint256 i = 0; i < N; i++) {
+            midnight.liquidate(
+                _market, i, 0, debtPerCollat, borrower, true, address(liquidator), address(liquidator), ""
+            );
+        }
+        uint256 gasUsed = gasBefore - gasleft();
+
+        console.log("Gas full liquidation max collaterals two hops per collat", gasUsed);
+    }
 }

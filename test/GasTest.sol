@@ -36,6 +36,24 @@ contract Liquidator {
     }
 }
 
+// Fully liquidates by repaying a fixed debt amount per collateral index.
+contract FullLiquidator {
+    IMidnight public immutable midnight;
+
+    constructor(address _midnight, address loanToken) {
+        midnight = IMidnight(_midnight);
+        IERC20Approve(loanToken).approve(_midnight, type(uint256).max);
+    }
+
+    function liquidateAll(Market calldata market, uint256 repaidUnitsPerCollat, address borrower) external {
+        uint256 n = market.collateralParams.length;
+        for (uint256 i = 0; i < n; i++) {
+            // healthyPath=true: post-maturity liquidation, no RCF constraint.
+            midnight.liquidate(market, i, 0, repaidUnitsPerCollat, borrower, true, address(this), address(0), "");
+        }
+    }
+}
+
 contract GasTest is BaseTest {
     using UtilsLib for uint256;
 
@@ -108,6 +126,63 @@ contract GasTest is BaseTest {
         json = string.concat(json, "]\n");
 
         vm.writeFile("./test/gas_report.json", json);
+    }
+
+    /// forge-config: default.isolate = true
+    function testGasFullLiquidateMaxCollaterals() public {
+        uint256 gasUsed = _measureFullLiquidateN(MAX_COLLATERALS_PER_BORROWER);
+        console.log("Gas full liquidation max collaterals", gasUsed);
+    }
+
+    // Measures gas for fully liquidating a position with n collaterals.
+    // Each of the n liquidate() calls repays debtPerCollat units (total debt = n * debtPerCollat).
+    function _measureFullLiquidateN(uint256 n) internal returns (uint256) {
+        uint256 lltv = 0.77e18;
+        uint256 _maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+
+        CollateralParams[] memory params = new CollateralParams[](n);
+        for (uint256 i = 0; i < n; i++) {
+            ERC20 token = new ERC20("collat", "collat");
+            Oracle o = new Oracle();
+            params[i] = CollateralParams({token: address(token), lltv: lltv, maxLif: _maxLif, oracle: address(o)});
+            token.approve(address(midnight), type(uint256).max);
+        }
+        params = sortCollateralParams(params);
+        for (uint256 i = 0; i < n; i++) {
+            market.collateralParams.push(params[i]);
+        }
+        id = toId(market);
+
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(this), true, borrower);
+
+        // Each collateral covers debtPerCollat of debt. Total debt = n * debtPerCollat.
+        uint256 debtPerCollat = 100e18;
+        uint256 units = n * debtPerCollat;
+        for (uint256 i = 0; i < n; i++) {
+            CollateralParams memory cp = market.collateralParams[i];
+            uint256 oraclePrice = Oracle(cp.oracle).price();
+            // Supply enough collateral to exactly cover debtPerCollat at the LLTV.
+            uint256 collateral = debtPerCollat.mulDivUp(WAD, cp.lltv).mulDivUp(ORACLE_PRICE_SCALE, oraclePrice);
+            deal(cp.token, address(this), collateral);
+            midnight.supplyCollateral(market, i, collateral, borrower);
+        }
+
+        setupMarket(market, units);
+
+        // Drop every oracle price to make the position unhealthy and advance to max LIF.
+        for (uint256 i = 0; i < n; i++) {
+            Oracle(market.collateralParams[i].oracle).setPrice(0.9e36);
+        }
+        vm.warp(market.maturity + TIME_TO_MAX_LIF);
+
+        FullLiquidator liquidator = new FullLiquidator(address(midnight), address(loanToken));
+        deal(address(loanToken), address(liquidator), type(uint256).max);
+
+        // Each call repays debtPerCollat units from collateral i; n calls repay all debt.
+        uint256 gasBefore = gasleft();
+        liquidator.liquidateAll(market, debtPerCollat, borrower);
+        return gasBefore - gasleft();
     }
 
     function _measureLiquidateN(uint256 n) internal returns (uint256) {

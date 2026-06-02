@@ -10,7 +10,7 @@ fs_permissions = [
     { access = "write", path = "test/gas_report.json" },
 ]
 gas_limit = "18446744073709551615"
-hardfork= "tempo:T4"
+hardfork = "tempo:T4"
 
 libs = ["lib", "dependencies"]
 
