@@ -53,7 +53,7 @@ rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
 
 // End-to-end: for any target units U <= debtBefore, calling repayAndWithdrawCollateral
 // with assets = floor(U * WAD / (WAD - pct)) repays exactly U units on Midnight.
-// Composes with repayUnitsFormula: units(assets, pct) == U, hence debt decreases by U.
+// Composes with repayUnitsFormula: assets - floor(assets*pct/WAD) == U, hence debt decreases by U.
 rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct, uint256 U) {
     require referralFeePct < WAD(), "PctExceeded";
 
