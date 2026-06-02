@@ -18,6 +18,10 @@ If of interest, [BaseTest.sol](https://github.com/morpho-org/midnight/blob/main/
 The repo contains some formal verification, done with [CVL](https://docs.certora.com/en/latest/docs/cvl/index.html).
 [This page](https://github.com/morpho-org/midnight/blob/main/certora/README.md) summarizes the proven properties.
 
+## Audits
+
+Audits can be found in the [audits](./audits/) folder.
+
 ## Licences
 
 The primary license is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](./LICENSE).
