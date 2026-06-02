@@ -265,15 +265,7 @@ contract Midnight is IMidnight {
         require(_marketState.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
-        uint16[7] memory feeCbps = [
-            _marketState.settlementFeeCbp0,
-            _marketState.settlementFeeCbp1,
-            _marketState.settlementFeeCbp2,
-            _marketState.settlementFeeCbp3,
-            _marketState.settlementFeeCbp4,
-            _marketState.settlementFeeCbp5,
-            _marketState.settlementFeeCbp6
-        ];
+        uint16[7] memory feeCbps = settlementFeeCbps(id);
         require(index == 0 || feeCbps[index - 1] <= newSettlementFeeCbp, SettlementFeeNotMonotonic());
         require(index == 6 || newSettlementFeeCbp <= feeCbps[index + 1], SettlementFeeNotMonotonic());
         if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
@@ -921,7 +913,7 @@ contract Midnight is IMidnight {
     }
 
     /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
-    function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
+    function settlementFeeCbps(bytes32 id) public view returns (uint16[7] memory) {
         return [
             marketState[id].settlementFeeCbp0,
             marketState[id].settlementFeeCbp1,
