@@ -36,7 +36,11 @@ function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
-persistent ghost summaryTickToPrice(uint256) returns uint256;
+// tickToPrice maps every valid tick into [0, WAD] (proved in TickToPrice.spec: tickToPriceAtMostWad, with
+// equality reached at MAX_TICK via tickToPriceIsOneAtMaxTick).
+persistent ghost summaryTickToPrice(uint256) returns uint256 {
+    axiom forall uint256 tick. summaryTickToPrice(tick) <= 10 ^ 18;
+}
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -121,8 +125,6 @@ rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAsse
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
     uint256 fee = settlementFee(id, timeToMaturity);
     require !offer.buy || fee <= offerPrice, "library reverts otherwise";
-    uint256 sellerPrice = offer.buy ? assert_uint256(offerPrice - fee) : offerPrice;
-    require sellerPrice <= WAD(), "invertibility requires sellerPrice <= WAD";
 
     uint256 units = TakeAmountsLibHarness.sellerAssetsToUnits(e, currentContract, id, offer, targetSellerAssets);
 

@@ -40,9 +40,6 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 // assets = floor(D * W / (W - p)), r = floor(assets * p / W), units = assets - r.
 // Show units = D for all D > 0 and 0 <= p < W (bundler requires p < W).
-//
-// Proof sketch Euclidean division on Dw = k(W-p)+ell and kp = k'W+ell'
-// with a = k, u = k - k', D - u = (ell - ell')/W and |ell - ell'| < W.
 rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
     require referralFeePct < WAD(), "PctExceeded: bundler reverts otherwise";
 
