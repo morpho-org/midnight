@@ -15,7 +15,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
-/// @dev This ratifier must only be used with the Midnight instance at `MIDNIGHT`.
+/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
