@@ -103,7 +103,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, otherBorrower);
 
-        vm.expectEmit(true, true, true, true, address(ecrecoverAuthorizer));
+        vm.expectEmit();
         emit SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, otherBorrower);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
