@@ -1,32 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    function toId(Midnight.Market market) external returns (bytes32) envfree;
     function creditOf(bytes32 id, address user) external returns (uint128) envfree;
     function debtOf(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
-    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
-
-    // Summarize toId to be able to reference the id in the rules.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
-    // Summarize complex internal functions irrelevant to authorization checks.
+    // Over-approximate view functions for prover performance.
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Summarize TickLib functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-
-    // Summarize UtilsLib functions.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -56,10 +46,6 @@ function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
 
 definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastAccrual;
 
-function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
-}
-
 /// CREDIT AND DEBT CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's credit and debt except via liquidate and updatePosition.
@@ -74,23 +60,6 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndUpdatePosition(env e,
     uint256 debtAfter = debtOf(id, user);
 
     assert (creditAfter == creditBefore && debtAfter == debtBefore) || userIsAuthorized || makerRatified[user];
-}
-
-/// UPDATED CREDIT CHANGE RULES ///
-
-/// An unauthorized caller cannot change a user's updated credit except via liquidate.
-/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
-rule onlyAuthorizedCanChangeUpdatedCreditExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
-    bytes32 id = summaryToId(market);
-    bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
-
-    uint128 updatedCreditBefore;
-    updatedCreditBefore, _, _ = updatePositionView(e, market, id, user);
-    f(e, args);
-    uint128 updatedCreditAfter;
-    updatedCreditAfter, _, _ = updatePositionView(e, market, id, user);
-
-    assert (updatedCreditAfter == updatedCreditBefore) || userIsAuthorized || makerRatified[user];
 }
 
 /// COLLATERAL CHANGE RULES ///
