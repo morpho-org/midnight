@@ -7,7 +7,6 @@ methods {
     function OfferTree.getHash(bytes32) external returns (bytes32) envfree;
     function OfferTree.isLeafNode(bytes32) external returns (bool) envfree;
     function OfferTree.wellFormedPath(bytes32, uint256, bytes32[]) external returns (bool) envfree;
-
     function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.isLeaf(bytes32, bytes32, uint256, bytes32[]) external returns (bool) envfree;
 }
