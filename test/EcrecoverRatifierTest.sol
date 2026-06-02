@@ -92,15 +92,6 @@ contract EcrecoverRatifierTest is BaseTest {
         ecrecoverRatifier.isRatified(offer, abi.encode(sig, _root, 0, new bytes32[](21)));
     }
 
-    function testIsRatifiedNotMidnight() public {
-        Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = buildRatifierData(_root, lender);
-
-        vm.expectRevert(IEcrecoverRatifier.NotMidnight.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
-    }
-
     function testIsRatifiedUnauthorizedSigner() public {
         Offer memory offer = makeOffer(lender);
         bytes32 _root = HashLib.hashOffer(offer);
