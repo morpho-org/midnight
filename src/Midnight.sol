@@ -430,6 +430,12 @@ contract Midnight is IMidnight {
             offer.maker,
             offer.buy,
             offer.group,
+            offer.tick,
+            offer.start,
+            offer.expiry,
+            offer.reduceOnly,
+            offer.maxUnits,
+            offer.maxAssets,
             buyerAssets,
             sellerAssets,
             newConsumed,
@@ -438,7 +444,11 @@ contract Midnight is IMidnight {
             buyerCreditIncrease,
             sellerCreditDecrease,
             receiver,
-            payer
+            offer.receiverIfMakerIsSeller,
+            receiverIfTakerIsSeller,
+            payer,
+            buyerCallback,
+            sellerCallback
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
@@ -509,7 +519,7 @@ contract Midnight is IMidnight {
         marketState[id].withdrawable += UtilsLib.toUint128(units);
 
         address payer = callback != address(0) ? callback : msg.sender;
-        emit EventsLib.Repay(msg.sender, id, units, onBehalf, payer);
+        emit EventsLib.Repay(msg.sender, id, units, onBehalf, payer, callback);
 
         if (callback != address(0)) {
             require(
@@ -688,6 +698,7 @@ contract Midnight is IMidnight {
             postMaturityMode,
             receiver,
             payer,
+            callback,
             badDebt,
             _marketState.lossFactor,
             _marketState.continuousFeeCredit

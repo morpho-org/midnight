@@ -395,6 +395,7 @@ contract LiquidationTest is BaseTest {
             false,
             address(this),
             address(this),
+            address(0),
             expectedBadDebt,
             expectedLossFactor,
             expectedContinuousFeeCredit
