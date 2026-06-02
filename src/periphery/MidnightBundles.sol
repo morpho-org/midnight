@@ -354,7 +354,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// INTERNAL ///
 
-    /// @dev Not checking the code size because a transfer (checking the code size) will always be performed after.
+    /// @dev Not checking the code size because a transfer will do it in the same call.
     function safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
         if (!success) {
