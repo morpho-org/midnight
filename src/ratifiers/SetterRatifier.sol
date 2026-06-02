@@ -12,6 +12,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each hash order during merkle proof verification.
+/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
@@ -28,7 +29,6 @@ contract SetterRatifier is ISetterRatifier {
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
-        require(msg.sender == MIDNIGHT, NotMidnight());
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[]));
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
