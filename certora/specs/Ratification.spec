@@ -7,7 +7,6 @@ methods {
 
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
-    function Utils.hashOffer(Midnight.Offer) external returns (bytes32) envfree;
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     function _.isRatified(Midnight.Offer, bytes) external => DISPATCHER(true);
@@ -17,7 +16,7 @@ methods {
     function _.transfer(address, uint256) external => NONDET;
 
     // Capture HashLib.isLeaf's return; needed by `isRatifiedRequiresIsLeaf` to assert isRatified gates on a merkle check.
-    function HashLib.isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof) internal returns (bool) => isLeafCapture(root, leafHash, leafIndex, proof);
+    function HashLib.isLeaf(bytes32, bytes32, uint256, bytes32[] memory) internal returns (bool) => isLeafCapture();
 
     function HashLib.hashOffer(Midnight.Offer memory) internal returns (bytes32) => NONDET;
     function HashLib.offerTreeTypeHash(uint256) internal returns (bytes32) => NONDET;
@@ -33,15 +32,11 @@ methods {
     function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
-function summaryHashOffer(Midnight.Offer offer) returns bytes32 {
-    return Utils.hashOffer(offer);
-}
-
 // Captures whether HashLib.isLeaf was called and returned true during the current rule.
 // Used by `isRatifiedRequiresIsLeaf` to assert that every successful isRatified gates on a merkle check.
 persistent ghost bool isLeafReturnedTrue;
 
-function isLeafCapture(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] proof) returns bool {
+function isLeafCapture() returns bool {
     bool ret;
     if (ret) {
         isLeafReturnedTrue = true;
