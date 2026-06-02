@@ -20,7 +20,7 @@ contract MaxAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -67,8 +67,8 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.expiry = block.timestamp + 200;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
+        borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 
         take(amount, lender, borrowerOffer);
@@ -94,8 +94,8 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.expiry = block.timestamp + 200;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
+        borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 
         vm.expectRevert(UtilsLib.CastOverflow.selector);

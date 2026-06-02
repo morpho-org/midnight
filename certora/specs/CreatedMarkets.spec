@@ -12,7 +12,7 @@ methods {
     function Utils.liquidationCursorHigh() external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
@@ -29,7 +29,7 @@ methods {
     // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
-    // Tokens are assumed to not reenter.
+    // Tokens are assumed to not reenter, for performance reasons.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
@@ -92,8 +92,8 @@ rule marketIsCreatedAfterTouchMarket(env e, Midnight.Market market) {
     assert marketIsCreated(market);
 }
 
-rule marketIsCreatedAfterTake(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+rule marketIsCreatedAfterTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
     assert marketIsCreated(offer.market);
 }
 
@@ -117,8 +117,8 @@ rule marketIsCreatedAfterWithdrawCollateral(env e, Midnight.Market market, uint2
     assert marketIsCreated(market);
 }
 
-rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     assert marketIsCreated(market);
 }
 
@@ -126,12 +126,12 @@ rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collat
 rule onlyTouchMarketCreatesMarket(env e, method f, calldataarg args, Midnight.Market market)
 filtered {
     f -> f.selector != sig:touchMarket(Midnight.Market).selector
-        && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector
+        && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
         && f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector
         && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
     require !marketIsCreated(market), "Assume that the market is not created";
     f(e, args);

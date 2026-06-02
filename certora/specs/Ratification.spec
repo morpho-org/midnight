@@ -29,7 +29,7 @@ methods {
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
 // Captures whether HashLib.isLeaf was called and returned true during the current rule.
@@ -45,10 +45,10 @@ function isLeafCapture() returns bool {
 }
 
 /// Every successful take requires the maker to have authorized the ratifier.
-rule takeRequiresMakerConsent(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeRequiresMakerConsent(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     bool makerAuthorizedRatifier = isAuthorized(offer.maker, offer.ratifier);
 
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert makerAuthorizedRatifier;
 }
@@ -65,10 +65,10 @@ strong invariant addressZeroCantAuthorize(address authorized)
     }
 
 /// No successful take can use address(0) as maker.
-rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     requireInvariant addressZeroCantAuthorize(offer.ratifier);
 
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
     assert offer.maker != 0;
 }
 
@@ -83,10 +83,10 @@ rule isRatifiedRequiresIsLeaf(env e, address ratifierAddr, Midnight.Offer offer,
 }
 
 /// Every successful Midnight.take implies HashLib.isLeaf was invoked and returned true.
-rule takeRequiresIsLeaf(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule takeRequiresIsLeaf(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     require !isLeafReturnedTrue, "fresh capture state";
 
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert isLeafReturnedTrue, "take must have triggered a ratifier that called HashLib.isLeaf returning true";
 }

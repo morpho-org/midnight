@@ -3,12 +3,10 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
@@ -32,7 +30,7 @@ contract TakeTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -59,36 +57,36 @@ contract TakeTest is BaseTest {
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.ratifier = address(ecrecoverRatifier);
+        lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = market;
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         otherLenderOffer.buy = false;
         otherLenderOffer.maker = otherLender;
-        otherLenderOffer.ratifier = address(ecrecoverRatifier);
+        otherLenderOffer.ratifier = address(dummyRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.market = market;
-        otherLenderOffer.expiry = block.timestamp + 200;
+        otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
 
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
-        borrowerOffer.ratifier = address(ecrecoverRatifier);
+        borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.market = market;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
 
         otherBorrowerOffer.buy = true;
         otherBorrowerOffer.maker = otherBorrower;
-        otherBorrowerOffer.ratifier = address(ecrecoverRatifier);
+        otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.market = market;
-        otherBorrowerOffer.expiry = block.timestamp + 200;
+        otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
     }
 
@@ -323,7 +321,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, lender, borrowerOffer);
     }
 
@@ -336,7 +334,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -397,7 +395,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, otherBorrower, borrowerOffer);
     }
 
@@ -412,7 +410,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         collateralize(market, borrower, units);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(units, borrower, otherBorrowerOffer);
     }
 
@@ -674,7 +672,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, lender, borrowerOffer);
     }
 
@@ -687,7 +685,7 @@ contract TakeTest is BaseTest {
         deal(address(loanToken), lender, 100);
         collateralize(market, borrower, 100);
 
-        vm.expectRevert(IMidnight.SellerIsLiquidatable.selector);
+        vm.expectRevert(IMidnight.CannotIncreaseDebtPostMaturity.selector);
         take(100, borrower, lenderOffer);
     }
 
@@ -720,7 +718,7 @@ contract TakeTest is BaseTest {
     }
 
     function testTakeOfferNotStarted(uint256 start) public {
-        start = bound(start, block.timestamp + 1, type(uint256).max);
+        start = bound(start, vm.getBlockTimestamp() + 1, type(uint256).max);
         Offer memory badOffer = lenderOffer;
         badOffer.start = start;
         vm.expectRevert(IMidnight.OfferNotStarted.selector);
@@ -890,54 +888,21 @@ contract TakeTest is BaseTest {
         assertGt(midnight.totalUnits(id), totalUnitsBefore);
     }
 
-    // test tree / signatures.
-
-    function testTakeInvalidRoot(bytes32 invalidRoot) public {
-        vm.assume(invalidRoot != root([lenderOffer]));
-        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            100,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, invalidRoot, 0, new bytes32[](0))
-        );
-    }
-
-    function testTakeInvalidSignature() public {
-        vm.expectRevert(IEcrecoverRatifier.InvalidSignature.selector);
-        Signature memory _sig = Signature({v: 1, r: 0, s: 0});
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            100,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            abi.encode(_sig, root([lenderOffer]), 0, new bytes32[](0))
-        );
-    }
+    // test ratifier dispatch.
 
     function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender) public {
         vm.assume(sender != address(0));
-        otherPrivateKey = boundPrivateKey(otherPrivateKey);
         IsRatifiedCallback ratifier = new IsRatifiedCallback();
         lenderOffer.maker = address(ratifier);
         lenderOffer.ratifier = address(ratifier);
 
-        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
-
         vm.prank(address(ratifier));
 
         midnight.setIsAuthorized(address(ratifier), true, address(ratifier));
-        bytes memory _ratifierData = merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey));
+        bytes memory _ratifierData = abi.encode(otherPrivateKey);
         vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
         vm.prank(sender);
-        midnight.take(lenderOffer, 0, sender, sender, address(0), hex"", _ratifierData);
+        midnight.take(lenderOffer, _ratifierData, 0, sender, sender, address(0), hex"");
     }
 
     function testTakeByRatificationDifferentFromMaker(address maker, address sender, uint256 otherPrivateKey) public {
@@ -950,176 +915,12 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = maker;
         lenderOffer.ratifier = address(ratifier);
 
-        privateKey[vm.addr(otherPrivateKey)] = otherPrivateKey;
-
         vm.prank(maker);
         midnight.setIsAuthorized(address(ratifier), true, maker);
-        bytes memory _ratifierData = merkleRatifierData([lenderOffer], vm.addr(otherPrivateKey));
+        bytes memory _ratifierData = abi.encode(otherPrivateKey);
         vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
         vm.prank(sender);
-        midnight.take(lenderOffer, 0, sender, sender, address(0), hex"", _ratifierData);
-    }
-
-    function testTakeInvalidProofOneLeaf(bytes32[] memory _proof) public {
-        vm.assume(_proof.length >= 1 && _proof.length <= 20);
-        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            100,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer]), 0, _proof)
-        );
-    }
-
-    function testTakeInvalidProof2LeavesWrongLeafHash(Offer memory otherOffer, bytes32[] memory _proof) public {
-        vm.assume(_proof.length >= 1 && _proof.length <= 20);
-        vm.assume(_proof[0] != HashLib.hashOffer(otherOffer));
-        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            100,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, _proof)
-        );
-    }
-
-    function testTakeInvalidProof2LeavesWrongLeafIndex(Offer memory otherOffer) public {
-        bytes32[] memory _proof = new bytes32[](1);
-        _proof[0] = HashLib.hashOffer(otherOffer);
-        vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            100,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 1, _proof)
-        );
-    }
-
-    function testTakeTwoLeaves(uint256 units, Offer memory otherOffer) public {
-        units = bound(units, 0, maxAssets);
-        uint256 price = TickLib.tickToPrice(lenderOffer.tick);
-        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
-        collateralize(market, borrower, units);
-        lenderOffer.maxUnits = units;
-
-        vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            units,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(lenderOffer, root([lenderOffer, otherOffer]), 0, proof([lenderOffer, otherOffer]))
-        );
-    }
-
-    // Adding salt to the expiry to test different leaf hashes.
-    function testTakeFourLeaves(uint256 units, uint256 saltTimestamp1, uint256 saltTimestamp2, uint256 saltTimestamp3)
-        public
-    {
-        units = bound(units, 0, maxAssets);
-        uint256 price = TickLib.tickToPrice(lenderOffer.tick);
-        deal(address(loanToken), lender, units.mulDivDown(price, WAD));
-        collateralize(market, borrower, units);
-        lenderOffer.maxUnits = units;
-
-        Offer memory offer0 = lenderOffer;
-
-        Offer memory offer1 = lenderOffer;
-        offer1.expiry += bound(saltTimestamp1, 0, type(uint32).max);
-
-        Offer memory offer2 = lenderOffer;
-        offer2.expiry += bound(saltTimestamp2, 0, type(uint32).max);
-
-        Offer memory offer3 = lenderOffer;
-        offer3.expiry += bound(saltTimestamp3, 0, type(uint32).max);
-
-        uint256 snapshot = vm.snapshotState();
-        vm.prank(borrower);
-        midnight.take(
-            offer0,
-            units,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(
-                offer0, root([offer0, offer1, offer2, offer3]), 0, proofFirstLeaf([offer0, offer1, offer2, offer3])
-            )
-        );
-
-        vm.revertToState(snapshot);
-        vm.prank(borrower);
-        midnight.take(
-            offer1,
-            units,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(
-                offer1, root([offer0, offer1, offer2, offer3]), 1, proofSecondLeaf([offer0, offer1, offer2, offer3])
-            )
-        );
-
-        vm.revertToState(snapshot);
-        vm.prank(borrower);
-        midnight.take(
-            offer2,
-            units,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(
-                offer2, root([offer0, offer1, offer2, offer3]), 2, proofThirdLeaf([offer0, offer1, offer2, offer3])
-            )
-        );
-
-        vm.revertToState(snapshot);
-        vm.prank(borrower);
-        midnight.take(
-            offer3,
-            units,
-            borrower,
-            borrower,
-            address(0),
-            hex"",
-            merkleRatifierData(
-                offer3, root([offer0, offer1, offer2, offer3]), 3, proofFourthLeaf([offer0, offer1, offer2, offer3])
-            )
-        );
-    }
-
-    function testTakeNotRatified() public {
-        vm.expectRevert();
-        vm.prank(borrower);
-        midnight.take(lenderOffer, 100, borrower, borrower, address(0), hex"", emptySig);
-    }
-
-    function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
-        vm.assume(sender != address(0));
-        makerSecretKey = boundPrivateKey(makerSecretKey);
-        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
-        lenderOffer.maker = vm.addr(makerSecretKey);
-        vm.assume(sender != vm.addr(makerSecretKey));
-        vm.prank(vm.addr(makerSecretKey));
-        midnight.setIsAuthorized(address(ecrecoverRatifier), true, vm.addr(makerSecretKey));
-        vm.prank(sender);
-        midnight.take(lenderOffer, 0, sender, sender, address(0), hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, _ratifierData, 0, sender, sender, address(0), hex"");
     }
 
     function testTakeOfferRatified(address maker, address sender) public {
@@ -1132,61 +933,7 @@ contract TakeTest is BaseTest {
         vm.prank(maker);
         midnight.setIsAuthorized(address(ratifier), true, maker);
         vm.prank(sender);
-        midnight.take(lenderOffer, 0, sender, sender, address(0), hex"", emptySig);
-    }
-
-    function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
-        makerSecretKey = boundPrivateKey(makerSecretKey);
-        otherSecretKey = boundPrivateKey(otherSecretKey);
-        vm.assume(otherSecretKey != makerSecretKey);
-        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
-        privateKey[vm.addr(otherSecretKey)] = otherSecretKey;
-
-        lenderOffer.maker = vm.addr(makerSecretKey);
-        vm.prank(vm.addr(makerSecretKey));
-        midnight.setIsAuthorized(address(ecrecoverRatifier), true, vm.addr(makerSecretKey));
-
-        vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        vm.prank(sender);
-        midnight.take(
-            lenderOffer,
-            100,
-            sender,
-            sender,
-            address(0),
-            hex"",
-            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
-        );
-    }
-
-    function testOfferAuthorizationAuthorizedSigner(uint256 makerSecretKey, address sender, uint256 otherSecretKey)
-        public
-    {
-        vm.assume(sender != address(0));
-        makerSecretKey = boundPrivateKey(makerSecretKey);
-        otherSecretKey = boundPrivateKey(otherSecretKey);
-        vm.assume(otherSecretKey != makerSecretKey);
-        privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
-        privateKey[vm.addr(otherSecretKey)] = otherSecretKey;
-
-        lenderOffer.maker = vm.addr(makerSecretKey);
-        vm.assume(sender != lenderOffer.maker);
-
-        vm.prank(vm.addr(makerSecretKey));
-
-        midnight.setIsAuthorized(address(ecrecoverRatifier), true, vm.addr(makerSecretKey));
-        vm.prank(lenderOffer.maker);
-        midnight.setIsAuthorized(vm.addr(otherSecretKey), true, lenderOffer.maker);
-        vm.prank(sender);
-        midnight.take(
-            lenderOffer,
-            0,
-            sender,
-            sender,
-            address(0),
-            hex"",
-            merkleRatifierData([lenderOffer], vm.addr(otherSecretKey))
-        );
+        midnight.take(lenderOffer, emptySig, 0, sender, sender, address(0), hex"");
     }
 
     function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
@@ -1203,15 +950,7 @@ contract TakeTest is BaseTest {
         midnight.setIsAuthorized(address(ratifier), true, maker);
         vm.expectRevert(IMidnight.RatifierFail.selector);
         vm.prank(sender);
-        midnight.take(
-            lenderOffer,
-            0,
-            sender,
-            sender,
-            address(0),
-            hex"",
-            merkleRatifierData([lenderOffer], vm.addr(signerPrivateKey))
-        );
+        midnight.take(lenderOffer, hex"", 0, sender, sender, address(0), hex"");
     }
 
     function testOrderNotAuthorized(address taker, address sender) public {
@@ -1221,14 +960,14 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.TakerUnauthorized.selector);
         vm.prank(sender);
-        midnight.take(lenderOffer, 100, taker, taker, address(0), hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, hex"", 100, taker, taker, address(0), hex"");
     }
 
     function testOrderByTaker(address taker) public {
         vm.assume(taker != address(0));
         vm.assume(taker != lenderOffer.maker);
         vm.prank(taker);
-        midnight.take(lenderOffer, 0, taker, taker, address(0), hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, hex"", 0, taker, taker, address(0), hex"");
     }
 
     function testOrderByAuthorized(address taker, address sender) public {
@@ -1239,7 +978,7 @@ contract TakeTest is BaseTest {
         vm.prank(taker);
         midnight.setIsAuthorized(sender, true, taker);
         vm.prank(sender);
-        midnight.take(lenderOffer, 0, taker, taker, address(0), hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, hex"", 0, taker, taker, address(0), hex"");
     }
 
     // test callbacks.
@@ -1255,7 +994,7 @@ contract TakeTest is BaseTest {
         take(units, user, offer);
     }
 
-    function testBuySellerCallback(uint256 units, uint32 continuousFee) public {
+    function testBuySellerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
@@ -1263,7 +1002,7 @@ contract TakeTest is BaseTest {
 
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
-        borrowerOffer.callbackData = abi.encode(0, collateral);
+        borrowerOffer.callbackData = abi.encode(0, collateral, data);
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
@@ -1278,15 +1017,23 @@ contract TakeTest is BaseTest {
         take(units, lender, borrowerOffer);
 
         assertEq(midnight.collateral(id, borrower, 0), collateral);
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedId(), id, "id");
+        assertEq(toId(BorrowCallback(borrowerOffer.callback).recordedMarket()), id, "market");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedReceiver(), borrower, "receiver");
+        assertEq(
+            BorrowCallback(borrowerOffer.callback).recordedSellerAssets(), units.mulDivUp(price, WAD), "sellerAssets"
+        );
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedUnits(), units, "units");
         assertEq(BorrowCallback(borrowerOffer.callback).recordedData(), borrowerOffer.callbackData);
         assertEq(
             BorrowCallback(borrowerOffer.callback).recordedPendingFeeDecrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeDecrease"
         );
     }
 
-    function testSellSellerCallback(uint256 units, uint32 continuousFee) public {
+    function testSellSellerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
@@ -1305,20 +1052,18 @@ contract TakeTest is BaseTest {
         midnight.setIsAuthorized(callback, true, borrower);
 
         vm.prank(borrower);
-        midnight.take(
-            lenderOffer,
-            units,
-            borrower,
-            borrower,
-            callback,
-            abi.encode(0, collateral),
-            merkleRatifierData([lenderOffer])
-        );
+        midnight.take(lenderOffer, hex"", units, borrower, borrower, callback, abi.encode(0, collateral, data));
         assertEq(midnight.collateral(id, borrower, 0), collateral);
-        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral));
+        assertEq(BorrowCallback(callback).recordedId(), id, "id");
+        assertEq(toId(BorrowCallback(callback).recordedMarket()), id, "market");
+        assertEq(BorrowCallback(callback).recordedSeller(), borrower, "seller");
+        assertEq(BorrowCallback(callback).recordedReceiver(), borrower, "receiver");
+        assertEq(BorrowCallback(callback).recordedSellerAssets(), units.mulDivDown(price, WAD), "sellerAssets");
+        assertEq(BorrowCallback(callback).recordedUnits(), units, "units");
+        assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral, data));
         assertEq(
             BorrowCallback(callback).recordedPendingFeeDecrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeDecrease"
         );
     }
@@ -1341,13 +1086,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(borrower);
         midnight.take(
-            lenderOffer,
-            units,
-            borrower,
-            borrower,
-            address(callback),
-            abi.encode(0, collateral, repaidUnits),
-            merkleRatifierData([lenderOffer])
+            lenderOffer, hex"", units, borrower, borrower, address(callback), abi.encode(0, collateral, repaidUnits)
         );
 
         assertFalse(callback.liquidateSucceeded());
@@ -1376,10 +1115,10 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(address(callback), true, borrower);
 
-        callback.prepare(lenderOffer, merkleRatifierData([lenderOffer]), units, 0, 2 * collateral, repaidUnits);
+        callback.prepare(lenderOffer, hex"", units, 0, 2 * collateral, repaidUnits);
 
         vm.prank(borrower);
-        midnight.take(lenderOffer, units, borrower, borrower, address(callback), "", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, hex"", units, borrower, borrower, address(callback), "");
 
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
@@ -1400,17 +1139,17 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.WrongSellCallbackReturnValue.selector);
         vm.prank(borrower);
-        midnight.take(lenderOffer, units, borrower, borrower, callback, hex"", merkleRatifierData([lenderOffer]));
+        midnight.take(lenderOffer, hex"", units, borrower, borrower, callback, hex"");
     }
 
-    function testSellBuyerCallback(uint256 units, uint32 continuousFee) public {
+    function testSellBuyerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivDown(price, WAD);
         lenderOffer.callback = address(new LendCallback());
-        lenderOffer.callbackData = abi.encode(loanToken, assets);
+        lenderOffer.callbackData = data;
         lenderOffer.maker = address(otherLender);
         lenderOffer.maxUnits = units;
         lenderOffer.tick = MAX_TICK;
@@ -1419,56 +1158,57 @@ contract TakeTest is BaseTest {
 
         take(units, borrower, lenderOffer);
 
+        assertEq(LendCallback(lenderOffer.callback).recordedId(), id, "id");
+        assertEq(toId(LendCallback(lenderOffer.callback).recordedMarket()), id, "market");
+        assertEq(LendCallback(lenderOffer.callback).recordedBuyer(), lenderOffer.maker, "buyer");
+        assertEq(LendCallback(lenderOffer.callback).recordedBuyerAssets(), assets, "buyerAssets");
+        assertEq(LendCallback(lenderOffer.callback).recordedUnits(), units, "units");
         assertEq(LendCallback(lenderOffer.callback).recordedData(), lenderOffer.callbackData);
         assertEq(
             LendCallback(lenderOffer.callback).recordedPendingFeeIncrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeIncrease"
         );
     }
 
-    function testBuyBuyerCallback(uint256 units, uint32 continuousFee) public {
+    function testBuyBuyerCallback(uint256 units, uint32 continuousFee, bytes memory data) public {
         units = bound(units, 0, maxAssets);
         continuousFee = uint32(bound(continuousFee, 0, MAX_CONTINUOUS_FEE));
         midnight.setMarketContinuousFee(id, continuousFee);
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
-        (address _otherLender,) = makeAddrAndKey("otherLender");
         address callback = address(new LendCallback());
         borrowerOffer.maxUnits = units;
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), callback, assets);
         collateralize(market, borrower, units);
 
-        vm.prank(_otherLender);
-        midnight.take(
-            borrowerOffer,
-            units,
-            _otherLender,
-            address(0),
-            callback,
-            abi.encode(address(loanToken), assets),
-            merkleRatifierData([borrowerOffer])
-        );
-        assertEq(LendCallback(callback).recordedData(), abi.encode(address(loanToken), assets));
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), callback, data);
+        assertEq(LendCallback(callback).recordedId(), id, "id");
+        assertEq(toId(LendCallback(callback).recordedMarket()), id, "market");
+        assertEq(LendCallback(callback).recordedBuyer(), lender, "buyer");
+        assertEq(LendCallback(callback).recordedBuyerAssets(), assets, "buyerAssets");
+        assertEq(LendCallback(callback).recordedUnits(), units, "units");
+        assertEq(LendCallback(callback).recordedData(), data);
         assertEq(
             LendCallback(callback).recordedPendingFeeIncrease(),
-            units.mulDivDown(continuousFee * (market.maturity - block.timestamp), WAD),
+            units.mulDivDown(continuousFee * (market.maturity - vm.getBlockTimestamp()), WAD),
             "pendingFeeIncrease"
         );
     }
 
     // Summary of zero price tests:
     //
-    // Trading at 0 succeeds in those cases:
-    // - any offer / unit take input / 0 trading fee.
-    // - sell offer / unit take input / > 0 trading fee.
+    // Settlement at 0 succeeds in those cases:
+    // - any offer / unit take input / 0 settlement fee.
+    // - sell offer / unit take input / > 0 settlement fee.
     //
     // Otherwise it fails:
-    // - by underflow when the trading fee is > 0, and the offer is a buy offer.
+    // - by underflow when the settlement fee is > 0, and the offer is a buy offer.
 
     // fee=0, sell, units
-    function testPriceZeroNoTradingFeeSell() public {
+    function testPriceZeroNoSettlementFeeSell() public {
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1481,9 +1221,9 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, buy, units
-    function testPriceZeroWithTradingFeeBuy() public {
+    function testPriceZeroWithSettlementFeeBuy() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
@@ -1493,10 +1233,10 @@ contract TakeTest is BaseTest {
     }
 
     // fee>0, sell, units
-    function testPriceZeroWithTradingFeeSell() public {
+    function testPriceZeroWithSettlementFeeSell() public {
         midnight.touchMarket(market);
-        midnight.setMarketTradingFee(id, 1, 1e12);
-        uint256 fee = midnight.tradingFee(id, market.maturity - block.timestamp);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
+        uint256 fee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 units = 1e18;
         borrowerOffer.tick = 0;
         borrowerOffer.maxUnits = units;
@@ -1510,27 +1250,25 @@ contract TakeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "debtOf");
     }
 
-    function testTradeWithAddressZero(uint256 units) public {
+    function testTakeWithAddressZero(uint256 units) public {
         units = bound(units, 1, maxAssets);
 
         // address(0) as maker cannot authorize the ratifier
         Offer memory zeroOffer;
         zeroOffer.buy = true;
         zeroOffer.maker = address(0);
-        zeroOffer.ratifier = address(ecrecoverRatifier);
+        zeroOffer.ratifier = address(dummyRatifier);
         zeroOffer.maxUnits = units;
         zeroOffer.market = market;
-        zeroOffer.expiry = block.timestamp + 200;
+        zeroOffer.expiry = vm.getBlockTimestamp() + 200;
         zeroOffer.tick = 0; // 0 price so any units transfer 0 assets
 
         // taker = borrower, needs collateral
         collateralize(market, borrower, units);
 
-        Signature memory badSig;
-
         vm.expectRevert(IMidnight.RatifierUnauthorized.selector);
         vm.prank(borrower);
-        midnight.take(zeroOffer, units, borrower, borrower, address(0), hex"", abi.encode(badSig));
+        midnight.take(zeroOffer, hex"", units, borrower, borrower, address(0), hex"");
     }
 
     function testBuyBuyerCallbackRevertsOnInvalidReturn(uint256 units) public {
@@ -1545,7 +1283,7 @@ contract TakeTest is BaseTest {
 
         vm.expectRevert(IMidnight.WrongBuyCallbackReturnValue.selector);
         vm.prank(lender);
-        midnight.take(borrowerOffer, units, lender, address(0), callback, hex"", merkleRatifierData([borrowerOffer]));
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), callback, hex"");
     }
 }
 
@@ -1562,27 +1300,41 @@ contract InvalidBuyCallback is IBuyCallback {
 contract BorrowCallback is ISellCallback {
     bytes public recordedData;
     bytes32 public recordedId;
+    Market internal _recordedMarket;
+    address public recordedSeller;
+    address public recordedReceiver;
+    uint256 public recordedSellerAssets;
+    uint256 public recordedUnits;
     uint256 public recordedPendingFeeDecrease;
 
     function onSell(
         bytes32 id,
         Market memory market,
-        uint256,
-        uint256,
+        uint256 sellerAssets,
+        uint256 units,
         uint256 pendingFeeDecrease,
         address seller,
-        address,
+        address receiver,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         recordedId = id;
+        _recordedMarket = market;
+        recordedSeller = seller;
+        recordedReceiver = receiver;
+        recordedSellerAssets = sellerAssets;
+        recordedUnits = units;
         recordedData = data;
         recordedPendingFeeDecrease = pendingFeeDecrease;
-        (uint256 collateralIndex, uint256 amount) = abi.decode(data, (uint256, uint256));
+        (uint256 collateralIndex, uint256 amount,) = abi.decode(data, (uint256, uint256, bytes));
         address collateralToken = market.collateralParams[collateralIndex].token;
         ERC20(collateralToken).approve(msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(market, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
+    }
+
+    function recordedMarket() external view returns (Market memory) {
+        return _recordedMarket;
     }
 }
 
@@ -1612,7 +1364,7 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         oracle.setPrice(healthyPrice / 2);
         ERC20(market.loanToken).approve(msg.sender, repaidUnits);
         try Midnight(msg.sender)
-            .liquidate(market, collateralIndex, 0, repaidUnits, seller, address(this), address(0), "") returns (
+            .liquidate(market, collateralIndex, 0, repaidUnits, seller, false, address(this), address(0), "") returns (
             uint256, uint256
         ) {
             liquidateSucceeded = true;
@@ -1666,14 +1418,14 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
 
             reentered = true;
             Offer memory nestedOffer = storedOffer;
-            Midnight(msg.sender).take(nestedOffer, innerUnits, seller, seller, address(this), "", storedSig);
+            Midnight(msg.sender).take(nestedOffer, storedSig, innerUnits, seller, seller, address(this), hex"");
 
             Oracle oracle = Oracle(market.collateralParams[idx].oracle);
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
             ERC20(market.loanToken).approve(msg.sender, storedRepaidUnits);
             try Midnight(msg.sender)
-                .liquidate(market, idx, 0, storedRepaidUnits, seller, address(this), address(0), "") returns (
+                .liquidate(market, idx, 0, storedRepaidUnits, seller, false, address(this), address(0), "") returns (
                 uint256, uint256
             ) {
                 liquidateSucceeded = true;
@@ -1691,23 +1443,35 @@ contract LendCallback is IBuyCallback {
     bytes public recordedData;
 
     bytes32 public recordedId;
+    Market internal _recordedMarket;
+    address public recordedBuyer;
+    uint256 public recordedBuyerAssets;
+    uint256 public recordedUnits;
     uint256 public recordedPendingFeeIncrease;
 
     function onBuy(
         bytes32 id,
         Market memory market,
         uint256 buyerAssets,
-        uint256,
+        uint256 units,
         uint256 pendingFeeIncrease,
-        address,
+        address buyer,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
         recordedId = id;
+        _recordedMarket = market;
+        recordedBuyer = buyer;
+        recordedBuyerAssets = buyerAssets;
+        recordedUnits = units;
         recordedData = data;
         recordedPendingFeeIncrease = pendingFeeIncrease;
         ERC20(market.loanToken).approve(msg.sender, buyerAssets);
         return CALLBACK_SUCCESS;
+    }
+
+    function recordedMarket() external view returns (Market memory) {
+        return _recordedMarket;
     }
 }
 

@@ -12,23 +12,23 @@ library EventsLib {
     event SetFeeSetter(address indexed feeSetter);
     event SetTickSpacingSetter(address indexed tickSpacingSetter);
     event SetMarketTickSpacing(bytes32 indexed id_, uint256 newTickSpacing);
-    event SetMarketTradingFee(bytes32 indexed id_, uint256 indexed index, uint256 newTradingFee);
-    event SetDefaultTradingFee(address indexed loanToken, uint256 indexed index, uint256 newTradingFee);
+    event SetMarketSettlementFee(bytes32 indexed id_, uint256 indexed index, uint256 newSettlementFee);
+    event SetDefaultSettlementFee(address indexed loanToken, uint256 indexed index, uint256 newSettlementFee);
     event SetFeeClaimer(address indexed feeClaimer);
     event SetMarketContinuousFee(bytes32 indexed id_, uint256 newContinuousFee);
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
     event UpdatePosition(bytes32 indexed id_, address indexed user, uint256 creditDecrease, uint256 pendingFeeDecrease, uint256 accruedFee);
-    event MarketCreated(bytes32 indexed id_, Market market);
-    event Take(address caller, bytes32 indexed id_, address indexed maker, address indexed taker, bool offerIsBuy, uint256 buyerAssets, uint256 sellerAssets, uint256 units, address payer, address receiver, bytes32 group, uint256 consumed, uint256 buyerPendingFeeIncrease, uint256 sellerPendingFeeDecrease, uint256 buyerCreditIncrease, uint256 sellerCreditDecrease);
+    event MarketCreated(Market market, bytes32 indexed id_);
+    event Take(address caller, bytes32 indexed id_, uint256 units, address indexed taker, address indexed maker, bool offerIsBuy, bytes32 group, uint256 buyerAssets, uint256 sellerAssets, uint256 consumed, uint256 buyerPendingFeeIncrease, uint256 sellerPendingFeeDecrease, uint256 buyerCreditIncrease, uint256 sellerCreditDecrease, address receiver, address payer);
     event Withdraw(address caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address indexed receiver, uint256 pendingFeeDecrease);
-    event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address callback);
+    event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address payer);
     event SupplyCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf);
     event WithdrawCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf, address receiver);
-    event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, uint256 badDebt, uint256 latestLossFactor, address payer, address receiver);
-    event SetConsumed(address indexed caller, address indexed onBehalf, bytes32 indexed group, uint256 amount);
+    event Liquidate(address caller, bytes32 indexed id_, address indexed collateral, uint256 seizedAssets, uint256 repaidUnits, address indexed borrower, bool postMaturityMode, address receiver, address payer, uint256 badDebt, uint256 latestLossFactor, uint256 latestContinuousFeeCredit);
+    event SetConsumed(address indexed caller, bytes32 indexed group, uint256 amount, address indexed onBehalf);
     event FlashLoan(address indexed caller, address[] tokens, uint256[] assets, address indexed callback);
-    event SetIsAuthorized(address indexed caller, address indexed onBehalf, address indexed authorized, bool newIsAuthorized);
+    event SetIsAuthorized(address indexed caller, address indexed authorized, bool newIsAuthorized, address indexed onBehalf);
     event ClaimContinuousFee(address indexed caller, bytes32 indexed id_, uint256 amount, address indexed receiver);
-    event ClaimTradingFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);
+    event ClaimSettlementFee(address indexed caller, address indexed token, uint256 amount, address indexed receiver);
     // forgefmt: disable-end
 }

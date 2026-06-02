@@ -19,7 +19,7 @@ contract TickGatingTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -48,9 +48,9 @@ contract TickGatingTest is BaseTest {
         offer.market = market;
         offer.buy = true;
         offer.maker = lender;
-        offer.ratifier = address(ecrecoverRatifier);
+        offer.ratifier = address(dummyRatifier);
         offer.maxUnits = type(uint256).max;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = tick;
     }
 
@@ -82,7 +82,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -97,7 +97,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -114,7 +114,7 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", merkleRatifierData([offer]));
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
 
         // Refine to spacing 2.
         midnight.setMarketTickSpacing(id, 2);

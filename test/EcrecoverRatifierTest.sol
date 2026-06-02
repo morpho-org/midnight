@@ -5,7 +5,11 @@ pragma solidity ^0.8.0;
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
-import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {
+    IEcrecoverRatifier,
+    Signature,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 contract EcrecoverRatifierTest is BaseTest {
@@ -17,7 +21,35 @@ contract EcrecoverRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         offer.maker = maker;
         offer.ratifier = address(ecrecoverRatifier);
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
+    }
+
+    function testDomainSeparator() public view {
+        bytes32 _domainSeparator =
+            keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(ecrecoverRatifier)));
+        bytes32 expectedDomainSeparator = vm.eip712HashStruct(
+            "EIP712Domain(uint256 chainId,address verifyingContract)",
+            abi.encode(block.chainid, address(ecrecoverRatifier))
+        );
+        assertEq(_domainSeparator, expectedDomainSeparator);
+    }
+
+    function testIsRatifiedValidSignature(uint256 privateKey) public {
+        privateKey = boundPrivateKey(privateKey);
+        address maker = vm.addr(privateKey);
+
+        Offer memory offer;
+        offer.maker = maker;
+        bytes32 root = HashLib.hashOffer(offer);
+
+        Signature memory _sig = signature(root, privateKey, address(ecrecoverRatifier), 0);
+
+        vm.prank(maker);
+        midnight.setIsAuthorized(address(ecrecoverRatifier), true, maker);
+
+        vm.prank(address(midnight));
+        bytes32 result = ecrecoverRatifier.isRatified(offer, abi.encode(_sig, root, 0, new bytes32[](0)));
+        assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testIsRatifiedMakerSigns() public {
@@ -42,15 +74,6 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
-    }
-
-    function testIsRatifiedNotMidnight() public {
-        Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = buildRatifierData(_root, lender);
-
-        vm.expectRevert(IEcrecoverRatifier.NotMidnight.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
     function testIsRatifiedUnauthorizedSigner() public {

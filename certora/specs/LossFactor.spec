@@ -5,8 +5,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
+    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
@@ -21,7 +21,8 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    // External calls are assumed non-reentrant.
+    // External calls are assumed non-reentrant: this is justified as we verify properties about the function's bodies.
+    // External calls are assumed non-reverting: we verify that reverts do not happen in the function's bodies.
 }
 
 /// HELPERS ///
@@ -35,7 +36,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 }
 
 /// The market's lossFactor is only modified by liquidate.
-rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, address, address, bytes).selector } {
+rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
 
     f(e, args);
@@ -44,14 +45,14 @@ rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataa
 }
 
 /// In liquidate, the market's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
-rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data) {
+rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
     uint256 totalUnitsBefore = totalUnits(id);
 
     require lossFactorBefore < max_uint128, "market lossFactor must not be saturated";
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, receiver, callback, data);
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     bool lossFactorChanged = currentContract.marketState[id].lossFactor != lossFactorBefore;
     bool badDebtOccurred = totalUnits(id) < totalUnitsBefore;
@@ -100,7 +101,7 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address bor
     require e.msg.value == 0, "Midnight is not payable";
 
     address zero = 0;
-    liquidate@withrevert(e, market, 0, 0, 0, borrower, borrower, zero, data);
+    liquidate@withrevert(e, market, 0, 0, 0, borrower, false, borrower, zero, data);
 
     assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
 }

@@ -18,7 +18,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The maximum time to maturity is 100 years.
 /// @dev Markets have at most 128 collaterals.
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
-/// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (10) collaterals simultaneously.
+/// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (16) collaterals simultaneously.
 /// @dev The case LLTV = 1 is special, and should be used with care, notably:
 /// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
 /// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
@@ -37,16 +37,16 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
-/// TRADING FEES
-/// @dev A default trading fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The trading fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
+/// SETTLEMENT FEES
+/// @dev A default settlement fee (per loan token) is set on new markets. Then, the fee setter can override it.
+/// @dev The settlement fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
 /// approximation between breakpoints.
-/// @dev Trading fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
-/// @dev For TTM > 360d, the trading fee is the fee at the 360d breakpoint.
-/// @dev Post-maturity, the trading fee is the fee at the 0d breakpoint.
-/// @dev Trading fees are stored in cbp (centi-basis-points): tradingFee / CBP.
+/// @dev Settlement fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
+/// @dev For TTM > 360d, the settlement fee is the fee at the 360d breakpoint.
+/// @dev Post-maturity, the settlement fee is the fee at the 0d breakpoint.
+/// @dev Settlement fees are stored in cbp (centi-basis-points): settlementFee / CBP.
 /// @dev One cbp is 1e-6 WAD, i.e. 0.01 bps. This fits each breakpoint in 16 bits.
-/// @dev Max trading fee is defined per index: 50 bps for ttm=360 days, scaled linearly (except for 0d, 0.14 bps).
+/// @dev Max settlement fee is defined per index: 50 bps for ttm=360 days, scaled linearly (except for 0d, 0.14 bps).
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
@@ -59,23 +59,23 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev If an account is healthy, the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif at
-/// maturity + TIME_TO_MAX_LIF.
-/// @dev Before or at maturity, the liquidation cannot put the borrower back into health (recovery close factor), unless
-/// the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units.
-/// @dev The "recovery close factor" (RCF) limits the amount that can be liquidated. In particular, it prevents the
-/// liquidation from putting the borrower back into health. Which means (omitting scaling and roundings):
+/// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
+/// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
+/// between both modes.
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
-/// The maxRepaid computation is rounded up to avoid consecutive max liquidations, so the position could be slightly
-/// healthy after a liquidation.
-/// @dev The RCF is deactivated after the maturity.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
+/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
+/// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
 /// @dev When a borrower's bad debt is realized, it is socialized among lenders in this market.
@@ -83,7 +83,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same max values and loan token.
+/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
+/// loan token.
 ///
 /// OFFER CAPS
 /// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
@@ -109,13 +110,19 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
-/// @dev Because of roundings, trading and continuous fees might charge less than expected, which can become problematic
-/// for chains where the gas is cheaper than 1 asset of the loan token.
-/// @dev lossFactor is rounded up so lenders collectively lose a bit more on each bad debt realization.
-/// @dev updatePosition rounds the credit down, so lenders lose a bit at each interaction after a bad debt realization.
+/// @dev assets are rounded against the taker and in favor of the maker in take. Therefore, the settlement fee has no
+/// defined rounding direction, which could lead to fees manipulations on chains with very cheap gas.
+/// @dev pendingFee updates are rounded in favor of the user. It could lead to fees manipulations too.
+/// @dev maxDebt is rounded down in isHealthy and liquidate.
+/// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
-/// may become extremely imprecise (against the user), potentially leading to a total loss. In those cases the
-/// market doesn't function properly, and notably the take function reverts when the loss factor is maxed out.
+/// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
+/// reverts when the loss factor is maxed out.
+/// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
+/// realization.
+/// @dev repaidUnits/seizedAssets computations round against the liquidator.
+/// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
+/// healthy after a liquidation in the normal mode.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
@@ -152,8 +159,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// ROLES
 /// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter.
-/// @dev The fee setter can set the default and per-market trading fee and continuous fee.
-/// @dev The fee claimer can claim the trading fee and continuous fee.
+/// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
+/// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 /// @dev The tick spacing setter can decrease the tick spacing of a market.
 ///
@@ -183,9 +190,9 @@ contract Midnight is IMidnight {
     mapping(bytes32 id => MarketState) public marketState;
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
-    mapping(address loanToken => uint16[7]) public defaultTradingFeeCbp;
+    mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
-    mapping(address token => uint256) public claimableTradingFee;
+    mapping(address token => uint256) public claimableSettlementFee;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -248,33 +255,33 @@ contract Midnight is IMidnight {
         emit EventsLib.SetMarketTickSpacing(id, newTickSpacing);
     }
 
-    function setMarketTradingFee(bytes32 id, uint256 index, uint256 newTradingFee) external {
+    function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external {
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         require(_marketState.tickSpacing > 0, MarketNotCreated());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
-        uint16 newTradingFeeCbp = uint16(newTradingFee / CBP);
-        if (index == 0) _marketState.tradingFeeCbp0 = newTradingFeeCbp;
-        else if (index == 1) _marketState.tradingFeeCbp1 = newTradingFeeCbp;
-        else if (index == 2) _marketState.tradingFeeCbp2 = newTradingFeeCbp;
-        else if (index == 3) _marketState.tradingFeeCbp3 = newTradingFeeCbp;
-        else if (index == 4) _marketState.tradingFeeCbp4 = newTradingFeeCbp;
-        else if (index == 5) _marketState.tradingFeeCbp5 = newTradingFeeCbp;
-        else if (index == 6) _marketState.tradingFeeCbp6 = newTradingFeeCbp;
-        emit EventsLib.SetMarketTradingFee(id, index, newTradingFee);
+        // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
+        uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
+        if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
+        else if (index == 1) _marketState.settlementFeeCbp1 = newSettlementFeeCbp;
+        else if (index == 2) _marketState.settlementFeeCbp2 = newSettlementFeeCbp;
+        else if (index == 3) _marketState.settlementFeeCbp3 = newSettlementFeeCbp;
+        else if (index == 4) _marketState.settlementFeeCbp4 = newSettlementFeeCbp;
+        else if (index == 5) _marketState.settlementFeeCbp5 = newSettlementFeeCbp;
+        else if (index == 6) _marketState.settlementFeeCbp6 = newSettlementFeeCbp;
+        emit EventsLib.SetMarketSettlementFee(id, index, newSettlementFee);
     }
 
-    function setDefaultTradingFee(address loanToken, uint256 index, uint256 newTradingFee) external {
+    function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newTradingFee <= maxTradingFee(index), TradingFeeTooHigh());
-        require(newTradingFee % CBP == 0, FeeNotMultipleOfFeeCbp());
-        // forge-lint: disable-next-item(unsafe-typecast) as newTradingFee <= maxTradingFee <= uint16.max * CBP
-        defaultTradingFeeCbp[loanToken][index] = uint16(newTradingFee / CBP);
-        emit EventsLib.SetDefaultTradingFee(loanToken, index, newTradingFee);
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+        // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
+        defaultSettlementFeeCbp[loanToken][index] = uint16(newSettlementFee / CBP);
+        emit EventsLib.SetDefaultSettlementFee(loanToken, index, newSettlementFee);
     }
 
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {
@@ -295,10 +302,10 @@ contract Midnight is IMidnight {
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
     }
 
-    function claimTradingFee(address token, uint256 amount, address receiver) external {
+    function claimSettlementFee(address token, uint256 amount, address receiver) external {
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        claimableTradingFee[token] -= amount;
-        emit EventsLib.ClaimTradingFee(msg.sender, token, amount, receiver);
+        claimableSettlementFee[token] -= amount;
+        emit EventsLib.ClaimSettlementFee(msg.sender, token, amount, receiver);
         SafeTransferLib.safeTransfer(token, receiver, amount);
     }
 
@@ -319,22 +326,22 @@ contract Midnight is IMidnight {
 
     /// ENTRY-POINTS ///
 
-    /// @dev The taker might not get the price they expected if the trading fee was just changed. A smart-contract can
-    /// be used to perform atomic price checks.
-    /// @dev Taking buy offers with price < trading fee will revert.
-    /// @dev In particular, if the trading fee gets increased, it might implicitly cancel offers with very low price.
+    /// @dev The taker might not get the price they expected if the settlement fee was just changed. A smart-contract
+    /// can be used to perform atomic price checks.
+    /// @dev Taking buy offers with price < settlement fee will revert.
+    /// @dev In particular, if the settlement fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
         Offer memory offer,
+        bytes memory ratifierData,
         uint256 units,
         address taker,
         address receiverIfTakerIsSeller,
         address takerCallback,
-        bytes memory takerCallbackData,
-        bytes memory ratifierData
+        bytes memory takerCallbackData
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchMarket(offer.market);
@@ -350,9 +357,9 @@ contract Midnight is IMidnight {
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
-        uint256 _tradingFee = tradingFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _tradingFee : offerPrice;
-        uint256 buyerPrice = sellerPrice + _tradingFee;
+        uint256 _settlementFee = settlementFee(id, timeToMaturity);
+        uint256 sellerPrice = offer.buy ? offerPrice - _settlementFee : offerPrice;
+        uint256 buyerPrice = sellerPrice + _settlementFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
@@ -381,6 +388,7 @@ contract Midnight is IMidnight {
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
 
+        require(block.timestamp <= offer.market.maturity || sellerDebtIncrease == 0, CannotIncreaseDebtPostMaturity());
         require(
             !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
             MakerCreditOrDebtIncreased()
@@ -407,7 +415,7 @@ contract Midnight is IMidnight {
 
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
-        claimableTradingFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+        claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -417,20 +425,20 @@ contract Midnight is IMidnight {
         emit EventsLib.Take(
             msg.sender,
             id,
-            offer.maker,
+            units,
             taker,
+            offer.maker,
             offer.buy,
+            offer.group,
             buyerAssets,
             sellerAssets,
-            units,
-            payer,
-            receiver,
-            offer.group,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             buyerCreditIncrease,
-            sellerCreditDecrease
+            sellerCreditDecrease,
+            receiver,
+            payer
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
@@ -465,11 +473,7 @@ contract Midnight is IMidnight {
             );
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
-        require(
-            position[id][seller].debt == 0 || liquidationLocked(id, seller)
-                || (block.timestamp <= offer.market.maturity && isHealthy(offer.market, id, seller)),
-            SellerIsLiquidatable()
-        );
+        require(liquidationLocked(id, seller) || isHealthy(offer.market, id, seller), SellerIsLiquidatable());
 
         return (buyerAssets, sellerAssets);
     }
@@ -580,6 +584,7 @@ contract Midnight is IMidnight {
         uint256 seizedAssets,
         uint256 repaidUnits,
         address borrower,
+        bool postMaturityMode,
         address receiver,
         address callback,
         bytes calldata data
@@ -588,6 +593,7 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         Position storage _position = position[id][borrower];
         require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
+        require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
         require(
             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),
             LiquidatorGatedFromLiquidating()
@@ -612,8 +618,8 @@ contract Midnight is IMidnight {
         }
 
         require(
-            originalDebt > 0 && !liquidationLocked(id, borrower)
-                && (block.timestamp > market.maturity || originalDebt > maxDebt),
+            !liquidationLocked(id, borrower)
+                && (postMaturityMode ? block.timestamp > market.maturity : originalDebt > maxDebt),
             NotLiquidatable()
         );
 
@@ -636,9 +642,9 @@ contract Midnight is IMidnight {
 
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
-            uint256 lif = originalDebt > maxDebt
-                ? _maxLif
-                : UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF);
+            uint256 lif = postMaturityMode
+                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
+                : _maxLif;
 
             if (seizedAssets > 0) {
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
@@ -646,11 +652,12 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (block.timestamp <= market.maturity) {
+            if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
+                // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD, WAD - lif.mulDivUp(lltv, WAD))
+                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
@@ -678,10 +685,12 @@ contract Midnight is IMidnight {
             seizedAssets,
             repaidUnits,
             borrower,
+            postMaturityMode,
+            receiver,
+            payer,
             badDebt,
             _marketState.lossFactor,
-            payer,
-            receiver
+            _marketState.continuousFeeCredit
         );
 
         SafeTransferLib.safeTransfer(market.collateralParams[collateralIndex].token, receiver, seizedAssets);
@@ -690,16 +699,16 @@ contract Midnight is IMidnight {
             require(
                 ILiquidateCallback(callback)
                     .onLiquidate(
+                        msg.sender,
                         id,
                         market,
                         collateralIndex,
                         seizedAssets,
                         repaidUnits,
-                        badDebt,
-                        msg.sender,
                         borrower,
                         receiver,
-                        data
+                        data,
+                        badDebt
                     ) == CALLBACK_SUCCESS,
                 WrongLiquidateCallbackReturnValue()
             );
@@ -715,14 +724,14 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;
-        emit EventsLib.SetConsumed(msg.sender, onBehalf, group, amount);
+        emit EventsLib.SetConsumed(msg.sender, group, amount, onBehalf);
     }
 
     /// @dev See AUTHORIZATIONS section above.
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         isAuthorized[onBehalf][authorized] = newIsAuthorized;
-        emit EventsLib.SetIsAuthorized(msg.sender, onBehalf, authorized, newIsAuthorized);
+        emit EventsLib.SetIsAuthorized(msg.sender, authorized, newIsAuthorized, onBehalf);
     }
 
     function flashLoan(address[] calldata tokens, uint256[] calldata assets, address callback, bytes calldata data)
@@ -734,7 +743,7 @@ contract Midnight is IMidnight {
             SafeTransferLib.safeTransfer(tokens[i], callback, assets[i]);
         }
         require(
-            IFlashLoanCallback(callback).onFlashLoan(tokens, assets, msg.sender, data) == CALLBACK_SUCCESS,
+            IFlashLoanCallback(callback).onFlashLoan(msg.sender, tokens, assets, data) == CALLBACK_SUCCESS,
             WrongFlashLoanCallbackReturnValue()
         );
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -765,18 +774,18 @@ contract Midnight is IMidnight {
 
             MarketState storage _marketState = marketState[id];
             _marketState.tickSpacing = DEFAULT_TICK_SPACING;
-            uint16[7] memory _defaultTradingFeeCbp = defaultTradingFeeCbp[market.loanToken];
-            _marketState.tradingFeeCbp0 = _defaultTradingFeeCbp[0];
-            _marketState.tradingFeeCbp1 = _defaultTradingFeeCbp[1];
-            _marketState.tradingFeeCbp2 = _defaultTradingFeeCbp[2];
-            _marketState.tradingFeeCbp3 = _defaultTradingFeeCbp[3];
-            _marketState.tradingFeeCbp4 = _defaultTradingFeeCbp[4];
-            _marketState.tradingFeeCbp5 = _defaultTradingFeeCbp[5];
-            _marketState.tradingFeeCbp6 = _defaultTradingFeeCbp[6];
+            uint16[7] memory _defaultSettlementFeeCbp = defaultSettlementFeeCbp[market.loanToken];
+            _marketState.settlementFeeCbp0 = _defaultSettlementFeeCbp[0];
+            _marketState.settlementFeeCbp1 = _defaultSettlementFeeCbp[1];
+            _marketState.settlementFeeCbp2 = _defaultSettlementFeeCbp[2];
+            _marketState.settlementFeeCbp3 = _defaultSettlementFeeCbp[3];
+            _marketState.settlementFeeCbp4 = _defaultSettlementFeeCbp[4];
+            _marketState.settlementFeeCbp5 = _defaultSettlementFeeCbp[5];
+            _marketState.settlementFeeCbp6 = _defaultSettlementFeeCbp[6];
             _marketState.continuousFee = defaultContinuousFee[market.loanToken];
             IdLib.storeInCode(market, INITIAL_CHAIN_ID);
 
-            emit EventsLib.MarketCreated(id, market);
+            emit EventsLib.MarketCreated(market, id);
         }
         return id;
     }
@@ -871,15 +880,15 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Market));
     }
 
-    function creditOf(bytes32 id, address user) external view returns (uint256) {
+    function creditOf(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].credit;
     }
 
-    function debtOf(bytes32 id, address user) external view returns (uint256) {
+    function debtOf(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].debt;
     }
 
-    function totalUnits(bytes32 id) external view returns (uint256) {
+    function totalUnits(bytes32 id) external view returns (uint128) {
         return marketState[id].totalUnits;
     }
 
@@ -891,20 +900,20 @@ contract Midnight is IMidnight {
         return marketState[id].tickSpacing;
     }
 
-    function withdrawable(bytes32 id) external view returns (uint256) {
+    function withdrawable(bytes32 id) external view returns (uint128) {
         return marketState[id].withdrawable;
     }
 
-    /// @dev The trading fee cbp values are 0 until the market is created, then set to the default value.
-    function tradingFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
+    /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
+    function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
         return [
-            marketState[id].tradingFeeCbp0,
-            marketState[id].tradingFeeCbp1,
-            marketState[id].tradingFeeCbp2,
-            marketState[id].tradingFeeCbp3,
-            marketState[id].tradingFeeCbp4,
-            marketState[id].tradingFeeCbp5,
-            marketState[id].tradingFeeCbp6
+            marketState[id].settlementFeeCbp0,
+            marketState[id].settlementFeeCbp1,
+            marketState[id].settlementFeeCbp2,
+            marketState[id].settlementFeeCbp3,
+            marketState[id].settlementFeeCbp4,
+            marketState[id].settlementFeeCbp5,
+            marketState[id].settlementFeeCbp6
         ];
     }
 
@@ -913,7 +922,7 @@ contract Midnight is IMidnight {
         return marketState[id].continuousFee;
     }
 
-    function continuousFeeCredit(bytes32 id) external view returns (uint256) {
+    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
         return marketState[id].continuousFeeCredit;
     }
 
@@ -950,21 +959,21 @@ contract Midnight is IMidnight {
         return maxDebt >= debt;
     }
 
-    /// @dev Returns the trading fee using piecewise linear interpolation between breakpoints.
-    function tradingFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
+    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
         MarketState storage _marketState = marketState[id];
         require(_marketState.tickSpacing > 0, MarketNotCreated());
 
-        if (timeToMaturity >= 360 days) return _marketState.tradingFeeCbp6 * CBP;
+        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.tradingFeeCbp0 * CBP, _marketState.tradingFeeCbp1 * CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.tradingFeeCbp1 * CBP, _marketState.tradingFeeCbp2 * CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.tradingFeeCbp2 * CBP, _marketState.tradingFeeCbp3 * CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.tradingFeeCbp3 * CBP, _marketState.tradingFeeCbp4 * CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.tradingFeeCbp4 * CBP, _marketState.tradingFeeCbp5 * CBP) :
-                                        (180 days, 360 days, _marketState.tradingFeeCbp5 * CBP, _marketState.tradingFeeCbp6 * CBP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
+                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
