@@ -48,8 +48,8 @@ contract OfferTree {
     // value (that is not already used).
     // Leaves keep the fixed-size pre-image of hashOffer (see Leaf) so isWellFormed can recompute a leaf's hash
     // and pin its hashNode into the image of hashOffer. hashOffer and hashNode feed keccak distinct
-    // input shapes, this gives domain separation between leaves and internal nodes. The tree is built only via newLeaf and newInternalNode, which preserve well-formedness by
-    // construction.
+    // input shapes, this gives domain separation between leaves and internal nodes. The tree is built only via newLeaf
+    // and newInternalNode, which preserve well-formedness by construction.
     mapping(bytes32 => Node) internal tree;
 
     /* MAIN FUNCTIONS */
