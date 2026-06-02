@@ -597,7 +597,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         Position storage _position = position[id][borrower];
-        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
+        require(repaidUnits == 0 || seizedAssets == 0, InconsistentInput());
         require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
         require(
             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),
