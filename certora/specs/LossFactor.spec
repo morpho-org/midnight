@@ -90,7 +90,6 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require marketIsCreated(market), "market created";
     require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "see updatePositionDoesNotRevert";
@@ -126,7 +125,6 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require marketIsCreated(market), "market created";
     require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
     require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
     require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
