@@ -71,7 +71,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 /// An unauthorized caller cannot change a user's updated credit except via liquidate.
 /// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
-rule onlyAuthorizedCanChangeUpdatedCreditExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) {
+rule onlyAuthorizedCanChangeUpdatedCreditExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     require e.block.timestamp <= max_uint128, "realistic timestamp, needed for the uint128 cast";
 
     bytes32 id = summaryToId(market);
