@@ -265,17 +265,12 @@ contract Midnight is IMidnight {
         require(_marketState.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
-        uint16[7] memory feeCbps = [
-            _marketState.settlementFeeCbp0,
-            _marketState.settlementFeeCbp1,
-            _marketState.settlementFeeCbp2,
-            _marketState.settlementFeeCbp3,
-            _marketState.settlementFeeCbp4,
-            _marketState.settlementFeeCbp5,
-            _marketState.settlementFeeCbp6
-        ];
-        feeCbps[index] = newSettlementFeeCbp;
-        _requireSettlementFeeCbpsNonDecreasing(feeCbps);
+        _requireSettlementFeeCbpNonDecreasing(
+            index,
+            newSettlementFeeCbp,
+            index == 0 ? 0 : _settlementFeeCbpAt(_marketState, index - 1),
+            index == 6 ? 0 : _settlementFeeCbpAt(_marketState, index + 1)
+        );
         if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
         else if (index == 1) _marketState.settlementFeeCbp1 = newSettlementFeeCbp;
         else if (index == 2) _marketState.settlementFeeCbp2 = newSettlementFeeCbp;
@@ -293,17 +288,32 @@ contract Midnight is IMidnight {
         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
-        uint16[7] memory feeCbps = defaultSettlementFeeCbp[loanToken];
+        uint16[7] storage feeCbps = defaultSettlementFeeCbp[loanToken];
+        _requireSettlementFeeCbpNonDecreasing(
+            index, newSettlementFeeCbp, index == 0 ? 0 : feeCbps[index - 1], index == 6 ? 0 : feeCbps[index + 1]
+        );
         feeCbps[index] = newSettlementFeeCbp;
-        _requireSettlementFeeCbpsNonDecreasing(feeCbps);
-        defaultSettlementFeeCbp[loanToken][index] = newSettlementFeeCbp;
         emit EventsLib.SetDefaultSettlementFee(loanToken, index, newSettlementFee);
     }
 
-    function _requireSettlementFeeCbpsNonDecreasing(uint16[7] memory feeCbps) internal pure {
-        for (uint256 i = 1; i < 7; ++i) {
-            require(feeCbps[i - 1] <= feeCbps[i], SettlementFeeNotMonotonic());
-        }
+    function _settlementFeeCbpAt(MarketState storage _marketState, uint256 index) internal view returns (uint16) {
+        if (index == 0) return _marketState.settlementFeeCbp0;
+        if (index == 1) return _marketState.settlementFeeCbp1;
+        if (index == 2) return _marketState.settlementFeeCbp2;
+        if (index == 3) return _marketState.settlementFeeCbp3;
+        if (index == 4) return _marketState.settlementFeeCbp4;
+        if (index == 5) return _marketState.settlementFeeCbp5;
+        return _marketState.settlementFeeCbp6;
+    }
+
+    function _requireSettlementFeeCbpNonDecreasing(
+        uint256 index,
+        uint16 newSettlementFeeCbp,
+        uint16 previousSettlementFeeCbp,
+        uint16 nextSettlementFeeCbp
+    ) internal pure {
+        require(index == 0 || previousSettlementFeeCbp <= newSettlementFeeCbp, SettlementFeeNotMonotonic());
+        require(index == 6 || newSettlementFeeCbp <= nextSettlementFeeCbp, SettlementFeeNotMonotonic());
     }
 
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {
