@@ -46,41 +46,41 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
-persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
 /* Axioms that are proved by MulDiv.spec */
 
 /* proved in mulDivZero in MulDiv.spec */
-definition axiomDownZero(mathint b, mathint d) returns bool = d > 0 => summaryMulDivDownM(0, b, d) == 0;
+definition axiomDownZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivDown(0, b, d) == 0;
 
 /* proved in mulDivMonotoneA */
-definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => summaryMulDivDownM(a1, b, d) <= summaryMulDivDownM(a2, b, d);
+definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
 
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => summaryMulDivUpM(a1, b, d) <= summaryMulDivUpM(a2, b, d);
+definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
 
 /* proved in mulDivMonotoneB */
-definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => summaryMulDivDownM(a, b1, d) <= summaryMulDivDownM(a, b2, d);
+definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
 
 /* proved in mulDivMonotoneD */
-definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => summaryMulDivUpM(a, b, d1) >= summaryMulDivUpM(a, b, d2);
+definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2);
 
 /* proved in mulDivAddDownUp */
-definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => summaryMulDivDownM(a1, b, d) + summaryMulDivUpM(a2, b, d) >= summaryMulDivDownM(a1 + a2, b, d);
+definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivDown(a1, b, d) + ghostMulDivUp(a2, b, d) >= ghostMulDivDown(a1 + a2, b, d);
 
 /* proved in mulDivInverseUpDown */
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => summaryMulDivUpM(summaryMulDivDownM(a, b, d), d, b) <= a;
+definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
 
 /* proved in ExactMath.spec (mulDivLifLLTV) */
-definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => summaryMulDivUpM(a, lltv, WAD()) <= summaryMulDivUpM(a, WAD(), lif);
+definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif);
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(summaryMulDivDownM(a, b, d));
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -88,7 +88,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(summaryMulDivUpM(a, b, d));
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 // global variable indicating whether to use the optimized isHealthy() or the bitmap-less implementation
@@ -267,10 +267,10 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require axiomDownZero(price, ORACLE_PRICE_SCALE()), "axiom";
     require axiomDownZero(globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
     require axiomInverseUpDown(repaidUnitsOut, globalMarketCollateralMaxLif[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(summaryMulDivDownM(repaidUnitsOut, globalMarketCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomLifLLTV(summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralMaxLif[collateralIndex], globalMarketCollateralLLTV[collateralIndex]), "axiom";
+    require axiomInverseUpDown(ghostMulDivDown(repaidUnitsOut, globalMarketCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    require axiomLifLLTV(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralMaxLif[collateralIndex], globalMarketCollateralLLTV[collateralIndex]), "axiom";
     require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddDownUp(summaryMulDivDownM(collateralAfter, price, ORACLE_PRICE_SCALE()), summaryMulDivUpM(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require axiomAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
