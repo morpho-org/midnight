@@ -300,13 +300,13 @@ abstract contract BaseTest is Test {
     function setupMarket(Market memory market, uint256 units) internal {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
-        Offer memory borrowerOffer = _setupMarketOffer(market, units);
+        Offer memory borrowerOffer = _setupMarketOffer(market);
 
         vm.prank(lender);
         midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
     }
 
-    function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
+    function _setupMarketOffer(Market memory market) internal view returns (Offer memory borrowerOffer) {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
