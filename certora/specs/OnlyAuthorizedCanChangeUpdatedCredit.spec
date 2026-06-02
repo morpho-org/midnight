@@ -11,7 +11,7 @@ methods {
     // Summarize toId to be able to reference the id in the rules.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
-    // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
+    // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
     // Over-approximate view functions for prover performance.
