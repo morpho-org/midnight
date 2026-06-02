@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Leaves store the fixed-size pre-image of `hashOffer` (its scalar fields plus `marketHash` and `callbackDataHash`)
-// instead of the raw `Offer`, so `isWellFormed` re-hashes a leaf with one bounded keccak (`_hashLeaf`) and the
-// invariant scales. The rules below justify the trick: `newLeafConnectsHashLeafToHashOffer` checks `_hashLeaf`
-// faithfully reproduces `hashOffer`, `leafHashDisjointFromNodeHash` checks leaf and internal hashes never collide,
-// and `nodeHashInjective` underpins the merkle reasoning in OfferTreeMembership.spec.
+// Leaves store the fixed-size pre-image of hashOffer (its static fields plus marketHash and callbackDataHash)
+// instead of the raw Offer, so isWellFormed re-hashes a leaf with one bounded keccak (_hashLeaf) and the
+// wellFormed proof stays bounded regardless of offer size (no dynamic-array loops, no dynamic-length hashing).
+// hashLeafReproducesHashOffer justifies the trick: the stored pre-image re-hashes
+// to the real hashOffer. leafHashDisjointFromNodeHash and nodeHashInjective record the two keccak-model
+// properties (leaf/internal domain separation, hashNode injectivity) that OfferTreeMembership.spec relies on.
 
 methods {
     function newLeaf(OfferTree.Offer) external envfree;
@@ -28,17 +29,13 @@ strong invariant wellFormed(bytes32 id)
         }
     }
 
-// `_hashLeaf` reproduces the real `hashOffer` for the pre-image stored by `newLeaf`.
-rule newLeafConnectsHashLeafToHashOffer(OfferTree.Offer offer) {
-    bytes32 id = hashOffer(offer);
-
-    require id != to_bytes32(0);
-    require isEmpty(id);
-
+// _hashLeaf reproduces the real hashOffer for the leaf stored by newLeaf.
+// newLeaf is called without @withrevert, so its own guards (id != 0, slot empty) hold as assumptions.
+rule hashLeafReproducesHashOffer(OfferTree.Offer offer) {
     newLeaf(offer);
 
+    bytes32 id = hashOffer(offer);
     assert _hashLeaf(id) == id;
-    assert _hashLeaf(id) == hashOffer(offer);
 }
 
 // A recomputed leaf hash never equals an internal-node hash: image(_hashLeaf) and image(hashNode) are disjoint.
