@@ -25,7 +25,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 /// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
-/// is an incentive to take resting sell offers with price < 1. (more precisely price < 1 - settlementFee) and withdraw
+/// is an incentive to take resting sell offers with price < 1 (more precisely price < 1 - settlementFee) and withdraw
 /// instantly. Lenders (and the fee claimer) might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
