@@ -74,6 +74,8 @@ The membership result is stated for any well-formed root; the checker in [`check
 A passing run certifies that the root is the root of a well-formed tree built from exactly those offers, so the membership guarantee applies to it.
 This confirms what a root commits to, not that it was signed; verifying the ratifier's signature is a separate step.
 
+The verification setup and technique is inspired from the Merkle Tree Membership soundness spec in [Universal Rewards Distributor](https://github.com/morpho-org/universal-rewards-distributor/).
+
 ## Fees
 
 Continuous-fee accrual and settlement-fee rounding stay within their expected bounds.
