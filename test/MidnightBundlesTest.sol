@@ -41,8 +41,9 @@ contract MidnightBundlesTest is BaseTest {
 
         // Set settlement fees to max for all breakpoints.
         midnight.setFeeClaimer(makeAddr("feeClaimer"));
-        for (uint256 i; i <= 6; i++) {
+        for (uint256 i = 6;; --i) {
             midnight.setDefaultSettlementFee(address(loanToken), i, maxSettlementFee(i));
+            if (i == 0) break;
         }
 
         market.loanToken = address(loanToken);

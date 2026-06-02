@@ -42,6 +42,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The settlement fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
 /// approximation between breakpoints.
 /// @dev Settlement fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
+/// @dev Settlement fees are non-decreasing with the TTM.
 /// @dev For TTM > 360d, the settlement fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the settlement fee is the fee at the 0d breakpoint.
 /// @dev Settlement fees are stored in cbp (centi-basis-points): settlementFee / CBP.
@@ -264,6 +265,17 @@ contract Midnight is IMidnight {
         require(_marketState.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
+        uint16[7] memory feeCbps = [
+            _marketState.settlementFeeCbp0,
+            _marketState.settlementFeeCbp1,
+            _marketState.settlementFeeCbp2,
+            _marketState.settlementFeeCbp3,
+            _marketState.settlementFeeCbp4,
+            _marketState.settlementFeeCbp5,
+            _marketState.settlementFeeCbp6
+        ];
+        feeCbps[index] = newSettlementFeeCbp;
+        _requireSettlementFeeCbpsNonDecreasing(feeCbps);
         if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
         else if (index == 1) _marketState.settlementFeeCbp1 = newSettlementFeeCbp;
         else if (index == 2) _marketState.settlementFeeCbp2 = newSettlementFeeCbp;
@@ -280,8 +292,18 @@ contract Midnight is IMidnight {
         require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
-        defaultSettlementFeeCbp[loanToken][index] = uint16(newSettlementFee / CBP);
+        uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
+        uint16[7] memory feeCbps = defaultSettlementFeeCbp[loanToken];
+        feeCbps[index] = newSettlementFeeCbp;
+        _requireSettlementFeeCbpsNonDecreasing(feeCbps);
+        defaultSettlementFeeCbp[loanToken][index] = newSettlementFeeCbp;
         emit EventsLib.SetDefaultSettlementFee(loanToken, index, newSettlementFee);
+    }
+
+    function _requireSettlementFeeCbpsNonDecreasing(uint16[7] memory feeCbps) internal pure {
+        for (uint256 i = 1; i < 7; ++i) {
+            require(feeCbps[i - 1] <= feeCbps[i], SettlementFeeNotMonotonic());
+        }
     }
 
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {

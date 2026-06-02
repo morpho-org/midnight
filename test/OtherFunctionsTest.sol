@@ -233,8 +233,9 @@ contract OtherFunctionsTest is BaseTest {
         _market = validMarket(_market);
 
         midnight.setDefaultContinuousFee(_market.loanToken, MAX_CONTINUOUS_FEE);
-        for (uint256 i = 0; i < 7; i++) {
+        for (uint256 i = 6;; --i) {
             midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
+            if (i == 0) break;
         }
 
         bytes32 _id = midnight.touchMarket(_market);
@@ -637,8 +638,9 @@ contract OtherFunctionsTest is BaseTest {
         _defaultContinuousFee = bound(_defaultContinuousFee, 0, MAX_CONTINUOUS_FEE);
 
         midnight.setDefaultContinuousFee(_market.loanToken, _defaultContinuousFee);
-        for (uint256 i = 0; i < 7; i++) {
+        for (uint256 i = 6;; --i) {
             midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
+            if (i == 0) break;
         }
 
         bytes32 _id = midnight.touchMarket(_market);

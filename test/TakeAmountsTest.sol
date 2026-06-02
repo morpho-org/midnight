@@ -59,10 +59,13 @@ contract TakeAmountsTest is BaseTest {
         returns (uint256 settlementFee)
     {
         settlementFee0 = bound(settlementFee0, 0, maxSettlementFee(0)) / 1e12 * 1e12;
-        settlementFee1 = bound(settlementFee1, 0, maxSettlementFee(1)) / 1e12 * 1e12;
+        settlementFee1 = bound(settlementFee1, settlementFee0, maxSettlementFee(1)) / 1e12 * 1e12;
         midnight.touchMarket(market);
+        for (uint256 i = 6;; --i) {
+            midnight.setMarketSettlementFee(id, i, settlementFee1);
+            if (i == 1) break;
+        }
         midnight.setMarketSettlementFee(id, 0, settlementFee0);
-        midnight.setMarketSettlementFee(id, 1, settlementFee1);
         settlementFee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
     }
 

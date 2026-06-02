@@ -16,6 +16,23 @@ import {BaseTest} from "./BaseTest.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 
 contract SettersTest is BaseTest {
+    function _createMarket(address loanToken_) internal returns (bytes32) {
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            loanToken: loanToken_,
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+        midnight.touchMarket(market);
+        return toId(market);
+    }
+
     function testMaxSettlementFeeConstants() public pure {
         assertEq(maxSettlementFee(0), MAX_SETTLEMENT_FEE_0_DAYS, "0 days max settlement fee");
         assertEq(maxSettlementFee(1), MAX_SETTLEMENT_FEE_1_DAY, "1 day max settlement fee");
@@ -65,12 +82,12 @@ contract SettersTest is BaseTest {
         uint256 threeSixtyDaysFee
     ) public {
         postMaturityFee = bound(postMaturityFee, 0, maxSettlementFee(0)) / 1e12 * 1e12;
-        oneDayFee = bound(oneDayFee, 0, maxSettlementFee(1)) / 1e12 * 1e12;
-        sevenDaysFee = bound(sevenDaysFee, 0, maxSettlementFee(2)) / 1e12 * 1e12;
-        thirtyDaysFee = bound(thirtyDaysFee, 0, maxSettlementFee(3)) / 1e12 * 1e12;
-        ninetyDaysFee = bound(ninetyDaysFee, 0, maxSettlementFee(4)) / 1e12 * 1e12;
-        oneEightyDaysFee = bound(oneEightyDaysFee, 0, maxSettlementFee(5)) / 1e12 * 1e12;
-        threeSixtyDaysFee = bound(threeSixtyDaysFee, 0, maxSettlementFee(6)) / 1e12 * 1e12;
+        oneDayFee = bound(oneDayFee, postMaturityFee, maxSettlementFee(1)) / 1e12 * 1e12;
+        sevenDaysFee = bound(sevenDaysFee, oneDayFee, maxSettlementFee(2)) / 1e12 * 1e12;
+        thirtyDaysFee = bound(thirtyDaysFee, sevenDaysFee, maxSettlementFee(3)) / 1e12 * 1e12;
+        ninetyDaysFee = bound(ninetyDaysFee, thirtyDaysFee, maxSettlementFee(4)) / 1e12 * 1e12;
+        oneEightyDaysFee = bound(oneEightyDaysFee, ninetyDaysFee, maxSettlementFee(5)) / 1e12 * 1e12;
+        threeSixtyDaysFee = bound(threeSixtyDaysFee, oneEightyDaysFee, maxSettlementFee(6)) / 1e12 * 1e12;
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -87,13 +104,13 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(market);
         midnight.touchMarket(market);
 
-        midnight.setMarketSettlementFee(id, 0, postMaturityFee);
-        midnight.setMarketSettlementFee(id, 1, oneDayFee);
-        midnight.setMarketSettlementFee(id, 2, sevenDaysFee);
-        midnight.setMarketSettlementFee(id, 3, thirtyDaysFee);
-        midnight.setMarketSettlementFee(id, 4, ninetyDaysFee);
-        midnight.setMarketSettlementFee(id, 5, oneEightyDaysFee);
         midnight.setMarketSettlementFee(id, 6, threeSixtyDaysFee);
+        midnight.setMarketSettlementFee(id, 5, oneEightyDaysFee);
+        midnight.setMarketSettlementFee(id, 4, ninetyDaysFee);
+        midnight.setMarketSettlementFee(id, 3, thirtyDaysFee);
+        midnight.setMarketSettlementFee(id, 2, sevenDaysFee);
+        midnight.setMarketSettlementFee(id, 1, oneDayFee);
+        midnight.setMarketSettlementFee(id, 0, postMaturityFee);
 
         assertEq(midnight.settlementFee(id, 0), postMaturityFee, "post maturity settlement fee");
         assertEq(midnight.settlementFee(id, 1 days), oneDayFee, "one day settlement fee");
@@ -137,6 +154,37 @@ contract SettersTest is BaseTest {
         vm.assume(fee % 1e12 != 0);
         vm.expectRevert(IMidnight.FeeNotMultipleOfFeeCbp.selector);
         midnight.setDefaultSettlementFee(loanToken, index, fee);
+    }
+
+    function testSetMarketSettlementFeeRejectsDecreaseWithLongerTtm() public {
+        bytes32 id = _createMarket(address(loanToken));
+
+        vm.expectRevert(IMidnight.SettlementFeeNotMonotonic.selector);
+        midnight.setMarketSettlementFee(id, 1, 1e12);
+    }
+
+    function testSetMarketSettlementFeeRejectsDecreaseWithShorterTtm() public {
+        bytes32 id = _createMarket(address(loanToken));
+        midnight.setMarketSettlementFee(id, 6, 3e12);
+        midnight.setMarketSettlementFee(id, 5, 2e12);
+        midnight.setMarketSettlementFee(id, 4, 1e12);
+
+        vm.expectRevert(IMidnight.SettlementFeeNotMonotonic.selector);
+        midnight.setMarketSettlementFee(id, 5, 0);
+    }
+
+    function testSetDefaultSettlementFeeRejectsDecreaseWithLongerTtm() public {
+        vm.expectRevert(IMidnight.SettlementFeeNotMonotonic.selector);
+        midnight.setDefaultSettlementFee(address(loanToken), 1, 1e12);
+    }
+
+    function testSetDefaultSettlementFeeRejectsDecreaseWithShorterTtm() public {
+        midnight.setDefaultSettlementFee(address(loanToken), 6, 3e12);
+        midnight.setDefaultSettlementFee(address(loanToken), 5, 2e12);
+        midnight.setDefaultSettlementFee(address(loanToken), 4, 1e12);
+
+        vm.expectRevert(IMidnight.SettlementFeeNotMonotonic.selector);
+        midnight.setDefaultSettlementFee(address(loanToken), 5, 0);
     }
 
     function testSetMarketSettlementFeeMarketNotCreated(bytes32 id) public {
@@ -194,13 +242,13 @@ contract SettersTest is BaseTest {
         oneEightyDaysFee = bound(oneEightyDaysFee, ninetyDaysFee, maxSettlementFee(5)) / 1e12 * 1e12;
         threeSixtyDaysFee = bound(threeSixtyDaysFee, oneEightyDaysFee, maxSettlementFee(6)) / 1e12 * 1e12;
 
-        midnight.setDefaultSettlementFee(loanToken, 0, postMaturityFee);
-        midnight.setDefaultSettlementFee(loanToken, 1, oneDayFee);
-        midnight.setDefaultSettlementFee(loanToken, 2, sevenDaysFee);
-        midnight.setDefaultSettlementFee(loanToken, 3, thirtyDaysFee);
-        midnight.setDefaultSettlementFee(loanToken, 4, ninetyDaysFee);
-        midnight.setDefaultSettlementFee(loanToken, 5, oneEightyDaysFee);
         midnight.setDefaultSettlementFee(loanToken, 6, threeSixtyDaysFee);
+        midnight.setDefaultSettlementFee(loanToken, 5, oneEightyDaysFee);
+        midnight.setDefaultSettlementFee(loanToken, 4, ninetyDaysFee);
+        midnight.setDefaultSettlementFee(loanToken, 3, thirtyDaysFee);
+        midnight.setDefaultSettlementFee(loanToken, 2, sevenDaysFee);
+        midnight.setDefaultSettlementFee(loanToken, 1, oneDayFee);
+        midnight.setDefaultSettlementFee(loanToken, 0, postMaturityFee);
 
         // touch market with this loan token
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
@@ -253,12 +301,12 @@ contract SettersTest is BaseTest {
         uint256 settlementFee6
     ) public {
         settlementFee0 = bound(settlementFee0, 0, maxSettlementFee(0)) / 1e12 * 1e12;
-        settlementFee1 = bound(settlementFee1, 0, maxSettlementFee(1)) / 1e12 * 1e12;
-        settlementFee2 = bound(settlementFee2, 0, maxSettlementFee(2)) / 1e12 * 1e12;
-        settlementFee3 = bound(settlementFee3, 0, maxSettlementFee(3)) / 1e12 * 1e12;
-        settlementFee4 = bound(settlementFee4, 0, maxSettlementFee(4)) / 1e12 * 1e12;
-        settlementFee5 = bound(settlementFee5, 0, maxSettlementFee(5)) / 1e12 * 1e12;
-        settlementFee6 = bound(settlementFee6, 0, maxSettlementFee(6)) / 1e12 * 1e12;
+        settlementFee1 = bound(settlementFee1, settlementFee0, maxSettlementFee(1)) / 1e12 * 1e12;
+        settlementFee2 = bound(settlementFee2, settlementFee1, maxSettlementFee(2)) / 1e12 * 1e12;
+        settlementFee3 = bound(settlementFee3, settlementFee2, maxSettlementFee(3)) / 1e12 * 1e12;
+        settlementFee4 = bound(settlementFee4, settlementFee3, maxSettlementFee(4)) / 1e12 * 1e12;
+        settlementFee5 = bound(settlementFee5, settlementFee4, maxSettlementFee(5)) / 1e12 * 1e12;
+        settlementFee6 = bound(settlementFee6, settlementFee5, maxSettlementFee(6)) / 1e12 * 1e12;
 
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
@@ -275,13 +323,13 @@ contract SettersTest is BaseTest {
         bytes32 id = toId(market);
         midnight.touchMarket(market);
 
-        midnight.setMarketSettlementFee(id, 0, settlementFee0);
-        midnight.setMarketSettlementFee(id, 1, settlementFee1);
-        midnight.setMarketSettlementFee(id, 2, settlementFee2);
-        midnight.setMarketSettlementFee(id, 3, settlementFee3);
-        midnight.setMarketSettlementFee(id, 4, settlementFee4);
-        midnight.setMarketSettlementFee(id, 5, settlementFee5);
         midnight.setMarketSettlementFee(id, 6, settlementFee6);
+        midnight.setMarketSettlementFee(id, 5, settlementFee5);
+        midnight.setMarketSettlementFee(id, 4, settlementFee4);
+        midnight.setMarketSettlementFee(id, 3, settlementFee3);
+        midnight.setMarketSettlementFee(id, 2, settlementFee2);
+        midnight.setMarketSettlementFee(id, 1, settlementFee1);
+        midnight.setMarketSettlementFee(id, 0, settlementFee0);
 
         // Test exact breakpoints
         assertEq(midnight.settlementFee(id, 0), settlementFee0, "0 days");

@@ -1223,7 +1223,10 @@ contract TakeTest is BaseTest {
     // fee>0, buy, units
     function testPriceZeroWithSettlementFeeBuy() public {
         midnight.touchMarket(market);
-        midnight.setMarketSettlementFee(id, 1, 1e12);
+        for (uint256 i = 6;; --i) {
+            midnight.setMarketSettlementFee(id, i, 1e12);
+            if (i == 1) break;
+        }
         uint256 units = 1e18;
         lenderOffer.tick = 0;
         lenderOffer.maxUnits = units;
@@ -1235,7 +1238,10 @@ contract TakeTest is BaseTest {
     // fee>0, sell, units
     function testPriceZeroWithSettlementFeeSell() public {
         midnight.touchMarket(market);
-        midnight.setMarketSettlementFee(id, 1, 1e12);
+        for (uint256 i = 6;; --i) {
+            midnight.setMarketSettlementFee(id, i, 1e12);
+            if (i == 1) break;
+        }
         uint256 fee = midnight.settlementFee(id, market.maturity - vm.getBlockTimestamp());
         uint256 units = 1e18;
         borrowerOffer.tick = 0;

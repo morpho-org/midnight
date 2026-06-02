@@ -96,6 +96,7 @@ interface IMidnight {
     error OfferNotStarted();
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
+    error SettlementFeeNotMonotonic();
     error OnlyRoleSetter();
     error OnlyTickSpacingSetter();
     error RatifierFail();

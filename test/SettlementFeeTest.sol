@@ -31,6 +31,13 @@ contract SettlementFeeTest is BaseTest {
     Offer internal borrowerOffer;
     address internal feeClaimer = makeAddr("feeClaimer");
 
+    function _setDefaultSettlementFeeFrom(uint256 index, uint256 settlementFee) internal {
+        for (uint256 i = 6;; --i) {
+            midnight.setDefaultSettlementFee(address(loanToken), i, settlementFee);
+            if (i == index) break;
+        }
+    }
+
     function setUp() public override {
         super.setUp();
 
@@ -87,7 +94,7 @@ contract SettlementFeeTest is BaseTest {
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         settlementFee = bound(settlementFee, 0, maxSettlementFee(1)) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
         midnight.touchMarket(market);
         midnight.setMarketTickSpacing(id, 1);
         borrowerOffer.tick = sellerTick;
@@ -112,7 +119,7 @@ contract SettlementFeeTest is BaseTest {
         uint256 buyerPrice = TickLib.tickToPrice(buyerTick);
         vm.assume(buyerPrice >= MIN_SELLER_PRICE);
         settlementFee = bound(settlementFee, 0, maxSettlementFee(1)) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
         lenderOffer.tick = buyerTick;
 
         uint256 sellerPrice = buyerPrice - settlementFee;
@@ -134,7 +141,7 @@ contract SettlementFeeTest is BaseTest {
         uint256 sellerPrice = TickLib.tickToPrice(sellerTick);
         vm.assume(sellerPrice >= MIN_SELLER_PRICE);
         settlementFee = bound(settlementFee, 0, maxSettlementFee(1)) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
         borrowerOffer.tick = sellerTick;
 
         uint256 buyerPrice = sellerPrice + settlementFee;
@@ -168,8 +175,8 @@ contract SettlementFeeTest is BaseTest {
 
         // Set fees at breakpoints for linear interpolation (3 days is between 1 and 7 days)
         // Must be set before touchMarket, which snapshots defaultFees at creation time.
+        _setDefaultSettlementFeeFrom(2, settlementFee7Days);
         midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee1Day);
-        midnight.setDefaultSettlementFee(address(loanToken), 2, settlementFee7Days);
 
         id = midnight.touchMarket(market);
         lenderOffer.market = market;
@@ -209,7 +216,7 @@ contract SettlementFeeTest is BaseTest {
         lenderOffer.market = market;
         borrowerOffer.market = market;
 
-        midnight.setDefaultSettlementFee(address(loanToken), 0, settlementFee0Day);
+        _setDefaultSettlementFeeFrom(0, settlementFee0Day);
         borrowerOffer.tick = sellerTick;
 
         collateralize(market, borrower, MAX_DEBT);
@@ -255,7 +262,7 @@ contract SettlementFeeTest is BaseTest {
     function testClaimSettlementFee(uint256 settlementFee, uint256 units, uint256 withdrawAmount) public {
         units = bound(units, 1, MAX_DEBT);
         settlementFee = bound(settlementFee, 1e12, maxSettlementFee(1)) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
 
         collateralize(market, borrower, MAX_DEBT);
         take(units, lender, borrowerOffer);
@@ -281,7 +288,7 @@ contract SettlementFeeTest is BaseTest {
 
     function testClaimSettlementFeeExcessReverts() public {
         uint256 settlementFee = maxSettlementFee(1) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
         borrowerOffer.tick = 0;
 
         collateralize(market, borrower, MAX_DEBT);
@@ -296,7 +303,7 @@ contract SettlementFeeTest is BaseTest {
 
     function testSettlementFeesAccumulate() public {
         uint256 settlementFee = maxSettlementFee(1) / 1e12 * 1e12;
-        midnight.setDefaultSettlementFee(address(loanToken), 1, settlementFee);
+        _setDefaultSettlementFeeFrom(1, settlementFee);
         borrowerOffer.tick = 0;
         borrowerOffer.group = keccak256("g1");
 
