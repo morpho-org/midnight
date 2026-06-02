@@ -44,8 +44,6 @@ function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
     return result;
 }
 
-definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastAccrual;
-
 /// CREDIT AND DEBT CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's credit and debt except via liquidate and updatePosition.
