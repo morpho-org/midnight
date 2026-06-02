@@ -43,13 +43,6 @@ methods {
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => callbackCheckpoint() expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => callbackCheckpoint() expect(bytes32);
     function _.onFlashLoan(address, address[], uint256[], bytes) external => callbackCheckpoint() expect(bytes32);
-
-    // Sound NONDET over-approximations of internals irrelevant to the seller's debt and to the lock.
-    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
-    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
-    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 }
 
 /// GHOSTS ///
@@ -59,13 +52,15 @@ persistent ghost mapping(bytes32 => mathint) idMaturity;
 
 // The (id, user) position the property is checked against. Left unconstrained => universally quantified.
 persistent ghost bytes32 trackedId;
+
 persistent ghost address trackedUser;
 
 // Snapshot of the tracked debt at the start of the call, and the call's block.timestamp.
 persistent ghost mathint trackedDebtBefore;
+
 persistent ghost mathint blockTimestamp;
 
-// True iff the property held at every external-call boundary reached so far.
+// True if the property held at every external-call boundary reached so far.
 persistent ghost bool propHeldAtBoundaries;
 
 /// HELPERS ///
@@ -83,9 +78,7 @@ function callbackCheckpoint() returns bytes32 {
 
 /// RULE ///
 
-rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args)
-    filtered { f -> !f.isView }
-{
+rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     blockTimestamp = to_mathint(e.block.timestamp);
     trackedDebtBefore = to_mathint(debtOf(trackedId, trackedUser));
     propHeldAtBoundaries = true;
