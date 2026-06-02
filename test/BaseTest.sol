@@ -167,10 +167,10 @@ abstract contract BaseTest is Test {
 
     // Convenience wrapper for take with the dummy ratifier and no callbacks.
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
-        // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
-        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
+        // receiverIfTakerIsSeller param is for taker (when offer.buy == true), and must be zero otherwise.
+        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false).
         vm.prank(taker);
-        return midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
+        return midnight.take(offer, hex"", units, taker, offer.buy ? taker : address(0), address(0), hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -303,7 +303,7 @@ abstract contract BaseTest is Test {
         Offer memory borrowerOffer = _setupMarketOffer(market, units);
 
         vm.prank(lender);
-        midnight.take(borrowerOffer, hex"", units, lender, borrower, address(0), hex"");
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
     }
 
     function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
@@ -311,7 +311,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();

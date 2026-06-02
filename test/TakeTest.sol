@@ -850,7 +850,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZero.selector);
+        vm.expectRevert(IMidnight.InvalidOfferCaps.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -981,6 +981,32 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, hex"", 0, taker, taker, address(0), hex"");
     }
 
+    function testTakeUnusedReceiverMustBeZeroBuy(address receiver) public {
+        vm.assume(receiver != address(0));
+        // lenderOffer is a buy offer, so receiverIfMakerIsSeller is unused and must be zero.
+        lenderOffer.receiverIfMakerIsSeller = receiver;
+        vm.expectRevert(IMidnight.UnusedReceiverMustBeZero.selector);
+        vm.prank(borrower);
+        midnight.take(lenderOffer, hex"", 0, borrower, address(0), address(0), hex"");
+    }
+
+    function testTakeUnusedReceiverMustBeZeroSell(address receiver) public {
+        vm.assume(receiver != address(0));
+        // borrowerOffer is a sell offer, so the receiverIfTakerIsSeller input is unused and must be zero.
+        vm.expectRevert(IMidnight.UnusedReceiverMustBeZero.selector);
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", 0, lender, receiver, address(0), hex"");
+    }
+
+    function testTakeInvalidOfferCapsBothZero(uint256 units) public {
+        // Both caps are zero: the offer cannot trade anything, so take always reverts.
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = 0;
+        vm.expectRevert(IMidnight.InvalidOfferCaps.selector);
+        vm.prank(borrower);
+        midnight.take(lenderOffer, hex"", units, borrower, address(0), address(0), hex"");
+    }
+
     // test callbacks.
 
     function addCredit(address user, uint256 units) internal {
@@ -1003,7 +1029,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
         borrowerOffer.callbackData = abi.encode(0, collateral, data);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
@@ -1040,7 +1066,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         addCredit(borrower, units);
 
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         address callback = address(new BorrowCallback());
@@ -1151,7 +1177,7 @@ contract TakeTest is BaseTest {
         lenderOffer.callback = address(new LendCallback());
         lenderOffer.callbackData = data;
         lenderOffer.maker = address(otherLender);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lenderOffer.callback, assets);
         collateralize(market, borrower, units);
@@ -1178,7 +1204,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         address callback = address(new LendCallback());
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), callback, assets);
         collateralize(market, borrower, units);
