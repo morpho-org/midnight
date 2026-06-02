@@ -32,6 +32,7 @@ Healthy positions stay healthy, and liquidations only touch liquidatable positio
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
+- [`MaxNormalModeLiquidation.spec`](specs/MaxNormalModeLiquidation.spec) checks that the requested normal-mode max-liquidation input succeeds under the explicit debt/collateral fit assumptions required by rounding, and that once it succeeds, a second nonzero normal-mode liquidation on the same collateral reverts.
 
 ## Offers and consumption
 
