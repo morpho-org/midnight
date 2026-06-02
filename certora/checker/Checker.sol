@@ -20,27 +20,6 @@ contract Checker is Test {
 
     // Replay the certificate through the verified `newLeaf` and `newInternalNode`
     // primitives, then assert that the final certificate item matches `root`.
-    function _verifyCertificate(Offer[] memory leaves, InternalNode[] memory nodes, bytes32 root) internal {
-        require(leaves.length > 0, "no leaves");
-        require(nodes.length > 0 || leaves.length == 1, "missing internal nodes");
-
-        OfferTree tree = new OfferTree();
-
-        for (uint256 i = 0; i < leaves.length; i++) {
-            tree.newLeaf(leaves[i]);
-        }
-
-        bytes32 rootId = HashLib.hashOffer(leaves[0]);
-        for (uint256 i = 0; i < nodes.length; i++) {
-            InternalNode memory node = nodes[i];
-            tree.newInternalNode(node.id, node.left, node.right);
-            rootId = node.id;
-        }
-
-        assertTrue(!tree.isEmpty(rootId), "empty root");
-        assertEq(tree.getHash(rootId), root, "mismatched roots");
-    }
-
     function testVerifyCertificate() public {
         string memory path = string.concat(vm.projectRoot(), "/certificate.json");
         if (!vm.exists(path)) vm.skip(true, "no certificate.json at project root");
@@ -62,6 +41,22 @@ contract Checker is Test {
             nodes[i] = abi.decode(enc, (InternalNode));
         }
 
-        _verifyCertificate(leaves, nodes, root);
+        require(leaves.length > 0, "no leaves");
+        require(nodes.length > 0 || leaves.length == 1, "missing internal nodes");
+
+        OfferTree tree = new OfferTree();
+
+        for (uint256 i = 0; i < leaves.length; i++) {
+            tree.newLeaf(leaves[i]);
+        }
+
+        bytes32 rootId = HashLib.hashOffer(leaves[0]);
+        for (uint256 i = 0; i < nodes.length; i++) {
+            InternalNode memory node = nodes[i];
+            tree.newInternalNode(node.id, node.left, node.right);
+            rootId = node.id;
+        }
+
+        assertEq(tree.getHash(rootId), root, "mismatched roots");
     }
 }

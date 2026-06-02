@@ -162,10 +162,11 @@ def hash_node(left, right):
     return w3.to_hex(w3.keccak(_bytes32(left) + _bytes32(right)))
 
 
-# Builds a dense certificate from a power-of-two list of offers, in leftIndex order.
-def build_dense(leaves, claimed_root):
+# Builds a certificate from a power-of-two list of offers, in leftIndex order, by pairing
+# leaves level-by-level into a perfect binary tree.
+def build_certificate(leaves, claimed_root):
     n = len(leaves)
-    assert n > 0 and (n & (n - 1)) == 0, "dense leaves count must be a power of two"
+    assert n > 0 and (n & (n - 1)) == 0, "leaves count must be a power of two"
 
     leaf_instructions = {}
     node_instructions = {}
@@ -192,12 +193,11 @@ def build_dense(leaves, claimed_root):
         level = next_level
 
     assert level[0].lower() == claimed_root.lower(), (
-        f"dense: computed root {level[0]} != claimed root {claimed_root}"
+        f"computed root {level[0]} != claimed root {claimed_root}"
     )
 
     return {
         "root": claimed_root,
-        "treeLeafLength": n,
         "leafLength": len(leaf_instructions),
         "leaf": list(leaf_instructions.values()),
         "nodeLength": len(node_instructions),
@@ -214,7 +214,7 @@ def main():
         proofs = json.load(f)
 
     root = proofs["root"]
-    certificate = build_dense([entry["offer"] for entry in proofs["leaves"]], root)
+    certificate = build_certificate([entry["offer"] for entry in proofs["leaves"]], root)
 
     with open("certificate.json", "w") as f:
         json.dump(certificate, f, indent=2)

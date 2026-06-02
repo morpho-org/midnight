@@ -19,16 +19,11 @@ contract Utils {
     }
 
     // Wraps `HashLib.hashOffer` directly so CVL specs can expose the real EIP-712 offer hash
-    // envfree. Avoids the prior `keccak256(abi.encode(offer))` reimplementation, which is a
-    // *different* hash than `HashLib.hashOffer` (no typehash prefix, no inner hashing of
-    // market/callbackData) and broke keccak unification across summary boundaries when the
-    // prover had to forward-compute the merkle chain (completeness direction).
+    // envfree. Used by OfferTreeMembership.spec as the leaf id. A `keccak256(abi.encode(offer))`
+    // reimplementation would be a *different* hash (no typehash prefix, no inner hashing of
+    // market/callbackData), so we forward to the real library function.
     function hashOffer(Offer memory offer) external pure returns (bytes32) {
         return HashLib.hashOffer(offer);
-    }
-
-    function hashNode(bytes32 a, bytes32 b) external pure returns (bytes32) {
-        return HashLib.hashNode(a, b);
     }
 
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
