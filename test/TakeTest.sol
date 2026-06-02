@@ -534,7 +534,7 @@ contract TakeTest is BaseTest {
         public
     {
         units = bound(units, 0, maxAssets - 1);
-        offerUnits = bound(offerUnits, units, maxAssets - 1);
+        offerUnits = bound(offerUnits, max(units, 1), maxAssets - 1);
         secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         borrowerOffer.maxUnits = offerUnits;
@@ -554,7 +554,7 @@ contract TakeTest is BaseTest {
         public
     {
         units = bound(units, 0, maxAssets - 1);
-        offerUnits = bound(offerUnits, units, maxAssets - 1);
+        offerUnits = bound(offerUnits, max(units, 1), maxAssets - 1);
         secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         lenderOffer.maxUnits = offerUnits;
@@ -573,6 +573,7 @@ contract TakeTest is BaseTest {
     function testBuyGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
+        vm.assume(firstFill + secondFill > 0); // an offer must have a nonzero cap
         borrowerOffer.maxUnits = firstFill + secondFill;
         borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
@@ -592,6 +593,7 @@ contract TakeTest is BaseTest {
     function testSellGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
+        vm.assume(firstFill + secondFill > 0); // an offer must have a nonzero cap
         lenderOffer.maxUnits = firstFill + secondFill;
         lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;

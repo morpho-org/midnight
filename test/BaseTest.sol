@@ -182,7 +182,7 @@ abstract contract BaseTest is Test {
         lenderOffer.market = market;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
