@@ -26,9 +26,15 @@ OFFER_ABI_TYPE = (
 INTERNAL_NODE_ABI_TYPE = "(bytes32,bytes32,bytes32)"
 
 
+# Safety checks use this instead of `assert`, which is stripped under `python -O`.
+def _require(cond, msg):
+    if not cond:
+        raise ValueError(msg)
+
+
 def _bytes32(v):
     raw = bytes.fromhex(v.removeprefix("0x"))
-    assert len(raw) == 32, f"expected 32 bytes, got {len(raw)}"
+    _require(len(raw) == 32, f"expected 32 bytes, got {len(raw)}")
     return raw
 
 
@@ -166,7 +172,7 @@ def hash_node(left, right):
 # leaves level-by-level into a perfect binary tree.
 def build_certificate(leaves, claimed_root):
     n = len(leaves)
-    assert n > 0 and (n & (n - 1)) == 0, "leaves count must be a power of two"
+    _require(n > 0 and (n & (n - 1)) == 0, "leaves count must be a power of two")
 
     leaf_instructions = {}
     node_instructions = {}
@@ -175,7 +181,7 @@ def build_certificate(leaves, claimed_root):
     for leaf, leaf_hash in zip(leaves, level):
         encoded_leaf = abi_encode_offer(leaf)
         previous = leaf_instructions.setdefault(leaf_hash, encoded_leaf)
-        assert previous == encoded_leaf, "leaf hash collides with a different offer"
+        _require(previous == encoded_leaf, "leaf hash collides with a different offer")
 
     while len(level) > 1:
         next_level = []
@@ -183,17 +189,16 @@ def build_certificate(leaves, claimed_root):
             left = level[2 * i]
             right = level[2 * i + 1]
             node_hash = hash_node(left, right)
-            assert (
-                node_hash not in leaf_instructions
-            ), "internal node id collides with a leaf id"
+            _require(node_hash not in leaf_instructions, "internal node id collides with a leaf id")
             encoded_node = abi_encode_node(node_hash, left, right)
             previous = node_instructions.setdefault(node_hash, encoded_node)
-            assert previous == encoded_node, "internal node id collides with different children"
+            _require(previous == encoded_node, "internal node id collides with different children")
             next_level.append(node_hash)
         level = next_level
 
-    assert level[0].lower() == claimed_root.lower(), (
-        f"computed root {level[0]} != claimed root {claimed_root}"
+    _require(
+        level[0].lower() == claimed_root.lower(),
+        f"computed root {level[0]} != claimed root {claimed_root}",
     )
 
     return {
