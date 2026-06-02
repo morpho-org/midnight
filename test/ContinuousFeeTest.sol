@@ -283,12 +283,6 @@ contract ContinuousFeeTest is BaseTest {
             otherLender,
             true,
             keccak256("lender-exit"),
-            MAX_TICK,
-            0,
-            vm.getBlockTimestamp(),
-            false,
-            exitAmount,
-            0,
             takeAssets,
             takeAssets,
             exitAmount,
@@ -297,11 +291,7 @@ contract ContinuousFeeTest is BaseTest {
             exitAmount,
             exitAmount,
             lender,
-            address(0),
-            lender,
-            otherLender,
-            address(0),
-            address(0)
+            otherLender
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
