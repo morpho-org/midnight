@@ -49,7 +49,7 @@ Offers are authorized in batches: a ratifier signs a single Merkle root over an 
 Objective is to show that a successful `take` can only settle an offer that was genuinely committed in the signed tree.
 We reason about [`OfferTree`](helpers/OfferTree.sol), a model of the tree built only through the `newLeaf` and `newInternalNode` primitives. Leaves are keyed by `HashLib.hashOffer(offer)` and store a fixed-size pre-image of the offer, so `isWellFormed` re-hashes a leaf with a single bounded keccak instead of looping over the offer's dynamic members, which keeps the proofs bounded regardless of offer size.
 
-- [`OfferTreeWellFormed.spec`](specs/OfferTreeWellFormed.spec) checks that the primitives only ever build well-formed trees: every node is empty, a leaf carrying a genuine `hashOffer`, or an internal node correctly hashing its two children.
+- [`OfferTreeWellFormed.spec`](specs/OfferTreeWellFormed.spec) checks that the primitives only ever build well-formed trees: every node is empty, a leaf carrying a genuine `hashOffer`, or an internal node correctly hashing its two children. In particular, there is no restriction for the left and right children of a parent node to be sorted.
 - [`OfferTreeMembership.spec`](specs/OfferTreeMembership.spec) checks the main soundness result: for any well-formed tree, if a Merkle proof verifies an offer's hash against the root, then the offer is registered as a leaf. Equivalently, no valid proof can be forged for an offer that is not in the tree.
 - [`Ratification.spec`](specs/Ratification.spec) connects this to the on-chain path: every successful `isRatified` (across all ratifier implementations) and every successful `take` actually invokes `HashLib.isLeaf` and it returns true.
 
