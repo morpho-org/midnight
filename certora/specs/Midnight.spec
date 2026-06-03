@@ -63,17 +63,13 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 rule takeInputOutputConsistency(env e, Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
-    uint256 buyerCreditIncreaseOutput;
-    uint256 buyerPendingFeeIncreaseOutput;
-    uint256 sellerCreditDecreaseOutput;
-    uint256 sellerPendingFeeDecreaseOutput;
 
     uint256 claimableBefore = claimableSettlementFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput, buyerCreditIncreaseOutput, buyerPendingFeeIncreaseOutput, sellerCreditDecreaseOutput, sellerPendingFeeDecreaseOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
 
     // If the input is zero, all the output arguments are zero.
-    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && buyerCreditIncreaseOutput == 0 && buyerPendingFeeIncreaseOutput == 0 && sellerCreditDecreaseOutput == 0 && sellerPendingFeeDecreaseOutput == 0;
+    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
 
     // The claimable settlement fee increases by exactly the spread.
     assert claimableSettlementFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;

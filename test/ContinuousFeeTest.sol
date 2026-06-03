@@ -293,25 +293,7 @@ contract ContinuousFeeTest is BaseTest {
             lender,
             otherLender
         );
-        Offer memory exitOffer = _makeBuyOffer(keccak256("lender-exit"));
-
-        // lender is taker = seller
-        vm.prank(lender);
-        (
-            uint256 returnedBuyerAssets,
-            uint256 returnedSellerAssets,
-            uint256 returnedBuyerCreditIncrease,
-            uint256 returnedBuyerPendingFeeIncrease,
-            uint256 returnedSellerCreditDecrease,
-            uint256 returnedSellerPendingFeeDecrease
-        ) = midnight.take(exitOffer, hex"", exitAmount, lender, lender, address(0), hex"");
-
-        assertEq(returnedBuyerAssets, takeAssets, "returned buyerAssets");
-        assertEq(returnedSellerAssets, takeAssets, "returned sellerAssets");
-        assertEq(returnedBuyerCreditIncrease, exitAmount, "returned buyerCreditIncrease");
-        assertEq(returnedBuyerPendingFeeIncrease, buyerPendingFeeIncrease, "returned buyerPendingFeeIncrease");
-        assertEq(returnedSellerCreditDecrease, exitAmount, "returned sellerCreditDecrease");
-        assertEq(returnedSellerPendingFeeDecrease, sellerPendingFeeDecrease, "returned sellerPendingFeeDecrease");
+        take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - exitAmount, "credit after exit");
@@ -362,9 +344,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Withdraw(lender, id, withdrawAmount, lender, lender, pendingFeeDecrease);
         vm.prank(lender);
-        uint256 returnedPendingFeeDecrease = midnight.withdraw(market, withdrawAmount, lender, lender);
-
-        assertEq(returnedPendingFeeDecrease, pendingFeeDecrease, "returned pendingFeeDecrease");
+        midnight.withdraw(market, withdrawAmount, lender, lender);
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - pendingFeeDecrease : 0;
 
