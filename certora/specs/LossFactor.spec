@@ -86,6 +86,65 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     assert !lastReverted, "updatePosition should not revert under valid state";
 }
 
+/// updatePosition is idempotent: a second call in the same env leaves the relevant position state unchanged and accrues no new fee.
+rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+
+    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "see updatePositionDoesNotRevert";
+
+    // Snapshot the relevant position state after a first updatePosition.
+    updatePosition(e, market, user);
+    mathint creditAfterFirst = creditOf(id, user);
+    mathint pendingFeeAfterFirst = pendingFee(id, user);
+    uint128 lastLossFactorAfterFirst = lastLossFactor(id, user);
+    uint128 lastAccrualAfterFirst = currentContract.position[id][user].lastAccrual;
+    uint128 cfcAfterFirst = currentContract.marketState[id].continuousFeeCredit;
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePosition(e, market, user);
+
+    // Second call's return values match the first call's resulting state and no new fee accrues.
+    assert newCredit == creditAfterFirst;
+    assert newPendingFee == pendingFeeAfterFirst;
+    assert accruedFee == 0;
+
+    // Stored position state is unchanged by the second call.
+    assert creditOf(id, user) == creditAfterFirst;
+    assert pendingFee(id, user) == pendingFeeAfterFirst;
+    assert lastLossFactor(id, user) == lastLossFactorAfterFirst;
+    assert currentContract.position[id][user].lastAccrual == lastAccrualAfterFirst;
+    assert currentContract.marketState[id].continuousFeeCredit == cfcAfterFirst;
+}
+
+/// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated),
+/// updatePosition does not slash: credit and pendingFee only decrease by the accrued fee.
+rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+
+    require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
+    require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
+    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+
+    mathint creditBefore = creditOf(id, user);
+    mathint pendingFeeBefore = pendingFee(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePosition(e, market, user);
+
+    // Credit and pendingFee only decrease by the accrued fee (no slashing).
+    assert newCredit + accruedFee == creditBefore;
+    assert newPendingFee + accruedFee == pendingFeeBefore;
+    assert creditOf(id, user) + accruedFee == creditBefore;
+    assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
+}
+
 /// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address borrower, bytes data) {
     bytes32 id = summaryToId(market);
