@@ -29,7 +29,7 @@ methods {
 
     // Callbacks: ghost-controlled to force revert/bad-return per rule. Modeled as pure (no state changes):
     // For callback-revert rules, the callback reverts so that it's equivalent to the real behavior of EVM.
-    // For gate rules, gate checks precede callbacks so re-entrant state changes cannot affect them.
+    // For gate rules, gate checks follow all callbacks so changes made by callbacks can affect them.
     // For oracle rules, re-entrant callbacks cannot deactivate collaterals without calling
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
