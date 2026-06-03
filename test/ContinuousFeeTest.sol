@@ -54,11 +54,11 @@ contract ContinuousFeeTest is BaseTest {
         setupMarket(market, credit);
     }
 
-    function _makeBuyOffer(uint256 units, bytes32 group) internal view returns (Offer memory o) {
+    function _makeBuyOffer(bytes32 group) internal view returns (Offer memory o) {
         o.market = market;
         o.buy = true;
         o.maker = otherLender;
-        o.maxUnits = units;
+        o.maxUnits = type(uint256).max;
         o.ratifier = address(dummyRatifier);
         o.expiry = vm.getBlockTimestamp();
         o.tick = MAX_TICK;
@@ -293,7 +293,7 @@ contract ContinuousFeeTest is BaseTest {
             lender,
             otherLender
         );
-        take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
+        take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - exitAmount, "credit after exit");
