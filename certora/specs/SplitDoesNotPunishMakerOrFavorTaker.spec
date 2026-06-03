@@ -23,7 +23,6 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
 
     // Over-approximate view functions.
-    function UtilsLib.atMostOneNonZero(uint256, uint256) internal returns (bool) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Over-approximate transient storage.
