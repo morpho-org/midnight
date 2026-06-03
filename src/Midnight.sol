@@ -394,17 +394,6 @@ contract Midnight is IMidnight {
             MakerCreditOrDebtIncreased()
         );
 
-        require(
-            offer.market.enterGate == address(0) || buyerCreditIncrease == 0
-                || IEnterGate(offer.market.enterGate).canIncreaseCredit(buyer),
-            BuyerGatedFromIncreasingCredit()
-        );
-        require(
-            offer.market.enterGate == address(0) || sellerDebtIncrease == 0
-                || IEnterGate(offer.market.enterGate).canIncreaseDebt(seller),
-            SellerGatedFromIncreasingDebt()
-        );
-
         buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
         buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
@@ -474,6 +463,17 @@ contract Midnight is IMidnight {
         }
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
         require(liquidationLocked(id, seller) || isHealthy(offer.market, id, seller), SellerIsLiquidatable());
+
+        require(
+            offer.market.enterGate == address(0) || buyerCreditIncrease == 0
+                || IEnterGate(offer.market.enterGate).canIncreaseCredit(buyer),
+            BuyerGatedFromIncreasingCredit()
+        );
+        require(
+            offer.market.enterGate == address(0) || sellerDebtIncrease == 0
+                || IEnterGate(offer.market.enterGate).canIncreaseDebt(seller),
+            SellerGatedFromIncreasingDebt()
+        );
 
         return (buyerAssets, sellerAssets);
     }
