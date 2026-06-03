@@ -13,6 +13,11 @@ methods {
 
     // Deterministic, injective id linking a call-site market to its maturity.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+
+    // No explicit summaries for the callbacks and token transfers reached by take/repay/liquidate/flashLoan:
+    // we rely on the default AUTO summary (HAVOC_ECF for these non-view external calls).
+    // This encodes a no-reentrancy assumption, justified because the property is about the effect of each
+    // function's own body on debt, not the full transaction including (re-entrant) callbacks.
 }
 
 /// HELPERS ///
