@@ -436,9 +436,6 @@ contract Midnight is IMidnight {
             id,
             units,
             taker,
-            offer.maker,
-            offer.buy,
-            offer.group,
             buyerAssets,
             sellerAssets,
             newConsumed,
@@ -447,7 +444,21 @@ contract Midnight is IMidnight {
             buyerCreditIncrease,
             sellerCreditDecrease,
             receiver,
-            payer
+            payer,
+            takerCallback
+        );
+
+        emit EventsLib.TakenOffer(
+            offer.maker,
+            offer.tick,
+            offer.start,
+            offer.expiry,
+            offer.reduceOnly,
+            offer.maxUnits,
+            offer.maxAssets,
+            offer.buy,
+            offer.group,
+            offer.callback
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
