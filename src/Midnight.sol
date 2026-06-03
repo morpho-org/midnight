@@ -87,11 +87,12 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// loan token.
 ///
 /// OFFER CAPS
-/// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
+/// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
 /// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
+/// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the market's spacing.
@@ -347,11 +348,15 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(offer.market);
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
-        require(UtilsLib.atMostOneNonZero(offer.maxAssets, offer.maxUnits), MultipleNonZero());
+        require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
+        require(
+            offer.buy ? offer.receiverIfMakerIsSeller == address(0) : receiverIfTakerIsSeller == address(0),
+            UnusedReceiverMustBeZero()
+        );
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
@@ -592,7 +597,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         Position storage _position = position[id][borrower];
-        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
+        require(repaidUnits == 0 || seizedAssets == 0, InconsistentInput());
         require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
         require(
             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),
