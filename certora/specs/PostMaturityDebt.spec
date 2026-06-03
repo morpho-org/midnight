@@ -13,7 +13,6 @@ methods {
 
     // Deterministic, injective id linking a call-site market to its maturity.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 }
 
 /// HELPERS ///
