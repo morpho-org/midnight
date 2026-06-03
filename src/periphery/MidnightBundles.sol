@@ -23,7 +23,7 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 /// @dev buy/sell functions take min("units needed to targetUnits", takes[i].units, "consumable units") units.
 /// @dev buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was
 /// available in other offers passed as argument.
-/// @dev The taker/onBehalf must have authorized this bundler and the msg.sender (if different from the taker/onBehalf)
+/// @dev This bundler and the msg.sender (if different from the taker/onBehalf) must be authorized by the taker/onBehalf
 /// on Midnight.
 /// @dev msg.sender is always the tokens payer (for buy, supplyCollateral and repay), and receiver is always the tokens
 /// receiver (for sell and withdraw collateral).
