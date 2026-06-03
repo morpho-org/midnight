@@ -148,7 +148,7 @@ interface IMidnight {
 
     /// ENTRY-POINTS ///
     function take(Offer memory offer, bytes memory ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes memory takerCallbackData) external returns (uint256, uint256);
-    function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external;
+    function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external returns (uint128);
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;

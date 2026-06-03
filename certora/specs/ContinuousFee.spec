@@ -98,9 +98,12 @@ rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Market market, 
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, market, id, onBehalf);
 
-    withdraw(e, market, units, onBehalf, receiver);
+    uint128 returnedPendingFeeDecrease;
+    returnedPendingFeeDecrease = withdraw(e, market, units, onBehalf, receiver);
 
     require id == lastId, "id should be derived from market";
+
+    assert postUpdatePendingFee == pendingFee(id, onBehalf) + returnedPendingFeeDecrease;
 
     // When postUpdateCredit == 0, pendingFee(id, onBehalf) is unchanged on withdraw.
     assert postUpdateCredit == 0 ? pendingFee(id, onBehalf) == postUpdatePendingFee : pendingFee(id, onBehalf) == postUpdatePendingFee - (postUpdatePendingFee * units + postUpdateCredit - 1) / postUpdateCredit;
