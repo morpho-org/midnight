@@ -280,9 +280,6 @@ contract ContinuousFeeTest is BaseTest {
             id,
             exitAmount,
             lender,
-            otherLender,
-            true,
-            keccak256("lender-exit"),
             takeAssets,
             takeAssets,
             exitAmount,
@@ -291,7 +288,21 @@ contract ContinuousFeeTest is BaseTest {
             exitAmount,
             exitAmount,
             lender,
-            otherLender
+            otherLender,
+            address(0)
+        );
+        vm.expectEmit();
+        emit EventsLib.TakenOffer(
+            otherLender,
+            MAX_TICK,
+            0,
+            vm.getBlockTimestamp(),
+            false,
+            exitAmount,
+            0,
+            true,
+            keccak256("lender-exit"),
+            address(0)
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 
