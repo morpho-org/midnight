@@ -15,6 +15,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
+/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract EcrecoverRatifier is IEcrecoverRatifier {
     address public immutable MIDNIGHT;
 
@@ -31,7 +32,6 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
-        require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
