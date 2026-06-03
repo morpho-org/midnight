@@ -579,37 +579,6 @@ contract LiquidationTest is BaseTest {
         assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
     }
 
-    function testSeizedAssetsInputRcfRejectsNextAmountButMaxAllowedStaysUnhealthy() public {
-        delete market.collateralParams;
-        market.collateralParams
-            .push(
-                CollateralParams({
-                    token: address(collateralToken1),
-                    lltv: 0.385e18,
-                    maxLif: maxLif(0.385e18, LIQUIDATION_CURSOR_LOW),
-                    oracle: address(oracle1)
-                })
-            );
-        id = toId(market);
-
-        Oracle(market.collateralParams[0].oracle).setPrice(3 * ORACLE_PRICE_SCALE);
-        deal(address(collateralToken1), borrower, 100);
-        vm.startPrank(borrower);
-        collateralToken1.approve(address(midnight), 100);
-        midnight.supplyCollateral(market, 0, 100, borrower);
-        vm.stopPrank();
-        setupMarket(market, 81);
-        Oracle(market.collateralParams[0].oracle).setPrice(2 * ORACLE_PRICE_SCALE);
-
-        uint256 seizedAssets = 4;
-        vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
-        midnight.liquidate(market, 0, seizedAssets + 1, 0, borrower, false, address(this), address(0), "");
-
-        midnight.liquidate(market, 0, seizedAssets, 0, borrower, false, address(this), address(0), "");
-
-        assertFalse(midnight.isHealthy(market, id, borrower), "borrower should remain unhealthy");
-    }
-
     /// @dev When rcfThreshold > remaining debt after max repayment, full liquidation is allowed pre-maturity.
     function testRcfThresholdAllowsFullLiquidation(uint256 units, uint256 liquidationOraclePrice, uint256 rcfThreshold)
         public

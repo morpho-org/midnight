@@ -40,7 +40,7 @@ rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uin
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert offer.buy => buyerAssets * WAD() <= units * offerPrice;
     assert !offer.buy => sellerAssets * WAD() >= units * offerPrice;
@@ -55,7 +55,7 @@ rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, 
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert buyerAssets - sellerAssets >= (units * fee) / WAD();
     assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();

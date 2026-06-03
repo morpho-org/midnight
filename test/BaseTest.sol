@@ -170,9 +170,7 @@ abstract contract BaseTest is Test {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true), and must be zero otherwise.
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false).
         vm.prank(taker);
-        (uint256 buyerAssets, uint256 sellerAssets,,,,) =
-            midnight.take(offer, hex"", units, taker, offer.buy ? taker : address(0), address(0), hex"");
-        return (buyerAssets, sellerAssets);
+        return midnight.take(offer, hex"", units, taker, offer.buy ? taker : address(0), address(0), hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {

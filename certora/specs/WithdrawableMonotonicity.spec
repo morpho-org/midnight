@@ -69,7 +69,7 @@ rule takeIncreasesClaimableSettlementFee(env e, Midnight.Offer offer, bytes rati
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     // We know that buyerAssets - sellerAssets >= 0, see rule settlementFeeSpreadBounds.
     assert anyToken == offer.market.loanToken => claimableSettlementFee(anyToken) == before + buyerAssets - sellerAssets;

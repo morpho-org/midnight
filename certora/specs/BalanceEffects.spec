@@ -115,21 +115,15 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     address buyer = offer.buy ? offer.maker : taker;
     uint256 buyerDebtBefore = debtOf(id, buyer);
     uint128 buyerUpdatedCreditBefore;
-    uint128 buyerUpdatedPendingFeeBefore;
-    buyerUpdatedCreditBefore, buyerUpdatedPendingFeeBefore, _ = updatePositionView(e, offer.market, id, buyer);
+    buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
 
-    uint256 buyerCreditIncrease;
-    uint256 buyerPendingFeeIncrease;
-    _, _, buyerCreditIncrease, buyerPendingFeeIncrease, _, _ = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
     assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
     assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
     assert debtOf(id, buyer) <= buyerDebtBefore;
     assert debtOf(id, buyer) >= buyerDebtBefore - units;
-    assert creditOf(id, buyer) == buyerUpdatedCreditBefore + buyerCreditIncrease;
-    assert pendingFee(id, buyer) == buyerUpdatedPendingFeeBefore + buyerPendingFeeIncrease;
-    assert debtOf(id, buyer) + units == buyerDebtBefore + buyerCreditIncrease;
 }
 
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
@@ -141,21 +135,15 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     address seller = offer.buy ? taker : offer.maker;
     uint256 sellerDebtBefore = debtOf(id, seller);
     uint128 sellerUpdatedCreditBefore;
-    uint128 sellerUpdatedPendingFeeBefore;
-    sellerUpdatedCreditBefore, sellerUpdatedPendingFeeBefore, _ = updatePositionView(e, offer.market, id, seller);
+    sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
 
-    uint256 sellerCreditDecrease;
-    uint256 sellerPendingFeeDecrease;
-    _, _, _, _, sellerCreditDecrease, sellerPendingFeeDecrease = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
     assert debtOf(id, seller) >= sellerDebtBefore;
     assert debtOf(id, seller) <= sellerDebtBefore + units;
     assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
     assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
-    assert creditOf(id, seller) + sellerCreditDecrease == sellerUpdatedCreditBefore;
-    assert pendingFee(id, seller) + sellerPendingFeeDecrease == sellerUpdatedPendingFeeBefore;
-    assert debtOf(id, seller) == sellerDebtBefore + units - sellerCreditDecrease;
 }
 
 /// REPAY ///
