@@ -483,7 +483,11 @@ contract Midnight is IMidnight {
         return (buyerAssets, sellerAssets);
     }
 
-    function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external {
+    /// @dev Returns the pending fee decrease.
+    function withdraw(Market memory market, uint256 units, address onBehalf, address receiver)
+        external
+        returns (uint128)
+    {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
@@ -502,6 +506,7 @@ contract Midnight is IMidnight {
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(market.loanToken, receiver, units);
+        return pendingFeeDecrease;
     }
 
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes calldata data)
