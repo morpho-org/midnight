@@ -73,6 +73,10 @@ contract LiquidationTest is BaseTest {
         deal(address(loanToken), address(this), type(uint256).max);
     }
 
+    function testTimeToMaxLifIs60Minutes() public pure {
+        assertEq(TIME_TO_MAX_LIF, 60 minutes);
+    }
+
     function testLiquidateInvalidCollateralIndex() public {
         uint256 units = 100e18;
         collateralize(market, borrower, units);
