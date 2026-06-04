@@ -7,20 +7,15 @@ using Utils as Utils;
 /**
 Property: "Debts can always be liquidated if unhealthy or expired".
 
-Range liveness + progress (3-collateral, parametric amount and parametric seized collateral): for every
-liquidatable borrower, every seized collateral index in {0,1,2}, and every amount in the safe interval an
-off-chain liquidator computes from the position, `liquidate` (1) does NOT revert and (2) strictly decreases
-debt. Proven for both modes (unhealthy lltv == WAD / lltv < WAD, post-maturity) and both entry paths (repay
-with parametric repaidUnits, seize with parametric seizedAssets).
+For every liquidatable borrower, every seized-collateral index in {0,1,2}, and every amount in the safe
+interval an off-chain liquidator computes from the position, `liquidate` (1) does NOT revert and (2) strictly
+decreases debt. Covered for both modes (unhealthy lltv == WAD / lltv < WAD, post-maturity) and both entry
+paths (repay with parametric repaidUnits, seize with parametric seizedAssets).
 
-Borrowers the seizing rules cannot reach (dust / inactive seized collateral, where a seizing call would divide
-by a zero liquidatedCollatPrice) are covered by the no-transfer bad-debt witness `badDebtCanBeLiquidated`
-(repaidUnits = 0, seizedAssets = 0). Together they cover every liquidatable borrower in scope.
-
-The safe amount is reconstructed in CVL from the contract's own quantities. Because `mulDiv*` are summarized as
-deterministic ghosts, those values are bit-for-bit identical to the ones inside `liquidate`, so bounding the
-amount by them neutralises each revert site (annotated per-require with the Midnight.sol line). Over-constraining
-only WEAKENS the result (never unsound); under-constraining surfaces as an `assert !lastReverted` counterexample.
+The seizing rules need the seized collateral active and priced (otherwise `liquidate` divides by a zero price).
+Borrowers they cannot reach (dust / inactive seized collateral) are instead covered by the no-transfer witness
+`badDebtCanBeLiquidated` (repaidUnits = seizedAssets = 0), which skips the seize block. Together they cover
+every liquidatable borrower in scope.
 
 Assumptions (LIVENESS): no liquidator gate, well-behaved tokens (transfers summarized NONDET), constant oracle
 prices per address. Scope: a 3-collateral market with up to 3 active collaterals, bounded by `loop_iter = 3`.
@@ -38,7 +33,7 @@ methods {
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function _.price() external => summaryPrice(calledContract) expect(uint256);
+    function _.price() external => ghostPrice(calledContract) expect(uint256);
 
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
@@ -54,37 +49,51 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
+// Assume the market is already created.
 function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
-persistent ghost summaryPrice(address) returns uint256;
+persistent ghost ghostPrice(address) returns uint256;
 
+/// Deterministic ghost for UtilsLib.mulDivDown. Each axiom is proven over the real mulDivDown in MulDiv.spec, so assuming them here is sound.
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
+    // mulDivDownRoundsDown
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+    // mulDivDownTightBound
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+    // mulDivArgumentLesserThanDenominator (b <= d => result <= a)
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
+    // exact division: from mulDivDownRoundsDown + mulDivDownTightBound at b = d
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivDown(a, d, d) == a;
+    // mulDivZero (left); right side from mulDivDownRoundsDown (a*0 = 0)
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivDown(0, a, d) == 0 && ghostMulDivDown(a, 0, d) == 0;
 
-    /// Monotonicity in each numerator factor. Sound (floor(a*b/d) is nondecreasing in a and b). Used by the
-    /// post-maturity range rule to upper-bound the decayed-lif seize by the maxLif seize (lif <= maxLif).
+    /// Monotonicity in each numerator factor (mulDivMonotoneA / mulDivMonotoneB). Used by the post-maturity
+    /// range rule to upper-bound the decayed-lif seize by the maxLif seize (lif <= maxLif).
     axiom forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 && a1 <= a2 => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
     axiom forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 && b1 <= b2 => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
 }
 
+/// Deterministic ghost for UtilsLib.mulDivUp. Each axiom is proven over the real mulDivUp in MulDiv.spec, so assuming them here is sound.
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
+    // mulDivUpRoundsUp
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+    // mulDivUpTightBound
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+    // mulDivArgumentLesserThanDenominator (b <= d => result <= a)
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
-
-    /// Mirror of ghostMulDivDown's `b <= d => <= a` axiom. Sound: result * d >= a*b >= a*d.
+    // dual of the above: from mulDivUpRoundsUp, result * d >= a*b >= a*d
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b >= d => ghostMulDivUp(a, b, d) >= a;
+    // exact division: from mulDivUpRoundsUp + mulDivArgumentLesserThanDenominator at b = d
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(a, d, d) == a;
+    // mulDivZero (left); right side from mulDivUpUpperBound (a*0 = 0)
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(0, a, d) == 0 && ghostMulDivUp(a, 0, d) == 0;
+    // mulDivMonotoneA
     axiom forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 && a1 <= a2 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
 
-    /// Sound (ceil(a*b/d) is nonincreasing in d). Used by the post-maturity seize path to upper-bound the derived repaidUnits (lif in the denominator, lif >= WAD) by its value at lif = WAD.
+    /// Antitone in the denominator (mulDivMonotoneD). Used by the post-maturity seize path to upper-bound the
+    /// derived repaidUnits (lif in the denominator, lif >= WAD) by its value at lif = WAD.
     axiom forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2);
 }
 
@@ -102,26 +111,28 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     return ghostMulDivUp(x, y, d);
 }
 
+
+/// Proven in CollateralBitmap.spec; excluded from this conf and only assumed via requireInvariant. 
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
     collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
-/// Per-collateral validity (lltv, maxLif, ExactMath bounds, liveness bound on collat * price).
+/// Per-collateral validity. The lltv/maxLif bounds are theorems about created markets, proven in
+/// CreatedMarkets.spec and ExactMath.spec (cited per require); only the collat*price bound is a LIVENESS no-overflow assumption.
 function validCollateralAt(Midnight.Market market, bytes32 id, address borrower, uint256 i) {
     uint256 lltv = market.collateralParams[i].lltv;
     uint256 maxLif = market.collateralParams[i].maxLif;
 
-    require lltv > 0 && lltv <= WAD(), "valid lltv (touchMarket)";
-    require maxLif >= WAD(), "valid maxLif (touchMarket)";
-    require lltv < WAD() => lltv * maxLif <= WAD() * (WAD() - 1), "ExactMath: lltv*maxLif <= WAD*(WAD-1) when lltv<WAD";
-    require lltv * maxLif <= WAD() * WAD(), "ExactMath: lltv*maxLif <= WAD*WAD";
+    require lltv > 0 && lltv <= WAD(), "lltv in (0, WAD] for a created market (createdMarketsHaveAllowedLltv, createdMarketsHaveLltvLessThanOrEqualToOne)";
+    require maxLif >= WAD(), "maxLif >= WAD (maxLifIsAtLeastWad)";
+    require lltv < WAD() => lltv * maxLif <= WAD() * (WAD() - 1), "lltv < WAD => lltv*maxLif <= WAD*(WAD-1) (lifTimesLltvStrictBound)";
+    require lltv * maxLif <= WAD() * WAD(), "lltv*maxLif <= WAD*WAD (lifTimesLltvIsLessThanOrEqualToOne)";
 
     address oracle = market.collateralParams[i].oracle;
-    require collateral(id, borrower, i) * summaryPrice(oracle) <= ORACLE_PRICE_SCALE() * WAD() * max_uint128, "oracle-quoted collat fits in uint128*WAD (LIVENESS)";
+    require collateral(id, borrower, i) * ghostPrice(oracle) <= ORACLE_PRICE_SCALE() * WAD() * max_uint128, "oracle-quoted collat fits in uint128*WAD (LIVENESS)";
 }
 
 /// Shared setup: 3-collateral market with at most collaterals 0,1,2 active (loop runs <= loop_iter), well-behaved
-/// env, no liquidator gate, unlocked, positive debt, totalUnits/withdrawable bounds (Midnight.spec). Does NOT
-/// assume which collateral is active.
+/// env, no liquidator gate, unlocked, positive debt, totalUnits/withdrawable bounds (Midnight.spec). Does NOT assume which collateral is active.
 function threeCollatSetup(env e, Midnight.Market market, bytes32 id, address borrower) {
     require market.collateralParams.length == 3, "three-collateral market (borrower activates 0, 1, 2 or 3 of them)";
     uint128 bitmap = collateralBitmap(id, borrower);
@@ -150,7 +161,7 @@ function threeCollatSetup(env e, Midnight.Market market, bytes32 id, address bor
 /// Seized-collateral field selectors. A constant-index case split over the 3-collateral market keeps the prover
 /// on concrete struct-array accesses (no symbolic indexing); collateralIndex is pinned to {0,1,2} by seizablePreamble.
 function seizedPrice(Midnight.Market market, uint256 collateralIndex) returns uint256 {
-    return collateralIndex == 0 ? summaryPrice(market.collateralParams[0].oracle) : collateralIndex == 1 ? summaryPrice(market.collateralParams[1].oracle) : summaryPrice(market.collateralParams[2].oracle);
+    return collateralIndex == 0 ? ghostPrice(market.collateralParams[0].oracle) : collateralIndex == 1 ? ghostPrice(market.collateralParams[1].oracle) : ghostPrice(market.collateralParams[2].oracle);
 }
 
 function seizedMaxLif(Midnight.Market market, uint256 collateralIndex) returns uint256 {
@@ -173,17 +184,17 @@ function seizablePreamble(env e, Midnight.Market market, bytes32 id, address bor
 /// maxDebt = sum over all collaterals of collat * price * lltv (down-rounded). An inactive collateral's term
 /// vanishes (its collat == 0 by nonZeroCollateralsAreActivated).
 function maxDebtSum(Midnight.Market market, bytes32 id, address borrower) returns mathint {
-    mathint contrib0 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 0), summaryPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[0].lltv, WAD());
-    mathint contrib1 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 1), summaryPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[1].lltv, WAD());
-    mathint contrib2 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 2), summaryPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[2].lltv, WAD());
+    mathint contrib0 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 0), ghostPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[0].lltv, WAD());
+    mathint contrib1 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 1), ghostPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[1].lltv, WAD());
+    mathint contrib2 = ghostMulDivDown(ghostMulDivDown(collateral(id, borrower, 2), ghostPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), market.collateralParams[2].lltv, WAD());
     return contrib0 + contrib1 + contrib2;
 }
 
 /// debtAfter = debt - badDebt, where badDebt = zeroFloorSub chain = max(0, debt - recovery0 - recovery1 - recovery2).
 function debtAfterBadDebt(Midnight.Market market, bytes32 id, address borrower) returns mathint {
-    mathint recovery0 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 0), summaryPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[0].maxLif);
-    mathint recovery1 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 1), summaryPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[1].maxLif);
-    mathint recovery2 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 2), summaryPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[2].maxLif);
+    mathint recovery0 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 0), ghostPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[0].maxLif);
+    mathint recovery1 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 1), ghostPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[1].maxLif);
+    mathint recovery2 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 2), ghostPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[2].maxLif);
     mathint _debt = debtOf(id, borrower);
     mathint badDebt = _debt > recovery0 + recovery1 + recovery2 ? _debt - recovery0 - recovery1 - recovery2 : 0;
     return _debt - badDebt;
@@ -196,17 +207,17 @@ function debtAfterBadDebt(Midnight.Market market, bytes32 id, address borrower) 
 function lowLltvScaffolding(Midnight.Market market, bytes32 id, address borrower, uint256 collateralIndex) {
     uint256 lltv0 = market.collateralParams[0].lltv;
     uint256 maxLif0 = market.collateralParams[0].maxLif;
-    uint256 price0 = summaryPrice(market.collateralParams[0].oracle);
+    uint256 price0 = ghostPrice(market.collateralParams[0].oracle);
     uint128 collat0 = collateral(id, borrower, 0);
 
     uint256 lltv1 = market.collateralParams[1].lltv;
     uint256 maxLif1 = market.collateralParams[1].maxLif;
-    uint256 price1 = summaryPrice(market.collateralParams[1].oracle);
+    uint256 price1 = ghostPrice(market.collateralParams[1].oracle);
     uint128 collat1 = collateral(id, borrower, 1);
 
     uint256 lltv2 = market.collateralParams[2].lltv;
     uint256 maxLif2 = market.collateralParams[2].maxLif;
-    uint256 price2 = summaryPrice(market.collateralParams[2].oracle);
+    uint256 price2 = ghostPrice(market.collateralParams[2].oracle);
     uint128 collat2 = collateral(id, borrower, 2);
 
     // recovery_i >= maxDebtContrib_i for every collateral (sound theorem from validCollateralAt; ensures debtAfter >= maxDebt).
@@ -220,7 +231,7 @@ function lowLltvScaffolding(Midnight.Market market, bytes32 id, address borrower
     uint256 maxLifJ = seizedMaxLif(market, collateralIndex);
     uint256 priceJ = seizedPrice(market, collateralIndex);
     uint128 collatJ = collateral(id, borrower, collateralIndex);
-    require maxLifJ * lltvJ <= WAD() * (WAD() - 1), "WAD*(WAD-1) ExactMath bound (touchMarket) => WAD*WAD - maxLif*lltv >= WAD >= 1";
+    require maxLifJ * lltvJ <= WAD() * (WAD() - 1), "maxLif*lltv <= WAD*(WAD-1) (lifTimesLltvStrictBound) => WAD*WAD - maxLif*lltv >= WAD >= 1";
     require ghostMulDivUp(ghostMulDivUp(collatJ, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLifJ) > ghostMulDivDown(ghostMulDivDown(collatJ, priceJ, ORACLE_PRICE_SCALE()), lltvJ, WAD()), "recoveryJ > maxDebtContribJ (seized lltv < WAD, collatJ*priceJ >= ORACLE_PRICE_SCALE)";
 }
 
@@ -242,13 +253,13 @@ rule unhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market market
     require _debt > maxDebtSum(market, id, borrower), "unhealthy: debt > maxDebt";
 
     require repaidUnits > 0;
-    require repaidUnits <= debtAfter, "no debt underflow (L675)";
-    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize fits the seized collateral (L669)";
+    require repaidUnits <= debtAfter, "no debt underflow";
+    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize fits the seized collateral";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, false, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
 /// Unhealthy, lltv < WAD: maxRepaid is finite, so the safe interval is additionally capped by repaidUnits <= maxRepaid.
@@ -269,19 +280,19 @@ rule unhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market market,
 
     lowLltvScaffolding(market, id, borrower, collateralIndex);
 
-    // maxRepaid per contract #944 (L658-660): mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv), lif = maxLif here.
+    // maxRepaid (RCF check) = mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv), lif = maxLif here.
     // Reconstructed bit-for-bit so the bound matches the RCF check exactly; denominator > 0 and debtAfter >= maxDebt from lowLltvScaffolding.
     mathint maxRepaid = ghostMulDivUp(assert_uint256(debtAfter - maxDebt), assert_uint256(WAD() * WAD()), assert_uint256(WAD() * WAD() - maxLif * lltv));
 
     require repaidUnits > 0;
-    require repaidUnits <= maxRepaid, "RCF check passes (L661)";
-    require repaidUnits <= debtAfter, "no debt underflow (L675)";
-    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize fits the seized collateral (L669)";
+    require repaidUnits <= maxRepaid, "RCF check passes";
+    require repaidUnits <= debtAfter, "no debt underflow";
+    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize fits the seized collateral";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, false, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
 /// Post-maturity: liquidatable by expiry alone (no health check), RCF / `debt - maxDebt` block skipped. lif <=
@@ -299,16 +310,16 @@ rule postMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market, add
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
 
     require repaidUnits > 0;
-    require repaidUnits <= debtAfter, "no debt underflow (L675)";
-    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize (at lif <= maxLif) fits the seized collateral (L669)";
+    require repaidUnits <= debtAfter, "no debt underflow";
+    require ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), priceJ) <= collatJ, "seize (at lif <= maxLif) fits the seized collateral";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, true, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
-/// SEIZE PATH (seizedAssets > 0, repaidUnits = 0): contract derives repaidUnits (L650) = mulDivUp(mulDivUp(seizedAssets, price0, ORACLE_PRICE_SCALE), WAD, lif). 
+/// SEIZE PATH (seizedAssets > 0, repaidUnits = 0): contract derives repaidUnits = mulDivUp(mulDivUp(seizedAssets, price0, ORACLE_PRICE_SCALE), WAD, lif). 
 /// Collateral guard is a direct `seizedAssets <= collateral[0]`; debt-underflow / RCF apply to the derived repaidUnits, which is >= 1 (seizedAssets > 0, price0 > 0) so progress holds. 
 
 /// Seize path, unhealthy, lltv == WAD: maxRepaid = uint256.max (RCF auto-passes), lif = maxLif.
@@ -328,13 +339,13 @@ rule seizeUnhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market m
     mathint repaidUnits = ghostMulDivUp(ghostMulDivUp(seizedAssets, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
     require seizedAssets > 0;
-    require seizedAssets <= collatJ, "seize fits the seized collateral (L669)";
-    require repaidUnits <= debtAfter, "derived repaidUnits: no debt underflow (L675)";
+    require seizedAssets <= collatJ, "seize fits the seized collateral";
+    require repaidUnits <= debtAfter, "derived repaidUnits: no debt underflow";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, false, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
 /// Seize path, unhealthy, lltv < WAD: RCF caps the derived repaidUnits by maxRepaid; same scaffolding applies.
@@ -355,21 +366,21 @@ rule seizeUnhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market ma
 
     lowLltvScaffolding(market, id, borrower, collateralIndex);
 
-    // maxRepaid per contract #944 (L658-660): mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv),
+    // maxRepaid (RCF check) = mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv),
     // lif = maxLif here. Reconstructed bit-for-bit so the bound matches the contract's RCF check exactly.
     mathint maxRepaid = ghostMulDivUp(assert_uint256(debtAfter - maxDebt), assert_uint256(WAD() * WAD()), assert_uint256(WAD() * WAD() - maxLif * lltv));
 
     mathint repaidUnits = ghostMulDivUp(ghostMulDivUp(seizedAssets, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
     require seizedAssets > 0;
-    require seizedAssets <= collatJ, "seize fits the seized collateral (L669)";
-    require repaidUnits <= maxRepaid, "derived repaidUnits: RCF check passes (L661)";
-    require repaidUnits <= debtAfter, "derived repaidUnits: no debt underflow (L675)";
+    require seizedAssets <= collatJ, "seize fits the seized collateral";
+    require repaidUnits <= maxRepaid, "derived repaidUnits: RCF check passes";
+    require repaidUnits <= debtAfter, "derived repaidUnits: no debt underflow";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, false, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
 /// Seize path, post-maturity: no RCF. lif >= WAD, and the derived repaidUnits = mulDivUp(quote, WAD, lif) is
@@ -388,13 +399,13 @@ rule seizePostMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market
     mathint quoteUp = ghostMulDivUp(seizedAssets, priceJ, ORACLE_PRICE_SCALE());
 
     require seizedAssets > 0;
-    require seizedAssets <= collatJ, "seize fits the seized collateral (L669)";
-    require quoteUp <= debtAfter, "derived repaidUnits (<= quote since lif >= WAD): no debt underflow (L675)";
+    require seizedAssets <= collatJ, "seize fits the seized collateral";
+    require quoteUp <= debtAfter, "derived repaidUnits (<= quote since lif >= WAD): no debt underflow";
 
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, true, receiver, 0, data);
-    assert !lastReverted, "the call is live (succeeds)";
-    assert debtOf(id, borrower) < _debt, "and it makes progress: debt strictly decreases";
+    assert !lastReverted;
+    assert debtOf(id, borrower) < _debt;
 }
 
 /// BAD-DEBT WITNESS (repaidUnits = 0, seizedAssets = 0): any liquidatable borrower can be liquidated with the
@@ -407,5 +418,5 @@ rule badDebtCanBeLiquidated(env e, Midnight.Market market, address borrower, add
 
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 0, borrower, postMaturityMode, receiver, 0, data);
-    assert !lastReverted, "the no-transfer bad-debt call is live (succeeds)";
+    assert !lastReverted;
 }
