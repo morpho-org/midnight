@@ -415,12 +415,13 @@ contract Midnight is IMidnight {
 
         uint256 newConsumed;
         if (offer.maxAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            newConsumed = consumed[offer.maker][offer.group] + offer.buy ? buyerAssets : sellerAssets;
             require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
+            newConsumed = consumed[offer.maker][offer.group] + units;
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
         }
+        consumed[offer.maker][offer.group] = newConsumed;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
