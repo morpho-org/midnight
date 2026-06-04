@@ -54,9 +54,9 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
-    require x == 0 => r == 0;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    require x == 0 => r == 0, "see mulDivZero";
+    require d > 0 && y <= d => r <= x, "see mulDivArgumentLesserThanDenominator";
+    require d > 0 && x <= d && y <= d => x - r <= d - y, "see mulDivResidualBound";
     return r;
 }
 
