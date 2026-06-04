@@ -69,10 +69,10 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
-/// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
-///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
-///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
-///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
+/// with a value that would repay at most rcfThreshold units. Which means (omitting scaling and roundings):
+///   minNewCollateral * liquidatedCollatPrice / LIF <= rcfThreshold
+///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF <= rcfThreshold
+///     <=> max(collateral * liquidatedCollatPrice / LIF - maxRepaid, 0) <= rcfThreshold
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -664,10 +664,10 @@ contract Midnight is IMidnight {
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
+                uint256 repaidIfAllSeized = _position.collateral[collateralIndex]
+                    .mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
                 require(
-                    repaidUnits <= maxRepaid
-                        || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < market.rcfThreshold,
+                    repaidUnits <= maxRepaid || repaidIfAllSeized.zeroFloorSub(maxRepaid) <= market.rcfThreshold,
                     RecoveryCloseFactorConditionsViolated()
                 );
             }

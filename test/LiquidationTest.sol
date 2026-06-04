@@ -549,11 +549,15 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 100, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE - 1);
 
-        _setupUnhealthy(units, liquidationOraclePrice);
+        (uint256 collatAmount,) = _setupUnhealthy(units, liquidationOraclePrice);
 
         uint256 maxR = _maxRepaid(units, units, liquidationOraclePrice);
+        uint256 repaidIfAllSeized = collatAmount.mulDivUp(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivUp(WAD, market.collateralParams[0].maxLif);
+        vm.assume(maxR < units);
+        vm.assume(maxR < repaidIfAllSeized);
 
-        repaid = bound(repaid, maxR + 1, max(units, maxR + 1));
+        repaid = bound(repaid, maxR + 1, units);
         vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
 
@@ -579,32 +583,32 @@ contract LiquidationTest is BaseTest {
         assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
     }
 
-    /// @dev When rcfThreshold > remaining debt after max repayment, full liquidation is allowed pre-maturity.
+    /// @dev When rcfThreshold >= remaining repayable after max repayment, full liquidation is allowed pre-maturity.
     function testRcfThresholdAllowsFullLiquidation(uint256 units, uint256 liquidationOraclePrice, uint256 rcfThreshold)
         public
     {
         units = bound(units, 100, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, fullRepaymentPrice(units), ORACLE_PRICE_SCALE - 1);
 
-        // Compute remaining debt after max repayment from the input parameters.
+        // Compute remaining repayable after max repayment from the input parameters.
         uint256 lltv = market.collateralParams[0].lltv;
         uint256 collatAmount = units.mulDivUp(WAD, lltv);
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         uint256 lif0 = market.collateralParams[0].maxLif;
-        uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, lif0).zeroFloorSub(maxRepaid);
-        market.rcfThreshold = bound(rcfThreshold, remainingRepayable + 1, type(uint256).max);
+        uint256 remainingRepayable = collatAmount.mulDivUp(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivUp(WAD, lif0).zeroFloorSub(maxRepaid);
+        market.rcfThreshold = bound(rcfThreshold, remainingRepayable, type(uint256).max);
 
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        // Full liquidation should succeed because remaining debt < rcfThreshold.
+        // Full liquidation should succeed because remaining repayable <= rcfThreshold.
         midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
         assertEq(midnight.debtOf(toId(market), borrower), 0, "debt should be zero");
     }
 
-    /// @dev When rcfThreshold <= remaining debt after max repayment, recovery close factor is enforced.
+    /// @dev When rcfThreshold < remaining repayable after max repayment, recovery close factor is enforced.
     function testRcfThresholdEnforcesRecoveryCloseFactor(
         uint256 units,
         uint256 liquidationOraclePrice,
@@ -613,20 +617,21 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 100, MAX_UNITS);
         liquidationOraclePrice = bound(liquidationOraclePrice, badDebtPriceDown(units) + 1, ORACLE_PRICE_SCALE - 1);
 
-        // Compute remaining debt after max repayment from the input parameters.
+        // Compute remaining repayable after max repayment from the input parameters.
         uint256 lltv = market.collateralParams[0].lltv;
         uint256 collatAmount = units.mulDivUp(WAD, lltv);
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         vm.assume(maxRepaid < units); // needed because of the round up.
-        uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, market.collateralParams[0].maxLif).zeroFloorSub(maxRepaid);
-        market.rcfThreshold = bound(rcfThreshold, 0, remainingRepayable);
+        uint256 remainingRepayable = collatAmount.mulDivUp(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivUp(WAD, market.collateralParams[0].maxLif).zeroFloorSub(maxRepaid);
+        vm.assume(remainingRepayable > 0);
+        market.rcfThreshold = bound(rcfThreshold, 0, remainingRepayable - 1);
 
         collateralize(market, borrower, units);
         setupMarket(market, units);
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
 
-        // Full liquidation should revert because remaining debt >= rcfThreshold.
+        // Full liquidation should revert because remaining repayable > rcfThreshold.
         vm.expectRevert(IMidnight.RecoveryCloseFactorConditionsViolated.selector);
         midnight.liquidate(market, 0, 0, units, borrower, false, address(this), address(0), "");
     }
