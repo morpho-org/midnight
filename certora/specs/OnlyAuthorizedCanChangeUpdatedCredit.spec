@@ -38,16 +38,24 @@ methods {
 }
 
 ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    // Axioms proven in MulDiv.spec.
+    // Proven in the rule mulDivZero in MulDiv.spec
     axiom forall uint256 y. forall uint256 z. ghostMulDivDown(0, y, z) == 0;
+
+    // Proven in the rule mulDivZero in MulDiv.spec
     axiom forall uint256 x. forall uint256 z. ghostMulDivDown(x, 0, z) == 0;
+
+    // Proven in the rule mulDivIdentity in MulDiv.spec
     axiom forall uint256 x. forall uint256 y. y > 0 => ghostMulDivDown(x, y, y) == x;
 }
 
 ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    // Axioms proven in MulDiv.spec.
+    // Proven in the rule mulDivZero in MulDiv.spec
     axiom forall uint256 y. forall uint256 z. ghostMulDivUp(0, y, z) == 0;
+
+    // Proven in the rule mulDivZero in MulDiv.spec
     axiom forall uint256 x. forall uint256 z. ghostMulDivUp(x, 0, z) == 0;
+
+    // Proven in the rule mulDivIdentity in MulDiv.spec
     axiom forall uint256 x. forall uint256 y. y > 0 => ghostMulDivUp(x, y, y) == x;
 }
 
@@ -67,21 +75,25 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-/// UPDATED CREDIT CHANGE RULES ///
+/// UPDATED VALUES CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's updated credit except via liquidate.
+/// An unauthorized caller cannot change a user's updated values except via liquidate.
 /// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
-rule onlyAuthorizedCanChangeUpdatedCreditExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
+rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     require e.block.timestamp <= max_uint128, "realistic timestamp, needed for the uint128 cast";
 
     bytes32 id = summaryToId(market);
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
     uint128 updatedCreditBefore;
-    updatedCreditBefore, _, _ = updatePositionView(e, market, id, user);
+    uint128 updatedPendingFeeBefore;
+    uint128 accruedFeeBefore;
+    updatedCreditBefore, updatedPendingFeeBefore, accruedFeeBefore = updatePositionView(e, market, id, user);
     f(e, args);
     uint128 updatedCreditAfter;
-    updatedCreditAfter, _, _ = updatePositionView(e, market, id, user);
+    uint128 updatedPendingFeeAfter;
+    uint128 accruedFeeAfter;
+    updatedCreditAfter, updatedPendingFeeAfter, accruedFeeAfter = updatePositionView(e, market, id, user);
 
-    assert (updatedCreditAfter == updatedCreditBefore) || userIsAuthorized || makerRatified[user];
+    assert (updatedCreditAfter == updatedCreditBefore && updatedPendingFeeAfter == updatedPendingFeeBefore && accruedFeeAfter == accruedFeeBefore) || userIsAuthorized || makerRatified[user];
 }
