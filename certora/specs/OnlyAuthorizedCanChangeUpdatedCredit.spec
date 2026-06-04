@@ -8,6 +8,13 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
+    // Position/marketState getters used to express protocol invariants as preconditions.
+    function creditOf(bytes32, address) external returns (uint128) envfree;
+    function pendingFee(bytes32, address) external returns (uint128) envfree;
+    function lastLossFactor(bytes32, address) external returns (uint128) envfree;
+    function lastAccrual(bytes32, address) external returns (uint128) envfree;
+    function lossFactor(bytes32) external returns (uint128) envfree;
+
     // Summarize toId to be able to reference the id in the rules.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
@@ -46,6 +53,9 @@ ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 
     // Proven in the rule mulDivIdentity in MulDiv.spec
     axiom forall uint256 x. forall uint256 y. y > 0 => ghostMulDivDown(x, y, y) == x;
+
+    // Proven in the rule mulDivArgumentLesserThanDenominator in MulDiv.spec
+    axiom forall uint256 x. forall uint256 y. forall uint256 z. y <= z => ghostMulDivDown(x, y, z) <= x;
 }
 
 ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
@@ -57,6 +67,11 @@ ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
 
     // Proven in the rule mulDivIdentity in MulDiv.spec
     axiom forall uint256 x. forall uint256 y. y > 0 => ghostMulDivUp(x, y, y) == x;
+
+    // Proven in the rule mulDivArgumentLesserThanDenominator in MulDiv.spec
+    axiom forall uint256 x. forall uint256 y. forall uint256 z. y <= z => ghostMulDivUp(x, y, z) <= x;
+
+    axiom forall uint256 p. forall uint256 c. forall uint256 d. (c > 0 && p <= c && d <= c && to_mathint(p) + to_mathint(d) >= to_mathint(c)) => to_mathint(ghostMulDivUp(p, d, c)) >= to_mathint(p) + to_mathint(d) - to_mathint(c);
 }
 
 /// HELPERS ///
@@ -77,7 +92,8 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 /// UPDATED VALUES CHANGE RULES ///
 
-/// An unauthorized caller cannot change a user's updated values except via liquidate.
+/// An unauthorized caller cannot change a user's updated credit or updated pending fee except via liquidate.
+/// accruedFee is intentionally excluded: updatePosition is permissionless and can set the fees to 0.
 /// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
 rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     require e.block.timestamp <= max_uint128, "realistic timestamp, needed for the uint128 cast";
@@ -85,15 +101,17 @@ rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, callda
     bytes32 id = summaryToId(market);
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
+    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit";
+    require lastLossFactor(id, user) <= lossFactor(id), "see lastLossFactorLeqMarketLossFactor";
+    require lastAccrual(id, user) <= require_uint128(e.block.timestamp), "invariant: lastAccrual <= block.timestamp";
+
     uint128 updatedCreditBefore;
     uint128 updatedPendingFeeBefore;
-    uint128 accruedFeeBefore;
-    updatedCreditBefore, updatedPendingFeeBefore, accruedFeeBefore = updatePositionView(e, market, id, user);
+    updatedCreditBefore, updatedPendingFeeBefore, _ = updatePositionView(e, market, id, user);
     f(e, args);
     uint128 updatedCreditAfter;
     uint128 updatedPendingFeeAfter;
-    uint128 accruedFeeAfter;
-    updatedCreditAfter, updatedPendingFeeAfter, accruedFeeAfter = updatePositionView(e, market, id, user);
+    updatedCreditAfter, updatedPendingFeeAfter, _ = updatePositionView(e, market, id, user);
 
-    assert (updatedCreditAfter == updatedCreditBefore && updatedPendingFeeAfter == updatedPendingFeeBefore && accruedFeeAfter == accruedFeeBefore) || userIsAuthorized || makerRatified[user];
+    assert (updatedCreditAfter == updatedCreditBefore && updatedPendingFeeAfter == updatedPendingFeeBefore) || userIsAuthorized || makerRatified[user];
 }
