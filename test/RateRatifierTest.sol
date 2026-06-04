@@ -3,13 +3,17 @@
 pragma solidity ^0.8.0;
 
 import {Offer} from "../src/interfaces/IMidnight.sol";
-import {CALLBACK_SUCCESS, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE, WAD} from "../src/libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS, WAD} from "../src/libraries/ConstantsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {HashLib} from "../src/ratifiers/HashLib.sol";
+import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {RateRatifier} from "../src/ratifiers/RateRatifier.sol";
-import {IRateRatifier, RATE_OFFER_TYPE, RATE_OFFER_TYPEHASH} from "../src/ratifiers/interfaces/IRateRatifier.sol";
+import {IRateRatifier, RATE_OFFER_TYPEHASH} from "../src/ratifiers/interfaces/IRateRatifier.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest} from "./BaseTest.sol";
+import {COLLATERAL_PARAMS_TYPE, MARKET_TYPE} from "./HashLibTest.sol";
+
+bytes constant RATE_OFFER_TYPE =
+    "RateOffer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 rate,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
 
 contract RateRatifierTest is BaseTest {
     RateRatifier internal rateRatifier;
@@ -18,13 +22,13 @@ contract RateRatifierTest is BaseTest {
         super.setUp();
         rateRatifier = new RateRatifier(address(midnight));
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, address(rateRatifier), true);
+        midnight.setIsAuthorized(address(rateRatifier), true, lender);
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(rateRatifier), true);
+        midnight.setIsAuthorized(address(rateRatifier), true, borrower);
     }
 
     function testRateOfferTypeHash() public pure {
-        assertEq(RATE_OFFER_TYPEHASH, keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, OBLIGATION_TYPE)));
+        assertEq(RATE_OFFER_TYPEHASH, keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)));
     }
 
     function rateSignature(Offer memory offer, uint256 rate, uint256 _privateKey)
@@ -48,7 +52,7 @@ contract RateRatifierTest is BaseTest {
         offer.buy = buy;
         offer.ratifier = address(rateRatifier);
         offer.expiry = block.timestamp + 365 days;
-        offer.obligation.maturity = block.timestamp + 365 days;
+        offer.market.maturity = block.timestamp + 365 days;
     }
 
     /// @dev Per-second WAD rate giving ~10% over 1 year via simple interest: rate = 0.1e18 / 365 days.
@@ -83,7 +87,7 @@ contract RateRatifierTest is BaseTest {
         uint256 rate = rate10pct();
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
 
         bytes memory data = buildRatifierData(offer, rate, borrower);
         vm.prank(address(midnight));
@@ -158,7 +162,7 @@ contract RateRatifierTest is BaseTest {
         uint256 rate = rate10pct();
         // Pick a tick whose price sits between priceLimit(1 year) and priceLimit(0.5 year).
         // priceLimit(1y) ~ 0.909e18, priceLimit(0.5y) ~ 0.952e18.
-        uint256 _tick = TickLib.priceToTick(0.93e18);
+        uint256 _tick = TickLib.priceToTick(0.93e18, 1);
         offer.tick = _tick;
         bytes memory data = buildRatifierData(offer, rate, lender);
 
@@ -179,14 +183,14 @@ contract RateRatifierTest is BaseTest {
         uint256 rate = rate10pct();
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, true);
+        midnight.setIsAuthorized(borrower, true, lender);
         bytes memory data = buildRatifierData(offer, rate, borrower);
 
         vm.prank(address(midnight));
         rateRatifier.isRatified(offer, data);
 
         vm.prank(lender);
-        midnight.setIsAuthorized(lender, borrower, false);
+        midnight.setIsAuthorized(borrower, false, lender);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifier.Unauthorized.selector);

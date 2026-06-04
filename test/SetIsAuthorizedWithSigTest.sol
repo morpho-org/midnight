@@ -11,7 +11,19 @@ import {
 } from "../src/periphery/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
+bytes constant AUTHORIZATION_TYPE =
+    "Authorization(address authorizer,address authorized,bool isAuthorized,uint256 nonce,uint256 deadline)";
+bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
+
 contract EcrecoverAuthorizerTest is BaseTest {
+    function testAuthorizationTypeHash() public pure {
+        assertEq(AUTHORIZATION_TYPEHASH, keccak256(AUTHORIZATION_TYPE));
+    }
+
+    function testEip712DomainTypeHash() public pure {
+        assertEq(EIP712_DOMAIN_TYPEHASH, keccak256(EIP712_DOMAIN_TYPE));
+    }
+
     function makeAuthorization(address authorizer, address authorized, bool isAuth)
         internal
         view
@@ -22,7 +34,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
             authorized: authorized,
             isAuthorized: isAuth,
             nonce: ecrecoverAuthorizer.nonce(authorizer),
-            deadline: block.timestamp + 1 days
+            deadline: vm.getBlockTimestamp() + 1 days
         });
     }
 
@@ -41,7 +53,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizer() public {
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(ecrecoverAuthorizer), true);
+        midnight.setIsAuthorized(address(ecrecoverAuthorizer), true, borrower);
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, borrower);
 
@@ -61,7 +73,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizerPermissionless() public {
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(ecrecoverAuthorizer), true);
+        midnight.setIsAuthorized(address(ecrecoverAuthorizer), true, borrower);
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, borrower);
 
@@ -77,7 +89,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
-        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
+        vm.expectRevert(IEcrecoverAuthorizer.Unauthorized.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);
@@ -86,7 +98,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizerExpired() public {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
-        auth.deadline = block.timestamp - 1;
+        auth.deadline = vm.getBlockTimestamp() - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
         vm.expectRevert(IEcrecoverAuthorizer.Expired.selector);
@@ -104,7 +116,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizerNonce(uint8 n) public {
         vm.prank(borrower);
-        midnight.setIsAuthorized(borrower, address(ecrecoverAuthorizer), true);
+        midnight.setIsAuthorized(address(ecrecoverAuthorizer), true, borrower);
         n = uint8(bound(n, 1, 32));
 
         for (uint8 i = 0; i < n; i++) {

@@ -8,7 +8,7 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
-import {HashLib} from "./HashLib.sol";
+import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.
@@ -26,7 +26,7 @@ contract RateRatifier is IRateRatifier {
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         (Signature memory sig, uint256 rate) = abi.decode(ratifierData, (Signature, uint256));
-        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.obligation.maturity, block.timestamp);
+        uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         if (offer.buy) {
             uint256 priceLimitDown = WAD.mulDivDown(WAD, WAD + rate * timeToMaturity);
