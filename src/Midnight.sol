@@ -368,15 +368,6 @@ contract Midnight is IMidnight {
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
 
-        uint256 newConsumed;
-        if (offer.maxAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
-            require(newConsumed <= offer.maxAssets, ConsumedAssets());
-        } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
-            require(newConsumed <= offer.maxUnits, ConsumedUnits());
-        }
-
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
@@ -421,6 +412,15 @@ contract Midnight is IMidnight {
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+
+        uint256 newConsumed;
+        if (offer.maxAssets > 0) {
+            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            require(newConsumed <= offer.maxAssets, ConsumedAssets());
+        } else {
+            newConsumed = consumed[offer.maker][offer.group] += units;
+            require(newConsumed <= offer.maxUnits, ConsumedUnits());
+        }
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
