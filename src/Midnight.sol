@@ -389,7 +389,6 @@ contract Midnight is IMidnight {
             !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
             MakerCreditOrDebtIncreased()
         );
-
         require(
             offer.market.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.market.enterGate).canIncreaseCredit(buyer),
