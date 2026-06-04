@@ -71,7 +71,9 @@ ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     // Proven in the rule mulDivArgumentLesserThanDenominator in MulDiv.spec
     axiom forall uint256 x. forall uint256 y. forall uint256 z. y <= z => ghostMulDivUp(x, y, z) <= x;
 
-    axiom forall uint256 p. forall uint256 c. forall uint256 d. (c > 0 && p <= c && d <= c && to_mathint(p) + to_mathint(d) >= to_mathint(c)) => to_mathint(ghostMulDivUp(p, d, c)) >= to_mathint(p) + to_mathint(d) - to_mathint(c);
+    // Proven in the rule mulDivResidualBound in MulDiv.spec
+    axiom forall uint256 x. forall uint256 y. forall uint256 d.
+        (d > 0 && x <= d && y <= d) => to_mathint(x) - to_mathint(ghostMulDivUp(x, y, d)) <= to_mathint(d) - to_mathint(y);
 }
 
 /// HELPERS ///

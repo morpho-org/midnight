@@ -71,3 +71,8 @@ rule mulDivUpTightBound(uint256 a, uint256 b, uint256 d) {
 rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) * d <= a * b + d - 1;
 }
+
+rule mulDivResidualBound(uint256 a, uint256 b, uint256 d) {
+    assert a <= d && b <= d => a - mulDivDown(a, b, d) <= d - b;
+    assert a <= d && b <= d => a - mulDivUp(a, b, d) <= d - b;
+}
