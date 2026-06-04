@@ -12,10 +12,8 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {ERC20} from "./erc20s/ERC20.sol";
 import {ERC20NoRevert} from "./erc20s/ERC20NoRevert.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
-import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 
@@ -47,9 +45,13 @@ contract BrokenERC20 {
 
     /// @notice Transfers without checking balance. Always succeeds.
     ///         SafeTransferLib checks returndata == true -> passes.
+    /// @dev Uses unchecked subtraction to preserve the "no balance check"
+    ///      invariant. Solidity >=0.8 would revert on underflow otherwise.
     function transfer(address to, uint256 amount) external returns (bool) {
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
+        unchecked {
+            balanceOf[msg.sender] -= amount;
+            balanceOf[to] += amount;
+        }
         return true;
     }
 
