@@ -72,8 +72,7 @@ ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 x. forall uint256 y. forall uint256 z. y <= z => ghostMulDivUp(x, y, z) <= x;
 
     // Proven in the rule mulDivResidualBound in MulDiv.spec
-    axiom forall uint256 x. forall uint256 y. forall uint256 d.
-        (d > 0 && x <= d && y <= d) => to_mathint(x) - to_mathint(ghostMulDivUp(x, y, d)) <= to_mathint(d) - to_mathint(y);
+    axiom forall uint256 x. forall uint256 y. forall uint256 d. (x <= d && y <= d) => x - ghostMulDivUp(x, y, d) <= d - y;
 }
 
 /// HELPERS ///
@@ -105,7 +104,7 @@ rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, callda
 
     require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit";
     require lastLossFactor(id, user) <= lossFactor(id), "see lastLossFactorLeqMarketLossFactor";
-    require lastAccrual(id, user) <= require_uint128(e.block.timestamp), "invariant: lastAccrual <= block.timestamp";
+    require lastAccrual(id, user) <= require_uint128(e.block.timestamp), "lastAccrual <= block.timestamp by timestamp monotonicity";
 
     uint128 updatedCreditBefore;
     uint128 updatedPendingFeeBefore;
