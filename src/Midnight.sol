@@ -370,10 +370,10 @@ contract Midnight is IMidnight {
 
         uint256 newConsumed;
         if (offer.maxAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            newConsumed = consumed[offer.maker][offer.group] + (offer.buy ? buyerAssets : sellerAssets);
             require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
+            newConsumed = consumed[offer.maker][offer.group] + units;
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
         }
 
@@ -398,7 +398,6 @@ contract Midnight is IMidnight {
             !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
             MakerCreditOrDebtIncreased()
         );
-
         require(
             offer.market.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.market.enterGate).canIncreaseCredit(buyer),
@@ -421,6 +420,8 @@ contract Midnight is IMidnight {
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+
+        consumed[offer.maker][offer.group] = newConsumed;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
