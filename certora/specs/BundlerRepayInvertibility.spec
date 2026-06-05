@@ -34,8 +34,10 @@ function summaryToId(Midnight.Market market) returns bytes32 {
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
     // proved in mulDivUpRoundsUp
     axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
+
     // proved in mulDivDownRoundsDown
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
+
     // proved in mulDivDownTightBound
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }

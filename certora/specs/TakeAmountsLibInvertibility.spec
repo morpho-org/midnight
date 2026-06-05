@@ -48,10 +48,12 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 // MulDiv rounding axioms (each proved in MulDiv.spec); inlined on ghosts instead of requireMulDivAxioms().
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
-    // proved in mulDivUpRoundsUp 
+    // proved in mulDivUpRoundsUp
     axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
+
     // proved in mulDivDownRoundsDown
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
+
     // proved in mulDivDownTightBound
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
@@ -59,8 +61,10 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint {
     // proved in mulDivUpRoundsUp
     axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(0, b, d) == 0;
+
     // proved in mulDivUpRoundsUp
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d >= a * b;
+
     // proved in mulDivUpUpperBound
     axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d <= a * b + d - 1;
 }
@@ -101,7 +105,6 @@ rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets
 // If sellerAssetsToUnits(midnight, id, offer, T) returns u, then take(u, ...) produces sellerAssets == T.
 rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAssets, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
     bytes32 id = summaryToId(offer.market);
-
 
     uint256 units = TakeAmountsLibHarness.sellerAssetsToUnits(e, currentContract, id, offer, targetSellerAssets);
 
