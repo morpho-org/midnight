@@ -12,6 +12,7 @@ import {
 } from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -80,9 +81,16 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(market, borrower, units);
         setupMarket(market, units);
         deal(collateralToken, address(this), additionalCollateral);
+
+        vm.expectEmit();
+        emit EventsLib.SupplyCollateral(address(this), id, collateralToken, additionalCollateral, borrower);
+
         midnight.supplyCollateral(market, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
+
+        vm.expectEmit();
+        emit EventsLib.WithdrawCollateral(borrower, id, collateralToken, withdraw, borrower, borrower);
 
         vm.prank(borrower);
         midnight.withdrawCollateral(market, 0, withdraw, borrower, borrower);
@@ -120,6 +128,9 @@ contract OtherFunctionsTest is BaseTest {
         setupMarket(market, units);
         skip(99);
         deal(address(loanToken), address(borrower), repaid);
+
+        vm.expectEmit();
+        emit EventsLib.Repay(borrower, id, repaid, borrower, borrower);
 
         vm.prank(borrower);
         midnight.repay(market, repaid, borrower, address(0), hex"");
@@ -198,6 +209,9 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+        vm.expectEmit();
+        emit EventsLib.SetConsumed(user, group, amount, user);
+
         vm.prank(user);
         midnight.setConsumed(group, amount, user);
         assertEq(midnight.consumed(user, group), amount, "consumed");
@@ -237,7 +251,11 @@ contract OtherFunctionsTest is BaseTest {
             midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
         }
 
-        bytes32 _id = midnight.touchMarket(_market);
+        bytes32 _id = toId(_market);
+        vm.expectEmit();
+        emit EventsLib.MarketCreated(_market, _id);
+
+        assertEq(midnight.touchMarket(_market), _id, "id");
         assertEq(midnight.tickSpacing(_id) > 0, true, "market created");
         uint16[7] memory fees = midnight.settlementFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {

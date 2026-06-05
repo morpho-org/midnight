@@ -4,18 +4,23 @@ pragma solidity ^0.8.0;
 
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE, MAX_SETTLEMENT_FEE_0_DAYS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
+import {StdStorage, stdStorage} from "../lib/forge-std/src/StdStorage.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
+    using stdStorage for StdStorage;
+
+    StdStorage private stdstoreFinder;
 
     Market internal market;
     bytes32 internal id;
@@ -91,6 +96,113 @@ contract TakeTest is BaseTest {
     }
 
     // tests.
+
+    function testTakeEmitsEvent(
+        uint256 units,
+        uint256 tick,
+        bytes32 group,
+        uint256 existingDebt,
+        uint256 existingCredit,
+        uint256 existingConsumed,
+        bool offerIsBuy
+    ) public {
+        address caller = makeAddr("caller");
+        address receiver = makeAddr("receiver");
+        LendCallback payerCallback = new LendCallback();
+
+        midnight.setMarketSettlementFee(id, 0, MAX_SETTLEMENT_FEE_0_DAYS);
+        midnight.setMarketSettlementFee(id, 1, MAX_SETTLEMENT_FEE_0_DAYS); // flat settlement fee
+        midnight.setMarketContinuousFee(id, MAX_CONTINUOUS_FEE);
+
+        units = bound(units, 1e10, maxAssets / 8);
+        tick = bound(tick, 0, MAX_TICK);
+        uint256 price = TickLib.tickToPrice(tick);
+        vm.assume(price > 0.01 ether); // keep price > settlement fee.
+        existingDebt = bound(existingDebt, 1e8, units - 1e8);
+        existingCredit = bound(existingCredit, 1e8, units - 1);
+        existingConsumed = bound(existingConsumed, 1, type(uint128).max);
+
+        collateralize(market, lender, existingDebt);
+        Offer memory buy0 = _setupMarketOffer(market, existingDebt);
+        buy0.buy = true;
+        buy0.maker = otherLender;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        buy0.group = bytes32("debt-helper");
+        deal(address(loanToken), otherLender, existingDebt);
+        take(existingDebt, lender, buy0);
+
+        collateralize(market, otherBorrower, existingCredit);
+        Offer memory sell0 = _setupMarketOffer(market, existingCredit);
+        sell0.maker = otherBorrower;
+        sell0.receiverIfMakerIsSeller = otherBorrower;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        sell0.group = bytes32("credit-helper");
+        deal(address(loanToken), borrower, existingCredit.mulDivUp(WAD + MAX_SETTLEMENT_FEE_0_DAYS, WAD));
+        take(existingCredit, borrower, sell0);
+
+        collateralize(market, borrower, units - existingCredit);
+
+        Offer memory offer;
+        address maker;
+        address taker;
+        uint256 buyerAssets;
+        uint256 sellerAssets;
+        if (offerIsBuy) {
+            offer = lenderOffer;
+            offer.callback = address(payerCallback);
+            maker = lender;
+            taker = borrower;
+            buyerAssets = units.mulDivDown(price, WAD);
+            sellerAssets = units.mulDivDown(price - MAX_SETTLEMENT_FEE_0_DAYS, WAD);
+        } else {
+            offer = borrowerOffer;
+            offer.receiverIfMakerIsSeller = receiver;
+            maker = borrower;
+            taker = lender;
+            buyerAssets = units.mulDivUp(price + MAX_SETTLEMENT_FEE_0_DAYS, WAD);
+            sellerAssets = units.mulDivUp(price, WAD);
+        }
+        offer.group = group;
+        offer.tick = tick;
+
+        stdstoreFinder.target(address(midnight)).sig("consumed(address,bytes32)").with_key(maker).with_key(group)
+            .checked_write(existingConsumed);
+
+        deal(address(loanToken), address(payerCallback), buyerAssets);
+        vm.prank(taker);
+        midnight.setIsAuthorized(caller, true, taker);
+
+        uint256 ttm = market.maturity - block.timestamp;
+        uint256 buyerPendingFeeIncrease = (units - existingDebt).mulDivDown(uint256(MAX_CONTINUOUS_FEE) * ttm, WAD);
+        uint256 sellerPendingFeeDecrease = existingCredit.mulDivDown(uint256(MAX_CONTINUOUS_FEE) * ttm, WAD);
+
+        vm.expectEmit();
+        emit EventsLib.Take(
+            caller,
+            id,
+            units,
+            taker,
+            maker,
+            offerIsBuy,
+            group,
+            buyerAssets,
+            sellerAssets,
+            existingConsumed + units,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            units - existingDebt,
+            existingCredit,
+            receiver,
+            address(payerCallback)
+        );
+
+        vm.prank(caller);
+        if (offerIsBuy) {
+            midnight.take(offer, hex"", units, taker, receiver, address(0), hex"");
+        } else {
+            midnight.take(offer, hex"", units, taker, address(0), address(payerCallback), hex"");
+        }
+    }
 
     // path 1: Lender enters + borrower enters.
 
