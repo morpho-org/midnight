@@ -11,7 +11,7 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Deterministic, injective id linking a call-site market to its maturity.
+    // Deterministic toId summary.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
     // No explicit summaries for the callbacks and token transfers reached by take/repay/liquidate/flashLoan:
@@ -35,5 +35,5 @@ rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args, M
 
     f(e, args);
 
-    assert e.block.timestamp > to_mathint(market.maturity) => (liquidationLocked(id, user) || debtOf(id, user) <= debtBefore);
+    assert e.block.timestamp > market.maturity => (liquidationLocked(id, user) || debtOf(id, user) <= debtBefore);
 }
