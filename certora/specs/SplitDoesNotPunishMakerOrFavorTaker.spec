@@ -34,18 +34,6 @@ methods {
 
 // ghostMulDivDown(a, b, d) abstracts floor(a*b/d). Axioms are proven as rules in MulDiv.spec.
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    // Identity (b=d=x): floor(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivDown(a, x, x) == a;
-
-    // floor(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivDown(a, 0, c) == 0;
-
-    // floor(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivDown(0, b, c) == 0;
-
-    // Boundedness: b <= d => floor(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
-
     // Sub-additivity (1st arg): floor((b+c)*x/d) ∈ [floor(b*x/d)+floor(c*x/d), floor(b*x/d)+floor(c*x/d)+1].
     // Lower bound proven by mulDivAddDownDown, upper bound by mulDivAddDownDownTight in MulDiv.spec.
     axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && a == b + c => ghostMulDivDown(a, x, d) >= ghostMulDivDown(b, x, d) + ghostMulDivDown(c, x, d) && ghostMulDivDown(a, x, d) <= ghostMulDivDown(b, x, d) + ghostMulDivDown(c, x, d) + 1;
@@ -53,18 +41,6 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 
 // ghostMulDivUp(a, b, d) abstracts ceil(a*b/d). Axioms are proven as rules in MulDiv.spec.
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    // Identity (b=d=x): ceil(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
-
-    // ceil(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivUp(a, 0, c) == 0;
-
-    // ceil(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivUp(0, b, c) == 0;
-
-    // Boundedness: b <= d => ceil(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
-
     // Super-additivity (1st arg): ceil((b+c)*x/d) ∈ [ceil(b*x/d)+ceil(c*x/d)-1, ceil(b*x/d)+ceil(c*x/d)].
     // Lower bound proven by mulDivAddUpUpTight, upper bound by mulDivAddUpUp in MulDiv.spec.
     axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && a == b + c => ghostMulDivUp(a, x, d) <= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d) && ghostMulDivUp(a, x, d) + 1 >= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d);
