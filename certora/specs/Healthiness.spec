@@ -304,15 +304,12 @@ rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.se
     // for withdraw collateral and take we choose isHealthy() for all others the isHealthyNoBitmap function.
     useIsHealthyNoBitmap = (f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector);
 
-    // use 2 collaterals.
-    mathint maxCollaterals = 2;
-
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
 
-    require globalMarketCollateralLength <= maxCollaterals, "too many collateralParams for the spec to handle";
+    require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
     Midnight.Market globalMarket = getGlobalMarket();
 
