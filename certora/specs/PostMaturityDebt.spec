@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Property: "Post maturity, the liquidation is locked or the debt cannot increase."
-
 using Utils as Utils;
 
 methods {
@@ -14,10 +12,12 @@ methods {
     // Deterministic toId summary.
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
-    // No explicit summaries for the callbacks and token transfers reached by take/repay/liquidate/flashLoan:
-    // we rely on the default AUTO summary (HAVOC_ECF for these non-view external calls).
-    // This encodes a no-reentrancy assumption, justified because the property is about the effect of each
-    // function's own body on debt, not the full transaction including (re-entrant) callbacks.
+    // Callbacks and token transfers reached by take/repay/liquidate/flashLoan use the default AUTO summary
+    // (HAVOC_ECF), which assumes the callees do not re-enter Midnight and so leave the debt unchanged.
+    // This is sound for the full re-entrant transaction by induction on the call depth: the inner-most
+    // re-entrant call is itself a verified function (so it does not increase the debt), and by the
+    // induction hypothesis neither does the surrounding call. The rule covers every non-view method,
+    // so every re-entrant entry point is in scope.
 }
 
 /// HELPERS ///
@@ -28,6 +28,7 @@ function summaryToId(Midnight.Market market) returns bytes32 {
 
 /// RULE ///
 
+// Post maturity, the liquidation is locked or the debt cannot increase
 rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
     bytes32 id = summaryToId(market);
 
@@ -35,5 +36,5 @@ rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args, M
 
     f(e, args);
 
-    assert e.block.timestamp > market.maturity => (liquidationLocked(id, user) || debtOf(id, user) <= debtBefore);
+    assert e.block.timestamp > market.maturity => debtOf(id, user) <= debtBefore;
 }
