@@ -12,11 +12,10 @@ methods {
     // Deterministic market id (same pattern as Midnight.spec / TakeAmountsLibInvertibility.spec).
     function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
 
-    // Deterministic floor division; must not call MulDiv (it delegates back to UtilsLib.mulDivDown).
+    // Deterministic mulDivDown.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
 
-    // Token / permit functions are irrelevant to the units formula but NONDET prevent havoc calls.
-    function _.allowance(address, address) external => NONDET;
+    // Token / permit functions are irrelevant to the units formula, use a NONDET summary to prevent calls that havoc Midnight.
     function _.approve(address, uint256) external => NONDET;
     function _.permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -33,7 +32,7 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0) {
         revert();
     }
-    return require_uint256((to_mathint(a) * to_mathint(b)) / to_mathint(d));
+    return require_uint256(a * b / d);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
@@ -68,8 +67,7 @@ rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, 
 
     MidnightBundles.TokenPermit loanTokenPermit;
 
-    // PermitKind.None — avoid ERC2612 / Permit2 paths (irrelevant to units, havoc external calls).
-    require assert_uint8(loanTokenPermit.kind) == 0, "PermitKind.None == 0.";
+    require assert_uint8(loanTokenPermit.kind) == 0, "paths irrelevant to units, havoc external calls";
 
     MidnightBundles.CollateralWithdrawal[] collateralWithdrawals;
     require collateralWithdrawals.length == 0, "isolate repay path from withdrawals";

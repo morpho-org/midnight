@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {TakeAmountsLib} from "../../src/periphery/TakeAmountsLib.sol";
 
-/// @dev Thin harness exposing TakeAmountsLib's `internal` library functions to CVL.
 contract TakeAmountsLibHarness {
     function buyerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)
         external

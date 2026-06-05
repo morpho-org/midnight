@@ -46,7 +46,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 /// MULDIV GHOST SUMMARIES (mirrors AccrualRounding.spec) ///
 
-persistent ghost summaryMulDivDownM(mathint, mathint, mathint) returns mathint {
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
     axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(0, b, d) == 0;
 }
 
