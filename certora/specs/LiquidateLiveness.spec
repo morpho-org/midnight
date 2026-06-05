@@ -60,12 +60,16 @@ persistent ghost ghostPrice(address) returns uint256;
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     // mulDivDownRoundsDown
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+
     // mulDivDownTightBound
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+
     // mulDivArgumentLesserThanDenominator (b <= d => result <= a)
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
+
     // exact division: from mulDivDownRoundsDown + mulDivDownTightBound at b = d
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivDown(a, d, d) == a;
+
     // mulDivZero (left); right side from mulDivDownRoundsDown (a*0 = 0)
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivDown(0, a, d) == 0 && ghostMulDivDown(a, 0, d) == 0;
 
@@ -79,16 +83,22 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     // mulDivUpRoundsUp
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b;
+
     // mulDivUpTightBound
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b;
+
     // mulDivArgumentLesserThanDenominator (b <= d => result <= a)
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
+
     // dual of the above: from mulDivUpRoundsUp, result * d >= a*b >= a*d
     axiom forall uint256 a. forall uint256 b. forall uint256 d. d > 0 && b >= d => ghostMulDivUp(a, b, d) >= a;
+
     // exact division: from mulDivUpRoundsUp + mulDivArgumentLesserThanDenominator at b = d
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(a, d, d) == a;
+
     // mulDivZero (left); right side from mulDivUpUpperBound (a*0 = 0)
     axiom forall uint256 a. forall uint256 d. d > 0 => ghostMulDivUp(0, a, d) == 0 && ghostMulDivUp(a, 0, d) == 0;
+
     // mulDivMonotoneA
     axiom forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 && a1 <= a2 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
 
@@ -110,7 +120,6 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     }
     return ghostMulDivUp(x, y, d);
 }
-
 
 /// Proven in CollateralBitmap.spec; excluded from this conf and only assumed via requireInvariant. 
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
