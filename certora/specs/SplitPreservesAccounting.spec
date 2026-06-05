@@ -48,28 +48,10 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 
     // floor(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
     axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivDown(a, 0, c) == 0;
-
-    // floor(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivDown(0, b, c) == 0;
-
-    // Boundedness: b <= d => floor(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivDown(a, b, d) <= a;
 }
 
-// ghostMulDivUp(a, b, d) abstracts ceil(a*b/d). Axioms are proven as rules in MulDiv.spec.
-persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
-    // Identity (b=d=x): ceil(a*x/x) = a. Proven by mulDivIdentity in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 x. x != 0 => ghostMulDivUp(a, x, x) == a;
-
-    // ceil(a*0/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 c. c != 0 => ghostMulDivUp(a, 0, c) == 0;
-
-    // ceil(0*b/c) = 0. Proven by mulDivZero in MulDiv.spec.
-    axiom forall uint256 b. forall uint256 c. c != 0 => ghostMulDivUp(0, b, c) == 0;
-
-    // Boundedness: b <= d => ceil(a*b/d) <= a. Proven by mulDivArgumentLesserThanDenominator in MulDiv.spec.
-    axiom forall uint256 a. forall uint256 b. forall uint256 d. d != 0 && b <= d => ghostMulDivUp(a, b, d) <= a;
-}
+// ghostMulDivUp(a, b, d) abstracts ceil(a*b/d).
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 /// Taking A units at once preserves position accounting versus taking B then C, where A = B + C.
 /// This is intentionally not an economic no-advantage rule; asset rounding is covered in SplitDoesNotPunishMakerOrFavorTaker.spec.
