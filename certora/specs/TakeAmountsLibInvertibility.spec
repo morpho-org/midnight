@@ -46,49 +46,37 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 /// MULDIV GHOST SUMMARIES (mirrors AccrualRounding.spec) ///
 
+// MulDiv rounding axioms (each proved in MulDiv.spec); inlined on ghosts instead of requireMulDivAxioms().
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
-    axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDownM(0, b, d) == 0;
+    // proved in mulDivUpRoundsUp 
+    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
+    // proved in mulDivDownRoundsDown
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
+    // proved in mulDivDownTightBound
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
 }
 
-persistent ghost summaryMulDivUpM(mathint, mathint, mathint) returns mathint {
-    axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivUpM(0, b, d) == 0;
+persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint {
+    // proved in mulDivUpRoundsUp
+    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(0, b, d) == 0;
+    // proved in mulDivUpRoundsUp
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d >= a * b;
+    // proved in mulDivUpUpperBound
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d <= a * b + d - 1;
 }
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b > max_uint256) {
         revert();
     }
-    return require_uint256(summaryMulDivDownM(a, b, d));
+    return assert_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b > max_uint256) {
         revert();
     }
-    return require_uint256(summaryMulDivUpM(a, b, d));
-}
-
-/// AXIOMS (each proved in MulDiv.spec against the real implementation) ///
-
-/* proved in mulDivUpRoundsUp */
-definition axiomUpLowerBound(mathint a, mathint b, mathint d) returns bool = 0 <= a && 0 <= b && 0 < d => summaryMulDivUpM(a, b, d) * d >= a * b;
-
-/* proved in mulDivUpUpperBound */
-definition axiomUpUpperBound(mathint a, mathint b, mathint d) returns bool = 0 <= a && 0 <= b && 0 < d => summaryMulDivUpM(a, b, d) * d <= a * b + d - 1;
-
-/* proved in mulDivDownRoundsDown */
-definition axiomDownUpperBound(mathint a, mathint b, mathint d) returns bool = 0 <= a && 0 <= b && 0 < d => summaryMulDivDownM(a, b, d) * d <= a * b;
-
-/* proved in mulDivDownTightBound */
-definition axiomDownTightBound(mathint a, mathint b, mathint d) returns bool = 0 <= a && 0 <= b && 0 < d => (summaryMulDivDownM(a, b, d) + 1) * d > a * b;
-
-function requireMulDivAxioms() {
-    require forall mathint a. forall mathint b. forall mathint d. axiomUpLowerBound(a, b, d), "axiomUpLowerBound";
-    require forall mathint a. forall mathint b. forall mathint d. axiomUpUpperBound(a, b, d), "axiomUpUpperBound";
-    require forall mathint a. forall mathint b. forall mathint d. axiomDownUpperBound(a, b, d), "axiomDownUpperBound";
-    require forall mathint a. forall mathint b. forall mathint d. axiomDownTightBound(a, b, d), "axiomDownTightBound";
+    return assert_uint256(ghostMulDivUp(a, b, d));
 }
 
 /// TAKE AMOUNTS LIB INVERTIBILITY ///
@@ -97,10 +85,7 @@ function requireMulDivAxioms() {
 //
 // If buyerAssetsToUnits(midnight, id, offer, T) returns u, then take(u, ...) produces buyerAssets == T.
 rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
-    requireMulDivAxioms();
-
     bytes32 id = summaryToId(offer.market);
-    require tickSpacing(id) > 0, "market is already created";
 
     uint256 units = TakeAmountsLibHarness.buyerAssetsToUnits(e, currentContract, id, offer, targetBuyerAssets);
 
@@ -115,16 +100,8 @@ rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets
 //
 // If sellerAssetsToUnits(midnight, id, offer, T) returns u, then take(u, ...) produces sellerAssets == T.
 rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAssets, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
-    requireMulDivAxioms();
-
     bytes32 id = summaryToId(offer.market);
-    require tickSpacing(id) > 0, "market is already created";
 
-    // Mirror the library's sellerPrice computation in CVL to express the WAD precondition.
-    uint256 offerPrice = summaryTickToPrice(offer.tick);
-    uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
-    uint256 fee = settlementFee(id, timeToMaturity);
-    require !offer.buy || fee <= offerPrice, "library reverts otherwise";
 
     uint256 units = TakeAmountsLibHarness.sellerAssetsToUnits(e, currentContract, id, offer, targetSellerAssets);
 

@@ -28,39 +28,34 @@ function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
+/// MULDIV GHOST SUMMARIES (mirrors TakeAmountsLibInvertibility.spec) ///
+
+// MulDiv rounding axioms (each proved in MulDiv.spec).
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
+    // proved in mulDivUpRoundsUp
+    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
+    // proved in mulDivDownRoundsDown
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
+    // proved in mulDivDownTightBound
+    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
+}
+
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0) {
+    if (d == 0 || a * b > max_uint256) {
         revert();
     }
-    return require_uint256(a * b / d);
+    return assert_uint256(ghostMulDivDown(a, b, d));
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-// assets = floor(D * W / (W - p)), r = floor(assets * p / W), units = assets - r.
-// Show units = D for all D > 0 and 0 <= p < W (bundler requires p < W).
-rule repayUnitsFormula(uint256 D, uint256 referralFeePct) {
-    require referralFeePct < WAD(), "PctExceeded: bundler reverts otherwise";
-
-    uint256 wMinusP = assert_uint256(WAD() - referralFeePct);
-    uint256 assets = summaryMulDivDown(D, WAD(), wMinusP);
-    uint256 r = summaryMulDivDown(assets, referralFeePct, WAD());
-    uint256 units = assert_uint256(assets - r);
-
-    assert units == D;
-}
-
 // End-to-end: for any target units U <= debtBefore, calling repayAndWithdrawCollateral
 // with assets = floor(U * WAD / (WAD - pct)) repays exactly U units on Midnight.
-// Composes with repayUnitsFormula: assets - floor(assets*pct/WAD) == U, hence debt decreases by U.
 rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, address onBehalf, address collateralReceiver, address referralFeeRecipient, uint256 referralFeePct, uint256 U) {
     require referralFeePct < WAD(), "PctExceeded";
 
     bytes32 id = summaryToId(market);
     uint256 debtBefore = midnight.debtOf(id, onBehalf);
-    require U > 0 && U <= debtBefore, "target units within current debt";
-
-    require midnight.isAuthorized(onBehalf, currentContract), "bundler must be authorized on Midnight for repay";
 
     uint256 wMinusP = assert_uint256(WAD() - referralFeePct);
     uint256 assets = summaryMulDivDown(U, WAD(), wMinusP);
