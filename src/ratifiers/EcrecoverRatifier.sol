@@ -34,7 +34,6 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));
-        require(proof.length <= 20, HashLib.TreeTooHigh());
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(proof.length), root));

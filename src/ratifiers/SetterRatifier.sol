@@ -31,7 +31,6 @@ contract SetterRatifier is ISetterRatifier {
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[]));
-        require(proof.length <= 20, HashLib.TreeTooHigh());
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());
         require(isRootRatified[offer.maker][root], NotRatified());
         return CALLBACK_SUCCESS;
