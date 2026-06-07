@@ -21,6 +21,9 @@ import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
+/// @dev Offers are taken in the order they are passed. One sensible strategy is to sort them by price (increasing to
+/// buy, decreasing to sell).
+/// @dev takes.units should prevent taking more than what is takeable w.r.t. the callback / the balances / the health.
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
