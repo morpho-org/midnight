@@ -115,7 +115,7 @@ function validCollateralAt(Midnight.Market market, bytes32 id, address borrower,
     require lltv * maxLif <= WAD() * WAD(), "lltv*maxLif <= WAD*WAD (lifTimesLltvIsLessThanOrEqualToOne)";
 
     address oracle = market.collateralParams[i].oracle;
-    require collateral(id, borrower, i) * ghostPrice(oracle) <= ORACLE_PRICE_SCALE() * WAD() * max_uint128, "oracle-quoted collat fits in uint128*WAD (LIVENESS)";
+    require collateral(id, borrower, i) * ghostPrice(oracle) + ORACLE_PRICE_SCALE() - 1 <= max_uint256, "collat*price fits in uint256 for mulDivUp(price, ORACLE_PRICE_SCALE) (LIVENESS)";
 }
 
 /// Shared setup: 3-collateral market with at most collaterals 0,1,2 active (loop runs <= loop_iter), well-behaved env,
