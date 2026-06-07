@@ -398,5 +398,5 @@ rule badDebtCanBeLiquidated(env e, Midnight.Market market, address borrower, add
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 0, borrower, postMaturityMode, receiver, 0, data);
     assert !lastReverted;
-    assert debtAfter < to_mathint(_debt) => debtOf(id, borrower) < _debt;
+    assert debtOf(id, borrower) == debtAfter;
 }
