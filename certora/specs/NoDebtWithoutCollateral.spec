@@ -70,14 +70,10 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
             require market.collateralParams.length <= 10, "assume less than 10 collaterals so that the loop can be bounded";
         
-            // Inlined axioms (proved in MulDiv.spec): mulDivUp monotonicity in a and d, and the up/down inverse.
-            // mulDivMonotoneA
             require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. a1 <= a2 && d > 0 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "see mulDivMonotoneA";
         
-            // mulDivMonotoneD
             require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2), "see mulDivMonotoneD";
         
-            // mulDivInverseUpDown
             require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "see mulDivInverseUpDown";
         }
         preserved onTransactionBoundary with (env e) {
