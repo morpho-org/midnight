@@ -90,8 +90,7 @@ weak invariant liquidationLockClearedAtBoundary(bytes32 id, address user)
 
 // Lemma justifying that external calls leave the liquidation lock unchanged, where callbacks are HAVOC_ECF and so cannot touch currentContract's transient storage). 
 // This is the induction step that makes the HAVOC_ECF modeling of the lock (liquidationLockClearedAtBoundary) faithful, including under reentrancy.
-rule liquidationLockNeutral(method f, env e, calldataarg args, bytes32 id, address user)
-{
+rule liquidationLockNeutral(method f, env e, calldataarg args, bytes32 id, address user) {
     bool before = liquidationLocked(id, user);
     f(e, args);
     assert liquidationLocked(id, user) == before;
