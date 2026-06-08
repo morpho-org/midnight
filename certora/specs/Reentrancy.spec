@@ -37,13 +37,20 @@ persistent ghost bool storageChanged;
 
 persistent ghost bool ignoredCall;
 persistent ghost bool hasCallAfterStore;
+persistent ghost bool unsafeCall;
 
 hook ALL_SSTORE(uint _, uint _) {
     storageChanged = true;
+    if (hasCallAfterStore) {
+        unsafeCall = true;
+    }
 }
 
 hook ALL_TSTORE(uint _, uint _) {
     storageChanged = true;
+    if (hasCallAfterStore) {
+        unsafeCall = true;
+    }
 }
 
 hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
@@ -59,7 +66,7 @@ hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 ar
 
 // Check that there are no untrusted external calls, ensuring notably reentrancy safety.
 rule reentrancySafe(method f, env e, calldataarg data) {
-    require (!storageChanged && !ignoredCall && !hasCallAfterStore, "set up the initial ghost state");
+    require (!storageChanged && !ignoredCall && !hasCallAfterStore && !unsafeCall, "set up the initial ghost state");
     f(e,data);
-    assert !hasCallAfterStore;
+    assert !unsafeCall;
 }
