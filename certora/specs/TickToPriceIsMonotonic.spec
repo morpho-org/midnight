@@ -7,7 +7,7 @@ methods {
 }
 
 persistent ghost summaryWExp(int256) returns uint256 {
-    // The rule wExpIsMonotonicOnPositiveRange and wExpIsMonotonicOnNegativeRange in WExp.spec prove that wExp is non-decreasing.
+    // See the rules in the wExp section of TickToPrice.spec, which together prove that wExp is non-decreasing.
     axiom forall int256 x. forall int256 y. x <= y => summaryWExp(x) <= summaryWExp(y);
 }
 
