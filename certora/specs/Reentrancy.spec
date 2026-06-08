@@ -3,6 +3,11 @@
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
+
+    // ignore changes done by touchMarket and _updatePosition; the state after these calls is still
+    // valid even if they changed the state.
+    function touchMarket(Midnight.Market memory) internal returns (bytes32) => NONDET;
+    function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 }
 
 function ignoredCallVoidSummary() {
@@ -31,7 +36,7 @@ function ignoredCallUintSummary() returns uint256 {
 persistent ghost bool storageChanged;
 
 persistent ghost bool ignoredCall;
-persistent ghost bool hasCall;
+persistent ghost bool hasCallAfterStore;
 
 hook ALL_SSTORE(uint _, uint _) {
     storageChanged = true;
@@ -47,14 +52,14 @@ hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 ar
         ignoredCall = false;
     } else {
         if (storageChanged) {
-            hasCall = true;
+            hasCallAfterStore = true;
         }
     }
 }
 
 // Check that there are no untrusted external calls, ensuring notably reentrancy safety.
 rule reentrancySafe(method f, env e, calldataarg data) {
-    require (!storageChanged && !ignoredCall && !hasCall, "set up the initial ghost state");
+    require (!storageChanged && !ignoredCall && !hasCallAfterStore, "set up the initial ghost state");
     f(e,data);
-    assert !hasCall;
+    assert !hasCallAfterStore;
 }
