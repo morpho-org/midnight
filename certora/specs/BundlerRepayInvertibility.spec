@@ -28,25 +28,11 @@ function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
-/// MULDIV GHOST SUMMARIES (mirrors TakeAmountsLibInvertibility.spec) ///
-
-// MulDiv rounding axioms (each proved in MulDiv.spec).
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
-    // proved in mulDivUpRoundsUp
-    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
-
-    // proved in mulDivDownRoundsDown
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
-
-    // proved in mulDivDownTightBound
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
-}
-
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || a * b > max_uint256) {
         revert();
     }
-    return assert_uint256(ghostMulDivDown(a, b, d));
+    return require_uint256(a*b/d);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
