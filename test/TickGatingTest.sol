@@ -5,6 +5,7 @@ import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMid
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 
@@ -138,6 +139,9 @@ contract TickGatingTest is BaseTest {
 
         vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
         midnight.setMarketTickSpacing(id, 0);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketTickSpacing(id, 1);
 
         midnight.setMarketTickSpacing(id, 1);
         vm.expectRevert(IMidnight.InvalidTickSpacing.selector);

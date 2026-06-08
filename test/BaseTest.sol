@@ -307,11 +307,19 @@ abstract contract BaseTest is Test {
     }
 
     function _setupMarketOffer(Market memory market) internal view returns (Offer memory borrowerOffer) {
+        borrowerOffer = _setupMarketOffer(market, type(uint256).max);
+    }
+
+    function _setupMarketOffer(Market memory market, uint256 maxUnits)
+        internal
+        view
+        returns (Offer memory borrowerOffer)
+    {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = maxUnits;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();
