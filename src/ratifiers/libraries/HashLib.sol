@@ -48,8 +48,7 @@ library HashLib {
     }
 
     /// @dev Verifies a Merkle proof using the leaf index to determine the left/right position of each sibling.
-    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex. In practice the height is capped at 20
-    /// by offerTreeTypeHash.
+    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex.
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure

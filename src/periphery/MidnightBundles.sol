@@ -32,6 +32,9 @@ import {WAD} from "../libraries/ConstantsLib.sol";
 /// receiver (for sell and withdraw collateral).
 /// @dev The bundler contract must have an allowance to pull enough tokens from msg.sender.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
+/// @dev Offers are taken in the order they are passed. One sensible strategy is to sort them by price (increasing to
+/// buy, decreasing to sell).
+/// @dev takes.units should prevent taking more than what is takeable w.r.t. the callback / the balances / the health.
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
@@ -345,7 +348,7 @@ contract MidnightBundles is IMidnightBundles {
 
     /// INTERNAL ///
 
-    /// @dev Not checking the code size because a transfer (checking the code size) will always be performed after.
+    /// @dev Not checking the code size because a transfer will do it in the same call.
     function safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
         if (!success) {

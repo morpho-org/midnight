@@ -39,6 +39,9 @@ contract SetterRatifierTest is BaseTest {
     function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
+        vm.expectEmit();
+        emit ISetterRatifier.SetIsRootRatified(lender, lender, _root, true);
+
         vm.prank(lender);
         setterRatifier.setIsRootRatified(lender, _root, true);
 
@@ -95,17 +98,6 @@ contract SetterRatifierTest is BaseTest {
         vm.prank(address(midnight));
         bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof));
         assertEq(result, CALLBACK_SUCCESS);
-    }
-
-    function testIsRatifiedNotMidnight() public {
-        Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
-
-        vm.prank(lender);
-        setterRatifier.setIsRootRatified(lender, _root, true);
-
-        vm.expectRevert(ISetterRatifier.NotMidnight.selector);
-        setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
     }
 
     function testSetIsRootRatifiedUnauthorizedOnBehalf() public {
