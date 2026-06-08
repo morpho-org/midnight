@@ -20,14 +20,17 @@ import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
-/// @dev buy/sell functions take min("units needed to targetUnits", takes[i].units, "consumable units") units.
-/// @dev buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was
+/// @dev For each offer, the buy/sell functions will take min("units needed to fill target units / assets",
+/// takes[i].units, "units still consumable in takes[i].offer") units.
+/// @dev Only touched offers are checked to point to the same market. The collateral is supplied/withdrawn from the
+/// market of the first offer.
+/// @dev Buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was
 /// available in other offers passed as argument.
-/// @dev This bundler and the msg.sender (if different from the taker/onBehalf) must be authorized by the taker/onBehalf
+/// @dev This bundler and the msg.sender (if different from the taker/onBehalf) should be authorized by taker/onBehalf
 /// on Midnight.
 /// @dev msg.sender is always the tokens payer (for buy, supplyCollateral and repay), and receiver is always the tokens
 /// receiver (for sell and withdraw collateral).
-/// @dev msg.sender must have approved the bundler to pull enough tokens.
+/// @dev The bundler contract must have an allowance to pull enough tokens from msg.sender.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
 /// @dev No-ops are allowed.
@@ -48,7 +51,8 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender will pay at most maxBuyerAssets.
     /// @dev Total loan assets transferred from msg.sender is
     /// filledBuyerAssets + filledBuyerAssets * referralFeePct / (WAD - referralFeePct).
-    /// @dev The receiver will receive collateralWithdrawals[0].assets of the first collateral token of the list etc.
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals, etc.
     function buyWithUnitsTargetAndWithdrawCollateral(
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -110,7 +114,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The receiver will receive at least minSellerAssets.
     /// @dev Total loan assets received by the receiver is
     /// filledSellerAssets - filledSellerAssets * referralFeePct / WAD.
-    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first collateral token of the list etc.
+    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first token of collateralSupplies etc.
     function supplyCollateralAndSellWithUnitsTarget(
         uint256 targetUnits,
         uint256 minSellerAssets,
@@ -168,7 +172,8 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Total loan assets transferred from msg.sender is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    /// @dev The receiver will receive collateralWithdrawals[0].assets of the first collateral token of the list etc.
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals etc.
     function buyWithAssetsTargetAndWithdrawCollateral(
         uint256 targetBuyerAssets,
         uint256 minUnits,
@@ -234,7 +239,7 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev Total loan assets received by the receiver is targetSellerAssets.
     /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
-    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first collateral token of the list etc.
+    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first token of collateralSupplies etc.
     function supplyCollateralAndSellWithAssetsTarget(
         uint256 targetSellerAssets,
         uint256 maxUnits,
@@ -296,7 +301,8 @@ contract MidnightBundles is IMidnightBundles {
     /// @dev The msg.sender must have approved the contract to transfer assets of the market's loan token.
     /// @dev Fee = assets * pct / WAD; units repaid = assets - fee.
     /// @dev To fully repay a debt D, pass assets = floor(D * WAD / (WAD - pct)).
-    /// @dev The receiver will receive collateralWithdrawals[0].assets of the first collateral token of the list etc.
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals etc.
     function repayAndWithdrawCollateral(
         Market memory market,
         uint256 assets,
