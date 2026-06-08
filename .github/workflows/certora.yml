@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  format-specs:
+  format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -43,7 +43,7 @@ jobs:
         run: echo "confs=$(ls certora/confs/*.conf | xargs -I{} basename {} .conf | jq -nRc '[inputs]')" >> "$GITHUB_OUTPUT"
 
   verify:
-    needs: matrix
+    needs: [matrix, format]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
