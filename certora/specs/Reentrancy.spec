@@ -8,6 +8,10 @@ methods {
     // valid even if they changed the state.
     function touchMarket(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
+
+    // Ignore the transient stores of LIQUIDATION_LOCK via the tExchange method.
+    // These are intentionally happen after the external calls.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
 }
 
 function ignoredCallVoidSummary() {
