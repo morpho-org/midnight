@@ -6,7 +6,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function debtOf(bytes32 id, address user) external returns (uint128) envfree;
-    function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId summary.
@@ -29,7 +28,7 @@ function summaryToId(Midnight.Market market) returns bytes32 {
 /// RULE ///
 
 // Post maturity, the debt cannot increase
-rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
+rule debtCannotIncreasePostMaturity(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
     bytes32 id = summaryToId(market);
 
     mathint debtBefore = debtOf(id, user);
