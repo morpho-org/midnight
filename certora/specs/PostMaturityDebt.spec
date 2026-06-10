@@ -28,7 +28,7 @@ function summaryToId(Midnight.Market market) returns bytes32 {
 
 /// RULE ///
 
-// Post maturity, the liquidation is locked or the debt cannot increase
+// Post maturity, the debt cannot increase
 rule lockedOrDebtCannotIncreasePostMaturity(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
     bytes32 id = summaryToId(market);
 
