@@ -44,7 +44,7 @@ hook STATICCALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength,
 // The state before the first store is valid, as is the state after the last store.
 // Additionally changes by updatePosition and touchMarket are ignored because they ensure the state is valid again.
 rule reentrancyViewSafe(method f, env e, calldataarg data) {
-    require(!storageChanged && !staticCallAfterSStore && !staticCallUnsafe, "set up the initial ghost state");
+    require(!storageChanged && !staticCallAfterStore && !staticCallUnsafe, "set up the initial ghost state");
 
     f(e, data);
 
