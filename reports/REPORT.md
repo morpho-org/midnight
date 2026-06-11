@@ -30,11 +30,11 @@ uint256 lif = postMaturityMode
     : _maxLif;
 ```
 
-Right at maturity, the actual `lif` is **1.0**. However, the `badDebt` calculation still assumes a `maxLif` (e.g., 1.4x). This creates a "haircut window" where a position that is fully solvent under the current `lif` is treated as having "bad debt" simply because it is insolvent under the theoretical `maxLif`.
+Immediately after maturity, the actual `lif` is **approximately 1.0**. However, the `badDebt` calculation still assumes a `maxLif` (e.g., 1.4x). This creates a "haircut window" where a position that is fully solvent under the current `lif` is treated as having "bad debt" simply because it is insolvent under the theoretical `maxLif`.
 
 ### 3. The Exploit Path
 1.  **Preparation:** A borrower maintains an unhealthy (below LLTV) but solvent (Collateral > Debt) position.
-2.  **Trigger:** At market maturity, the borrower calls `liquidate` on themselves with `repaidUnits = 0` and `seizedAssets = 0`.
+2.  **Trigger:** Immediately after maturity, the borrower calls `liquidate` on themselves with `repaidUnits = 0` and `seizedAssets = 0`.
 3.  **Haircut realization:** 
     - The protocol calculates `badDebt` based on the static `maxLif`. 
     - The borrower's debt is reduced by this `badDebt` amount.
