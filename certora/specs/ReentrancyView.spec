@@ -40,9 +40,8 @@ hook STATICCALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength,
     }
 }
 
-// Check that all external view calls are done on a valid internal state.
-// The state before the first store is valid, as is the state after the last store.
-// Additionally changes by updatePosition and touchMarket are ignored because they ensure the state is valid again.
+// Check that all external view calls are done before the first store or after the last store.
+// Additionally changes by _updatePosition and touchMarket are ignored because they ensure the state is valid again.
 rule reentrancyViewSafe(method f, env e, calldataarg data) {
     require(!storageChanged && !staticCallAfterStore && !staticCallUnsafe, "set up the initial ghost state");
 
