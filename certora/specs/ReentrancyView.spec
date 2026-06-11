@@ -34,8 +34,7 @@ hook ALL_TSTORE(uint _, uint _) {
 }
 
 hook STATICCALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
-    // address(1) is ignored because it's the ecrecover function.
-    if (storageChanged && addr != 0x1) {
+    if (storageChanged) {
         staticCallAfterStore = true;
     }
 }
