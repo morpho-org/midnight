@@ -14,21 +14,21 @@ methods {
 persistent ghost bool storageChanged;
 
 // True when at least one STATICCALL is executed after a storage change.
-persistent ghost bool staticCallAfterSStore;
+persistent ghost bool staticCallAfterStore;
 
 // True when at least one slot is changed after a STATICCALL is executed after a storage change.
 persistent ghost bool staticCallUnsafe;
 
 hook ALL_SSTORE(uint _, uint _) {
     storageChanged = true;
-    if (staticCallAfterSStore) {
+    if (staticCallAfterStore) {
         staticCallUnsafe = true;
     }
 }
 
 hook ALL_TSTORE(uint _, uint _) {
     storageChanged = true;
-    if (staticCallAfterSStore) {
+    if (staticCallAfterStore) {
         staticCallUnsafe = true;
     }
 }
@@ -36,15 +36,15 @@ hook ALL_TSTORE(uint _, uint _) {
 hook STATICCALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
     // address(1) is ignored because it's the ecrecover function.
     if (storageChanged && addr != 0x1) {
-        staticCallAfterSStore = true;
+        staticCallAfterStore = true;
     }
 }
 
-// Check that there are no reentrancy unsafe calls except potentially for balanceOf on the asset, realAssets on the adapters and canReceiveShares, canSendShares, canReceiveAssets and canSendAssets on the gates, and isInRegistry on adapter registry.
+// Check that all external view calls are done on a valid internal state.
+// The state before the first store is valid, as is the state after the last store.
+// Additionally changes by updatePosition and touchMarket are ignored because they ensure the state is valid again.
 rule reentrancyViewSafe(method f, env e, calldataarg data) {
-    require storageChanged == false, "setup ghost state";
-    require staticCallAfterSStore == false, "setup ghost state";
-    require staticCallUnsafe == false, "setup ghost state";
+    require(!storageChanged && !staticCallAfterSStore && !staticCallUnsafe, "set up the initial ghost state");
 
     f(e, data);
 
