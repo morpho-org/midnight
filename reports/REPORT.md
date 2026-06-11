@@ -5,26 +5,26 @@ A critical economic vulnerability exists in the Morpho Midnight protocol (`Midni
 The Morpho Midnight `liquidate` function performs "Bad Debt Realization" (slashing lenders) before executing the actual debt repayment and collateral seizure. 
 
 ### 1. The Vulnerable Logic
-In `Midnight.sol`, the protocol calculates `badDebt` to determine if a position is unrecoverable. This calculation (Lines 620-622) utilizes the **static `_collateralParam.maxLif`**, assuming the maximum possible incentive must be paid to a liquidator:
+In `Midnight.sol`, the protocol calculates `badDebt` to determine if a position is unrecoverable. This calculation (Lines 623-625) utilizes the **static `_collateralParam.maxLif`**, assuming the maximum possible incentive must be paid to a liquidator:
 
 ```solidity
-// Midnight.sol:620-622
+// Midnight.sol:623-625
 badDebt = badDebt.zeroFloorSub(
     _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
 );
 ```
 
-If `badDebt > 0`, the borrower's debt is immediately reduced (Line 634), and the loss is socialized to lenders:
+If `badDebt > 0`, the borrower's debt is immediately reduced (Line 637), and the loss is socialized to lenders:
 ```solidity
-// Midnight.sol:634
+// Midnight.sol:637
 _position.debt -= uint128(badDebt);
 ```
 
 ### 2. The Incentive Mismatch
-Crucially, when a market is in `postMaturityMode`, the actual incentive (`lif`) applied to the liquidation decays towards `1.0` (WAD) to facilitate market winding-down (Lines 651-653):
+Crucially, when a market is in `postMaturityMode`, the actual incentive (`lif`) applied to the liquidation decays towards `1.0` (WAD) to facilitate market winding-down (Lines 654-656):
 
 ```solidity
-// Midnight.sol:651-653
+// Midnight.sol:654-656
 uint256 lif = postMaturityMode
     ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
     : _maxLif;
