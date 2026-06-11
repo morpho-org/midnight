@@ -55,16 +55,16 @@ The vulnerability was verified using a Foundry PoC (`MorphoMidnightExploit.t.sol
 
 ```text
 Ran 1 test for test/MorphoMidnightExploit.t.sol:MorphoMidnightExploitTest
-[PASS] test_BadDebtStealing() (gas: 10204)
+[PASS] test_BadDebtSocializationMismatch() (gas: 70251)
 Logs:
   Original Debt: 75.00 WAD
-  Collateral Recovery Value (assumed maxLif): 69.44 WAD
-  Realized Bad Debt (Socialized to Lenders): 5.56 WAD
-  Remaining Debt for Borrower after Socialization: 69.44 WAD
-  Attacker Profit (Socialized Loss): 5.56 WAD
+  Collateral Recovery Value (with LLTV_0 and maxLif): 69.25 WAD
+  Realized Bad Debt (Socialized to Lenders): 5.75 WAD
+  Remaining Debt for Borrower after Socialization: 69.25 WAD
+  Attacker Profit (Socialized Loss): 5.75 WAD
 ```
 
-**Result:** The borrower successfully socialized 5.56 WAD of their debt to lenders while maintaining full control of their collateral, proving the existence of a risk-free haircut window at maturity.
+**Result:** The borrower successfully socialized 5.75 WAD of their debt to lenders while maintaining full control of their collateral, proving the existence of a risk-free haircut window at maturity.
 
 ## Recommendation
 Update the `badDebt` calculation to use the **current, maturity-adjusted `lif`** when the market is in `postMaturityMode`.
