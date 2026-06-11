@@ -21,7 +21,7 @@ _position.debt -= uint128(badDebt);
 ```
 
 ### 2. The Incentive Mismatch
-Crucially, when a market is in `postMaturityMode`, the actual incentive (`lif`) applied to the liquidation decays towards `1.0` (WAD) to facilitate market winding-down (Lines 654-656):
+Crucially, when a market is in `postMaturityMode`, the actual incentive (`lif`) applied to the liquidation starts near `1.0` (WAD) immediately after maturity and grows linearly toward `_maxLif` to facilitate market winding-down (Lines 654-656):
 
 ```solidity
 // Midnight.sol:654-656
