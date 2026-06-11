@@ -43,8 +43,7 @@ hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 ar
     }
 }
 
-// Check that there are no unsafe external calls.
-// A call is unsafe if it is neither before the first store nor after the last store.
+// Check that calls are either before the first store nor after the last store (excluding the effects of touchMarket, _updatePosition and tExchange).
 rule reentrancySafe(method f, env e, calldataarg data) {
     require(!storageChanged && !hasCallAfterStore && !unsafeCall, "set up the initial ghost state");
     f(e, data);
