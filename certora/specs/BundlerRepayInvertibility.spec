@@ -52,7 +52,7 @@ rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, 
 
     MidnightBundles.TokenPermit loanTokenPermit;
 
-    require assert_uint8(loanTokenPermit.kind) == 0, "paths irrelevant to units, havoc external calls";
+    require assert_uint8(loanTokenPermit.kind) == 0, "ignore irrelevant Permit2 and ERC2612 paths to avoid summarizing external calls";
 
     MidnightBundles.CollateralWithdrawal[] collateralWithdrawals;
     require collateralWithdrawals.length == 0, "isolate repay path from withdrawals";
