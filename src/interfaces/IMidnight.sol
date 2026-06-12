@@ -82,6 +82,7 @@ interface IMidnight {
     error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
+    error InvalidOfferCaps();
     error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
@@ -89,7 +90,6 @@ interface IMidnight {
     error MaturityTooFar();
     error MaxTakeableAssetsExceeded();
     error MaxTotalUnitsExceeded();
-    error MultipleNonZero();
     error NoCollateralParams();
     error NotBorrower();
     error NotLiquidatable();
@@ -114,6 +114,7 @@ interface IMidnight {
     error SettlementFeeTooHigh();
     error Unauthorized();
     error UnhealthyBorrower();
+    error UnusedReceiverMustBeZero();
 
     // forgefmt: disable-start
     /// IMMUTABLES ///

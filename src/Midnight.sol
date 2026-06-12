@@ -25,8 +25,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
 /// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
-/// is an incentive to take resting sell offers with price < 1 and withdraw instantly. Lenders (and the fee claimer)
-/// might also race to withdraw first.
+/// is an incentive to take resting sell offers with price < 1 (more precisely price < 1 - settlementFee) and withdraw
+/// instantly. Lenders (and the fee claimer) might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
@@ -87,11 +87,12 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// loan token.
 ///
 /// OFFER CAPS
-/// @dev At most one of maxAssets or maxUnits can be nonzero per offer.
+/// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
 /// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
+/// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the market's spacing.
@@ -110,8 +111,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
-/// @dev assets are rounded against the taker and in favor of the maker in take. Therefore, the settlement fee has no
-/// defined rounding direction, which could lead to fees manipulations on chains with very cheap gas.
+/// @dev assets are rounded against the taker and in favor of the maker in take (in particular a take with non-zero
+/// units could end up with buyerAssets or sellerAssets equal to zero). Therefore, the settlement fee has no defined
+/// rounding direction, which could lead to fees manipulations on chains with very cheap gas.
 /// @dev pendingFee updates are rounded in favor of the user. It could lead to fees manipulations too.
 /// @dev maxDebt is rounded down in isHealthy and liquidate.
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
@@ -168,11 +170,13 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev creditOf, pendingFee, and lossFactor are not up to date. Use updatePositionView to get the up-to-date values.
+/// @dev creditOf, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
+/// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing market ids,
 /// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
 /// there can be some market id clashes.
+/// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
 /// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
 /// (Shanghai).
 ///
@@ -372,11 +376,15 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(offer.market);
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
-        require(UtilsLib.atMostOneNonZero(offer.maxAssets, offer.maxUnits), MultipleNonZero());
+        require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
+        require(
+            offer.buy ? offer.receiverIfMakerIsSeller == address(0) : receiverIfTakerIsSeller == address(0),
+            UnusedReceiverMustBeZero()
+        );
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
         require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
 
@@ -390,10 +398,10 @@ contract Midnight is IMidnight {
 
         uint256 newConsumed;
         if (offer.maxAssets > 0) {
-            newConsumed = consumed[offer.maker][offer.group] += offer.buy ? buyerAssets : sellerAssets;
+            newConsumed = consumed[offer.maker][offer.group] + (offer.buy ? buyerAssets : sellerAssets);
             require(newConsumed <= offer.maxAssets, ConsumedAssets());
         } else {
-            newConsumed = consumed[offer.maker][offer.group] += units;
+            newConsumed = consumed[offer.maker][offer.group] + units;
             require(newConsumed <= offer.maxUnits, ConsumedUnits());
         }
 
@@ -418,7 +426,6 @@ contract Midnight is IMidnight {
             !offer.reduceOnly || (offer.buy ? buyerCreditIncrease == 0 : sellerDebtIncrease == 0),
             MakerCreditOrDebtIncreased()
         );
-
         require(
             offer.market.enterGate == address(0) || buyerCreditIncrease == 0
                 || IEnterGate(offer.market.enterGate).canIncreaseCredit(buyer),
@@ -441,6 +448,8 @@ contract Midnight is IMidnight {
         _marketState.totalUnits =
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+
+        consumed[offer.maker][offer.group] = newConsumed;
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -625,7 +634,7 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         Position storage _position = position[id][borrower];
-        require(UtilsLib.atMostOneNonZero(repaidUnits, seizedAssets), InconsistentInput());
+        require(repaidUnits == 0 || seizedAssets == 0, InconsistentInput());
         require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
         require(
             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),

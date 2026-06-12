@@ -5,13 +5,6 @@ pragma solidity ^0.8.0;
 library UtilsLib {
     error CastOverflow();
 
-    /// @dev Returns true if at most one of x and y is nonzero.
-    function atMostOneNonZero(uint256 x, uint256 y) internal pure returns (bool z) {
-        assembly {
-            z := or(iszero(x), iszero(y))
-        }
-    }
-
     /// @dev Returns min(a, b).
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         assembly {
