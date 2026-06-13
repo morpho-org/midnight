@@ -32,9 +32,9 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || a * b > max_uint256) {
         revert();
     }
-
-    // a*b <= max_uint256 and d >= 1  =>  a*b/d <= a*b <= max_uint256, so the cast never truncates.
-    return require_uint256(a * b / d);
+    mathint temp = a*b/d;
+    assert temp >= 0 && temp <= 2^256;
+    return require_uint256(temp);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
