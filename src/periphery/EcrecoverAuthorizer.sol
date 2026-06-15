@@ -11,6 +11,8 @@ import {
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IEcrecoverAuthorizer.sol";
 
+/// @dev Helper contract to authorize on Midnight with a signature.
+/// @dev This contract must be authorized by ther authorizer on Midnight.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed authorizations
 /// are no longer valid.
 contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
