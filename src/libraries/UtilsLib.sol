@@ -45,9 +45,8 @@ library UtilsLib {
 
     /// @dev Assumes bitmap is not zero.
     function msb(uint128 bitmap) internal pure returns (uint256 res) {
-        require(bitmap != 0);
-        while (bitmap >> (res + 1) != 0) {
-            res++;
+        assembly {
+            res := sub(255, clz(bitmap))
         }
     }
 
