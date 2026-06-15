@@ -4,8 +4,15 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function lossFactor(bytes32 id) external returns (uint128) envfree;
+    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function toId(Midnight.Market) external returns (bytes32) envfree;
 }
+
+/// Once a position has been accrued at or after maturity, its pending fee is fully realized and stays
+/// at zero: the continuous fee only accrues up to maturity, so there is nothing left to accrue.
+invariant pendingFeeZeroAfterMaturity(Midnight.Market market, address user)
+    lastAccrual(toId(market), user) >= market.maturity => pendingFee(toId(market), user) == 0;
 
 /// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
 /// The continuous fee cancels out (it is subtracted from both credit and pendingFee), so this only
@@ -34,7 +41,7 @@ filtered {
 
     mathint creditAfter = netCredit(e, market, user);
 
-    assert creditAfter >= creditBefore;
+    assert creditAfter == creditBefore;
 }
 
 /// Withdrawing on behalf of another account does not decrease an unrelated user's net credit.
@@ -47,7 +54,7 @@ rule withdrawDoesNotDecreaseOtherCredit(env e, Midnight.Market market, uint256 u
 
     mathint creditAfter = netCredit(e, market, user);
 
-    assert creditAfter >= creditBefore;
+    assert creditAfter == creditBefore;
 }
 
 /// Taking does not decrease the net credit of a user that is neither the taker nor the offer's maker.
@@ -60,7 +67,7 @@ rule takeDoesNotDecreaseUninvolvedCredit(env e, Midnight.Offer offer, bytes rati
 
     mathint creditAfter = netCredit(e, offer.market, user);
 
-    assert creditAfter >= creditBefore;
+    assert creditAfter == creditBefore;
 }
 
 /// Liquidating does not decrease any user's net credit as long as no bad debt is realized,
@@ -78,5 +85,5 @@ rule liquidateWithoutBadDebtDoesNotDecreaseCredit(env e, Midnight.Market market,
 
     mathint creditAfter = netCredit(e, market, user);
 
-    assert creditAfter >= creditBefore;
+    assert creditAfter == creditBefore;
 }
