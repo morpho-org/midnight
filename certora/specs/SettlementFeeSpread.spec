@@ -49,7 +49,8 @@ rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, 
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
     bytes32 id = summaryToId(offer.market);
 
-    // take calls touchMarket, so calling settlementFee (in particular checking if the market is touched) doesn't prune meaningful take paths.
+    // take calls touchMarket see rule takeCallsTouchMarket.
+    // Thus calling settlementFee (in particular checking if the market is touched) doesn't prune meaningful take paths.
     uint256 fee = settlementFee(id, timeToMaturity);
 
     uint256 buyerAssets;

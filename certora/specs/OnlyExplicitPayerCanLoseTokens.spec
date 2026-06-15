@@ -10,8 +10,8 @@ methods {
 
     // Callbacks can modify the whole state arbitrarily, and can only modify the ghost variables to allow
     // themselves as payer. Callbacks are checked to only be called by their corresponding function,
-    // eg onLiquidate is only called by liquidate. onSell cannot authorize a payer, so we
-    // model them with a plain HAVOC_ALL.
+    // eg onLiquidate is only called by liquidate. onSell cannot authorize a payer, so we model them
+    // with a plain HAVOC_ALL.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, buyCallbackAllowed) expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
