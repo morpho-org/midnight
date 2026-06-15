@@ -48,8 +48,12 @@ rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uin
 rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
+    // See rule touchMarketRevertCausesTakeRevert for why calling touchMarket doesn't prune meaningful take paths.
+    touchMarket(e, offer.market);
+
     bytes32 id = summaryToId(offer.market);
-    uint256 fee = settlementFee(id, timeToMaturity);
+    uint256 fee = settlementFee@withrevert(id, timeToMaturity);
+    assert !lastReverted;
 
     uint256 buyerAssets;
     uint256 sellerAssets;
