@@ -7,12 +7,20 @@ methods {
 
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Record every call to touchMarket and the market it is called with. The `internal` entry catches the
-    // same-contract calls made by take/withdraw/repay/supplyCollateral/withdrawCollateral/liquidate.
-    // Summarizing touchMarket is sound for the property proved here (that it is called): we only observe whether
-    // the call happens, not its effects. Solidity propagates reverts out of internal calls, so proving that each
-    // interaction calls touchMarket(market) shows that a reverting touchMarket forces the interaction to revert.
+    // Record every call to touchMarket and the market it is called with.
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => recordTouchMarket(market);
+
+    // Over-approximate the heavy functions for prover performance.
+    // This is safe here: the worst they could do is fail to record a touchMarket call, which would make a rule fail rather than pass unsoundly.
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
+    function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 /// HELPERS ///
