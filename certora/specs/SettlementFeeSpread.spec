@@ -19,8 +19,6 @@ methods {
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Assume no reentrancy, because we need to know that the settlement fee won't change in the onRatify callback. This allows to reference the settlement fee in the rule settlementFeeSpreadBounds.
 }
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
