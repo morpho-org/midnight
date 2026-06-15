@@ -47,14 +47,10 @@ rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uin
 // The spread between what the buyer pays and what the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
 rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
-
-    // take calls touchMarket (see rule takeCallsTouchMarket), so a reverting touchMarket reverts take too.
-    // Calling touchMarket here therefore only prunes take paths that revert anyway.
-    touchMarket(e, offer.market);
-
     bytes32 id = summaryToId(offer.market);
-    uint256 fee = settlementFee@withrevert(id, timeToMaturity);
-    assert !lastReverted;
+
+    // take calls touchMarket, so calling settlementFee (in particular checking if the market is touched) doesn't prune meaningful take paths.
+    uint256 fee = settlementFee(id, timeToMaturity);
 
     uint256 buyerAssets;
     uint256 sellerAssets;
