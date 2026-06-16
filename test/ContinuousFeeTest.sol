@@ -302,7 +302,8 @@ contract ContinuousFeeTest is BaseTest {
             0,
             true,
             keccak256("lender-exit"),
-            address(0)
+            address(0),
+            address(dummyRatifier)
         );
         take(exitAmount, lender, _makeBuyOffer(exitAmount, keccak256("lender-exit"))); // lender is taker = seller
 

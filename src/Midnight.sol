@@ -449,7 +449,8 @@ contract Midnight is IMidnight {
             offer.maxAssets,
             offer.buy,
             offer.group,
-            offer.callback
+            offer.callback,
+            offer.ratifier
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
