@@ -52,7 +52,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
 /// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuious fee is decreased
-/// lenders might self-take to exit and re-enter to reduce their pending fee.
+/// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the trading fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
 ///
 /// LIQUIDATIONS
