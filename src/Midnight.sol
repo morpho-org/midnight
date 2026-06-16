@@ -53,6 +53,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
 /// pending fee of existing lenders is not updated (=> their fee is fixed).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
+/// @dev A buy offer carries a maxContinuousFee: take reverts if the market's continuous fee exceeds it, so the maker
+/// (the buyer) is never charged a continuous fee above the value they committed to when signing the offer.
 ///
 /// LIQUIDATIONS
 /// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation
@@ -83,8 +85,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
-/// loan token.
+/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values,
+/// maxContinuousFee, and loan token.
 ///
 /// OFFER CAPS
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
@@ -352,6 +354,7 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
         require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
+        require(!offer.buy || _marketState.continuousFee <= offer.maxContinuousFee, ContinuousFeeAboveMax());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());

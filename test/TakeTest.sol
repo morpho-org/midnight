@@ -64,6 +64,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxContinuousFee = type(uint256).max;
         lenderOffer.market = market;
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
@@ -90,6 +91,7 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxContinuousFee = type(uint256).max;
         otherBorrowerOffer.market = market;
         otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
@@ -125,6 +127,7 @@ contract TakeTest is BaseTest {
         collateralize(market, lender, existingDebt);
         Offer memory buy0 = _setupMarketOffer(market, existingDebt);
         buy0.buy = true;
+        buy0.maxContinuousFee = type(uint256).max;
         buy0.maker = otherLender;
         buy0.receiverIfMakerIsSeller = address(0);
         // forge-lint: disable-next-line(unsafe-typecast)

@@ -9,7 +9,7 @@ bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c4
 /// @dev keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE)).
 bytes32 constant MARKET_TYPEHASH = 0x358117e98511cc3df97175dca58053b06675b43ad090b0553f8a1eff008b6e2e;
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant OFFER_TYPEHASH = 0x980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c;
+bytes32 constant OFFER_TYPEHASH = 0x37506ae960bd1ee59f5ab2dbd0c1ed8f9b5fbce861155185dcf57b4dae1ed806;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -21,28 +21,28 @@ library HashLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0x2b9ee710e1977dfc5778fe18c905ccc1d9e144baf3ba83be732d4da65ecb73e3;
-            if (height == 1) return 0x3cc16189b92a85898f1d5c6e87282c8ded7c1c93b2323d5e85ae10c5f4b2b220;
-            if (height == 2) return 0x6de37d3e570afa293a8107d4b6b1d9547616c04f42164d009c89194787b2ffa6;
-            if (height == 3) return 0xba3ea2ddfbf40a906fcd1b9506dbd344c062e8dcba8b5c902ceb13339f45a358;
-            if (height == 4) return 0xe5faa865e93bc1b7b8fdf91980f54682d649683b014edd6c54b642f5a0c96977;
-            if (height == 5) return 0xeda50f61dd2a827c6ff9fbfcd54335628dcaa78aaa4f2d118c60886219cdce2b;
-            if (height == 6) return 0x54e2c9cc40cdc0e9ad530cf2be298f952f57af2b18b02f88274a9bbab359d23a;
-            if (height == 7) return 0xc9d81859d60d6b21c688f4be93ca83e3be222728bb156ef5f4cf497f879f1e29;
-            if (height == 8) return 0xd59b0c4544e0c60c8611eab0aaa402575f14ee784d22289c5d57f48c422a62d6;
-            if (height == 9) return 0xccad21701f34f08bb8398a3dbc77e20e4c9c424930f3a8b31485bf059e2bdb20;
-            return 0x8a42dfb49807647bfc49c906aef322aa0239d40e4cb675761e141bc7bfa530da;
+            if (height == 0) return 0xeb3f50577f098116361b11b1bbc1132b57ce752e28662540768c9202b7da8e79;
+            if (height == 1) return 0x1b534886acd069eb4bfb25c4e808fe44111b83fc996534841ea39936a2c644c8;
+            if (height == 2) return 0xd52b3e9c171afe62b4a7ef18722c1a3426769b795f5a00753e0f3c82fc4e9242;
+            if (height == 3) return 0x30013cd7bd61d8940482ca5c36f334164043f405680950568428c16d3b2f79b4;
+            if (height == 4) return 0x042232b53c70701f7de1e13ef6e06deb8efd311b0bd4afb5dc7f398c46536abe;
+            if (height == 5) return 0x8d885f558a38b3ac8a8167b6948e20704445d3a50bf1a3bd6fb612733a6a139c;
+            if (height == 6) return 0x490cf3e82aa1440daa960f07bd892aa17cc3dbf43d499fed9b5d7432e76dc4c6;
+            if (height == 7) return 0x45042cabfb9d41706c3e633df6058cd235aee2ed2cef96c7ffb11f575c0e3d75;
+            if (height == 8) return 0xd487e443cbd35469a9c6b23417c56eef45cc6b647597414799e8a773d1af82b0;
+            if (height == 9) return 0x6f007ea0c225b44afe84f1d6239f57b918022b0c4efc56190626427a3545bea4;
+            return 0x5552efc3ebec05564da399299980f1989114d55ab4f15c55d7c7ab13d96747c5;
         } else {
-            if (height == 11) return 0x2adc0d948b2e3ecb642661590d2eec36d4e71e9acf382deb6574371800caf198;
-            if (height == 12) return 0xf5845dfaed016de272342f346346a49d4b1694f622144d420558a38e46ac9dad;
-            if (height == 13) return 0x3d7df854e6294bf433b64bbb8d0a82fa875a87b45b0016db27fc5752e54126ad;
-            if (height == 14) return 0x72a991a101708716ff427c524404ab44f4d4d1f4e7e76c0ae8b967222164b348;
-            if (height == 15) return 0x762c88fc52cf78a54401d247790f1bdb619d51d3458d1415c20d1422197cecc4;
-            if (height == 16) return 0x8ede2209e94c8d5f8379d733dc8712b71a3888c1c4b70f3d6b22285f70bf4286;
-            if (height == 17) return 0x425b18f07b3ac2f641977d2c294590565dd40b5d8414610568dca64628399975;
-            if (height == 18) return 0x7e7d98718c0180e882e5963b9bd49810096912c273dfa38d8afdd6d39fde86ec;
-            if (height == 19) return 0x8d35d491a29d846489e19688efff3c4cc7dbd54458058d49b30294074539f0b9;
-            if (height == 20) return 0x824e385eea1953bcbc783bf900b18aa6fba129b6908765e986cf0968b491ec4f;
+            if (height == 11) return 0x5cd4011f887ef0adca39577933ee87883bcb764d6158c4e61d0ac232939ed112;
+            if (height == 12) return 0x4f7029a032cb432e7f76cc66e09c960c43f0202fa1123b172696bbddbd793a41;
+            if (height == 13) return 0xd4808138b3d27ffed3eeea1d4256263c7107bfa7469696842774531db829eb2c;
+            if (height == 14) return 0x261e3f5411f1f213ee0d75885492786508455b3fc35323fdb9e15a4aa066951e;
+            if (height == 15) return 0x233612f28095cd987952c83314568e077d879332f1828efa67fe5d0d4f657d00;
+            if (height == 16) return 0xa709f9f47f644039570fb065fc154bc778c6eebfa88519ac6f0c39d7971d66fc;
+            if (height == 17) return 0xfd2a3aa54ed6836739be6dcba53282de4be82b38f2a06f16283fd90a406727fd;
+            if (height == 18) return 0x48d24eca0e5fccba484a2d406e47be0b8a83474286093befa6b3449a051411c6;
+            if (height == 19) return 0x706209d07a74d59d2475c4a74b0b6d9cec8f69068f43b5642f44202300bbd20e;
+            if (height == 20) return 0xe1cc846c902c4c561f4f244bb9bb0d7da9a8089e0c1acb01f4151537b05a7ffc;
             revert TreeTooHigh();
         }
     }
@@ -131,7 +131,8 @@ library HashLib {
                 offer.ratifier,
                 offer.reduceOnly,
                 offer.maxUnits,
-                offer.maxAssets
+                offer.maxAssets,
+                offer.maxContinuousFee
             )
         );
     }

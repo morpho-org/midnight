@@ -59,6 +59,7 @@ contract ContinuousFeeTest is BaseTest {
         o.buy = true;
         o.maker = otherLender;
         o.maxUnits = type(uint256).max;
+        o.maxContinuousFee = type(uint256).max;
         o.ratifier = address(dummyRatifier);
         o.expiry = vm.getBlockTimestamp();
         o.tick = MAX_TICK;
@@ -536,5 +537,64 @@ contract ContinuousFeeTest is BaseTest {
     function testLastAccrualZeroForFreshPosition() public {
         setupLender(1e18, 0, 100 days);
         assertEq(midnight.lastAccrual(id, makeAddr("nobody")), 0, "lastAccrual zero for fresh position");
+    }
+
+    /// @dev Creates the market with continuousFee == feeRate (touch copies the default fee).
+    function _setupFeeMarket(uint256 feeRate) internal {
+        market.maturity = vm.getBlockTimestamp() + 100 days;
+        id = toId(market);
+        midnight.setDefaultContinuousFee(address(loanToken), feeRate);
+        midnight.touchMarket(market);
+        assertEq(midnight.continuousFee(id), feeRate, "market continuousFee");
+    }
+
+    function testTakeRevertsWhenBuyOfferMaxContinuousFeeExceeded(uint256 feeRate, uint256 maxContinuousFee) public {
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        maxContinuousFee = bound(maxContinuousFee, 0, feeRate - 1);
+        _setupFeeMarket(feeRate);
+
+        uint256 units = 1e18;
+        collateralize(market, borrower, units * 2);
+        deal(address(loanToken), otherLender, units);
+
+        Offer memory offer = _makeBuyOffer(keccak256("buy-max-fee"));
+        offer.maxUnits = units;
+        offer.maxContinuousFee = maxContinuousFee;
+
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
+        take(units, borrower, offer); // borrower is the seller, otherLender (maker) is the buyer.
+    }
+
+    function testTakeSucceedsWhenBuyOfferMaxContinuousFeeRespected(uint256 feeRate, uint256 maxContinuousFee) public {
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
+        maxContinuousFee = bound(maxContinuousFee, feeRate, type(uint256).max);
+        _setupFeeMarket(feeRate);
+
+        uint256 units = 1e18;
+        collateralize(market, borrower, units * 2);
+        deal(address(loanToken), otherLender, units);
+
+        Offer memory offer = _makeBuyOffer(keccak256("buy-ok-fee"));
+        offer.maxUnits = units;
+        offer.maxContinuousFee = maxContinuousFee;
+
+        take(units, borrower, offer);
+        assertEq(midnight.debtOf(id, borrower), units, "borrower took on debt");
+    }
+
+    /// @dev maxContinuousFee is not enforced on sell offers, whose maker (the seller) pays no continuous fee.
+    function testTakeIgnoresMaxContinuousFeeForSellOffer(uint256 feeRate) public {
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        _setupFeeMarket(feeRate);
+
+        uint256 units = 1e18;
+        collateralize(market, otherBorrower, units * 2);
+        deal(address(loanToken), lender, units);
+
+        Offer memory offer = _makeBorrowOffer(units);
+        offer.maxContinuousFee = 0; // below the market fee, but ignored for sell offers.
+
+        take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
+        assertEq(midnight.creditOf(id, lender), units, "lender gained credit");
     }
 }
