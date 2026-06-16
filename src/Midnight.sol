@@ -73,6 +73,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
+/// @dev Nothing prevents borrowers to open small positions / liquidators to leave small positions that might not be
+/// profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic aspect.
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -170,8 +172,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev Nothing prevents borrowers to open small positions / liquidators to leave small positions that might not be
-/// profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic aspect.
 /// @dev creditOf, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
 /// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
