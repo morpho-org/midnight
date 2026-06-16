@@ -89,6 +89,15 @@ The collateral bitmap is an optimization: no functional changes compared to the 
   It also proves the bitmap-optimized `isHealthy` returns the same value, and reverts no more often, than the bitmap-less implementation.
 - [`Bitmap.spec`](specs/Bitmap.spec) checks the low-level 128-bit bitmap operations underpinning that abstraction: `setBit`/`clearBit` change exactly the targeted bit, `countBits` is at most 128 and positive when a bit is set, and `msb` returns the largest set bit.
 
+## Library invertibility
+
+Round-trip properties ensuring that helper computations can reach any target amount.
+
+- [`TakeAmountsLibInvertibility.spec`](specs/TakeAmountsLibInvertibility.spec) checks that `TakeAmountsLib.buyerAssetsToUnits` and `sellerAssetsToUnits` are exact inverses of `take`: feeding the returned units back into `take` produces exactly the target buyer (resp. seller) assets.
+- [`BundlerRepayInvertibility.spec`](specs/BundlerRepayInvertibility.spec) checks the bundler's repay formula.
+  `repayUnitsFormula` proves the pure arithmetic identity: for `assets = floor(D * WAD / (WAD - pct))`, the net units `assets - floor(assets * pct / WAD)` equal `D`.
+  `repayAndWithdrawCollateralRepaysTargetUnits` proves the end-to-end property: calling `repayAndWithdrawCollateral` with those assets decreases the on-chain debt by exactly `U`.
+
 ## Fixed-point math
 
 Properties of the fixed-point primitives the protocol relies on.
