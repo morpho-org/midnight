@@ -4,18 +4,23 @@ pragma solidity ^0.8.0;
 
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE, MAX_SETTLEMENT_FEE_0_DAYS} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
+import {StdStorage, stdStorage} from "../lib/forge-std/src/StdStorage.sol";
 
 contract TakeTest is BaseTest {
     using UtilsLib for uint256;
+    using stdStorage for StdStorage;
+
+    StdStorage private stdstoreFinder;
 
     Market internal market;
     bytes32 internal id;
@@ -91,6 +96,114 @@ contract TakeTest is BaseTest {
     }
 
     // tests.
+
+    function testTakeEmitsEvent(
+        uint256 units,
+        uint256 tick,
+        bytes32 group,
+        uint256 existingDebt,
+        uint256 existingCredit,
+        uint256 existingConsumed,
+        bool offerIsBuy
+    ) public {
+        address caller = makeAddr("caller");
+        address receiver = makeAddr("receiver");
+        LendCallback payerCallback = new LendCallback();
+
+        midnight.setMarketSettlementFee(id, 0, MAX_SETTLEMENT_FEE_0_DAYS);
+        midnight.setMarketSettlementFee(id, 1, MAX_SETTLEMENT_FEE_0_DAYS); // flat settlement fee
+        midnight.setMarketContinuousFee(id, MAX_CONTINUOUS_FEE);
+
+        units = bound(units, 1e10, maxAssets / 8);
+        tick = bound(tick, 0, MAX_TICK);
+        uint256 price = TickLib.tickToPrice(tick);
+        vm.assume(price > 0.01 ether); // keep price > settlement fee.
+        existingDebt = bound(existingDebt, 1e8, units - 1e8);
+        existingCredit = bound(existingCredit, 1e8, units - 1);
+        existingConsumed = bound(existingConsumed, 1, type(uint128).max);
+
+        collateralize(market, lender, existingDebt);
+        Offer memory buy0 = _setupMarketOffer(market, existingDebt);
+        buy0.buy = true;
+        buy0.maker = otherLender;
+        buy0.receiverIfMakerIsSeller = address(0);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        buy0.group = bytes32("debt-helper");
+        deal(address(loanToken), otherLender, existingDebt);
+        take(existingDebt, lender, buy0);
+
+        collateralize(market, otherBorrower, existingCredit);
+        Offer memory sell0 = _setupMarketOffer(market, existingCredit);
+        sell0.maker = otherBorrower;
+        sell0.receiverIfMakerIsSeller = otherBorrower;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        sell0.group = bytes32("credit-helper");
+        deal(address(loanToken), borrower, existingCredit.mulDivUp(WAD + MAX_SETTLEMENT_FEE_0_DAYS, WAD));
+        take(existingCredit, borrower, sell0);
+
+        collateralize(market, borrower, units - existingCredit);
+
+        Offer memory offer;
+        address maker;
+        address taker;
+        uint256 buyerAssets;
+        uint256 sellerAssets;
+        if (offerIsBuy) {
+            offer = lenderOffer;
+            offer.callback = address(payerCallback);
+            maker = lender;
+            taker = borrower;
+            buyerAssets = units.mulDivDown(price, WAD);
+            sellerAssets = units.mulDivDown(price - MAX_SETTLEMENT_FEE_0_DAYS, WAD);
+        } else {
+            offer = borrowerOffer;
+            offer.receiverIfMakerIsSeller = receiver;
+            maker = borrower;
+            taker = lender;
+            buyerAssets = units.mulDivUp(price + MAX_SETTLEMENT_FEE_0_DAYS, WAD);
+            sellerAssets = units.mulDivUp(price, WAD);
+        }
+        offer.group = group;
+        offer.tick = tick;
+
+        stdstoreFinder.target(address(midnight)).sig("consumed(address,bytes32)").with_key(maker).with_key(group)
+            .checked_write(existingConsumed);
+
+        deal(address(loanToken), address(payerCallback), buyerAssets);
+        vm.prank(taker);
+        midnight.setIsAuthorized(caller, true, taker);
+
+        uint256 ttm = market.maturity - block.timestamp;
+        uint256 buyerPendingFeeIncrease = (units - existingDebt).mulDivDown(uint256(MAX_CONTINUOUS_FEE) * ttm, WAD);
+        uint256 sellerPendingFeeDecrease = existingCredit.mulDivDown(uint256(MAX_CONTINUOUS_FEE) * ttm, WAD);
+
+        vm.expectEmit();
+        emit EventsLib.Take(
+            caller,
+            id,
+            units,
+            taker,
+            maker,
+            offerIsBuy,
+            group,
+            buyerAssets,
+            sellerAssets,
+            existingConsumed + units,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            units - existingDebt,
+            existingCredit,
+            receiver,
+            address(payerCallback)
+        );
+
+        vm.prank(caller);
+        if (offerIsBuy) {
+            midnight.take(offer, hex"", units, taker, receiver, address(0), hex"");
+        } else {
+            midnight.take(offer, hex"", units, taker, address(0), address(payerCallback), hex"");
+        }
+    }
 
     // path 1: Lender enters + borrower enters.
 
@@ -534,7 +647,7 @@ contract TakeTest is BaseTest {
         public
     {
         units = bound(units, 0, maxAssets - 1);
-        offerUnits = bound(offerUnits, units, maxAssets - 1);
+        offerUnits = bound(offerUnits, max(units, 1), maxAssets - 1);
         secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         borrowerOffer.maxUnits = offerUnits;
@@ -554,7 +667,7 @@ contract TakeTest is BaseTest {
         public
     {
         units = bound(units, 0, maxAssets - 1);
-        offerUnits = bound(offerUnits, units, maxAssets - 1);
+        offerUnits = bound(offerUnits, max(units, 1), maxAssets - 1);
         secondRevertingTake = bound(secondRevertingTake, offerUnits - units + 1, maxAssets);
         secondPassingTake = bound(secondPassingTake, 0, offerUnits - units);
         lenderOffer.maxUnits = offerUnits;
@@ -573,6 +686,7 @@ contract TakeTest is BaseTest {
     function testBuyGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
+        vm.assume(firstFill + secondFill > 0); // an offer must have a nonzero cap
         borrowerOffer.maxUnits = firstFill + secondFill;
         borrowerOffer.tick = MAX_TICK;
         Offer memory borrowerOffer2 = borrowerOffer;
@@ -592,6 +706,7 @@ contract TakeTest is BaseTest {
     function testSellGroup(uint256 firstFill, uint256 secondFill) public {
         firstFill = bound(firstFill, 0, maxAssets);
         secondFill = bound(secondFill, 0, maxAssets);
+        vm.assume(firstFill + secondFill > 0); // an offer must have a nonzero cap
         lenderOffer.maxUnits = firstFill + secondFill;
         lenderOffer.tick = MAX_TICK;
         Offer memory lenderOffer2 = lenderOffer;
@@ -850,7 +965,7 @@ contract TakeTest is BaseTest {
         lenderOffer.maxAssets = 1e18;
         lenderOffer.maxUnits = 1e18;
 
-        vm.expectRevert(IMidnight.MultipleNonZero.selector);
+        vm.expectRevert(IMidnight.InvalidOfferCaps.selector);
         take(units, borrower, lenderOffer);
     }
 
@@ -981,6 +1096,32 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, hex"", 0, taker, taker, address(0), hex"");
     }
 
+    function testTakeUnusedReceiverMustBeZeroBuy(address receiver) public {
+        vm.assume(receiver != address(0));
+        // lenderOffer is a buy offer, so receiverIfMakerIsSeller is unused and must be zero.
+        lenderOffer.receiverIfMakerIsSeller = receiver;
+        vm.expectRevert(IMidnight.UnusedReceiverMustBeZero.selector);
+        vm.prank(borrower);
+        midnight.take(lenderOffer, hex"", 0, borrower, address(0), address(0), hex"");
+    }
+
+    function testTakeUnusedReceiverMustBeZeroSell(address receiver) public {
+        vm.assume(receiver != address(0));
+        // borrowerOffer is a sell offer, so the receiverIfTakerIsSeller input is unused and must be zero.
+        vm.expectRevert(IMidnight.UnusedReceiverMustBeZero.selector);
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", 0, lender, receiver, address(0), hex"");
+    }
+
+    function testTakeInvalidOfferCapsBothZero(uint256 units) public {
+        // Both caps are zero: the offer cannot trade anything, so take always reverts.
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = 0;
+        vm.expectRevert(IMidnight.InvalidOfferCaps.selector);
+        vm.prank(borrower);
+        midnight.take(lenderOffer, hex"", units, borrower, address(0), address(0), hex"");
+    }
+
     // test callbacks.
 
     function addCredit(address user, uint256 units) internal {
@@ -1003,7 +1144,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         borrowerOffer.callback = address(new BorrowCallback());
         borrowerOffer.callbackData = abi.encode(0, collateral, data);
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
@@ -1040,7 +1181,7 @@ contract TakeTest is BaseTest {
         uint256 collateral = units.mulDivUp(WAD, market.collateralParams[0].lltv);
         addCredit(borrower, units);
 
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.tick = MAX_TICK;
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         address callback = address(new BorrowCallback());
@@ -1151,7 +1292,7 @@ contract TakeTest is BaseTest {
         lenderOffer.callback = address(new LendCallback());
         lenderOffer.callbackData = data;
         lenderOffer.maker = address(otherLender);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.tick = MAX_TICK;
         deal(address(loanToken), lenderOffer.callback, assets);
         collateralize(market, borrower, units);
@@ -1178,7 +1319,7 @@ contract TakeTest is BaseTest {
         uint256 price = TickLib.tickToPrice(MAX_TICK);
         uint256 assets = units.mulDivUp(price, WAD);
         address callback = address(new LendCallback());
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.tick = MAX_TICK;
         deal(address(loanToken), callback, assets);
         collateralize(market, borrower, units);

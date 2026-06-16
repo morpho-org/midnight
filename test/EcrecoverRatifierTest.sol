@@ -135,7 +135,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
-        vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
+        vm.expectEmit();
         emit IEcrecoverRatifier.CancelRoot(lender, lender, _root);
         vm.prank(lender);
         ecrecoverRatifier.cancelRoot(lender, _root);

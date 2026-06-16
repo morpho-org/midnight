@@ -13,15 +13,10 @@ methods {
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
     function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
 
-    // Summarize complex internal functions irrelevant to authorization checks.
+    // Over-approximate view functions for prover performance.
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Summarize TickLib functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-
-    // Summarize UtilsLib functions.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -48,8 +43,6 @@ function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
     makerRatified[offer.maker] = true;
     return result;
 }
-
-definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastAccrual;
 
 /// CREDIT AND DEBT CHANGE RULES ///
 

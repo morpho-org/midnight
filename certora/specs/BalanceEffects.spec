@@ -38,8 +38,9 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
 
     uint256 creditBefore = creditOf(id, user);
     uint128 updatedUserCredit;
+    uint128 newPendingFee;
     uint128 userFee;
-    updatedUserCredit, _, userFee = updatePositionView(e, market, id, user);
+    updatedUserCredit, newPendingFee, userFee = updatePositionView(e, market, id, user);
 
     uint256 anyCredit = creditOf(anyId, anyUser);
     uint256 anyDebt = debtOf(anyId, anyUser);
@@ -50,6 +51,7 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert debtOf(anyId, anyUser) == anyDebt;
     assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
     assert creditOf(id, user) == updatedUserCredit;
+    assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert creditOf(id, user) <= creditBefore;
 }
