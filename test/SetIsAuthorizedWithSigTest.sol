@@ -67,7 +67,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Signature memory sig = signAuthorization(auth, borrower);
 
         vm.expectEmit();
-        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce);
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, borrower);
 
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
@@ -78,7 +78,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         sig = signAuthorization(auth, borrower);
 
         vm.expectEmit();
-        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, false, auth.nonce);
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, false, auth.nonce, borrower);
 
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
