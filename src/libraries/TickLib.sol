@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 5820;
-// Minimum representable price increment in WAD (1e-6 WAD). Tick prices are rounded to multiples of this value.
-uint256 constant PRICE_ROUNDING_STEP = 1e12;
+// Minimum representable price increment in WAD (1e-7 WAD). Tick prices are rounded to multiples of this value.
+uint256 constant PRICE_ROUNDING_STEP = 1e11;
 
 library TickLib {
     using TickLib for uint256;
@@ -43,6 +43,8 @@ library TickLib {
 
     function tickToPrice(uint256 tick) internal pure returns (uint256) {
         require(tick <= MAX_TICK, TickOutOfRange());
+        if (tick == 0) return 0;
+        if (tick == MAX_TICK) return 1e18;
         unchecked {
             // forge-lint: disable-next-item(unsafe-typecast)
             return uint256(1e36)
