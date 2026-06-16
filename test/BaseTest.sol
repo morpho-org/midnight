@@ -25,15 +25,6 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
-    LLTV_0,
-    LLTV_1,
-    LLTV_2,
-    LLTV_3,
-    LLTV_4,
-    LLTV_5,
-    LLTV_6,
-    LLTV_7,
-    LLTV_8,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
@@ -42,6 +33,17 @@ import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+
+/// @dev The LLTV tiers registered in tests, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
+uint256 constant LLTV_0 = 0.385e18;
+uint256 constant LLTV_1 = 0.625e18;
+uint256 constant LLTV_2 = 0.77e18;
+uint256 constant LLTV_3 = 0.86e18;
+uint256 constant LLTV_4 = 0.915e18;
+uint256 constant LLTV_5 = 0.945e18;
+uint256 constant LLTV_6 = 0.965e18;
+uint256 constant LLTV_7 = 0.98e18;
+uint256 constant LLTV_8 = 1e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -73,6 +75,11 @@ abstract contract BaseTest is Test {
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
+
+        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
+        for (uint256 i = 0; i < tiers.length; i++) {
+            midnight.addLltv(tiers[i]);
+        }
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
