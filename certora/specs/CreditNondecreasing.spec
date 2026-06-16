@@ -19,6 +19,15 @@ methods {
     // The axioms are proved in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // Price/fee/health helpers are non-linear (wExp, fee interpolation, oracle math) but only feed
+    // take()'s prices, settlement fees, and the maker/taker positions. The rules that exercise take
+    // (takeDoesNotDecreaseUninvolvedCredit) only look at an uninvolved user's position and never the
+    // market loss factor, so these are irrelevant to the asserted property. NONDET removes the
+    // non-linearity without weakening what we prove.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
 /// SUMMARY FUNCTIONS ///
