@@ -8,12 +8,11 @@ import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
-// Paste from frontend output (regenerated locally for the Offer type with maxContinuousFee; repaste real values once
-// the frontend signs the updated type).
-address constant ACCOUNT = 0xe05fcC23807536bEe418f142D19fa0d21BB0cfF7;
+// Paste from frontend output.
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
 uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0x92ec52bd735e9b88a66e6acb49152be6784fad1b5caeaad74ebd252f2f1e6891;
-bytes32 constant SIG_S = 0x56747b5a68fa64099547cb7c3077d0720ee0445b35f3d4b08830c01b1886b016;
+bytes32 constant SIG_R = 0xec8a2f2ccfc03dab636f331bccf6e7d6a1057108da8bed8214303d999d5b1c0d;
+bytes32 constant SIG_S = 0x283af2cf235e4c70a56911378b16fd36986fd69079755b9228cfecba5184abda;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
