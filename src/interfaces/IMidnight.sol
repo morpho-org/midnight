@@ -33,7 +33,7 @@ struct Offer {
     bool reduceOnly;
     uint256 maxUnits;
     uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
-    uint256 maxContinuousFee; // only enforced on buy offers
+    uint256 maxContinuousFee;
 }
 
 /// @dev Settlement fee cbp values and the continuous fee are 0 until the market is created, then set to the default
