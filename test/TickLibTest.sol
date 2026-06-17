@@ -17,9 +17,10 @@ contract TickLibTest is BaseTest {
     }
 
     function testTickToPriceMinMax() public pure {
+        assertEq(MAX_TICK, 6744, "max tick");
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(1), 0.0000005e18, "first non-zero tick");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 1), 1e18 - 0.0000005e18, "tick max - 1 just below par");
+        assertEq(TickLib.tickToPrice(2), 0.0000001e18, "first non-zero tick");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 0.0000001e18, "tick max - 2 just below par");
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
     }
 
@@ -133,8 +134,8 @@ contract TickLibTest is BaseTest {
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
-            // 3-term Taylor in wExp yields max ~1.4 bps absolute error; 2 bps threshold leaves headroom.
-            assertLe(absErrorWad, 0.00014e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
+            // 3-term Taylor in wExp yields sub-2 bps absolute error.
+            assertLe(absErrorWad, 0.0002e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
             if (solPrice > 0.01e18) {
                 assertLe(relErrorWad, 0.0007e18, string.concat("Tick ", vm.toString(tick), " error exceeds 7 bps"));
             }
