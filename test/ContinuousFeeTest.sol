@@ -194,6 +194,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.start = vm.getBlockTimestamp();
         borrowOffer.expiry = vm.getBlockTimestamp();
         borrowOffer.tick = MAX_TICK;
+        borrowOffer.maxContinuousFee = type(uint256).max;
     }
 
     function testTwoLendersDifferentRates(
@@ -582,9 +583,9 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.debtOf(id, borrower), units, "borrower took on debt");
     }
 
-    /// @dev maxContinuousFee is not enforced on sell offers, whose maker (the seller) pays no continuous fee.
-    function testTakeIgnoresMaxContinuousFeeForSellOffer(uint256 feeRate) public {
+    function testTakeRevertsWhenSellOfferMaxContinuousFeeExceeded(uint256 feeRate, uint256 maxContinuousFee) public {
         feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        maxContinuousFee = bound(maxContinuousFee, 0, feeRate - 1);
         _setupFeeMarket(feeRate);
 
         uint256 units = 1e18;
@@ -592,7 +593,23 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), lender, units);
 
         Offer memory offer = _makeBorrowOffer(units);
-        offer.maxContinuousFee = 0; // below the market fee, but ignored for sell offers.
+        offer.maxContinuousFee = maxContinuousFee;
+
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
+        take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
+    }
+
+    function testTakeSucceedsWhenSellOfferMaxContinuousFeeRespected(uint256 feeRate, uint256 maxContinuousFee) public {
+        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
+        maxContinuousFee = bound(maxContinuousFee, feeRate, type(uint256).max);
+        _setupFeeMarket(feeRate);
+
+        uint256 units = 1e18;
+        collateralize(market, otherBorrower, units * 2);
+        deal(address(loanToken), lender, units);
+
+        Offer memory offer = _makeBorrowOffer(units);
+        offer.maxContinuousFee = maxContinuousFee;
 
         take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
         assertEq(midnight.creditOf(id, lender), units, "lender gained credit");

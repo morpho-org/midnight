@@ -74,6 +74,7 @@ contract TakeTest is BaseTest {
         otherLenderOffer.ratifier = address(dummyRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxContinuousFee = type(uint256).max;
         otherLenderOffer.market = market;
         otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
@@ -83,6 +84,7 @@ contract TakeTest is BaseTest {
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxContinuousFee = type(uint256).max;
         borrowerOffer.market = market;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
