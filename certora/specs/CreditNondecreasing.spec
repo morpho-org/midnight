@@ -20,11 +20,7 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    // Price/fee/health helpers are non-linear (wExp, fee interpolation, oracle math) but only feed
-    // take()'s prices, settlement fees, and the maker/taker positions. The rules that exercise take
-    // (takeDoesNotDecreaseUninvolvedCredit) only look at an uninvolved user's position and never the
-    // market loss factor, so these are irrelevant to the asserted property. NONDET removes the
-    // non-linearity without weakening what we prove.
+    // Over-approximate view functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
@@ -70,8 +66,6 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 }
 
 /// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
-/// The continuous fee cancels out (it is subtracted from both credit and pendingFee), so this only
-/// reflects withdrawals, take transfers, and bad-debt slashing via the market loss factor.
 function netCredit(env e, Midnight.Market market, address user) returns mathint {
     bytes32 id = toId(market);
     uint128 credit;
@@ -99,7 +93,7 @@ invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, addres
 /// RULES ///
 
 /// The up-to-date face value of a lender's position (credit - pendingFee) can only decrease by
-/// withdrawing, taking, or liquidating. Every other function leaves it unchanged or increases it.
+/// withdrawing, taking, or liquidating. Every other function leaves it unchanged.
 rule creditNondecreasing(env e, method f, calldataarg args, Midnight.Market market, address user)
 filtered {
     f -> !f.isView
