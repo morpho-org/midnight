@@ -10,9 +10,9 @@ import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
-uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0xec8a2f2ccfc03dab636f331bccf6e7d6a1057108da8bed8214303d999d5b1c0d;
-bytes32 constant SIG_S = 0x283af2cf235e4c70a56911378b16fd36986fd69079755b9228cfecba5184abda;
+uint8 constant SIG_V = 28;
+bytes32 constant SIG_R = 0xb7a8c34b3aa87d799f2bd6e01a36c6a48673313015c592fc4137043b37ee80c6;
+bytes32 constant SIG_S = 0x5161ce684b17e81a0b297441856e8d8b498c541116fd6dde5d87e5624b847afb;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
