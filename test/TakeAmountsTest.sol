@@ -12,7 +12,7 @@ import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
 
-    uint256 internal constant BORROWER_POSITION_UNITS = 3e36;
+    uint256 internal constant BORROWER_POSITION_UNITS = 1e37;
 
     Market internal market;
     bytes32 internal id;
