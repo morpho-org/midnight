@@ -937,6 +937,55 @@ contract TakeTest is BaseTest {
         assertEq(buyerAssets, expectedBuyerAssets);
     }
 
+    function testMaxAssetsSellerConsumedAccumulates(uint256 units) public {
+        units = bound(units, 1, maxAssets / 2);
+        deal(address(loanToken), lender, type(uint128).max);
+        collateralize(market, borrower, 2 * units);
+
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = type(uint128).max;
+
+        (, uint256 sellerAssets1) = take(units, lender, borrowerOffer);
+        assertEq(midnight.consumed(borrower, borrowerOffer.group), sellerAssets1, "consumed after first take");
+
+        (, uint256 sellerAssets2) = take(units, lender, borrowerOffer);
+        assertEq(
+            midnight.consumed(borrower, borrowerOffer.group),
+            sellerAssets1 + sellerAssets2,
+            "consumed after second take"
+        );
+    }
+
+    function testMaxAssetsBuyerConsumedAccumulates(uint256 units) public {
+        units = bound(units, 1, maxAssets / 2);
+        deal(address(loanToken), lender, type(uint128).max);
+        collateralize(market, borrower, 2 * units);
+
+        lenderOffer.maxUnits = 0;
+        lenderOffer.maxAssets = type(uint128).max;
+
+        (uint256 buyerAssets1,) = take(units, borrower, lenderOffer);
+        assertEq(midnight.consumed(lender, lenderOffer.group), buyerAssets1, "consumed after first take");
+
+        (uint256 buyerAssets2,) = take(units, borrower, lenderOffer);
+        assertEq(
+            midnight.consumed(lender, lenderOffer.group), buyerAssets1 + buyerAssets2, "consumed after second take"
+        );
+    }
+
+    function testMaxUnitsConsumedAccumulates(uint256 units) public {
+        units = bound(units, 1, maxAssets / 2);
+        deal(address(loanToken), lender, type(uint128).max);
+        collateralize(market, borrower, 2 * units);
+
+        // Default offer caps: maxUnits set, maxAssets == 0 -> consumed tracks units.
+        take(units, lender, borrowerOffer);
+        assertEq(midnight.consumed(borrower, borrowerOffer.group), units, "consumed after first take");
+
+        take(units, lender, borrowerOffer);
+        assertEq(midnight.consumed(borrower, borrowerOffer.group), 2 * units, "consumed after second take");
+    }
+
     function testMaxAssetsZeroMeansNoLimitForSeller(uint256 units) public {
         units = bound(units, 1, maxAssets);
         deal(address(loanToken), lender, units);
