@@ -54,9 +54,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuious fee is decreased
 /// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
-/// @dev An offer carries a maxContinuousFee: take reverts if the market's continuous fee exceeds it. For a buy offer,
-/// this ensures the maker (the buyer) is never charged a continuous fee above the value they committed to when signing
-/// the offer.
+    /// @dev An offer cannot be taken if its maxContinuousFee value is higher than the current market continuous fee.
+    /// This ensures buy offer makers can protect against future continuous fee updates.
 ///
 /// LIQUIDATIONS
 /// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation
