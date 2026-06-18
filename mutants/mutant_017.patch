@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -681,7 +681,7 @@
+ 
+             uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
+             _position.collateral[collateralIndex] = newCollateral;
+-            if (newCollateral == 0 && seizedAssets > 0) {
++            if (newCollateral == 0 && seizedAssets && 0) {
+                 _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+             }
+             _marketState.withdrawable += UtilsLib.toUint128(repaidUnits);

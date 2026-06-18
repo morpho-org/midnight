@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -573,7 +573,7 @@
+         uint256 newCollateral = _position.collateral[collateralIndex] - assets;
+         _position.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
+ 
+-        if (newCollateral == 0 && assets > 0) {
++        if (newCollateral == 0 && assets == 0) {
+             _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+         }
+ 

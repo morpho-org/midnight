@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -968,7 +968,7 @@
+                 _collateralBitmap = _collateralBitmap.clearBit(i);
+             }
+         }
+-        return maxDebt >= debt;
++        return maxDebt < debt;
+     }
+ 
+     /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.

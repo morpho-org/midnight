@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -267,7 +267,7 @@
+         require(msg.sender == feeSetter, OnlyFeeSetter());
+         require(index <= 6, InvalidFeeIndex());
+         require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+-        require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
++        require(!(newSettlementFee % CBP == 0), FeeNotMultipleOfFeeCbp());
+         require(_marketState.tickSpacing > 0, MarketNotCreated());
+         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
+         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);

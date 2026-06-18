@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -266,7 +266,7 @@
+         MarketState storage _marketState = marketState[id];
+         require(msg.sender == feeSetter, OnlyFeeSetter());
+         require(index <= 6, InvalidFeeIndex());
+-        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
++        require(newSettlementFee >= maxSettlementFee(index), SettlementFeeTooHigh());
+         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
+         require(_marketState.tickSpacing > 0, MarketNotCreated());
+         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP

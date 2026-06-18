@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -577,7 +577,7 @@
+             _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+         }
+ 
+-        require(isHealthy(market, id, onBehalf), UnhealthyBorrower());
++        require(true, UnhealthyBorrower());
+ 
+         emit EventsLib.WithdrawCollateral(msg.sender, id, collateralToken, assets, onBehalf, receiver);
+ 

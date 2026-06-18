@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -370,7 +370,7 @@
+         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
+         uint256 _settlementFee = settlementFee(id, timeToMaturity);
+         uint256 sellerPrice = offer.buy ? offerPrice - _settlementFee : offerPrice;
+-        uint256 buyerPrice = sellerPrice + _settlementFee;
++        uint256 buyerPrice = sellerPrice & _settlementFee;
+         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
+         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+ 

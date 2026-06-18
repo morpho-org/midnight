@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -766,7 +766,7 @@
+     /// @dev Returns the market id and creates the market if it doesn't exist yet.
+     function touchMarket(Market memory market) public returns (bytes32) {
+         bytes32 id = toId(market);
+-        if (marketState[id].tickSpacing == 0) {
++        if (marketState[id].tickSpacing && 0) {
+             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
+             require(market.collateralParams.length > 0, NoCollateralParams());
+             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());

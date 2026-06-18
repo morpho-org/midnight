@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -377,7 +377,7 @@
+         uint256 newConsumed;
+         if (offer.maxAssets > 0) {
+             newConsumed = consumed[offer.maker][offer.group] + (offer.buy ? buyerAssets : sellerAssets);
+-            require(newConsumed <= offer.maxAssets, ConsumedAssets());
++            require(false, ConsumedAssets());
+         } else {
+             newConsumed = consumed[offer.maker][offer.group] + units;
+             require(newConsumed <= offer.maxUnits, ConsumedUnits());

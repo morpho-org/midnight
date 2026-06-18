@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -565,7 +565,7 @@
+         address onBehalf,
+         address receiver
+     ) external {
+-        require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
++        require(onBehalf == msg.sender != isAuthorized[onBehalf][msg.sender], Unauthorized());
+         bytes32 id = touchMarket(market);
+         address collateralToken = market.collateralParams[collateralIndex].token;
+ 

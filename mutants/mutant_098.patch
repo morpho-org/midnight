@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -604,7 +604,7 @@
+         bytes32 id = touchMarket(market);
+         MarketState storage _marketState = marketState[id];
+         Position storage _position = position[id][borrower];
+-        require(repaidUnits == 0 || seizedAssets == 0, InconsistentInput());
++        require(false, InconsistentInput());
+         require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
+         require(
+             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),

@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -655,7 +655,7 @@
+         if (repaidUnits > 0 || seizedAssets > 0) {
+             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
+             uint256 lif = postMaturityMode
+-                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
++                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp * market.maturity) / TIME_TO_MAX_LIF)
+                 : _maxLif;
+ 
+             if (seizedAssets > 0) {

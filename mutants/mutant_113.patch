@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -685,7 +685,7 @@
+                 _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+             }
+             _marketState.withdrawable += UtilsLib.toUint128(repaidUnits);
+-            _position.debt -= UtilsLib.toUint128(repaidUnits);
++            _position.debt >>= UtilsLib.toUint128(repaidUnits);
+         }
+ 
+         address payer = callback != address(0) ? callback : msg.sender;

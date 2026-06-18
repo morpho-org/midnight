@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -963,7 +963,7 @@
+                 uint256 i = UtilsLib.msb(_collateralBitmap);
+                 CollateralParams memory collateralParam = market.collateralParams[i];
+                 uint256 price = IOracle(collateralParam.oracle).price();
+-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
++                maxDebt %= _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                     .mulDivDown(collateralParam.lltv, WAD);
+                 _collateralBitmap = _collateralBitmap.clearBit(i);
+             }

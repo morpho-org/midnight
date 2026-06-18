@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -669,7 +669,7 @@
+                 // Note that debt >= maxDebt in this branch.
+                 // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
+                 uint256 maxRepaid = lltv < WAD
+-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
++                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif | lltv)
+                     : type(uint256).max;
+                 require(
+                     repaidUnits <= maxRepaid

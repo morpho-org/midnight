@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -375,7 +375,7 @@
+         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
+ 
+         uint256 newConsumed;
+-        if (offer.maxAssets > 0) {
++        if (offer.maxAssets < 0) {
+             newConsumed = consumed[offer.maker][offer.group] + (offer.buy ? buyerAssets : sellerAssets);
+             require(newConsumed <= offer.maxAssets, ConsumedAssets());
+         } else {

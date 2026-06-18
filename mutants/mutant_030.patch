@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -216,7 +216,7 @@
+     /// MULTICALL ///
+ 
+     function multicall(bytes[] calldata calls) external {
+-        for (uint256 i = 0; i < calls.length; i++) {
++        for (uint256 i = 0; i <= calls.length; i++) {
+             (bool success, bytes memory returnData) = address(this).delegatecall(calls[i]);
+             if (!success) {
+                 assembly ("memory-safe") {

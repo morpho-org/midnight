@@ -1,0 +1,12 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -684,7 +684,7 @@
+             if (newCollateral == 0 && seizedAssets > 0) {
+                 _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+             }
+-            _marketState.withdrawable += UtilsLib.toUint128(repaidUnits);
++            _marketState.withdrawable %= UtilsLib.toUint128(repaidUnits);
+             _position.debt -= UtilsLib.toUint128(repaidUnits);
+         }
+ 

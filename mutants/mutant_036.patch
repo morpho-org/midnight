@@ -1,0 +1,11 @@
+diff --git a/src/Midnight.sol b/src/Midnight.sol
+--- a/src/Midnight.sol
++++ b/src/Midnight.sol
+@@ -988,6 +988,6 @@
+                                         (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
+         // forgefmt: disable-end
+ 
+-        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
++        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) | (end - start);
+     }
+ }
