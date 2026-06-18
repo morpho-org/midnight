@@ -183,7 +183,7 @@ abstract contract BaseTest is Test {
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.maxContinuousFee = type(uint256).max;
+        lenderOffer.continuousFeeCap = type(uint256).max;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -209,7 +209,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.start = vm.getBlockTimestamp();
         badBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         badBorrowerOffer.tick = MAX_TICK;
-        badBorrowerOffer.maxContinuousFee = type(uint256).max;
+        badBorrowerOffer.continuousFeeCap = type(uint256).max;
 
         vm.prank(badBorrower);
 
@@ -326,7 +326,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();
         borrowerOffer.tick = MAX_TICK;
-        borrowerOffer.maxContinuousFee = type(uint256).max;
+        borrowerOffer.continuousFeeCap = type(uint256).max;
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {

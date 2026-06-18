@@ -59,7 +59,7 @@ contract ContinuousFeeTest is BaseTest {
         o.buy = true;
         o.maker = otherLender;
         o.maxUnits = type(uint256).max;
-        o.maxContinuousFee = type(uint256).max;
+        o.continuousFeeCap = type(uint256).max;
         o.ratifier = address(dummyRatifier);
         o.expiry = vm.getBlockTimestamp();
         o.tick = MAX_TICK;
@@ -194,7 +194,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.start = vm.getBlockTimestamp();
         borrowOffer.expiry = vm.getBlockTimestamp();
         borrowOffer.tick = MAX_TICK;
-        borrowOffer.maxContinuousFee = type(uint256).max;
+        borrowOffer.continuousFeeCap = type(uint256).max;
     }
 
     function testTwoLendersDifferentRates(
@@ -549,9 +549,9 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.continuousFee(id), feeRate, "market continuousFee");
     }
 
-    function testTakeRevertsWhenBuyOfferMaxContinuousFeeExceeded(uint256 feeRate, uint256 maxContinuousFee) public {
+    function testTakeRevertsWhenBuyOfferContinuousFeeCapExceeded(uint256 feeRate, uint256 continuousFeeCap) public {
         feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
-        maxContinuousFee = bound(maxContinuousFee, 0, feeRate - 1);
+        continuousFeeCap = bound(continuousFeeCap, 0, feeRate - 1);
         _setupFeeMarket(feeRate);
 
         uint256 units = 1e18;
@@ -560,15 +560,15 @@ contract ContinuousFeeTest is BaseTest {
 
         Offer memory offer = _makeBuyOffer(keccak256("buy-max-fee"));
         offer.maxUnits = units;
-        offer.maxContinuousFee = maxContinuousFee;
+        offer.continuousFeeCap = continuousFeeCap;
 
         vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         take(units, borrower, offer); // borrower is the seller, otherLender (maker) is the buyer.
     }
 
-    function testTakeSucceedsWhenBuyOfferMaxContinuousFeeRespected(uint256 feeRate, uint256 maxContinuousFee) public {
+    function testTakeSucceedsWhenBuyOfferContinuousFeeCapRespected(uint256 feeRate, uint256 continuousFeeCap) public {
         feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
-        maxContinuousFee = bound(maxContinuousFee, feeRate, type(uint256).max);
+        continuousFeeCap = bound(continuousFeeCap, feeRate, type(uint256).max);
         _setupFeeMarket(feeRate);
 
         uint256 units = 1e18;
@@ -577,15 +577,15 @@ contract ContinuousFeeTest is BaseTest {
 
         Offer memory offer = _makeBuyOffer(keccak256("buy-ok-fee"));
         offer.maxUnits = units;
-        offer.maxContinuousFee = maxContinuousFee;
+        offer.continuousFeeCap = continuousFeeCap;
 
         take(units, borrower, offer);
         assertEq(midnight.debtOf(id, borrower), units, "borrower took on debt");
     }
 
-    function testTakeRevertsWhenSellOfferMaxContinuousFeeExceeded(uint256 feeRate, uint256 maxContinuousFee) public {
+    function testTakeRevertsWhenSellOfferContinuousFeeCapExceeded(uint256 feeRate, uint256 continuousFeeCap) public {
         feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
-        maxContinuousFee = bound(maxContinuousFee, 0, feeRate - 1);
+        continuousFeeCap = bound(continuousFeeCap, 0, feeRate - 1);
         _setupFeeMarket(feeRate);
 
         uint256 units = 1e18;
@@ -593,15 +593,15 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), lender, units);
 
         Offer memory offer = _makeBorrowOffer(units);
-        offer.maxContinuousFee = maxContinuousFee;
+        offer.continuousFeeCap = continuousFeeCap;
 
         vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
     }
 
-    function testTakeSucceedsWhenSellOfferMaxContinuousFeeRespected(uint256 feeRate, uint256 maxContinuousFee) public {
+    function testTakeSucceedsWhenSellOfferContinuousFeeCapRespected(uint256 feeRate, uint256 continuousFeeCap) public {
         feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
-        maxContinuousFee = bound(maxContinuousFee, feeRate, type(uint256).max);
+        continuousFeeCap = bound(continuousFeeCap, feeRate, type(uint256).max);
         _setupFeeMarket(feeRate);
 
         uint256 units = 1e18;
@@ -609,7 +609,7 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), lender, units);
 
         Offer memory offer = _makeBorrowOffer(units);
-        offer.maxContinuousFee = maxContinuousFee;
+        offer.continuousFeeCap = continuousFeeCap;
 
         take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
         assertEq(midnight.creditOf(id, lender), units, "lender gained credit");
