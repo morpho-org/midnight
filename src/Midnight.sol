@@ -55,7 +55,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
 /// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee.
-/// This ensures buy offer makers can protect against future continuous fee updates.
+/// This ensures buy offer makers can protect against future continuous fee increases.
 ///
 /// LIQUIDATIONS
 /// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation
