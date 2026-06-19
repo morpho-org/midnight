@@ -90,6 +90,7 @@ function netCredit(env e, Midnight.Market market, address user) returns mathint 
 
 /// Once a position has been accrued at or after maturity, its pending fee is fully realized and stays
 /// at zero: the continuous fee only accrues up to maturity, so there is nothing left to accrue.
+/// This implies that the net credit is equal to the credit once a position has been accrued at or after maturity.
 invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, address user)
     toId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
 
