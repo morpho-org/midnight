@@ -190,8 +190,6 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
     assert creditAfter == creditBefore;
 }
 
-/// Liquidating does not change any user's net credit as long as no bad debt is realized,
-/// i.e. the market loss factor is unchanged by the liquidation.
 /// Liquidation cannot increase net credit.
 rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = toId(market);
