@@ -27,6 +27,16 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
+/// HELPERS ///
+
+definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
+
+definition MAX_TTM() returns mathint = 100 * 365 * 86400;
+
+definition WAD() returns uint256 = 10 ^ 18;
+
+definition zeroFloorSub(uint256 a, uint256 b) returns mathint = a >= b ? a - b : 0;
+
 /// SUMMARY FUNCTIONS ///
 
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
@@ -51,8 +61,6 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivResidualBound in MulDiv.spec */
     axiom forall uint256 a. forall uint256 b. forall uint256 d. a <= d && b <= d => a - ghostMulDivUp(a, b, d) <= d - b;
 }
-
-definition WAD() returns uint256 = 10 ^ 18;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -153,16 +161,14 @@ rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifier
 
 /// Taking does not decrease the net credit of a buyer in a take, and does not increase the net credit of a seller in a take.
 rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
-    mathint timeToMaturity = offer.market.maturity > e.block.timestamp ? offer.market.maturity - e.block.timestamp : 0;
-
     mathint creditBefore = netCredit(e, offer.market, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    // This follows from continuousFeeBounded in Midnight.sol under the asssumption
-    // that maturity is not more than 100 years in the future.
     // We require it after `take`, because `take` may initialize the market first.
-    require continuousFee(toId(offer.market)) * timeToMaturity <= WAD(), "continuousFee * timeToMaturity bounded by WAD";
+    require continuousFee(toId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    require offer.market.maturity <= e.block.timestamp + MAX_TTM(), "Maturity not too far in the future";
+    assert continuousFee(toId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
     mathint creditAfter = netCredit(e, offer.market, user);
 
