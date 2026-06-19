@@ -198,6 +198,7 @@ rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uin
     require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => a <= d => b2 <= b1 => ghostMulDivUp(a, b1, d) - ghostMulDivUp(a, b2, d) <= b1 - b2;
     require forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => b <= d => ghostMulDivUp(a, b, d) <= a;
 
+    require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => b1 <= b2 => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
     require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 => a1 <= a2 => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
     require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 => b <= d => a1 <= a2 => ghostMulDivDown(a2, b, d) - ghostMulDivDown(a1, b, d) <= a2 - a1;
 
