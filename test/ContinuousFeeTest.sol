@@ -596,7 +596,7 @@ contract ContinuousFeeTest is BaseTest {
         offer.maxUnits = units;
         offer.continuousFeeCap = continuousFeeCap;
 
-        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveCap.selector);
         take(units, borrower, offer); // borrower is the seller, otherLender (maker) is the buyer.
     }
 
@@ -629,7 +629,7 @@ contract ContinuousFeeTest is BaseTest {
         Offer memory offer = _makeBorrowOffer(units);
         offer.continuousFeeCap = continuousFeeCap;
 
-        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveCap.selector);
         take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
     }
 
