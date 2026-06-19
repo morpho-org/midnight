@@ -72,7 +72,7 @@ interface IMidnight {
     error CollateralParamsNotSorted();
     error ConsumedAssets();
     error ConsumedUnits();
-    error ContinuousFeeAboveMax();
+    error ContinuousFeeAboveCap();
     error ContinuousFeeTooHigh();
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();

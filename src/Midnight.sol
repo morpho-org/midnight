@@ -357,7 +357,7 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
         require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
-        require(_marketState.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveMax());
+        require(_marketState.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveCap());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
