@@ -439,6 +439,40 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after claim");
     }
 
+    function testClaimContinuousFeeDecrementsWithdrawable(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed)
+        public
+    {
+        credit = bound(credit, 1, MAX_CREDIT);
+        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
+        ttm = bound(ttm, 2, 360 days);
+        elapsed = bound(elapsed, 1, ttm - 1);
+
+        setupLender(credit, feeRate, ttm);
+
+        vm.warp(vm.getBlockTimestamp() + elapsed);
+        midnight.updatePosition(market, lender);
+
+        uint256 feeAmount = midnight.continuousFeeCredit(id);
+        vm.assume(feeAmount > 1);
+        uint256 claimAmount = feeAmount / 2; // two claims stay within the accrued fee.
+
+        // Repay so withdrawable covers the claims.
+        deal(address(loanToken), borrower, credit);
+        vm.prank(borrower);
+        midnight.repay(market, credit, borrower, address(0), hex"");
+
+        address receiver = makeAddr("receiver");
+        uint256 withdrawableBefore = midnight.withdrawable(id);
+
+        vm.prank(feeClaimer);
+        midnight.claimContinuousFee(market, claimAmount, receiver);
+        assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after first claim");
+
+        vm.prank(feeClaimer);
+        midnight.claimContinuousFee(market, claimAmount, receiver);
+        assertEq(midnight.withdrawable(id), withdrawableBefore - 2 * claimAmount, "withdrawable after second claim");
+    }
+
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
