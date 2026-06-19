@@ -193,7 +193,7 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
 /// Liquidation cannot increase net credit.
 rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = toId(market);
-    uint128 lossFactorBefore = lossFactor(id);
+    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "see rule lastLossFactorLeqMarketLossFactor in Midnight.spec";
 
     mathint creditBefore = netCredit(e, market, user);
 
