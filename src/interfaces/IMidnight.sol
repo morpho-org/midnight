@@ -73,14 +73,9 @@ interface IMidnight {
     error ConsumedAssets();
     error ConsumedUnits();
     error ContinuousFeeAboveMax();
-    error ContinuousFeeTooHigh();
+    error ContinuousFeeAboveOfferCap();
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
-    error WrongBuyCallbackReturnValue();
-    error WrongSellCallbackReturnValue();
-    error WrongRepayCallbackReturnValue();
-    error WrongLiquidateCallbackReturnValue();
-    error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
     error InvalidMaxLif();
     error InvalidOfferCaps();
@@ -88,32 +83,37 @@ interface IMidnight {
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
+    error MarketLossFactorMaxedOut();
+    error MarketNotCreated();
     error MaturityTooFar();
     error NoCollateralParams();
     error NotBorrower();
     error NotLiquidatable();
-    error MarketLossFactorMaxedOut();
-    error MarketNotCreated();
     error OfferExpired();
     error OfferNotStarted();
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
     error OnlyRoleSetter();
     error OnlyTickSpacingSetter();
-    error RatifierFail();
+    error RatifierFailed();
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
     error SelfTake();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
+    error SettlementFeeAboveMax();
     error TakerUnauthorized();
     error TickNotAccessible();
     error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
-    error SettlementFeeTooHigh();
     error Unauthorized();
     error UnhealthyBorrower();
     error UnusedReceiverMustBeZero();
+    error WrongBuyCallbackReturnValue();
+    error WrongFlashLoanCallbackReturnValue();
+    error WrongLiquidateCallbackReturnValue();
+    error WrongRepayCallbackReturnValue();
+    error WrongSellCallbackReturnValue();
 
     // forgefmt: disable-start
     /// IMMUTABLES ///
