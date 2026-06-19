@@ -871,8 +871,24 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
+    function creditOf(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].credit;
+    }
+
+    function pendingFee(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].pendingFee;
+    }
+
     function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].lastLossFactor;
+    }
+
+    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lastAccrual;
+    }
+
+    function debtOf(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].debt;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
@@ -895,14 +911,6 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Market));
     }
 
-    function creditOf(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].credit;
-    }
-
-    function debtOf(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].debt;
-    }
-
     function totalUnits(bytes32 id) external view returns (uint128) {
         return marketState[id].totalUnits;
     }
@@ -911,12 +919,12 @@ contract Midnight is IMidnight {
         return marketState[id].lossFactor;
     }
 
-    function tickSpacing(bytes32 id) external view returns (uint8) {
-        return marketState[id].tickSpacing;
-    }
-
     function withdrawable(bytes32 id) external view returns (uint128) {
         return marketState[id].withdrawable;
+    }
+
+    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
+        return marketState[id].continuousFeeCredit;
     }
 
     /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
@@ -937,16 +945,8 @@ contract Midnight is IMidnight {
         return marketState[id].continuousFee;
     }
 
-    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
-        return marketState[id].continuousFeeCredit;
-    }
-
-    function pendingFee(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].pendingFee;
-    }
-
-    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lastAccrual;
+    function tickSpacing(bytes32 id) external view returns (uint8) {
+        return marketState[id].tickSpacing;
     }
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
