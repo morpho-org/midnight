@@ -194,6 +194,13 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
 rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     mathint creditBefore = netCredit(e, market, user);
 
+    require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => b1 <= b2 => ghostMulDivUp(a, b1, d) <= ghostMulDivUp(a, b2, d);
+    require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => a <= d => b2 <= b1 => ghostMulDivUp(a, b1, d) - ghostMulDivUp(a, b2, d) <= b1 - b2;
+    require forall uint256 a. forall uint256 b. forall uint256 d. d > 0 => b <= d => ghostMulDivUp(a, b, d) <= a;
+
+    require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 => a1 <= a2 => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
+    require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. d > 0 => b <= d => a1 <= a2 => ghostMulDivDown(a2, b, d) - ghostMulDivDown(a1, b, d) <= a2 - a1;
+
     liquidate(e, liquidateMarket, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     mathint creditAfter = netCredit(e, market, user);
