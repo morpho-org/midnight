@@ -172,7 +172,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     assert user == seller => creditAfter <= creditBefore;
 }
 
-/// Liquidating does not change any user's net credit as long as no bad debt is realized,
+/// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market,
 /// i.e. the market loss factor is unchanged by the liquidation.
 rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = toId(market);
@@ -182,7 +182,7 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
 
     liquidate(e, liquidateMarket, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    // Restrict to executions in which no bad debt was realized.
+    // Restrict to executions in which no bad debt was realized or that are on other markets. 
     require lossFactor(id) == lossFactorBefore || toId(liquidateMarket) != toId(market), "no bad debt realized or on different market";
 
     mathint creditAfter = netCredit(e, market, user);
