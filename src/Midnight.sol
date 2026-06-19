@@ -91,7 +91,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
 /// loan token.
 ///
-/// OFFER CAPS
+/// OFFER SIZE
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
