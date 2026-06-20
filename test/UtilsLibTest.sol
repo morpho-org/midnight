@@ -198,11 +198,11 @@ contract UtilsLibTest is Test {
     // This test makes sure that the computation of maxRepaid (for RCF) is not too imprecise.
     function testRcfBound() public pure {
         uint256[8] memory lltvs = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7];
-        uint256[2] memory cursors = [LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH];
+        uint256[2] memory liquidationCursors = [LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH];
         for (uint256 i = 0; i < lltvs.length; i++) {
             uint256 lltv = lltvs[i];
-            for (uint256 j = 0; j < cursors.length; j++) {
-                uint256 lif = maxLif(lltv, cursors[j]);
+            for (uint256 j = 0; j < liquidationCursors.length; j++) {
+                uint256 lif = maxLif(lltv, liquidationCursors[j]);
                 assertLt(lif * lltv, WAD * WAD);
                 assertLt(WAD * WAD / (WAD * WAD - lif * lltv), 100);
             }

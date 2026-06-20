@@ -28,6 +28,8 @@ methods {
 
 definition CBP() returns uint256 = 10 ^ 12;
 
+definition WAD() returns uint256 = 10 ^ 18;
+
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
 definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].settlementFeeCbp0 : index == 1 ? currentContract.marketState[id].settlementFeeCbp1 : index == 2 ? currentContract.marketState[id].settlementFeeCbp2 : index == 3 ? currentContract.marketState[id].settlementFeeCbp3 : index == 4 ? currentContract.marketState[id].settlementFeeCbp4 : index == 5 ? currentContract.marketState[id].settlementFeeCbp5 : currentContract.marketState[id].settlementFeeCbp6;
@@ -121,6 +123,42 @@ rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args)
 
     assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
+
+/// LIQUIDATION CURSORS: LIVENESS ///
+
+rule roleSetterCanAddLiquidationCursor(env e, uint256 liquidationCursor) {
+    address roleSetterBefore = roleSetter();
+
+    addLiquidationCursor@withrevert(e, liquidationCursor);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0 && liquidationCursor <= WAD();
+    assert !reverted => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// LIQUIDATION CURSORS: ACCESS CONTROL ///
+
+/// Only the role setter can enable a liquidationCursor, and only through addLiquidationCursor.
+rule onlyRoleSetterCanAddLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+    address roleSetterBefore = roleSetter();
+
+    f(e, args);
+
+    assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == roleSetterBefore && f.selector == sig:addLiquidationCursor(uint256).selector;
+}
+
+/// LiquidationCursors can only be enabled, never disabled.
+rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+
+    f(e, args);
+
+    assert enabledBefore => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// Every enabled liquidationCursor is at most WAD.
+invariant liquidationCursorsBoundedByOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
 
 /// FEE SETTER: LIVENESS ///
 

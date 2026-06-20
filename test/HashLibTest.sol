@@ -10,7 +10,8 @@ import {
 } from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 
-bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
+bytes constant COLLATERAL_PARAMS_TYPE =
+    "CollateralParams(address token,uint256 lltv,uint256 liquidationCursor,address oracle)";
 bytes constant MARKET_TYPE =
     "Market(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 bytes constant OFFER_TYPE =

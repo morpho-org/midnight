@@ -206,6 +206,7 @@ contract Midnight is IMidnight {
     address public feeSetter;
     address public feeClaimer;
     address public tickSpacingSetter;
+    mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
 
     /// CONSTRUCTOR ///
 
@@ -252,6 +253,15 @@ contract Midnight is IMidnight {
         require(msg.sender == roleSetter, OnlyRoleSetter());
         tickSpacingSetter = newTickSpacingSetter;
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
+    }
+
+    /// @dev Enables a liquidationCursor for use at market creation. LiquidationCursors can only be enabled, never
+    /// disabled. touchMarket checks the resulting maxLif for each market.
+    function addLiquidationCursor(uint256 liquidationCursor) external {
+        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(liquidationCursor <= WAD, InvalidLiquidationCursor());
+        isLiquidationCursorEnabled[liquidationCursor] = true;
+        emit EventsLib.AddLiquidationCursor(liquidationCursor);
     }
 
     /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
@@ -627,7 +637,8 @@ contract Midnight is IMidnight {
             uint256 _collateral = _position.collateral[i];
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, maxLif(_collateralParam.lltv, _collateralParam.liquidationCursor))
             );
             _collateralBitmap = _collateralBitmap.clearBit(i);
         }
@@ -656,7 +667,10 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
+            uint256 _maxLif = maxLif(
+                market.collateralParams[collateralIndex].lltv,
+                market.collateralParams[collateralIndex].liquidationCursor
+            );
             uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
@@ -778,12 +792,10 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
+                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
                 require(isLltvAllowed(lltv), LltvNotAllowed());
-                require(
-                    market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
-                        || market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
-                    InvalidMaxLif()
-                );
+                require(isLiquidationCursorEnabled[liquidationCursor], InvalidLiquidationCursor());
+                require(isMaxLifAllowed(lltv, liquidationCursor), InvalidMaxLif());
                 previousCollateralToken = collateralToken;
             }
 

@@ -50,7 +50,7 @@ contract GateTest is BaseTest {
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
-                    maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
+                    liquidationCursor: LIQUIDATION_CURSOR_LOW
                 })
             );
         market.collateralParams = sortCollateralParams(market.collateralParams);
@@ -63,7 +63,7 @@ contract GateTest is BaseTest {
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
-                    maxLif: maxLif(0.77e18, LIQUIDATION_CURSOR_LOW)
+                    liquidationCursor: LIQUIDATION_CURSOR_LOW
                 })
             );
         gatedMarket.collateralParams = sortCollateralParams(gatedMarket.collateralParams);

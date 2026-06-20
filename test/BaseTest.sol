@@ -25,6 +25,7 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
     LLTV_0,
     LLTV_1,
     LLTV_2,
@@ -73,6 +74,10 @@ abstract contract BaseTest is Test {
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
+
+        // Enable the default liquidationCursors at deployment time.
+        midnight.addLiquidationCursor(LIQUIDATION_CURSOR_LOW);
+        midnight.addLiquidationCursor(LIQUIDATION_CURSOR_HIGH);
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -291,7 +296,7 @@ abstract contract BaseTest is Test {
                 address(uint160(uint256(keccak256(abi.encode(market.collateralParams[i].token, i)))));
             uint256 lltv = allowedLltv(market.collateralParams[i].lltv);
             collateralParams[i].lltv = lltv;
-            collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR_LOW;
         }
         collateralParams = sortCollateralParams(collateralParams);
         market.collateralParams = collateralParams;
@@ -341,8 +346,12 @@ abstract contract BaseTest is Test {
         return a > b ? a - b : b - a;
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
-        return _maxLif(lltv, cursor);
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal pure returns (uint256) {
+        return _maxLif(lltv, liquidationCursor);
+    }
+
+    function maxLif(CollateralParams memory params) internal pure returns (uint256) {
+        return _maxLif(params.lltv, params.liquidationCursor);
     }
 
     function maxSettlementFee(uint256 index) internal pure returns (uint256) {

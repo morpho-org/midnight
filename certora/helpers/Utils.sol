@@ -51,8 +51,8 @@ contract Utils {
         return _maxSettlementFee(index);
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {
-        return _maxLif(lltv, cursor);
+    function maxLif(uint256 lltv, uint256 liquidationCursor) external pure returns (uint256) {
+        return _maxLif(lltv, liquidationCursor);
     }
 
     function liquidationCursorLow() external pure returns (uint256) {

@@ -28,7 +28,7 @@ function buildTypes(height: number) {
     CollateralParams: [
       { name: "token", type: "address" },
       { name: "lltv", type: "uint256" },
-      { name: "maxLif", type: "uint256" },
+      { name: "liquidationCursor", type: "uint256" },
       { name: "oracle", type: "address" },
     ],
     Market: [
@@ -63,7 +63,7 @@ function defaultOffer(number: string) {
   return {
     market: {
       loanToken: "0x" + number.repeat(40),
-      collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: ZERO_ADDR}],
+      collateralParams: [{token: ZERO_ADDR, lltv: "0", liquidationCursor: "0", oracle: ZERO_ADDR}],
       maturity: "0",
       rcfThreshold: "0",
       enterGate: ZERO_ADDR,

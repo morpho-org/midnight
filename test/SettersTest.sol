@@ -3,6 +3,10 @@
 pragma solidity ^0.8.0;
 
 import {
+    LIQUIDATION_CURSOR_LOW,
+    LIQUIDATION_CURSOR_HIGH,
+    LLTV_0,
+    WAD,
     MAX_CONTINUOUS_FEE,
     MAX_SETTLEMENT_FEE_0_DAYS,
     MAX_SETTLEMENT_FEE_1_DAY,
@@ -97,7 +101,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: loanToken,
@@ -215,6 +219,121 @@ contract SettersTest is BaseTest {
         midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
+    // LiquidationCursor tests
+
+    function testInitialLiquidationCursors(uint256 liquidationCursor) public view {
+        // BaseTest enables LOW and HIGH at deployment time; nothing else is enabled.
+        vm.assume(liquidationCursor != LIQUIDATION_CURSOR_LOW && liquidationCursor != LIQUIDATION_CURSOR_HIGH);
+        assertTrue(midnight.isLiquidationCursorEnabled(LIQUIDATION_CURSOR_LOW), "low liquidationCursor enabled");
+        assertTrue(midnight.isLiquidationCursorEnabled(LIQUIDATION_CURSOR_HIGH), "high liquidationCursor enabled");
+        assertFalse(midnight.isLiquidationCursorEnabled(liquidationCursor), "other liquidationCursor not enabled");
+    }
+
+    function testAddLiquidationCursorSuccess(uint256 liquidationCursor) public {
+        liquidationCursor = bound(liquidationCursor, 0, WAD);
+
+        vm.expectEmit();
+        emit EventsLib.AddLiquidationCursor(liquidationCursor);
+        midnight.addLiquidationCursor(liquidationCursor);
+
+        assertTrue(midnight.isLiquidationCursorEnabled(liquidationCursor), "liquidationCursor enabled");
+    }
+
+    function testAddLiquidationCursorOnlyRoleSetter(address rdm, uint256 liquidationCursor) public {
+        vm.assume(rdm != address(this));
+        liquidationCursor = bound(liquidationCursor, 0, WAD);
+        vm.prank(rdm);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        midnight.addLiquidationCursor(liquidationCursor);
+    }
+
+    function testAddLiquidationCursorAboveHighSuccess(uint256 liquidationCursor) public {
+        liquidationCursor = bound(liquidationCursor, LIQUIDATION_CURSOR_HIGH + 1, WAD);
+        midnight.addLiquidationCursor(liquidationCursor);
+        assertTrue(midnight.isLiquidationCursorEnabled(liquidationCursor), "liquidationCursor enabled");
+    }
+
+    function testAddLiquidationCursorAboveOneReverts(uint256 liquidationCursor) public {
+        liquidationCursor = bound(liquidationCursor, WAD + 1, type(uint256).max);
+        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        midnight.addLiquidationCursor(liquidationCursor);
+    }
+
+    function testAddLiquidationCursorEnablesMarketCreation() public {
+        // A liquidationCursor that is not enabled is rejected, then becomes valid once added.
+        uint256 liquidationCursor = 0.375e18;
+        uint256 lltv = 0.77e18;
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1), lltv: lltv, liquidationCursor: liquidationCursor, oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        midnight.touchMarket(market);
+
+        midnight.addLiquidationCursor(liquidationCursor);
+
+        midnight.touchMarket(market);
+        assertEq(midnight.tickSpacing(toId(market)) > 0, true, "market created with added liquidationCursor");
+    }
+
+    function testTouchMarketAllowsCursorAboveHighWhenMaxLifAtMostTwoWad() public {
+        uint256 liquidationCursor = 0.75e18;
+        midnight.addLiquidationCursor(liquidationCursor);
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: LLTV_0,
+            liquidationCursor: liquidationCursor,
+            oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        midnight.touchMarket(market);
+        assertEq(midnight.tickSpacing(toId(market)) > 0, true, "market created with cursor above high");
+    }
+
+    function testTouchMarketRejectsMaxLifAboveTwoWad() public {
+        uint256 liquidationCursor = 0.814e18;
+        midnight.addLiquidationCursor(liquidationCursor);
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: LLTV_0,
+            liquidationCursor: liquidationCursor,
+            oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        vm.expectRevert(IMidnight.InvalidMaxLif.selector);
+        midnight.touchMarket(market);
+    }
+
     // Default settlement fee tests
 
     function testSettlementFeeRevertsWhenNotCreated() public {
@@ -271,7 +390,7 @@ contract SettersTest is BaseTest {
         // touch market with this loan token
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: loanToken,
@@ -328,7 +447,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: address(0),
@@ -382,7 +501,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: address(loanToken),
@@ -409,7 +528,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: address(loanToken),
@@ -442,7 +561,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: address(loanToken),

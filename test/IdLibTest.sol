@@ -25,7 +25,7 @@ contract IdLibTest is Test {
                 if (market1.collateralParams[i].lltv != market2.collateralParams[i].lltv) {
                     sameCollaterals = false;
                 }
-                if (market1.collateralParams[i].maxLif != market2.collateralParams[i].maxLif) {
+                if (market1.collateralParams[i].liquidationCursor != market2.collateralParams[i].liquidationCursor) {
                     sameCollaterals = false;
                 }
                 if (market1.collateralParams[i].oracle != market2.collateralParams[i].oracle) {

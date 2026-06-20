@@ -46,8 +46,13 @@ function maxSettlementFee(uint256 index) pure returns (uint256) {
     return [MAX_SETTLEMENT_FEE_0_DAYS, MAX_SETTLEMENT_FEE_1_DAY, MAX_SETTLEMENT_FEE_7_DAYS, MAX_SETTLEMENT_FEE_30_DAYS, MAX_SETTLEMENT_FEE_90_DAYS, MAX_SETTLEMENT_FEE_180_DAYS, MAX_SETTLEMENT_FEE_360_DAYS][index];
 }
 
-/// @dev Returns the max LIF for the given lltv and cursor.
-function maxLif(uint256 lltv, uint256 cursor) pure returns (uint256) {
-    return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+/// @dev Returns the max LIF for the given lltv and liquidationCursor.
+function maxLif(uint256 lltv, uint256 liquidationCursor) pure returns (uint256) {
+    return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(liquidationCursor, WAD - lltv, WAD));
+}
+
+/// @dev Returns true if the max LIF for the given lltv and liquidationCursor is at most 2 WAD.
+function isMaxLifAllowed(uint256 lltv, uint256 liquidationCursor) pure returns (bool) {
+    return lltv <= WAD && (lltv == WAD || liquidationCursor <= ((WAD / 2 + 1) * WAD - 1) / (WAD - lltv));
 }
 // forgefmt: disable-end

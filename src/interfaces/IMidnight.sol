@@ -14,7 +14,7 @@ struct Market {
 struct CollateralParams {
     address token;
     uint256 lltv;
-    uint256 maxLif;
+    uint256 liquidationCursor;
     address oracle;
 }
 
@@ -77,6 +77,7 @@ interface IMidnight {
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
     error InvalidFeeIndex();
+    error InvalidLiquidationCursor();
     error InvalidMaxLif();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
@@ -131,6 +132,7 @@ interface IMidnight {
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
     function tickSpacingSetter() external view returns (address);
+    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
 
     /// MULTICALL ///
     function multicall(bytes[] memory calls) external;
@@ -140,6 +142,7 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
+    function addLiquidationCursor(uint256 liquidationCursor) external;
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external;
     function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external;
     function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external;

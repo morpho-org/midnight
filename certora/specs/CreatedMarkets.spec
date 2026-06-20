@@ -7,9 +7,6 @@ methods {
 
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
-    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
-    function Utils.liquidationCursorLow() external returns (uint256) envfree;
-    function Utils.liquidationCursorHigh() external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -50,7 +47,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 
 definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 
-definition isMaxLifAllowed(uint256 lltv, uint256 maxLif) returns bool = maxLif == Utils.maxLif(lltv, Utils.liquidationCursorLow()) || maxLif == Utils.maxLif(lltv, Utils.liquidationCursorHigh());
+definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = lltv <= WAD() && (lltv == WAD() || to_mathint(liquidationCursor) * (to_mathint(WAD()) - to_mathint(lltv)) <= (to_mathint(WAD()) / 2 + 1) * to_mathint(WAD()) - 1);
 
 /// RULES ///
 
@@ -74,9 +71,14 @@ strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market mark
 strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => isLltvAllowed(market.collateralParams[i].lltv);
 
-// Show that a created market has maxLif allowed.
-strong invariant createdMarketsHaveAllowedMaxLif(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => isMaxLifAllowed(market.collateralParams[i].lltv, market.collateralParams[i].maxLif);
+// Show that a created market only has enabled liquidationCursors. Since liquidationCursors are an add-only set, a liquidationCursor enabled
+// at creation time stays enabled.
+strong invariant createdMarketsHaveEnabledLiquidationCursor(Midnight.Market market, uint256 i)
+    marketIsCreated(market) => i < market.collateralParams.length => currentContract.isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor];
+
+// Show that a created market has maxLif <= 2 WAD for every collateral.
+strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
+    marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor);
 
 // Show that a created market cannot be deleted.
 rule marketCannotBeDeleted(env e, method f, calldataarg args, Midnight.Market market) {

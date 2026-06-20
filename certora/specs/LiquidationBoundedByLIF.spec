@@ -9,6 +9,7 @@ methods {
 
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
@@ -76,7 +77,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 /// Liquidation profit is bounded by maxLif (repaidUnits input).
 /// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
 rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    mathint maxLif = market.collateralParams[collateralIndex].maxLif;
+    mathint maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchMarket validation and ExactMath.spec)";
 
@@ -91,7 +92,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uin
 
 /// Liquidation profit is bounded by maxLif (seizedAssets input)
 rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    mathint maxLif = market.collateralParams[collateralIndex].maxLif;
+    mathint maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require data.length == 0, "no callback for prover performance";
     require maxLif >= WAD(), "maxLif must be at least 1x for profit boundedness (see touchMarket validation and ExactMath.spec)";
 

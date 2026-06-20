@@ -29,7 +29,7 @@ contract ContinuousFeeTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    liquidationCursor: 0.25e18,
                     oracle: address(oracle1)
                 })
             );
