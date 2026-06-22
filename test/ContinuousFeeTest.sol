@@ -298,7 +298,7 @@ contract ContinuousFeeTest is BaseTest {
             0,
             vm.getBlockTimestamp(),
             false,
-            exitAmount,
+            type(uint256).max,
             0,
             true,
             keccak256("lender-exit"),
