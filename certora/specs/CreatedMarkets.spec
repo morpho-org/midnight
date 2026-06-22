@@ -35,26 +35,6 @@ methods {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition LLTV_0() returns uint256 = 385000000000000000;
-
-definition LLTV_1() returns uint256 = 625000000000000000;
-
-definition LLTV_2() returns uint256 = 770000000000000000;
-
-definition LLTV_3() returns uint256 = 860000000000000000;
-
-definition LLTV_4() returns uint256 = 915000000000000000;
-
-definition LLTV_5() returns uint256 = 945000000000000000;
-
-definition LLTV_6() returns uint256 = 965000000000000000;
-
-definition LLTV_7() returns uint256 = 980000000000000000;
-
-definition LLTV_8() returns uint256 = WAD();
-
-definition MAX_LIQUIDATION_CURSOR_FOR_LLTV_0() returns uint256 = 813008130081300814;
-
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
@@ -65,9 +45,10 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-definition isLltvAllowed(uint256 lltv) returns bool = lltv == LLTV_0() || lltv == LLTV_1() || lltv == LLTV_2() || lltv == LLTV_3() || lltv == LLTV_4() || lltv == LLTV_5() || lltv == LLTV_6() || lltv == LLTV_7() || lltv == LLTV_8();
+definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 
-definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = (lltv == LLTV_0() && liquidationCursor <= MAX_LIQUIDATION_CURSOR_FOR_LLTV_0()) || ((lltv == LLTV_1() || lltv == LLTV_2() || lltv == LLTV_3() || lltv == LLTV_4() || lltv == LLTV_5() || lltv == LLTV_6() || lltv == LLTV_7() || lltv == LLTV_8()) && liquidationCursor <= WAD());
+// For allowed LLTV tiers and enabled liquidationCursors, only the lowest LLTV tier can exceed 2 WAD at a cursor below WAD.
+definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = lltv != 385 * WAD() / 1000 || liquidationCursor <= 813008130081300814;
 
 /// RULES ///
 
@@ -105,6 +86,7 @@ strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, ui
     marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor)
     {
         preserved with (env e) {
+            requireInvariant createdMarketsHaveAllowedLltv(market, i);
             requireInvariant createdMarketsHaveEnabledLiquidationCursor(market, i);
             requireInvariant enabledLiquidationCursorsAreBounded(market.collateralParams[i].liquidationCursor);
         }
