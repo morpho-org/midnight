@@ -8,6 +8,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: ">=3.11"
+
+      - name: Install certora
+        run: pip install certora-cli
+
+      - name: Run Certora Specs Linter
+        run: |
+          for file in certora/specs/*.spec; do
+            echo "Fix lint errors by applying the following diff to $file:"
+            diff -u "$file" <(certoraCVLFormatter "$file")
+          done
+
   matrix:
     runs-on: ubuntu-latest
     outputs:
@@ -19,7 +43,7 @@ jobs:
         run: echo "confs=$(ls certora/confs/*.conf | xargs -I{} basename {} .conf | jq -nRc '[inputs]')" >> "$GITHUB_OUTPUT"
 
   verify:
-    needs: matrix
+    needs: [matrix, format]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -46,12 +70,6 @@ jobs:
 
       - name: Install certora
         run: pip install certora-cli
-
-      - name: Run Certora Specs Linter
-        run: |
-          file="certora/specs/${{ matrix.conf }}.spec"
-          echo "Fix lint errors by applying the following diff to $file:"
-          diff -u "$file" <(certoraCVLFormatter "$file")
 
       - name: Install solc (0.8.34)
         env:

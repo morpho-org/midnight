@@ -54,6 +54,7 @@ function buildTypes(height: number) {
       { name: "reduceOnly", type: "bool" },
       { name: "maxUnits", type: "uint256" },
       { name: "maxAssets", type: "uint256" },
+      { name: "continuousFeeCap", type: "uint256" },
     ],
   };
 }
@@ -81,6 +82,7 @@ function defaultOffer(number: string) {
     reduceOnly: false,
     maxUnits: "0",
     maxAssets: "0",
+    continuousFeeCap: "0",
   };
 }
 

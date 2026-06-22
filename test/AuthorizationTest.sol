@@ -7,6 +7,7 @@ import {BaseTest} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
@@ -38,10 +39,16 @@ contract AuthorizationTest is BaseTest {
 
         assertEq(midnight.isAuthorized(user, authorized), false);
 
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, true, user);
+
         vm.prank(user);
         midnight.setIsAuthorized(authorized, true, user);
 
         assertEq(midnight.isAuthorized(user, authorized), true);
+
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, false, user);
 
         vm.prank(user);
         midnight.setIsAuthorized(authorized, false, user);
@@ -242,7 +249,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, taker), units);
+        assertEq(midnight.debt(id, taker), units);
     }
 
     function testRepayAuthorization(address authorized) public {
@@ -268,7 +275,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(authorized);
         midnight.repay(market, units, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), 0);
+        assertEq(midnight.debt(id, borrower), 0);
     }
 
     function testSetConsumedAuthorization(address user, address authorized) public {
@@ -321,6 +328,6 @@ contract AuthorizationTest is BaseTest {
         // Borrower can take for themselves (no authorization needed)
         take(units, borrower, offer);
 
-        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.debt(id, borrower), units);
     }
 }

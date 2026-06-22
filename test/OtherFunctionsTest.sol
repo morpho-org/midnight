@@ -12,6 +12,7 @@ import {
 } from "../src/interfaces/ICallbacks.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -80,9 +81,16 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(market, borrower, units);
         setupMarket(market, units);
         deal(collateralToken, address(this), additionalCollateral);
+
+        vm.expectEmit();
+        emit EventsLib.SupplyCollateral(address(this), id, collateralToken, additionalCollateral, borrower);
+
         midnight.supplyCollateral(market, 0, additionalCollateral, borrower);
         withdraw = bound(withdraw, 0, additionalCollateral);
         uint256 initialCollateral = midnight.collateral(id, borrower, 0);
+
+        vm.expectEmit();
+        emit EventsLib.WithdrawCollateral(borrower, id, collateralToken, withdraw, borrower, borrower);
 
         vm.prank(borrower);
         midnight.withdrawCollateral(market, 0, withdraw, borrower, borrower);
@@ -121,10 +129,13 @@ contract OtherFunctionsTest is BaseTest {
         skip(99);
         deal(address(loanToken), address(borrower), repaid);
 
+        vm.expectEmit();
+        emit EventsLib.Repay(borrower, id, repaid, borrower, borrower);
+
         vm.prank(borrower);
         midnight.repay(market, repaid, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
         assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
@@ -147,7 +158,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(caller);
         midnight.repay(market, repaid, borrower, address(callback), data);
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(callback.recordedId(), id, "id");
         assertEq(toId(callback.recordedMarket()), id, "market");
         assertEq(callback.recordedOnBehalf(), borrower, "onBehalf");
@@ -163,7 +174,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(market, withdraw, lender, lender);
 
-        assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
+        assertEq(midnight.credit(id, lender), units - withdraw, "credit");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
         assertEq(midnight.totalUnits(id), units - withdraw, "totalUnits");
         assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
@@ -183,6 +194,45 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(loanToken.balanceOf(receiver), withdraw, "balance of receiver");
     }
 
+    function testRepayAccumulatesWithdrawable(uint256 units, uint256 repaid) public {
+        units = bound(units, 2, MAX_UNITS);
+        repaid = bound(repaid, 1, units / 2); // two equal repays stay within debt.
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        deal(address(loanToken), borrower, 2 * repaid);
+
+        assertEq(midnight.withdrawable(id), 0, "withdrawable before");
+
+        vm.prank(borrower);
+        midnight.repay(market, repaid, borrower, address(0), hex"");
+        assertEq(midnight.withdrawable(id), repaid, "withdrawable after first repay");
+
+        vm.prank(borrower);
+        midnight.repay(market, repaid, borrower, address(0), hex"");
+        assertEq(midnight.withdrawable(id), 2 * repaid, "withdrawable after second repay");
+    }
+
+    function testWithdrawDecrementsWithdrawable(uint256 units, uint256 withdrawn) public {
+        units = bound(units, 2, MAX_UNITS);
+        withdrawn = bound(withdrawn, 1, units / 2); // two equal withdraws stay within credit.
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+
+        // Fully repay so `units` is withdrawable.
+        deal(address(loanToken), borrower, units);
+        vm.prank(borrower);
+        midnight.repay(market, units, borrower, address(0), hex"");
+        assertEq(midnight.withdrawable(id), units, "withdrawable before");
+
+        vm.prank(lender);
+        midnight.withdraw(market, withdrawn, lender, lender);
+        assertEq(midnight.withdrawable(id), units - withdrawn, "withdrawable after first withdraw");
+
+        vm.prank(lender);
+        midnight.withdraw(market, withdrawn, lender, lender);
+        assertEq(midnight.withdrawable(id), units - 2 * withdrawn, "withdrawable after second withdraw");
+    }
+
     function testWithdrawCollateralToReceiver(uint256 supply, uint256 withdraw) public {
         supply = bound(supply, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, supply);
@@ -198,6 +248,9 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+        vm.expectEmit();
+        emit EventsLib.SetConsumed(user, group, amount, user);
+
         vm.prank(user);
         midnight.setConsumed(group, amount, user);
         assertEq(midnight.consumed(user, group), amount, "consumed");
@@ -237,7 +290,11 @@ contract OtherFunctionsTest is BaseTest {
             midnight.setDefaultSettlementFee(_market.loanToken, i, maxSettlementFee(i));
         }
 
-        bytes32 _id = midnight.touchMarket(_market);
+        bytes32 _id = toId(_market);
+        vm.expectEmit();
+        emit EventsLib.MarketCreated(_market, _id);
+
+        assertEq(midnight.touchMarket(_market), _id, "id");
         assertEq(midnight.tickSpacing(_id) > 0, true, "market created");
         uint16[7] memory fees = midnight.settlementFeeCbps(_id);
         for (uint256 i = 0; i < 7; i++) {

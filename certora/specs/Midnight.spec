@@ -8,8 +8,8 @@ methods {
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
@@ -54,9 +54,9 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
-    require x == 0 => r == 0;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    require x == 0 => r == 0, "see mulDivZero";
+    require d > 0 && y <= d => r <= x, "see mulDivArgumentLesserThanDenominator";
+    require d > 0 && x <= d && y <= d => x - r <= d - y, "see mulDivResidualBound";
     return r;
 }
 
@@ -109,13 +109,13 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
     require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
 
     f(e, args);
 
-    assert creditOf(id, user) <= creditBefore;
-    assert debtOf(id, user) <= debtBefore;
+    assert credit(id, user) <= creditBefore;
+    assert debt(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -135,7 +135,7 @@ strong invariant continuousFeeBounded(bytes32 id)
     }
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user)
+    pendingFee(id, user) <= credit(id, user)
     {
         preserved with (env e) {
             requireInvariant continuousFeeBounded(id);
@@ -150,7 +150,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
-    assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
+    assert credit(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
@@ -158,4 +158,4 @@ strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    creditOf(id, user) == 0 || debtOf(id, user) == 0;
+    credit(id, user) == 0 || debt(id, user) == 0;
