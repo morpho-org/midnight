@@ -80,16 +80,12 @@ strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market mark
 strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => isLltvAllowed(market.collateralParams[i].lltv);
 
-// Show that a created market only has enabled liquidationCursors. Since liquidationCursors are an add-only set, a liquidationCursor enabled
-// at creation time stays enabled.
 strong invariant createdMarketsHaveEnabledLiquidationCursor(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => currentContract.isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor];
 
-// Show that enabled liquidationCursors are at most WAD.
 strong invariant enabledLiquidationCursorsAreBounded(uint256 liquidationCursor)
     currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
 
-// Show that a created market has maxLif <= 2 WAD for every collateral.
 strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor)
     {
