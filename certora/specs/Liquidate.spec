@@ -3,8 +3,8 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
@@ -49,16 +49,16 @@ rule liquidateOnlyAffectsBalancesWhenLiquidatable(env e, Midnight.Market market,
     address user;
     uint256 collateralIndex;
 
-    bool wasLiquidatable = debtOf(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > market.maturity || !isHealthy(market, id, liqUser));
+    bool wasLiquidatable = debt(id, liqUser) > 0 && !liquidationLocked(id, liqUser) && (e.block.timestamp > market.maturity || !isHealthy(market, id, liqUser));
 
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
     uint256 collateralBefore = collateral(id, user, collateralIndex);
 
     liquidate(e, market, liqIndex, seizedAssets, repaidUnits, liqUser, postMaturityMode, receiver, callback, data);
 
-    uint256 creditAfter = creditOf(id, user);
-    uint256 debtAfter = debtOf(id, user);
+    uint256 creditAfter = credit(id, user);
+    uint256 debtAfter = debt(id, user);
     uint256 collateralAfter = collateral(id, user, collateralIndex);
 
     assert id == liqId => wasLiquidatable;
