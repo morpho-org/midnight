@@ -7,8 +7,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
@@ -205,7 +205,7 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Market market, u
     withdrawCollateral@withrevert(e, market, collateralIndex, assets, onBehalf, receiver);
     bool reverted = lastReverted;
 
-    assert debtOf(id, onBehalf) > 0 => reverted;
+    assert debt(id, onBehalf) > 0 => reverted;
 }
 
 /// If an activated collateral oracle reverts on price, isHealthy reverts when the borrower has debt.
@@ -218,7 +218,7 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Market market, bytes32 id
     isHealthy@withrevert(e, market, id, borrower);
     bool reverted = lastReverted;
 
-    assert debtOf(id, borrower) > 0 => reverted;
+    assert debt(id, borrower) > 0 => reverted;
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
@@ -237,7 +237,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, byte
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert debtOf(id, seller) == 0;
+    assert debt(id, seller) == 0;
 }
 
 /// ORACLE RETURNS ZERO ///
@@ -261,7 +261,7 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Market market, address
 
     bool healthy = isHealthy(e, market, id, borrower);
 
-    assert debtOf(id, borrower) > 0 => !healthy;
+    assert debt(id, borrower) > 0 => !healthy;
 }
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
@@ -273,7 +273,7 @@ rule oracleZeroPreventsWithdrawCollateralWhenBorrowerHasDebt(env e, Midnight.Mar
 
     withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
 
-    assert debtOf(id, onBehalf) == 0;
+    assert debt(id, onBehalf) == 0;
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
@@ -286,7 +286,7 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, bytes 
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert debtOf(id, seller) == 0;
+    assert debt(id, seller) == 0;
 }
 
 /// GATE BLOCKING ///
@@ -297,11 +297,11 @@ rule enterGateBlocksCreditIncrease(env e, Midnight.Offer offer, bytes ratifierDa
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
-    uint256 creditBefore = creditOf(id, user);
+    uint256 creditBefore = credit(id, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    uint256 creditAfter = creditOf(id, user);
+    uint256 creditAfter = credit(id, user);
 
     assert creditAfter <= creditBefore;
 }
@@ -312,11 +312,11 @@ rule enterGateBlocksDebtIncrease(env e, Midnight.Offer offer, bytes ratifierData
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 debtBefore = debt(id, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    uint256 debtAfter = debtOf(id, user);
+    uint256 debtAfter = debt(id, user);
 
     assert debtAfter <= debtBefore;
 }

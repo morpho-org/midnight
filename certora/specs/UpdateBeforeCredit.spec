@@ -73,7 +73,7 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 
 /// Check that credit is never loaded before _updatePosition is called.
 /// The SLOADs of _updatePosition are ignored (see summary above).
-rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
+rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:credit(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
     f(e, args);

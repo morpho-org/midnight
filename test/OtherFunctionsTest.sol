@@ -135,7 +135,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         midnight.repay(market, repaid, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
         assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
@@ -158,7 +158,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(caller);
         midnight.repay(market, repaid, borrower, address(callback), data);
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(callback.recordedId(), id, "id");
         assertEq(toId(callback.recordedMarket()), id, "market");
         assertEq(callback.recordedOnBehalf(), borrower, "onBehalf");
@@ -174,7 +174,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(market, withdraw, lender, lender);
 
-        assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
+        assertEq(midnight.credit(id, lender), units - withdraw, "credit");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
         assertEq(midnight.totalUnits(id), units - withdraw, "totalUnits");
         assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
