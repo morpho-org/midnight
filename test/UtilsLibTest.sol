@@ -4,20 +4,8 @@ pragma solidity ^0.8.0;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
-import {
-    WAD,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
-    LLTV_0,
-    LLTV_1,
-    LLTV_2,
-    LLTV_3,
-    LLTV_4,
-    LLTV_5,
-    LLTV_6,
-    LLTV_7,
-    maxLif
-} from "../src/libraries/ConstantsLib.sol";
+import {WAD, LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH, maxLif} from "../src/libraries/ConstantsLib.sol";
+import {LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7} from "./BaseTest.sol";
 
 contract UtilsLibTest is Test {
     int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
