@@ -87,12 +87,9 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 }
 
 /// The loss factor computation in updatePositionView does not revert.
-/// With the current implementation this follows from updatePositionDoesNotRevert (updatePosition calls it),
-/// but proving it directly guards against future implementation changes. It uses the same preconditions.
 rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    // No marketIsCreated require: updatePositionView has no MarketNotCreated check.
     require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
