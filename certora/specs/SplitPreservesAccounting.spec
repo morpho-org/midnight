@@ -78,7 +78,7 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     uint128 totalUnits1 = totalUnits(id);
     uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
     uint128 sellerLossFactor1 = lastLossFactor(id, seller);
-    uint128 continuousFeeCredit1 = currentContract.marketState[id].continuousFeeCredit;
+    uint128 continuousFeeCredit1 = currentContract._marketState[id].continuousFeeCredit;
 
     // lastAccrual is set to block.timestamp by _updatePosition; same env across both paths.
     uint128 buyerLastAccrual1 = lastAccrual(id, buyer);
@@ -98,5 +98,5 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     assert sellerLossFactor1 == lastLossFactor(id, seller);
     assert buyerLastAccrual1 == lastAccrual(id, buyer);
     assert sellerLastAccrual1 == lastAccrual(id, seller);
-    assert continuousFeeCredit1 == currentContract.marketState[id].continuousFeeCredit;
+    assert continuousFeeCredit1 == currentContract._marketState[id].continuousFeeCredit;
 }

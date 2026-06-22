@@ -30,7 +30,7 @@ definition CBP() returns uint256 = 10 ^ 12;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
-definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].settlementFeeCbp0 : index == 1 ? currentContract.marketState[id].settlementFeeCbp1 : index == 2 ? currentContract.marketState[id].settlementFeeCbp2 : index == 3 ? currentContract.marketState[id].settlementFeeCbp3 : index == 4 ? currentContract.marketState[id].settlementFeeCbp4 : index == 5 ? currentContract.marketState[id].settlementFeeCbp5 : currentContract.marketState[id].settlementFeeCbp6;
+definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract._marketState[id].settlementFeeCbp0 : index == 1 ? currentContract._marketState[id].settlementFeeCbp1 : index == 2 ? currentContract._marketState[id].settlementFeeCbp2 : index == 3 ? currentContract._marketState[id].settlementFeeCbp3 : index == 4 ? currentContract._marketState[id].settlementFeeCbp4 : index == 5 ? currentContract._marketState[id].settlementFeeCbp5 : currentContract._marketState[id].settlementFeeCbp6;
 
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
@@ -254,7 +254,7 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     bool marketIsCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
-    uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
+    uint128 continuousFeeCreditBefore = currentContract._marketState[id].continuousFeeCredit;
     mathint midnightBalanceBefore = tokenBalance[market.loanToken][currentContract];
     mathint receiverBalanceBefore = tokenBalance[market.loanToken][receiver];
     mathint userBalanceBefore = tokenBalance[market.loanToken][user];
@@ -264,7 +264,7 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketIsCreated && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
-    assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
+    assert !reverted => currentContract._marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;
     assert !reverted => tokenBalance[market.loanToken][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[market.loanToken][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
     assert !reverted => user != currentContract && user != receiver => tokenBalance[market.loanToken][user] == userBalanceBefore;

@@ -150,7 +150,7 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
 
 /// REPAY ///
 
-/// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
+/// Repay decreases onBehalf's debt by exactly units and only changes _position[id][onBehalf].debt
 rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, market);
 
@@ -168,7 +168,7 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
 /// LIQUIDATE ///
 
 /// Liquidate decreases the borrower's debt by at least repaidUnits,
-/// and only changes position[id][borrower].debt.
+/// and only changes _position[id][borrower].debt.
 rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool postMaturityMode) {
     bytes32 id = toId(e, market);
 
@@ -207,7 +207,7 @@ filtered {
 /// SUPPLY COLLATERAL ///
 
 /// supplyCollateral increases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+/// and only changes _position[id][onBehalf].collateral[collateralIndex].
 rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, market);
 
@@ -223,7 +223,7 @@ rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIn
 /// WITHDRAW COLLATERAL ///
 
 /// withdrawCollateral decreases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+/// and only changes _position[id][onBehalf].collateral[collateralIndex].
 rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = toId(e, market);
 
@@ -239,7 +239,7 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 
 /// LIQUIDATE (COLLATERAL) ///
 
 /// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
-/// and only changes position[id][borrower].collateral[collateralIndex].
+/// and only changes _position[id][borrower].collateral[collateralIndex].
 rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex, bool postMaturityMode) {
     bytes32 id = toId(e, market);
 

@@ -48,7 +48,7 @@ persistent ghost mapping(bytes32 => mathint) sumDebt {
     init_state axiom (forall bytes32 id. sumDebt[id] == 0);
 }
 
-hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
+hook Sstore _position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
@@ -93,9 +93,9 @@ rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 coll
 }
 
 rule marketLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
-    uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
+    uint128 lossFactorBefore = currentContract._marketState[id].lossFactor;
     f(e, args);
-    uint128 lossFactorAfter = currentContract.marketState[id].lossFactor;
+    uint128 lossFactorAfter = currentContract._marketState[id].lossFactor;
     assert lossFactorAfter >= lossFactorBefore;
 }
 
@@ -108,7 +108,7 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 }
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
-    require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    require currentContract._marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
     uint256 creditBefore = credit(id, user);
     uint256 debtBefore = debt(id, user);
 
@@ -127,7 +127,7 @@ strong invariant defaultContinuousFeeBoundedAll()
     forall address token. currentContract.defaultContinuousFee[token] <= MAX_CONTINUOUS_FEE();
 
 strong invariant continuousFeeBounded(bytes32 id)
-    currentContract.marketState[id].continuousFee <= MAX_CONTINUOUS_FEE()
+    currentContract._marketState[id].continuousFee <= MAX_CONTINUOUS_FEE()
     {
         preserved with (env e) {
             requireInvariant defaultContinuousFeeBoundedAll();
@@ -154,7 +154,7 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 }
 
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
-    lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor;
+    lastLossFactor(id, user) <= currentContract._marketState[id].lossFactor;
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)

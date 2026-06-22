@@ -58,8 +58,8 @@ persistent ghost bytes32 globalId;
 /// HOOKS ///
 
 // Follows from lastLossFactorLeqMarketLossFactor in Midnight.spec.
-hook Sload uint128 value position[KEY bytes32 id][KEY address user].lastLossFactor {
-    require value <= currentContract.marketState[id].lossFactor;
+hook Sload uint128 value _position[KEY bytes32 id][KEY address user].lastLossFactor {
+    require value <= currentContract._marketState[id].lossFactor;
 }
 
 /// SUMMARIES ///
@@ -122,7 +122,7 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
 
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
-    require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
+    require summaryGetBit(currentContract._position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     assert true;

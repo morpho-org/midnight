@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams, MarketState, Position} from "../src/interfaces/IMidnight.sol";
 import {
     IBuyCallback,
     ISellCallback,
@@ -70,6 +70,30 @@ contract OtherFunctionsTest is BaseTest {
         midnight.setIsAuthorized(address(this), true, borrower);
 
         id = toId(market);
+    }
+
+    function testPositionGetterReturnsPositionStruct() public {
+        uint256 units = 100e18;
+        uint256 expectedCollateral = units.mulDivUp(WAD, market.collateralParams[0].lltv)
+            .mulDivUp(ORACLE_PRICE_SCALE, Oracle(market.collateralParams[0].oracle).price());
+        collateralize(market, borrower, units);
+
+        Position memory borrowerPosition = midnight.position(id, borrower);
+
+        assertEq(borrowerPosition.credit, 0, "borrower credit");
+        assertEq(borrowerPosition.debt, 0, "borrower debt");
+        assertEq(borrowerPosition.collateral[0], expectedCollateral, "borrower collateral");
+        assertEq(borrowerPosition.collateralBitmap, 1, "borrower collateral bitmap");
+    }
+
+    function testMarketStateGetterReturnsMarketStateStruct() public {
+        midnight.touchMarket(market);
+
+        MarketState memory state = midnight.marketState(id);
+
+        assertEq(state.totalUnits, 0, "total units");
+        assertEq(state.lossFactor, midnight.lossFactor(id), "loss factor");
+        assertEq(state.tickSpacing, midnight.tickSpacing(id), "tick spacing");
     }
 
     function testWithdrawCollateralWithBorrowHealthy(uint256 additionalCollateral, uint256 withdraw, uint256 units)
@@ -700,37 +724,23 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchMarket(_market);
 
-        (
-            uint128 totalUnits,
-            uint128 _lossFactor,
-            uint128 _withdrawable,
-            uint128 _continuousFeeCredit,
-            uint16 settlementFeeCbp0,
-            uint16 settlementFeeCbp1,
-            uint16 settlementFeeCbp2,
-            uint16 settlementFeeCbp3,
-            uint16 settlementFeeCbp4,
-            uint16 settlementFeeCbp5,
-            uint16 settlementFeeCbp6,
-            uint32 _continuousFee,
-            uint8 tickSpacing
-        ) = midnight.marketState(_id);
+        MarketState memory state = midnight.marketState(_id);
 
         uint8 expectedTickSpacing = 4;
 
-        assertEq(totalUnits, 0, "totalUnits");
-        assertEq(_lossFactor, 0, "lossFactor");
-        assertEq(_withdrawable, 0, "withdrawable");
-        assertEq(_continuousFeeCredit, 0, "continuousFeeCredit");
-        assertEq(_continuousFee, _defaultContinuousFee, "continuousFee");
-        assertEq(tickSpacing, expectedTickSpacing, "tickSpacing");
-        assertEq(settlementFeeCbp0, midnight.defaultSettlementFeeCbp(_market.loanToken, 0), "settlementFeeCbp0");
-        assertEq(settlementFeeCbp1, midnight.defaultSettlementFeeCbp(_market.loanToken, 1), "settlementFeeCbp1");
-        assertEq(settlementFeeCbp2, midnight.defaultSettlementFeeCbp(_market.loanToken, 2), "settlementFeeCbp2");
-        assertEq(settlementFeeCbp3, midnight.defaultSettlementFeeCbp(_market.loanToken, 3), "settlementFeeCbp3");
-        assertEq(settlementFeeCbp4, midnight.defaultSettlementFeeCbp(_market.loanToken, 4), "settlementFeeCbp4");
-        assertEq(settlementFeeCbp5, midnight.defaultSettlementFeeCbp(_market.loanToken, 5), "settlementFeeCbp5");
-        assertEq(settlementFeeCbp6, midnight.defaultSettlementFeeCbp(_market.loanToken, 6), "settlementFeeCbp6");
+        assertEq(state.totalUnits, 0, "totalUnits");
+        assertEq(state.lossFactor, 0, "lossFactor");
+        assertEq(state.withdrawable, 0, "withdrawable");
+        assertEq(state.continuousFeeCredit, 0, "continuousFeeCredit");
+        assertEq(state.continuousFee, _defaultContinuousFee, "continuousFee");
+        assertEq(state.tickSpacing, expectedTickSpacing, "tickSpacing");
+        assertEq(state.settlementFeeCbp0, midnight.defaultSettlementFeeCbp(_market.loanToken, 0), "settlementFeeCbp0");
+        assertEq(state.settlementFeeCbp1, midnight.defaultSettlementFeeCbp(_market.loanToken, 1), "settlementFeeCbp1");
+        assertEq(state.settlementFeeCbp2, midnight.defaultSettlementFeeCbp(_market.loanToken, 2), "settlementFeeCbp2");
+        assertEq(state.settlementFeeCbp3, midnight.defaultSettlementFeeCbp(_market.loanToken, 3), "settlementFeeCbp3");
+        assertEq(state.settlementFeeCbp4, midnight.defaultSettlementFeeCbp(_market.loanToken, 4), "settlementFeeCbp4");
+        assertEq(state.settlementFeeCbp5, midnight.defaultSettlementFeeCbp(_market.loanToken, 5), "settlementFeeCbp5");
+        assertEq(state.settlementFeeCbp6, midnight.defaultSettlementFeeCbp(_market.loanToken, 6), "settlementFeeCbp6");
     }
 
     function testMarketStateAfterTake() public {
@@ -740,11 +750,11 @@ contract OtherFunctionsTest is BaseTest {
         collateralize(market, borrower, units);
         setupMarket(market, units);
 
-        (uint128 totalUnits,,,,,,,,,,, uint32 _continuousFee, uint8 tickSpacing) = midnight.marketState(id);
+        MarketState memory state = midnight.marketState(id);
 
-        assertEq(totalUnits, units, "totalUnits after take");
-        assertEq(_continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after take");
-        assertEq(tickSpacing, 4, "tickSpacing after take");
+        assertEq(state.totalUnits, units, "totalUnits after take");
+        assertEq(state.continuousFee, MAX_CONTINUOUS_FEE, "continuousFee after take");
+        assertEq(state.tickSpacing, 4, "tickSpacing after take");
     }
 
     function testMidnightRevertsOnCallbacks(address msgSender, bytes calldata data) public {

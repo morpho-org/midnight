@@ -33,13 +33,13 @@ function noSettlementFeesAreSet(bytes32 id) returns (bool) {
     return fees[0] == 0 && fees[1] == 0 && fees[2] == 0 && fees[3] == 0 && fees[4] == 0 && fees[5] == 0 && fees[6] == 0;
 }
 
-definition userHasEmptyCollateralBitmap(bytes32 id, address user) returns bool = currentContract.position[id][user].collateralBitmap == 0;
+definition userHasEmptyCollateralBitmap(bytes32 id, address user) returns bool = currentContract._position[id][user].collateralBitmap == 0;
 
 definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = pendingFee(id, user) == 0;
 
 definition userHasNoLastAccrual(bytes32 id, address user) returns bool = lastAccrual(id, user) == 0;
 
-definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
+definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract._position[id][user].collateral[collateralIndex] == 0;
 
 /// RULES ///
 
@@ -57,10 +57,10 @@ strong invariant marketContinuousFeeIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => continuousFee(id) == 0;
 
 strong invariant marketContinuousFeeCreditIsEmptyIfNotCreated(bytes32 id)
-    !marketIsCreated(id) => currentContract.marketState[id].continuousFeeCredit == 0;
+    !marketIsCreated(id) => currentContract._marketState[id].continuousFeeCredit == 0;
 
 strong invariant marketLossFactorIsEmptyIfNotCreated(bytes32 id)
-    !marketIsCreated(id) => currentContract.marketState[id].lossFactor == 0;
+    !marketIsCreated(id) => currentContract._marketState[id].lossFactor == 0;
 
 strong invariant marketCreditIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => credit(id, user) == 0;
@@ -81,4 +81,4 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
     !marketIsCreated(id) => userHasNoCollateral(id, user, collateralIndex);
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
-    !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+    !marketIsCreated(id) => currentContract._position[id][user].lastLossFactor == 0;

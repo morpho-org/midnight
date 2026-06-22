@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /* Proves: a position can never carry debt while having no active collateral bit, i.e.:
- *   position[id][user].collateralBitmap == 0  =>  position[id][user].debt == 0
+ *   _position[id][user].collateralBitmap == 0  =>  _position[id][user].debt == 0
  *
  * Combined with `nonZeroCollateralsAreActivated` (proved in CollateralBitmap.spec),
  * this implies the full semantic property: no position can have collateral[i] == 0 for every i while having debt > 0.
@@ -64,7 +64,7 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 /// INVARIANT ///
 
 strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
-    liquidationLocked(id, user) || (currentContract.position[id][user].collateralBitmap == 0 => currentContract.position[id][user].debt == 0)
+    liquidationLocked(id, user) || (currentContract._position[id][user].collateralBitmap == 0 => currentContract._position[id][user].debt == 0)
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) with (env e) {
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).

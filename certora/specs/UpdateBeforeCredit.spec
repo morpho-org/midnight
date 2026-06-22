@@ -42,18 +42,18 @@ function summaryUpdatePosition(bytes32 id, address user) returns (uint128, uint1
 
 /// Summary for hasCredit:  circumvent the load hook for credit checks.
 function summaryHasCredit(bytes32 id, address user) returns (bool) {
-    return currentContract.position[id][user].credit > 0;
+    return currentContract._position[id][user].credit > 0;
 }
 
 /// HOOKS ///
 
-hook Sstore position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
+hook Sstore _position[KEY bytes32 id][KEY address user].credit uint128 newVal (uint128 oldVal) {
     if (!updated[id][user] && newVal != oldVal) {
         creditStoredBeforeUpdate[id][user] = true;
     }
 }
 
-hook Sload uint128 val position[KEY bytes32 id][KEY address user].credit {
+hook Sload uint128 val _position[KEY bytes32 id][KEY address user].credit {
     if (!updated[id][user] && val != 0) {
         creditLoadedBeforeUpdate[id][user] = true;
     }

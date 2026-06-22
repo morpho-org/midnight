@@ -28,7 +28,7 @@ definition CBP() returns uint256 = 10 ^ 12;
 
 definition defaultSettlementFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultSettlementFeeCbp[loanToken][index] * CBP());
 
-definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].settlementFeeCbp0 : index == 1 ? currentContract.marketState[id].settlementFeeCbp1 : index == 2 ? currentContract.marketState[id].settlementFeeCbp2 : index == 3 ? currentContract.marketState[id].settlementFeeCbp3 : index == 4 ? currentContract.marketState[id].settlementFeeCbp4 : index == 5 ? currentContract.marketState[id].settlementFeeCbp5 : currentContract.marketState[id].settlementFeeCbp6;
+definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract._marketState[id].settlementFeeCbp0 : index == 1 ? currentContract._marketState[id].settlementFeeCbp1 : index == 2 ? currentContract._marketState[id].settlementFeeCbp2 : index == 3 ? currentContract._marketState[id].settlementFeeCbp3 : index == 4 ? currentContract._marketState[id].settlementFeeCbp4 : index == 5 ? currentContract._marketState[id].settlementFeeCbp5 : currentContract._marketState[id].settlementFeeCbp6;
 
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 

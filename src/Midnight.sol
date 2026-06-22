@@ -196,8 +196,8 @@ contract Midnight is IMidnight {
 
     /// STORAGE ///
 
-    mapping(bytes32 id => mapping(address user => Position)) public position;
-    mapping(bytes32 id => MarketState) public marketState;
+    mapping(bytes32 id => mapping(address user => Position)) internal _position;
+    mapping(bytes32 id => MarketState) internal _marketState;
     mapping(address user => mapping(bytes32 group => uint256)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
@@ -258,29 +258,29 @@ contract Midnight is IMidnight {
     /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
-        require(newTickSpacing > 0 && marketState[id].tickSpacing % newTickSpacing == 0, InvalidTickSpacing());
+        require(_marketState[id].tickSpacing > 0, MarketNotCreated());
+        require(newTickSpacing > 0 && _marketState[id].tickSpacing % newTickSpacing == 0, InvalidTickSpacing());
         // forge-lint: disable-next-line(unsafe-typecast) as newTickSpacing <= DEFAULT_TICK_SPACING < type(uint8).max
-        marketState[id].tickSpacing = uint8(newTickSpacing);
+        _marketState[id].tickSpacing = uint8(newTickSpacing);
         emit EventsLib.SetMarketTickSpacing(id, newTickSpacing);
     }
 
     function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external {
-        MarketState storage _marketState = marketState[id];
+        MarketState storage state = _marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
         require(newSettlementFee <= maxSettlementFee(index), SettlementFeeAboveMax());
         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
+        require(state.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         uint16 newSettlementFeeCbp = uint16(newSettlementFee / CBP);
-        if (index == 0) _marketState.settlementFeeCbp0 = newSettlementFeeCbp;
-        else if (index == 1) _marketState.settlementFeeCbp1 = newSettlementFeeCbp;
-        else if (index == 2) _marketState.settlementFeeCbp2 = newSettlementFeeCbp;
-        else if (index == 3) _marketState.settlementFeeCbp3 = newSettlementFeeCbp;
-        else if (index == 4) _marketState.settlementFeeCbp4 = newSettlementFeeCbp;
-        else if (index == 5) _marketState.settlementFeeCbp5 = newSettlementFeeCbp;
-        else if (index == 6) _marketState.settlementFeeCbp6 = newSettlementFeeCbp;
+        if (index == 0) state.settlementFeeCbp0 = newSettlementFeeCbp;
+        else if (index == 1) state.settlementFeeCbp1 = newSettlementFeeCbp;
+        else if (index == 2) state.settlementFeeCbp2 = newSettlementFeeCbp;
+        else if (index == 3) state.settlementFeeCbp3 = newSettlementFeeCbp;
+        else if (index == 4) state.settlementFeeCbp4 = newSettlementFeeCbp;
+        else if (index == 5) state.settlementFeeCbp5 = newSettlementFeeCbp;
+        else if (index == 6) state.settlementFeeCbp6 = newSettlementFeeCbp;
         emit EventsLib.SetMarketSettlementFee(id, index, newSettlementFee);
     }
 
@@ -295,12 +295,12 @@ contract Midnight is IMidnight {
     }
 
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {
-        MarketState storage _marketState = marketState[id];
+        MarketState storage state = _marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeAboveMax());
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
+        require(state.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
-        _marketState.continuousFee = uint32(newContinuousFee);
+        state.continuousFee = uint32(newContinuousFee);
         emit EventsLib.SetMarketContinuousFee(id, newContinuousFee);
     }
 
@@ -321,13 +321,13 @@ contract Midnight is IMidnight {
 
     function claimContinuousFee(Market memory market, uint256 amount, address receiver) external {
         bytes32 id = toId(market);
-        MarketState storage _marketState = marketState[id];
+        MarketState storage state = _marketState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
+        require(state.tickSpacing > 0, MarketNotCreated());
 
-        _marketState.continuousFeeCredit -= UtilsLib.toUint128(amount);
-        _marketState.totalUnits -= UtilsLib.toUint128(amount);
-        _marketState.withdrawable -= UtilsLib.toUint128(amount);
+        state.continuousFeeCredit -= UtilsLib.toUint128(amount);
+        state.totalUnits -= UtilsLib.toUint128(amount);
+        state.withdrawable -= UtilsLib.toUint128(amount);
 
         emit EventsLib.ClaimContinuousFee(msg.sender, id, amount, receiver);
 
@@ -355,11 +355,11 @@ contract Midnight is IMidnight {
     ) external returns (uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchMarket(offer.market);
-        MarketState storage _marketState = marketState[id];
-        require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
+        MarketState storage state = _marketState[id];
+        require(state.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
         require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
-        require(_marketState.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveOfferCap());
-        require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
+        require(state.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveOfferCap());
+        require(offer.tick % state.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
         require(offer.maker != taker, SelfTake());
@@ -388,8 +388,8 @@ contract Midnight is IMidnight {
         }
 
         (address buyer, address seller) = offer.buy ? (offer.maker, taker) : (taker, offer.maker);
-        Position storage buyerPos = position[id][buyer];
-        Position storage sellerPos = position[id][seller];
+        Position storage buyerPos = _position[id][buyer];
+        Position storage sellerPos = _position[id][seller];
 
         if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.market, id, buyer);
         if (hasCredit(id, seller)) _updatePosition(offer.market, id, seller);
@@ -398,7 +398,7 @@ contract Midnight is IMidnight {
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
         uint256 sellerDebtIncrease = units - sellerCreditDecrease;
         uint128 buyerPendingFeeIncrease =
-            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_marketState.continuousFee * timeToMaturity, WAD));
+            UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(state.continuousFee * timeToMaturity, WAD));
         uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
             ? UtilsLib.toUint128(sellerPos.pendingFee.mulDivUp(sellerCreditDecrease, sellerPos.credit))
             : 0;
@@ -427,8 +427,7 @@ contract Midnight is IMidnight {
         sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
         sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
 
-        _marketState.totalUnits =
-            UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
+        state.totalUnits = UtilsLib.toUint128(state.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
         consumed[offer.maker][offer.group] = newConsumed;
@@ -497,18 +496,18 @@ contract Midnight is IMidnight {
     function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
-        MarketState storage _marketState = marketState[id];
+        MarketState storage state = _marketState[id];
         _updatePosition(market, id, onBehalf);
 
-        Position storage _position = position[id][onBehalf];
+        Position storage userPosition = _position[id][onBehalf];
         uint128 pendingFeeDecrease;
-        if (_position.credit > 0) {
-            pendingFeeDecrease = UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
-            _position.pendingFee -= pendingFeeDecrease;
+        if (userPosition.credit > 0) {
+            pendingFeeDecrease = UtilsLib.toUint128(userPosition.pendingFee.mulDivUp(units, userPosition.credit));
+            userPosition.pendingFee -= pendingFeeDecrease;
         }
-        _position.credit -= UtilsLib.toUint128(units);
-        _marketState.withdrawable -= UtilsLib.toUint128(units);
-        _marketState.totalUnits -= UtilsLib.toUint128(units);
+        userPosition.credit -= UtilsLib.toUint128(units);
+        state.withdrawable -= UtilsLib.toUint128(units);
+        state.totalUnits -= UtilsLib.toUint128(units);
 
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
@@ -521,8 +520,8 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
 
-        position[id][onBehalf].debt -= UtilsLib.toUint128(units);
-        marketState[id].withdrawable += UtilsLib.toUint128(units);
+        _position[id][onBehalf].debt -= UtilsLib.toUint128(units);
+        _marketState[id].withdrawable += UtilsLib.toUint128(units);
 
         address payer = callback != address(0) ? callback : msg.sender;
         emit EventsLib.Repay(msg.sender, id, units, onBehalf, payer);
@@ -544,13 +543,13 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(market);
         address collateralToken = market.collateralParams[collateralIndex].token;
 
-        Position storage _position = position[id][onBehalf];
-        uint256 oldCollateral = _position.collateral[collateralIndex];
-        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
+        Position storage userPosition = _position[id][onBehalf];
+        uint256 oldCollateral = userPosition.collateral[collateralIndex];
+        userPosition.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
-            uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
-            _position.collateralBitmap = newCollateralBitmap;
+            uint128 newCollateralBitmap = userPosition.collateralBitmap.setBit(collateralIndex);
+            userPosition.collateralBitmap = newCollateralBitmap;
             require(
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
@@ -573,12 +572,12 @@ contract Midnight is IMidnight {
         bytes32 id = touchMarket(market);
         address collateralToken = market.collateralParams[collateralIndex].token;
 
-        Position storage _position = position[id][onBehalf];
-        uint256 newCollateral = _position.collateral[collateralIndex] - assets;
-        _position.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
+        Position storage userPosition = _position[id][onBehalf];
+        uint256 newCollateral = userPosition.collateral[collateralIndex] - assets;
+        userPosition.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
 
         if (newCollateral == 0 && assets > 0) {
-            _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+            userPosition.collateralBitmap = userPosition.collateralBitmap.clearBit(collateralIndex);
         }
 
         require(isHealthy(market, id, onBehalf), UnhealthyBorrower());
@@ -606,10 +605,10 @@ contract Midnight is IMidnight {
         bytes calldata data
     ) external returns (uint256, uint256) {
         bytes32 id = touchMarket(market);
-        MarketState storage _marketState = marketState[id];
-        Position storage _position = position[id][borrower];
+        MarketState storage state = _marketState[id];
+        Position storage userPosition = _position[id][borrower];
         require(repaidUnits == 0 || seizedAssets == 0, InconsistentInput());
-        require(_position.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
+        require(userPosition.debt > 0, NotBorrower()); // to avoid no-op liquidations of non borrower positions.
         require(
             market.liquidatorGate == address(0) || ILiquidatorGate(market.liquidatorGate).canLiquidate(msg.sender),
             LiquidatorGatedFromLiquidating()
@@ -617,15 +616,15 @@ contract Midnight is IMidnight {
 
         uint256 maxDebt;
         uint256 liquidatedCollatPrice;
-        uint256 originalDebt = _position.debt;
+        uint256 originalDebt = userPosition.debt;
         uint256 badDebt = originalDebt;
-        uint128 _collateralBitmap = _position.collateralBitmap;
+        uint128 _collateralBitmap = userPosition.collateralBitmap;
         while (_collateralBitmap != 0) {
             uint256 i = UtilsLib.msb(_collateralBitmap);
             CollateralParams memory _collateralParam = market.collateralParams[i];
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
-            uint256 _collateral = _position.collateral[i];
+            uint256 _collateral = userPosition.collateral[i];
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
@@ -640,18 +639,18 @@ contract Midnight is IMidnight {
         );
 
         if (badDebt > 0) {
-            // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
-            _position.debt -= uint128(badDebt);
-            uint256 _totalUnits = _marketState.totalUnits;
-            uint256 _lossFactor = _marketState.lossFactor;
-            _marketState.lossFactor = UtilsLib.toUint128(
+            // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= userPosition.debt
+            userPosition.debt -= uint128(badDebt);
+            uint256 _totalUnits = state.totalUnits;
+            uint256 _lossFactor = state.lossFactor;
+            state.lossFactor = UtilsLib.toUint128(
                 type(uint128).max - (type(uint128).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
             );
-            _marketState.totalUnits -= UtilsLib.toUint128(badDebt);
-            _marketState.continuousFeeCredit = _lossFactor < type(uint128).max
+            state.totalUnits -= UtilsLib.toUint128(badDebt);
+            state.continuousFeeCredit = _lossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
-                    _marketState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _marketState.lossFactor, type(uint128).max - _lossFactor)
+                    state.continuousFeeCredit
+                        .mulDivDown(type(uint128).max - state.lossFactor, type(uint128).max - _lossFactor)
                 )
                 : 0;
         }
@@ -673,23 +672,24 @@ contract Midnight is IMidnight {
                 // Note that debt >= maxDebt in this branch.
                 // The imprecision in this computation is at most a few hundred collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
+                    ? (userPosition.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
-                        || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < market.rcfThreshold,
+                        || userPosition.collateral[collateralIndex].mulDivDown(
+                                liquidatedCollatPrice, ORACLE_PRICE_SCALE
+                            ).mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < market.rcfThreshold,
                     RecoveryCloseFactorConditionsViolated()
                 );
             }
 
-            uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
-            _position.collateral[collateralIndex] = newCollateral;
+            uint128 newCollateral = userPosition.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
+            userPosition.collateral[collateralIndex] = newCollateral;
             if (newCollateral == 0 && seizedAssets > 0) {
-                _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
+                userPosition.collateralBitmap = userPosition.collateralBitmap.clearBit(collateralIndex);
             }
-            _marketState.withdrawable += UtilsLib.toUint128(repaidUnits);
-            _position.debt -= UtilsLib.toUint128(repaidUnits);
+            state.withdrawable += UtilsLib.toUint128(repaidUnits);
+            userPosition.debt -= UtilsLib.toUint128(repaidUnits);
         }
 
         address payer = callback != address(0) ? callback : msg.sender;
@@ -705,8 +705,8 @@ contract Midnight is IMidnight {
             receiver,
             payer,
             badDebt,
-            _marketState.lossFactor,
-            _marketState.continuousFeeCredit
+            state.lossFactor,
+            state.continuousFeeCredit
         );
 
         SafeTransferLib.safeTransfer(market.collateralParams[collateralIndex].token, receiver, seizedAssets);
@@ -770,7 +770,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the market id and creates the market if it doesn't exist yet.
     function touchMarket(Market memory market) public returns (bytes32) {
         bytes32 id = toId(market);
-        if (marketState[id].tickSpacing == 0) {
+        if (_marketState[id].tickSpacing == 0) {
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
@@ -788,17 +788,17 @@ contract Midnight is IMidnight {
                 previousCollateralToken = collateralToken;
             }
 
-            MarketState storage _marketState = marketState[id];
-            _marketState.tickSpacing = DEFAULT_TICK_SPACING;
+            MarketState storage state = _marketState[id];
+            state.tickSpacing = DEFAULT_TICK_SPACING;
             uint16[7] memory _defaultSettlementFeeCbp = defaultSettlementFeeCbp[market.loanToken];
-            _marketState.settlementFeeCbp0 = _defaultSettlementFeeCbp[0];
-            _marketState.settlementFeeCbp1 = _defaultSettlementFeeCbp[1];
-            _marketState.settlementFeeCbp2 = _defaultSettlementFeeCbp[2];
-            _marketState.settlementFeeCbp3 = _defaultSettlementFeeCbp[3];
-            _marketState.settlementFeeCbp4 = _defaultSettlementFeeCbp[4];
-            _marketState.settlementFeeCbp5 = _defaultSettlementFeeCbp[5];
-            _marketState.settlementFeeCbp6 = _defaultSettlementFeeCbp[6];
-            _marketState.continuousFee = defaultContinuousFee[market.loanToken];
+            state.settlementFeeCbp0 = _defaultSettlementFeeCbp[0];
+            state.settlementFeeCbp1 = _defaultSettlementFeeCbp[1];
+            state.settlementFeeCbp2 = _defaultSettlementFeeCbp[2];
+            state.settlementFeeCbp3 = _defaultSettlementFeeCbp[3];
+            state.settlementFeeCbp4 = _defaultSettlementFeeCbp[4];
+            state.settlementFeeCbp5 = _defaultSettlementFeeCbp[5];
+            state.settlementFeeCbp6 = _defaultSettlementFeeCbp[6];
+            state.continuousFee = defaultContinuousFee[market.loanToken];
             IdLib.storeInCode(market, INITIAL_CHAIN_ID);
 
             emit EventsLib.MarketCreated(market, id);
@@ -815,17 +815,17 @@ contract Midnight is IMidnight {
         view
         returns (uint128, uint128, uint128)
     {
-        Position storage _position = position[id][user];
-        uint128 _credit = _position.credit;
-        uint128 _lastLossFactor = _position.lastLossFactor;
+        Position storage userPosition = _position[id][user];
+        uint128 _credit = userPosition.credit;
+        uint128 _lastLossFactor = userPosition.lastLossFactor;
         uint256 postSlashCredit = _lastLossFactor < type(uint128).max
-            ? _credit.mulDivDown(type(uint128).max - marketState[id].lossFactor, type(uint128).max - _lastLossFactor)
+            ? _credit.mulDivDown(type(uint128).max - _marketState[id].lossFactor, type(uint128).max - _lastLossFactor)
             : 0;
-        uint128 _pendingFee = _position.pendingFee;
+        uint128 _pendingFee = userPosition.pendingFee;
         uint256 postSlashPendingFee =
             _credit > 0 ? _pendingFee - _pendingFee.mulDivUp(_credit - postSlashCredit, _credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, market.maturity);
-        uint128 _lastAccrual = _position.lastAccrual;
+        uint128 _lastAccrual = userPosition.lastAccrual;
         // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
         uint128 fee = _lastAccrual < market.maturity
             ? uint128(postSlashPendingFee.mulDivDown(accrualEnd - _lastAccrual, market.maturity - _lastAccrual))
@@ -838,7 +838,7 @@ contract Midnight is IMidnight {
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePosition(Market memory market, address user) external returns (uint128, uint128, uint128) {
         bytes32 id = toId(market);
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        require(_marketState[id].tickSpacing > 0, MarketNotCreated());
         return _updatePosition(market, id, user);
     }
 
@@ -849,17 +849,17 @@ contract Midnight is IMidnight {
         internal
         returns (uint128, uint128, uint128)
     {
-        Position storage _position = position[id][user];
+        Position storage userPosition = _position[id][user];
         (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(market, id, user);
 
-        uint128 creditDecrease = _position.credit - newCredit;
-        uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
+        uint128 creditDecrease = userPosition.credit - newCredit;
+        uint128 pendingFeeDecrease = userPosition.pendingFee - newPendingFee;
 
-        _position.credit = newCredit;
-        _position.lastLossFactor = marketState[id].lossFactor;
-        _position.pendingFee = newPendingFee;
-        _position.lastAccrual = uint128(block.timestamp);
-        marketState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
+        userPosition.credit = newCredit;
+        userPosition.lastLossFactor = _marketState[id].lossFactor;
+        userPosition.pendingFee = newPendingFee;
+        userPosition.lastAccrual = uint128(block.timestamp);
+        _marketState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
         emit EventsLib.UpdatePosition(id, user, creditDecrease, pendingFeeDecrease, accruedFee);
 
@@ -867,37 +867,45 @@ contract Midnight is IMidnight {
     }
 
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
-        return position[id][user].credit > 0;
+        return _position[id][user].credit > 0;
     }
 
     /// OTHER VIEW FUNCTIONS ///
 
+    function position(bytes32 id, address user) external view returns (Position memory) {
+        return _position[id][user];
+    }
+
+    function marketState(bytes32 id) external view returns (MarketState memory) {
+        return _marketState[id];
+    }
+
     function credit(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].credit;
+        return _position[id][user].credit;
     }
 
     function pendingFee(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].pendingFee;
+        return _position[id][user].pendingFee;
     }
 
     function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lastLossFactor;
+        return _position[id][user].lastLossFactor;
     }
 
     function lastAccrual(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lastAccrual;
+        return _position[id][user].lastAccrual;
     }
 
     function debt(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].debt;
+        return _position[id][user].debt;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].collateralBitmap;
+        return _position[id][user].collateralBitmap;
     }
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
-        return position[id][user].collateral[index];
+        return _position[id][user].collateral[index];
     }
 
     function toId(Market memory market) public view returns (bytes32) {
@@ -907,47 +915,47 @@ contract Midnight is IMidnight {
     /// @dev Reverts if the id is not a valid id of a touched market.
     /// @dev Returns the market corresponding to the given id.
     function toMarket(bytes32 id) external view returns (Market memory) {
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        require(_marketState[id].tickSpacing > 0, MarketNotCreated());
         address create2Address = address(uint160(uint256(id)));
         return abi.decode(create2Address.code, (Market));
     }
 
     function totalUnits(bytes32 id) external view returns (uint128) {
-        return marketState[id].totalUnits;
+        return _marketState[id].totalUnits;
     }
 
     function lossFactor(bytes32 id) external view returns (uint128) {
-        return marketState[id].lossFactor;
+        return _marketState[id].lossFactor;
     }
 
     function withdrawable(bytes32 id) external view returns (uint128) {
-        return marketState[id].withdrawable;
+        return _marketState[id].withdrawable;
     }
 
     function continuousFeeCredit(bytes32 id) external view returns (uint128) {
-        return marketState[id].continuousFeeCredit;
+        return _marketState[id].continuousFeeCredit;
     }
 
     /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
     function settlementFeeCbps(bytes32 id) external view returns (uint16[7] memory) {
         return [
-            marketState[id].settlementFeeCbp0,
-            marketState[id].settlementFeeCbp1,
-            marketState[id].settlementFeeCbp2,
-            marketState[id].settlementFeeCbp3,
-            marketState[id].settlementFeeCbp4,
-            marketState[id].settlementFeeCbp5,
-            marketState[id].settlementFeeCbp6
+            _marketState[id].settlementFeeCbp0,
+            _marketState[id].settlementFeeCbp1,
+            _marketState[id].settlementFeeCbp2,
+            _marketState[id].settlementFeeCbp3,
+            _marketState[id].settlementFeeCbp4,
+            _marketState[id].settlementFeeCbp5,
+            _marketState[id].settlementFeeCbp6
         ];
     }
 
     /// @dev The continuous fee is 0 until the market is created, then set to the default value.
     function continuousFee(bytes32 id) external view returns (uint32) {
-        return marketState[id].continuousFee;
+        return _marketState[id].continuousFee;
     }
 
     function tickSpacing(bytes32 id) external view returns (uint8) {
-        return marketState[id].tickSpacing;
+        return _marketState[id].tickSpacing;
     }
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
@@ -958,16 +966,16 @@ contract Midnight is IMidnight {
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the market's id.
     function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
-        Position storage _position = position[id][borrower];
-        uint256 _debt = _position.debt;
+        Position storage userPosition = _position[id][borrower];
+        uint256 _debt = userPosition.debt;
         uint256 maxDebt;
         if (_debt > 0) {
-            uint128 _collateralBitmap = _position.collateralBitmap;
+            uint128 _collateralBitmap = userPosition.collateralBitmap;
             while (_collateralBitmap != 0) {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                maxDebt += userPosition.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
                 _collateralBitmap = _collateralBitmap.clearBit(i);
             }
@@ -977,19 +985,19 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
     function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        MarketState storage _marketState = marketState[id];
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
+        MarketState storage state = _marketState[id];
+        require(state.tickSpacing > 0, MarketNotCreated());
 
-        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
+        if (timeToMaturity >= 360 days) return state.settlementFeeCbp6 * CBP;
 
         // forgefmt: disable-start
         (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
-                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
+            timeToMaturity < 1 days   ? (  0 days,   1 days, state.settlementFeeCbp0 * CBP, state.settlementFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, state.settlementFeeCbp1 * CBP, state.settlementFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, state.settlementFeeCbp2 * CBP, state.settlementFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, state.settlementFeeCbp3 * CBP, state.settlementFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, state.settlementFeeCbp4 * CBP, state.settlementFeeCbp5 * CBP) :
+                                        (180 days, 360 days, state.settlementFeeCbp5 * CBP, state.settlementFeeCbp6 * CBP);
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);

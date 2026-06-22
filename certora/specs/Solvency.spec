@@ -113,12 +113,12 @@ ghost mapping(bytes32 => mapping(address => mapping(address => mathint))) collat
 }
 
 // Safe require as markets limit the number of collateralParams.
-hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] {
+hook Sload uint128 value _position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] {
     require value == collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]], "ghost mirror";
 }
 
 // Safe require as markets limit the number of collateralParams.
-hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
+hook Sstore _position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
     collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
 }
 
@@ -129,11 +129,11 @@ ghost mapping(bytes32 => mapping(address => mathint)) withdrawableMirror {
     init_state axiom (forall address token. withdrawableSum(token) == 0);
 }
 
-hook Sload uint128 value marketState[KEY bytes32 id].withdrawable {
+hook Sload uint128 value _marketState[KEY bytes32 id].withdrawable {
     require value == withdrawableMirror[id][loantoken[id]], "ghost mirror";
 }
 
-hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
+hook Sstore _marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
