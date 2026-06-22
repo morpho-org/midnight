@@ -51,8 +51,11 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
-/// pending fee of existing lenders is not updated (=> their fee is fixed).
+/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuious fee is decreased
+/// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
+/// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee.
+/// This ensures maker buyers can protect against future continuous fee increases.
 ///
 /// LIQUIDATIONS
 /// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation
@@ -88,7 +91,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
 /// loan token.
 ///
-/// OFFER CAPS
+/// OFFER SIZE
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
@@ -265,7 +268,7 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeAboveMax());
         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         require(_marketState.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
@@ -283,7 +286,7 @@ contract Midnight is IMidnight {
     function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
         require(index <= 6, InvalidFeeIndex());
-        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeTooHigh());
+        require(newSettlementFee <= maxSettlementFee(index), SettlementFeeAboveMax());
         require(newSettlementFee % CBP == 0, FeeNotMultipleOfFeeCbp());
         // forge-lint: disable-next-item(unsafe-typecast) as newSettlementFee <= maxSettlementFee <= uint16.max * CBP
         defaultSettlementFeeCbp[loanToken][index] = uint16(newSettlementFee / CBP);
@@ -293,7 +296,7 @@ contract Midnight is IMidnight {
     function setMarketContinuousFee(bytes32 id, uint256 newContinuousFee) external {
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeSetter, OnlyFeeSetter());
-        require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
+        require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeAboveMax());
         require(_marketState.tickSpacing > 0, MarketNotCreated());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         _marketState.continuousFee = uint32(newContinuousFee);
@@ -302,7 +305,7 @@ contract Midnight is IMidnight {
 
     function setDefaultContinuousFee(address loanToken, uint256 newContinuousFee) external {
         require(msg.sender == feeSetter, OnlyFeeSetter());
-        require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeTooHigh());
+        require(newContinuousFee <= MAX_CONTINUOUS_FEE, ContinuousFeeAboveMax());
         // forge-lint: disable-next-line(unsafe-typecast) as newContinuousFee <= MAX_CONTINUOUS_FEE < type(uint32).max
         defaultContinuousFee[loanToken] = uint32(newContinuousFee);
         emit EventsLib.SetDefaultContinuousFee(loanToken, newContinuousFee);
@@ -354,6 +357,7 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
         require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
+        require(_marketState.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveOfferCap());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
         require(block.timestamp >= offer.start, OfferNotStarted());
         require(block.timestamp <= offer.expiry, OfferExpired());
@@ -363,7 +367,7 @@ contract Midnight is IMidnight {
             UnusedReceiverMustBeZero()
         );
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFail());
+        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFailed());
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
