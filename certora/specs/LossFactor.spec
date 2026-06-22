@@ -80,10 +80,26 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "Total credit should be bounded by 2^128 and an increase of continuous fee credit should corresponds to a similar decrease of credit";
 
-    require e.msg.value == 0, "setup the call";
+    require e.msg.value == 0, "Midnight is not payable";
     updatePosition@withrevert(e, market, user);
 
     assert !lastReverted, "updatePosition should not revert under valid state";
+}
+
+/// The loss factor computation in updatePositionView does not revert.
+rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+
+    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
+    require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "Total credit should be bounded by 2^128 and an increase of continuous fee credit should corresponds to a similar decrease of credit";
+
+    require e.msg.value == 0, "Midnight is not payable";
+    updatePositionView@withrevert(e, market, id, user);
+
+    assert !lastReverted, "updatePositionView should not revert under valid state";
 }
 
 /// updatePosition is idempotent: a second call in the same env leaves the relevant position state unchanged and accrues no new fee.
