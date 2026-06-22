@@ -117,11 +117,13 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
 
-    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    uint256 buyerCreditIncrease;
+    _, _, _, _, buyerCreditIncrease, _ = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
     assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
     assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
+    assert buyerCreditIncrease == creditOf(id, buyer) - buyerUpdatedCreditBefore;
     assert debtOf(id, buyer) <= buyerDebtBefore;
     assert debtOf(id, buyer) >= buyerDebtBefore - units;
 }
@@ -137,13 +139,15 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
 
-    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    uint256 sellerCreditDecrease;
+    _, _, _, _, _, sellerCreditDecrease = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
     assert debtOf(id, seller) >= sellerDebtBefore;
     assert debtOf(id, seller) <= sellerDebtBefore + units;
     assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
     assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
+    assert sellerCreditDecrease == sellerUpdatedCreditBefore - creditOf(id, seller);
 }
 
 /// REPAY ///
@@ -165,7 +169,7 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
 
 /// LIQUIDATE ///
 
-/// Liquidate decreases the borrower's debt by at least repaidUnits,
+/// Liquidate decreases the borrower's debt by exactly repaidUnits plus realized bad debt,
 /// and only changes position[id][borrower].debt.
 rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool postMaturityMode) {
     bytes32 id = toId(e, market);
@@ -176,9 +180,10 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    uint256 badDebtResult;
+    seizedResult, repaidResult, badDebtResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert debtOf(id, borrower) <= debtBefore - repaidResult;
+    assert debtOf(id, borrower) == debtBefore - repaidResult - badDebtResult;
     assert creditOf(anyId, anyUser) == otherCreditBefore;
     assert anyUser != borrower || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
 }
@@ -245,7 +250,7 @@ rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collatera
     uint256 otherCollateralBefore = collateral(anyId, anyUser, anyIndex);
 
     uint256 seizedResult;
-    seizedResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    seizedResult, _, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert collateral(id, borrower, collateralIndex) == collateralBefore - seizedResult;
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;

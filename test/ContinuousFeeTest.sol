@@ -293,7 +293,21 @@ contract ContinuousFeeTest is BaseTest {
             lender,
             otherLender
         );
-        take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
+        (
+            uint256 returnedBuyerAssets,
+            uint256 returnedSellerAssets,
+            uint256 returnedBuyerPendingFeeIncrease,
+            uint256 returnedSellerPendingFeeDecrease,
+            uint256 returnedBuyerCreditIncrease,
+            uint256 returnedSellerCreditDecrease
+        ) = take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
+
+        assertEq(returnedBuyerAssets, takeAssets, "returned buyerAssets");
+        assertEq(returnedSellerAssets, takeAssets, "returned sellerAssets");
+        assertEq(returnedBuyerCreditIncrease, exitAmount, "returned buyer credit increase");
+        assertEq(returnedSellerCreditDecrease, exitAmount, "returned seller credit decrease");
+        assertEq(returnedBuyerPendingFeeIncrease, buyerPendingFeeIncrease, "returned buyer pendingFee increase");
+        assertEq(returnedSellerPendingFeeDecrease, sellerPendingFeeDecrease, "returned seller pendingFee decrease");
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
         assertEq(midnight.creditOf(id, lender), creditAfterAccrual - exitAmount, "credit after exit");

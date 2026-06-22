@@ -200,7 +200,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
 
-        (uint256 seizedAssets, uint256 repaidUnits) =
+        (uint256 seizedAssets, uint256 repaidUnits,) =
             midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
 
         assertEq(repaidUnits, repaid, "repaid units");
@@ -233,7 +233,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         vm.warp(market.maturity + TIME_TO_MAX_LIF); // Warp to post-maturity for full LIF.
 
-        (uint256 seizedAssets, uint256 repaidUnits) =
+        (uint256 seizedAssets, uint256 repaidUnits,) =
             midnight.liquidate(market, 0, seized, 0, borrower, true, address(this), address(0), "");
 
         assertEq(
@@ -275,7 +275,12 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(ORACLE_PRICE_SCALE, liquidationOraclePrice);
 
         vm.prank(caller);
-        midnight.liquidate(market, collateralIndex, 0, repaid, borrower, true, address(this), address(this), data);
+        (uint256 returnedSeizedAssets, uint256 returnedRepaidUnits, uint256 returnedBadDebt) =
+            midnight.liquidate(market, collateralIndex, 0, repaid, borrower, true, address(this), address(this), data);
+
+        assertEq(returnedSeizedAssets, expectedSeizedAssets, "returned seized assets");
+        assertEq(returnedRepaidUnits, repaid, "returned repaid units");
+        assertEq(returnedBadDebt, expectedBadDebt, "returned bad debt");
 
         assertEq(recordedCaller, caller, "caller");
         assertEq(recordedId, id, "id");
@@ -352,7 +357,8 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 expectedBadDebt = _badDebt();
 
-        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
+        (,, uint256 badDebt) = midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
+        assertEq(badDebt, expectedBadDebt, "returned bad debt");
 
         assertEq(midnight.debtOf(id, borrower), units - expectedBadDebt, "debt");
         assertEq(midnight.totalUnits(id), units - expectedBadDebt, "total units");
@@ -430,7 +436,7 @@ contract LiquidationTest is BaseTest {
         Oracle(market.collateralParams[0].oracle).setPrice(liquidationOraclePrice);
         uint256 debtAfterBadDebt = units - _badDebt();
 
-        (, uint256 repaid) = midnight.liquidate(market, 0, seized, 0, borrower, false, address(this), address(0), "");
+        (, uint256 repaid,) = midnight.liquidate(market, 0, seized, 0, borrower, false, address(this), address(0), "");
 
         assertEq(midnight.debtOf(id, borrower), debtAfterBadDebt - repaid, "debt");
         assertEq(midnight.totalUnits(id), debtAfterBadDebt, "total units");

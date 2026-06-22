@@ -21,7 +21,7 @@ rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 colla
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    seizedResult, repaidResult, _ = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableAfter == withdrawableBefore + repaidResult;
 }
@@ -69,7 +69,7 @@ rule takeIncreasesClaimableSettlementFee(env e, Midnight.Offer offer, bytes rati
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     // We know that buyerAssets - sellerAssets >= 0, see rule settlementFeeSpreadBounds.
     assert anyToken == offer.market.loanToken => claimableSettlementFee(anyToken) == before + buyerAssets - sellerAssets;

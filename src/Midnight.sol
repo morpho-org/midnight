@@ -334,7 +334,9 @@ contract Midnight is IMidnight {
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
-    /// @dev Returns buyerAssets and sellerAssets.
+    /// @dev Returns buyerAssets, sellerAssets, buyerPendingFeeIncrease, sellerPendingFeeDecrease, buyerCreditIncrease,
+    /// and sellerCreditDecrease.
+    /// @dev Because of reentrancy, the returned deltas may not reflect the total change since before the take.
     function take(
         Offer memory offer,
         bytes memory ratifierData,
@@ -343,7 +345,7 @@ contract Midnight is IMidnight {
         address receiverIfTakerIsSeller,
         address takerCallback,
         bytes memory takerCallbackData
-    ) external returns (uint256, uint256) {
+    ) external returns (uint256, uint256, uint256, uint256, uint256, uint256) {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchMarket(offer.market);
         MarketState storage _marketState = marketState[id];
@@ -480,7 +482,14 @@ contract Midnight is IMidnight {
         if (!wasLocked) UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, false);
         require(liquidationLocked(id, seller) || isHealthy(offer.market, id, seller), SellerIsLiquidatable());
 
-        return (buyerAssets, sellerAssets);
+        return (
+            buyerAssets,
+            sellerAssets,
+            buyerPendingFeeIncrease,
+            sellerPendingFeeDecrease,
+            buyerCreditIncrease,
+            sellerCreditDecrease
+        );
     }
 
     /// @dev Returns the pending fee decrease.
@@ -587,7 +596,7 @@ contract Midnight is IMidnight {
     /// @dev Passing both 0 for seizedAssets and repaidUnits allows to realize bad debt with 0 token transferred.
     /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not
     /// activated.
-    /// @dev Returns the seized assets and the repaid units.
+    /// @dev Returns the seized assets, the repaid units, and the bad debt.
     function liquidate(
         Market calldata market,
         uint256 collateralIndex,
@@ -598,7 +607,7 @@ contract Midnight is IMidnight {
         address receiver,
         address callback,
         bytes calldata data
-    ) external returns (uint256, uint256) {
+    ) external returns (uint256, uint256, uint256) {
         bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         Position storage _position = position[id][borrower];
@@ -726,7 +735,7 @@ contract Midnight is IMidnight {
 
         SafeTransferLib.safeTransferFrom(market.loanToken, payer, address(this), repaidUnits);
 
-        return (seizedAssets, repaidUnits);
+        return (seizedAssets, repaidUnits, badDebt);
     }
 
     /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).

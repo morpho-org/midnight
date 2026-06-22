@@ -166,7 +166,10 @@ abstract contract BaseTest is Test {
     }
 
     // Convenience wrapper for take with the dummy ratifier and no callbacks.
-    function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
+    function take(uint256 units, address taker, Offer memory offer)
+        internal
+        returns (uint256, uint256, uint256, uint256, uint256, uint256)
+    {
         // receiverIfTakerIsSeller param is for taker (when offer.buy == true), and must be zero otherwise.
         // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false).
         vm.prank(taker);

@@ -82,7 +82,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uin
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    seizedResult, repaidResult, _ = liquidate(e, market, collateralIndex, 0, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 
@@ -101,7 +101,7 @@ rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256
 
     uint256 seizedResult;
     uint256 repaidResult;
-    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, postMaturityMode, receiver, callback, data);
+    seizedResult, repaidResult, _ = liquidate(e, market, collateralIndex, seizedAssets, 0, borrower, postMaturityMode, receiver, callback, data);
 
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
 

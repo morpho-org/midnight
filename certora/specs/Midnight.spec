@@ -63,23 +63,30 @@ function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
 rule takeInputOutputConsistency(env e, Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
+    uint256 buyerPendingFeeIncreaseOutput;
+    uint256 sellerPendingFeeDecreaseOutput;
+    uint256 buyerCreditIncreaseOutput;
+    uint256 sellerCreditDecreaseOutput;
 
     uint256 claimableBefore = claimableSettlementFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
+    buyerAssetsOutput, sellerAssetsOutput, buyerPendingFeeIncreaseOutput, sellerPendingFeeDecreaseOutput, buyerCreditIncreaseOutput, sellerCreditDecreaseOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
 
     // If the input is zero, all the output arguments are zero.
-    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
+    assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0 && buyerPendingFeeIncreaseOutput == 0 && sellerPendingFeeDecreaseOutput == 0 && buyerCreditIncreaseOutput == 0 && sellerCreditDecreaseOutput == 0;
 
     // The claimable settlement fee increases by exactly the spread.
     assert claimableSettlementFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
 rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
+    bytes32 id = summaryToId(market);
+    uint256 totalUnitsBefore = totalUnits(id);
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
+    uint256 badDebtOutput;
 
-    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    seizedAssetsOutput, repaidUnitsOutput, badDebtOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     // At most one of the input arguments can be zero.
     assert seizedAssets == 0 || repaidUnits == 0;
@@ -90,6 +97,9 @@ rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 coll
 
     // If all the input arguments are zero, all the output arguments are zero.
     assert repaidUnits == 0 && seizedAssets == 0 => seizedAssetsOutput == 0 && repaidUnitsOutput == 0;
+
+    // The bad debt output is exactly the realized loss of total units.
+    assert badDebtOutput == totalUnitsBefore - totalUnits(id);
 }
 
 rule marketLossFactorMonotonicallyIncreases(bytes32 id, method f, env e, calldataarg args) {
