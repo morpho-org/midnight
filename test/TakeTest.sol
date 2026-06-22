@@ -188,6 +188,7 @@ contract TakeTest is BaseTest {
             id,
             units,
             taker,
+            offer,
             buyerAssets,
             sellerAssets,
             existingConsumed + units,
@@ -198,20 +199,6 @@ contract TakeTest is BaseTest {
             receiver,
             address(payerCallback),
             offerIsBuy ? address(0) : address(payerCallback)
-        );
-        vm.expectEmit();
-        emit EventsLib.TakenOffer(
-            offer.maker,
-            offer.tick,
-            offer.start,
-            offer.expiry,
-            offer.reduceOnly,
-            offer.maxUnits,
-            offer.maxAssets,
-            offer.buy,
-            offer.group,
-            offer.callback,
-            offer.ratifier
         );
 
         vm.prank(caller);

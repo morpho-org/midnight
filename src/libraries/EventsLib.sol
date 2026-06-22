@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Market} from "../interfaces/IMidnight.sol";
+import {Market, Offer} from "../interfaces/IMidnight.sol";
 
 /// @dev id_ is used to avoid naming conflicts in indexers.
 library EventsLib {
@@ -20,8 +20,7 @@ library EventsLib {
     event SetDefaultContinuousFee(address indexed loanToken, uint256 newContinuousFee);
     event UpdatePosition(bytes32 indexed id_, address indexed user, uint256 creditDecrease, uint256 pendingFeeDecrease, uint256 accruedFee);
     event MarketCreated(Market market, bytes32 indexed id_);
-    event Take(address caller, bytes32 indexed id_, uint256 units, address indexed taker, uint256 buyerAssets, uint256 sellerAssets, uint256 consumed, uint256 buyerPendingFeeIncrease, uint256 sellerPendingFeeDecrease, uint256 buyerCreditIncrease, uint256 sellerCreditDecrease, address receiver, address payer, address takerCallback);
-    event TakenOffer(address indexed maker, uint256 tick, uint256 start, uint256 expiry, bool reduceOnly, uint256 maxUnits, uint256 maxAssets, bool buy, bytes32 group, address callback, address ratifier);
+    event Take(address caller, bytes32 indexed id_, uint256 units, address indexed taker, Offer offer, uint256 buyerAssets, uint256 sellerAssets, uint256 consumed, uint256 buyerPendingFeeIncrease, uint256 sellerPendingFeeDecrease, uint256 buyerCreditIncrease, uint256 sellerCreditDecrease, address receiver, address payer, address takerCallback);
     event Withdraw(address caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address indexed receiver, uint256 pendingFeeDecrease);
     event Repay(address indexed caller, bytes32 indexed id_, uint256 units, address indexed onBehalf, address payer);
     event SupplyCollateral(address caller, bytes32 indexed id_, address indexed collateral, uint256 assets, address indexed onBehalf);
