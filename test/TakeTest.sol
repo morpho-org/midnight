@@ -64,7 +64,6 @@ contract TakeTest is BaseTest {
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.maxUnits = type(uint256).max;
-        lenderOffer.continuousFeeCap = type(uint256).max;
         lenderOffer.market = market;
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
@@ -74,7 +73,6 @@ contract TakeTest is BaseTest {
         otherLenderOffer.ratifier = address(dummyRatifier);
         otherLenderOffer.receiverIfMakerIsSeller = otherLender;
         otherLenderOffer.maxUnits = type(uint256).max;
-        otherLenderOffer.continuousFeeCap = type(uint256).max;
         otherLenderOffer.market = market;
         otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
@@ -84,7 +82,6 @@ contract TakeTest is BaseTest {
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.continuousFeeCap = type(uint256).max;
         borrowerOffer.market = market;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
@@ -93,7 +90,6 @@ contract TakeTest is BaseTest {
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.maxUnits = type(uint256).max;
-        otherBorrowerOffer.continuousFeeCap = type(uint256).max;
         otherBorrowerOffer.market = market;
         otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
@@ -129,7 +125,6 @@ contract TakeTest is BaseTest {
         collateralize(market, lender, existingDebt);
         Offer memory buy0 = _setupMarketOffer(market, existingDebt);
         buy0.buy = true;
-        buy0.continuousFeeCap = type(uint256).max;
         buy0.maker = otherLender;
         buy0.receiverIfMakerIsSeller = address(0);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -942,55 +937,6 @@ contract TakeTest is BaseTest {
         assertEq(buyerAssets, expectedBuyerAssets);
     }
 
-    function testMaxAssetsSellerConsumedAccumulates(uint256 units) public {
-        units = bound(units, 1, maxAssets / 2);
-        deal(address(loanToken), lender, type(uint128).max);
-        collateralize(market, borrower, 2 * units);
-
-        borrowerOffer.maxUnits = 0;
-        borrowerOffer.maxAssets = type(uint128).max;
-
-        (, uint256 sellerAssets1) = take(units, lender, borrowerOffer);
-        assertEq(midnight.consumed(borrower, borrowerOffer.group), sellerAssets1, "consumed after first take");
-
-        (, uint256 sellerAssets2) = take(units, lender, borrowerOffer);
-        assertEq(
-            midnight.consumed(borrower, borrowerOffer.group),
-            sellerAssets1 + sellerAssets2,
-            "consumed after second take"
-        );
-    }
-
-    function testMaxAssetsBuyerConsumedAccumulates(uint256 units) public {
-        units = bound(units, 1, maxAssets / 2);
-        deal(address(loanToken), lender, type(uint128).max);
-        collateralize(market, borrower, 2 * units);
-
-        lenderOffer.maxUnits = 0;
-        lenderOffer.maxAssets = type(uint128).max;
-
-        (uint256 buyerAssets1,) = take(units, borrower, lenderOffer);
-        assertEq(midnight.consumed(lender, lenderOffer.group), buyerAssets1, "consumed after first take");
-
-        (uint256 buyerAssets2,) = take(units, borrower, lenderOffer);
-        assertEq(
-            midnight.consumed(lender, lenderOffer.group), buyerAssets1 + buyerAssets2, "consumed after second take"
-        );
-    }
-
-    function testMaxUnitsConsumedAccumulates(uint256 units) public {
-        units = bound(units, 1, maxAssets / 2);
-        deal(address(loanToken), lender, type(uint128).max);
-        collateralize(market, borrower, 2 * units);
-
-        // Default offer caps: maxUnits set, maxAssets == 0 -> consumed tracks units.
-        take(units, lender, borrowerOffer);
-        assertEq(midnight.consumed(borrower, borrowerOffer.group), units, "consumed after first take");
-
-        take(units, lender, borrowerOffer);
-        assertEq(midnight.consumed(borrower, borrowerOffer.group), 2 * units, "consumed after second take");
-    }
-
     function testMaxAssetsZeroMeansNoLimitForSeller(uint256 units) public {
         units = bound(units, 1, maxAssets);
         deal(address(loanToken), lender, units);
@@ -1117,7 +1063,7 @@ contract TakeTest is BaseTest {
 
         vm.prank(maker);
         midnight.setIsAuthorized(address(ratifier), true, maker);
-        vm.expectRevert(IMidnight.RatifierFailed.selector);
+        vm.expectRevert(IMidnight.RatifierFail.selector);
         vm.prank(sender);
         midnight.take(lenderOffer, hex"", 0, sender, sender, address(0), hex"");
     }

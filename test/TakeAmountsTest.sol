@@ -12,8 +12,6 @@ import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
 
-    uint256 internal constant BORROWER_POSITION_UNITS = 1e37;
-
     Market internal market;
     bytes32 internal id;
     Offer internal offer;
@@ -146,7 +144,7 @@ contract TakeAmountsTest is BaseTest {
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(BORROWER_POSITION_UNITS);
+        _createPosition(1e36);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -169,7 +167,7 @@ contract TakeAmountsTest is BaseTest {
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(BORROWER_POSITION_UNITS);
+        _createPosition(1e36);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -214,7 +212,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
-        _createPosition(BORROWER_POSITION_UNITS);
+        _createPosition(1e36);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + settlementFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);

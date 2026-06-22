@@ -30,7 +30,7 @@ rule wExpCasting(uint256 x) {
 
 definition maxInput() returns int256 = assert_int256(lnOnePlusDelta() * (maxTick() / 2));
 
-definition maxOutput() returns uint256 = 20134595243400876315901952;
+definition maxOutput() returns uint256 = 2010201770916298901946368;
 
 rule maxOutputIsWExpOfMaxInput() {
     assert maxOutput() == wExp(maxInput());
@@ -104,7 +104,7 @@ rule wExpIsMonotonicOnPositiveRangeWhenQJumps(int256 x) {
 /// tickToPrice properties ///
 
 // Useful for PriceToTick.spec
-definition cvlMaxTick() returns uint256 = 6744;
+definition cvlMaxTick() returns uint256 = 5820;
 
 rule cvlMaxTickIsMaxTick() {
     assert cvlMaxTick() == maxTick();

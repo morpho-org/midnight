@@ -59,7 +59,6 @@ contract ContinuousFeeTest is BaseTest {
         o.buy = true;
         o.maker = otherLender;
         o.maxUnits = type(uint256).max;
-        o.continuousFeeCap = type(uint256).max;
         o.ratifier = address(dummyRatifier);
         o.expiry = vm.getBlockTimestamp();
         o.tick = MAX_TICK;
@@ -194,7 +193,6 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.start = vm.getBlockTimestamp();
         borrowOffer.expiry = vm.getBlockTimestamp();
         borrowOffer.tick = MAX_TICK;
-        borrowOffer.continuousFeeCap = type(uint256).max;
     }
 
     function testTwoLendersDifferentRates(
@@ -450,40 +448,6 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after claim");
     }
 
-    function testClaimContinuousFeeDecrementsWithdrawable(uint256 credit, uint256 feeRate, uint256 ttm, uint256 elapsed)
-        public
-    {
-        credit = bound(credit, 1, MAX_CREDIT);
-        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
-        ttm = bound(ttm, 2, 360 days);
-        elapsed = bound(elapsed, 1, ttm - 1);
-
-        setupLender(credit, feeRate, ttm);
-
-        vm.warp(vm.getBlockTimestamp() + elapsed);
-        midnight.updatePosition(market, lender);
-
-        uint256 feeAmount = midnight.continuousFeeCredit(id);
-        vm.assume(feeAmount > 1);
-        uint256 claimAmount = feeAmount / 2; // two claims stay within the accrued fee.
-
-        // Repay so withdrawable covers the claims.
-        deal(address(loanToken), borrower, credit);
-        vm.prank(borrower);
-        midnight.repay(market, credit, borrower, address(0), hex"");
-
-        address receiver = makeAddr("receiver");
-        uint256 withdrawableBefore = midnight.withdrawable(id);
-
-        vm.prank(feeClaimer);
-        midnight.claimContinuousFee(market, claimAmount, receiver);
-        assertEq(midnight.withdrawable(id), withdrawableBefore - claimAmount, "withdrawable after first claim");
-
-        vm.prank(feeClaimer);
-        midnight.claimContinuousFee(market, claimAmount, receiver);
-        assertEq(midnight.withdrawable(id), withdrawableBefore - 2 * claimAmount, "withdrawable after second claim");
-    }
-
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
         vm.prank(caller);
@@ -583,80 +547,5 @@ contract ContinuousFeeTest is BaseTest {
     function testLastAccrualZeroForFreshPosition() public {
         setupLender(1e18, 0, 100 days);
         assertEq(midnight.lastAccrual(id, makeAddr("nobody")), 0, "lastAccrual zero for fresh position");
-    }
-
-    /// @dev Creates the market with continuousFee == feeRate (touch copies the default fee).
-    function _setupFeeMarket(uint256 feeRate) internal {
-        market.maturity = vm.getBlockTimestamp() + 100 days;
-        id = toId(market);
-        midnight.setDefaultContinuousFee(address(loanToken), feeRate);
-        midnight.touchMarket(market);
-        assertEq(midnight.continuousFee(id), feeRate, "market continuousFee");
-    }
-
-    function testTakeRevertsWhenBuyOfferContinuousFeeCapExceeded(uint256 feeRate, uint256 continuousFeeCap) public {
-        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
-        continuousFeeCap = bound(continuousFeeCap, 0, feeRate - 1);
-        _setupFeeMarket(feeRate);
-
-        uint256 units = 1e18;
-        collateralize(market, borrower, units * 2);
-        deal(address(loanToken), otherLender, units);
-
-        Offer memory offer = _makeBuyOffer(keccak256("buy-max-fee"));
-        offer.maxUnits = units;
-        offer.continuousFeeCap = continuousFeeCap;
-
-        vm.expectRevert(IMidnight.ContinuousFeeAboveOfferCap.selector);
-        take(units, borrower, offer); // borrower is the seller, otherLender (maker) is the buyer.
-    }
-
-    function testTakeSucceedsWhenBuyOfferContinuousFeeCapRespected(uint256 feeRate, uint256 continuousFeeCap) public {
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
-        continuousFeeCap = bound(continuousFeeCap, feeRate, type(uint256).max);
-        _setupFeeMarket(feeRate);
-
-        uint256 units = 1e18;
-        collateralize(market, borrower, units * 2);
-        deal(address(loanToken), otherLender, units);
-
-        Offer memory offer = _makeBuyOffer(keccak256("buy-ok-fee"));
-        offer.maxUnits = units;
-        offer.continuousFeeCap = continuousFeeCap;
-
-        take(units, borrower, offer);
-        assertEq(midnight.debtOf(id, borrower), units, "borrower took on debt");
-    }
-
-    function testTakeRevertsWhenSellOfferContinuousFeeCapExceeded(uint256 feeRate, uint256 continuousFeeCap) public {
-        feeRate = bound(feeRate, 1, MAX_CONTINUOUS_FEE);
-        continuousFeeCap = bound(continuousFeeCap, 0, feeRate - 1);
-        _setupFeeMarket(feeRate);
-
-        uint256 units = 1e18;
-        collateralize(market, otherBorrower, units * 2);
-        deal(address(loanToken), lender, units);
-
-        Offer memory offer = _makeBorrowOffer(units);
-        offer.continuousFeeCap = continuousFeeCap;
-
-        vm.expectRevert(IMidnight.ContinuousFeeAboveOfferCap.selector);
-        take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
-    }
-
-    function testTakeSucceedsWhenSellOfferContinuousFeeCapRespected(uint256 feeRate, uint256 continuousFeeCap) public {
-        feeRate = bound(feeRate, 0, MAX_CONTINUOUS_FEE);
-        continuousFeeCap = bound(continuousFeeCap, feeRate, type(uint256).max);
-        _setupFeeMarket(feeRate);
-
-        uint256 units = 1e18;
-        collateralize(market, otherBorrower, units * 2);
-        deal(address(loanToken), lender, units);
-
-        Offer memory offer = _makeBorrowOffer(units);
-        offer.continuousFeeCap = continuousFeeCap;
-
-        take(units, lender, offer); // lender is the buyer, otherBorrower (maker) is the seller.
-        assertEq(midnight.creditOf(id, lender), units, "lender gained credit");
     }
 }
