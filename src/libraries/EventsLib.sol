@@ -11,6 +11,7 @@ library EventsLib {
     event SetRoleSetter(address indexed roleSetter);
     event SetFeeSetter(address indexed feeSetter);
     event SetTickSpacingSetter(address indexed tickSpacingSetter);
+    event AddLltv(uint256 lltv);
     event AddLiquidationCursor(uint256 liquidationCursor);
     event SetMarketTickSpacing(bytes32 indexed id_, uint256 newTickSpacing);
     event SetMarketSettlementFee(bytes32 indexed id_, uint256 indexed index, uint256 newSettlementFee);

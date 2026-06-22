@@ -25,22 +25,6 @@ uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liqu
 bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
 uint8 constant DEFAULT_TICK_SPACING = 4;
 
-/// @dev The allowed LLTV values, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
-uint256 constant LLTV_0 = 0.385e18;
-uint256 constant LLTV_1 = 0.625e18;
-uint256 constant LLTV_2 = 0.77e18;
-uint256 constant LLTV_3 = 0.86e18;
-uint256 constant LLTV_4 = 0.915e18;
-uint256 constant LLTV_5 = 0.945e18;
-uint256 constant LLTV_6 = 0.965e18;
-uint256 constant LLTV_7 = 0.98e18;
-uint256 constant LLTV_8 = 1e18;
-
-/// @dev Returns true if lltv is one of the allowed LLTV tiers.
-function isLltvAllowed(uint256 lltv) pure returns (bool) {
-    return lltv == LLTV_0 || lltv == LLTV_1 || lltv == LLTV_2 || lltv == LLTV_3 || lltv == LLTV_4 || lltv == LLTV_5 || lltv == LLTV_6 || lltv == LLTV_7 || lltv == LLTV_8;
-}
-
 /// @dev Returns the max settlement fee for the given index.
 function maxSettlementFee(uint256 index) pure returns (uint256) {
     return [MAX_SETTLEMENT_FEE_0_DAYS, MAX_SETTLEMENT_FEE_1_DAY, MAX_SETTLEMENT_FEE_7_DAYS, MAX_SETTLEMENT_FEE_30_DAYS, MAX_SETTLEMENT_FEE_90_DAYS, MAX_SETTLEMENT_FEE_180_DAYS, MAX_SETTLEMENT_FEE_360_DAYS][index];

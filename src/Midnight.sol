@@ -165,7 +165,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter.
+/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter, and add LLTV tiers.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -202,6 +202,7 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
+    mapping(uint256 lltv => bool) public isLltvAllowed;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
@@ -253,6 +254,14 @@ contract Midnight is IMidnight {
         require(msg.sender == roleSetter, OnlyRoleSetter());
         tickSpacingSetter = newTickSpacingSetter;
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
+    }
+
+    /// @dev Allows a new LLTV tier. Tiers can only be added, never removed.
+    function addLltv(uint256 lltv) external {
+        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(lltv <= WAD, InvalidLltv());
+        isLltvAllowed[lltv] = true;
+        emit EventsLib.AddLltv(lltv);
     }
 
     /// @dev Enables a liquidationCursor for use at market creation. LiquidationCursors can only be enabled, never
@@ -793,7 +802,7 @@ contract Midnight is IMidnight {
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
                 uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
-                require(isLltvAllowed(lltv), LltvNotAllowed());
+                require(isLltvAllowed[lltv], LltvNotAllowed());
                 require(isLiquidationCursorEnabled[liquidationCursor], InvalidLiquidationCursor());
                 require(isMaxLifAllowed(lltv, liquidationCursor), InvalidMaxLif());
                 previousCollateralToken = collateralToken;
