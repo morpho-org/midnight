@@ -15,7 +15,7 @@ bytes constant AUTHORIZATION_TYPE =
     "Authorization(address authorizer,address authorized,bool isAuthorized,uint256 nonce,uint256 deadline)";
 bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
 
-contract SetIsAuthorizedWithSigTest is BaseTest {
+contract EcrecoverAuthorizerTest is BaseTest {
     function testAuthorizationTypeHash() public pure {
         assertEq(AUTHORIZATION_TYPEHASH, keccak256(AUTHORIZATION_TYPE));
     }
