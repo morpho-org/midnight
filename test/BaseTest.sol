@@ -240,9 +240,9 @@ abstract contract BaseTest is Test {
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(address(this), true, badBorrower);
-        deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
-        midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
-        assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debt(toId(market), badBorrower));
+        midnight.repay(market, midnight.debt(toId(market), badBorrower), badBorrower, address(0), hex"");
+        assertEq(midnight.debt(toId(market), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);

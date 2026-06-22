@@ -51,7 +51,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
-/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuious fee is decreased
+/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuous fee is decreased
 /// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
 /// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee.
@@ -68,16 +68,17 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
-///   newDebt >= newMaxDebt <=> debtOf - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
-///                         <=> repaidUnits <= (debtOf-maxDebt) / (1 - LIF*LLTV).
+///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
+///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers to open small positions / liquidators to leave small positions that might not be
-/// profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic aspect.
+/// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
+/// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
+/// aspect.
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -175,7 +176,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
 /// @dev NatSpec comments are included only when they bring clarity.
-/// @dev creditOf, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
+/// @dev credit, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
 /// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
 /// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing market ids,
@@ -679,7 +680,7 @@ contract Midnight is IMidnight {
             if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
-                // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
+                // The imprecision in this computation is at most a few hundred collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
@@ -824,14 +825,14 @@ contract Midnight is IMidnight {
         returns (uint128, uint128, uint128)
     {
         Position storage _position = position[id][user];
-        uint128 credit = _position.credit;
+        uint128 _credit = _position.credit;
         uint128 _lastLossFactor = _position.lastLossFactor;
         uint256 postSlashCredit = _lastLossFactor < type(uint128).max
-            ? credit.mulDivDown(type(uint128).max - marketState[id].lossFactor, type(uint128).max - _lastLossFactor)
+            ? _credit.mulDivDown(type(uint128).max - marketState[id].lossFactor, type(uint128).max - _lastLossFactor)
             : 0;
         uint128 _pendingFee = _position.pendingFee;
         uint256 postSlashPendingFee =
-            credit > 0 ? _pendingFee - _pendingFee.mulDivUp(credit - postSlashCredit, credit) : 0;
+            _credit > 0 ? _pendingFee - _pendingFee.mulDivUp(_credit - postSlashCredit, _credit) : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, market.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
         // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
@@ -880,8 +881,24 @@ contract Midnight is IMidnight {
 
     /// OTHER VIEW FUNCTIONS ///
 
+    function credit(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].credit;
+    }
+
+    function pendingFee(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].pendingFee;
+    }
+
     function lastLossFactor(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].lastLossFactor;
+    }
+
+    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].lastAccrual;
+    }
+
+    function debt(bytes32 id, address user) external view returns (uint128) {
+        return position[id][user].debt;
     }
 
     function collateralBitmap(bytes32 id, address user) external view returns (uint128) {
@@ -904,14 +921,6 @@ contract Midnight is IMidnight {
         return abi.decode(create2Address.code, (Market));
     }
 
-    function creditOf(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].credit;
-    }
-
-    function debtOf(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].debt;
-    }
-
     function totalUnits(bytes32 id) external view returns (uint128) {
         return marketState[id].totalUnits;
     }
@@ -920,12 +929,12 @@ contract Midnight is IMidnight {
         return marketState[id].lossFactor;
     }
 
-    function tickSpacing(bytes32 id) external view returns (uint8) {
-        return marketState[id].tickSpacing;
-    }
-
     function withdrawable(bytes32 id) external view returns (uint128) {
         return marketState[id].withdrawable;
+    }
+
+    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
+        return marketState[id].continuousFeeCredit;
     }
 
     /// @dev The settlement fee cbp values are 0 until the market is created, then set to the default value.
@@ -946,16 +955,8 @@ contract Midnight is IMidnight {
         return marketState[id].continuousFee;
     }
 
-    function continuousFeeCredit(bytes32 id) external view returns (uint128) {
-        return marketState[id].continuousFeeCredit;
-    }
-
-    function pendingFee(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].pendingFee;
-    }
-
-    function lastAccrual(bytes32 id, address user) external view returns (uint128) {
-        return position[id][user].lastAccrual;
+    function tickSpacing(bytes32 id) external view returns (uint8) {
+        return marketState[id].tickSpacing;
     }
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
@@ -967,9 +968,9 @@ contract Midnight is IMidnight {
     /// @dev Expects the id to correspond to the market's id.
     function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
-        uint256 debt = _position.debt;
+        uint256 _debt = _position.debt;
         uint256 maxDebt;
-        if (debt > 0) {
+        if (_debt > 0) {
             uint128 _collateralBitmap = _position.collateralBitmap;
             while (_collateralBitmap != 0) {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
@@ -980,7 +981,7 @@ contract Midnight is IMidnight {
                 _collateralBitmap = _collateralBitmap.clearBit(i);
             }
         }
-        return maxDebt >= debt;
+        return maxDebt >= _debt;
     }
 
     /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.

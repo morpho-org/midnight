@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {console} from "forge-std/Test.sol";
+import {console} from "../lib/forge-std/src/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK, PRICE_ROUNDING_STEP} from "../src/libraries/TickLib.sol";
