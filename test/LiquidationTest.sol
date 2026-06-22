@@ -7,7 +7,6 @@ import {
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
     MAX_CONTINUOUS_FEE,
-    LLTV_8,
     LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
@@ -16,7 +15,7 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LLTV_8} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
@@ -577,6 +576,24 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(market.collateralParams[0].lltv, WAD);
         // After max repayment the position should be just healthy or almost healthy (within rounding tolerance).
         assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
+    }
+
+    function testLiquidateAccumulatesWithdrawable(uint256 units, uint256 repaid) public {
+        units = bound(units, 100, MAX_UNITS);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // post-maturity: liquidatable with no recovery close factor cap.
+        Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+
+        repaid = bound(repaid, 1, units / 8); // two equal repays stay within debt and collateral capacity.
+
+        assertEq(midnight.withdrawable(id), 0, "withdrawable before");
+
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
+        assertEq(midnight.withdrawable(id), repaid, "withdrawable after first liquidation");
+
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
+        assertEq(midnight.withdrawable(id), 2 * repaid, "withdrawable after second liquidation");
     }
 
     /// @dev When rcfThreshold > remaining debt after max repayment, full liquidation is allowed pre-maturity.

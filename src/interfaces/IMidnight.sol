@@ -33,6 +33,7 @@ struct Offer {
     bool reduceOnly;
     uint256 maxUnits;
     uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
+    uint256 continuousFeeCap;
 }
 
 /// @dev Settlement fee cbp values and the continuous fee are 0 until the market is created, then set to the default
@@ -71,47 +72,49 @@ interface IMidnight {
     error CollateralParamsNotSorted();
     error ConsumedAssets();
     error ConsumedUnits();
-    error ContinuousFeeTooHigh();
+    error ContinuousFeeAboveMax();
+    error ContinuousFeeAboveOfferCap();
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
-    error WrongBuyCallbackReturnValue();
-    error WrongSellCallbackReturnValue();
-    error WrongRepayCallbackReturnValue();
-    error WrongLiquidateCallbackReturnValue();
-    error WrongFlashLoanCallbackReturnValue();
     error InvalidFeeIndex();
+    error InvalidLltv();
     error InvalidMaxLif();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
     error LltvNotAllowed();
     error MakerCreditOrDebtIncreased();
+    error MarketLossFactorMaxedOut();
+    error MarketNotCreated();
     error MaturityTooFar();
     error NoCollateralParams();
     error NotBorrower();
     error NotLiquidatable();
-    error MarketLossFactorMaxedOut();
-    error MarketNotCreated();
     error OfferExpired();
     error OfferNotStarted();
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
     error OnlyRoleSetter();
     error OnlyTickSpacingSetter();
-    error RatifierFail();
+    error RatifierFailed();
     error RatifierUnauthorized();
     error RecoveryCloseFactorConditionsViolated();
     error SelfTake();
     error SellerGatedFromIncreasingDebt();
     error SellerIsLiquidatable();
+    error SettlementFeeAboveMax();
     error TakerUnauthorized();
     error TickNotAccessible();
     error TooManyActivatedCollaterals();
     error TooManyCollateralParams();
-    error SettlementFeeTooHigh();
     error Unauthorized();
     error UnhealthyBorrower();
     error UnusedReceiverMustBeZero();
+    error WrongBuyCallbackReturnValue();
+    error WrongFlashLoanCallbackReturnValue();
+    error WrongLiquidateCallbackReturnValue();
+    error WrongRepayCallbackReturnValue();
+    error WrongSellCallbackReturnValue();
 
     // forgefmt: disable-start
     /// IMMUTABLES ///
@@ -125,6 +128,7 @@ interface IMidnight {
     function defaultSettlementFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
+    function isLltvAllowed(uint256 lltv) external view returns (bool);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
@@ -138,6 +142,7 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
+    function addLltv(uint256 lltv) external;
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external;
     function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external;
     function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external;
