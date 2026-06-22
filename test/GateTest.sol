@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
-import {LIQUIDATION_CURSOR_LOW, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
+import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR_LOW} from "./BaseTest.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
 contract WhitelistGate is IEnterGate, ILiquidatorGate {

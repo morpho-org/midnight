@@ -8,6 +8,7 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function isLltvAllowed(uint256) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
     // Over-approximate view functions for prover performance.
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -45,9 +46,6 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
-
-// For allowed LLTV tiers and enabled liquidationCursors, only the lowest LLTV tier can exceed 2 WAD at a cursor below WAD.
-definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = lltv != 385 * WAD() / 1000 || liquidationCursor <= 813008130081300814;
 
 /// RULES ///
 
@@ -91,14 +89,7 @@ strong invariant enabledLiquidationCursorsAreBounded(uint256 liquidationCursor)
 
 // Show that a created market has maxLif <= 2 WAD for every collateral.
 strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor)
-    {
-        preserved with (env e) {
-            requireInvariant createdMarketsHaveAllowedLltv(market, i);
-            requireInvariant createdMarketsHaveEnabledLiquidationCursor(market, i);
-            requireInvariant enabledLiquidationCursorsAreBounded(market.collateralParams[i].liquidationCursor);
-        }
-    }
+    marketIsCreated(market) => i < market.collateralParams.length => Utils.maxLif(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD();
 
 // Show that a created market cannot be deleted.
 rule marketCannotBeDeleted(env e, method f, calldataarg args, Midnight.Market market) {

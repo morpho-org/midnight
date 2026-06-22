@@ -24,8 +24,6 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
@@ -45,6 +43,10 @@ uint256 constant LLTV_5 = 0.945e18;
 uint256 constant LLTV_6 = 0.965e18;
 uint256 constant LLTV_7 = 0.98e18;
 uint256 constant LLTV_8 = 1e18;
+
+/// @dev The default liquidationCursors enabled in tests.
+uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
+uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;

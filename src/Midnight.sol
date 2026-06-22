@@ -801,10 +801,11 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
-                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
                 require(isLltvAllowed[lltv], LltvNotAllowed());
-                require(isLiquidationCursorEnabled[liquidationCursor], InvalidLiquidationCursor());
-                require(isMaxLifAllowed(lltv, liquidationCursor), InvalidMaxLif());
+                require(
+                    isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor], InvalidLiquidationCursor()
+                );
+                require(maxLif(lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD, InvalidMaxLif());
                 previousCollateralToken = collateralToken;
             }
 

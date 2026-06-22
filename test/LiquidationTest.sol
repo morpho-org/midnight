@@ -7,7 +7,6 @@ import {
     ORACLE_PRICE_SCALE,
     TIME_TO_MAX_LIF,
     MAX_CONTINUOUS_FEE,
-    LIQUIDATION_CURSOR_LOW,
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -15,7 +14,7 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT, LLTV_8} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LLTV_8, LIQUIDATION_CURSOR_LOW} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 

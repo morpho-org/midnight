@@ -19,8 +19,6 @@ uint32 constant MAX_CONTINUOUS_FEE = uint32(uint256(0.01e18) / uint256(365 days)
 uint256 constant TIME_TO_MAX_LIF = 15 minutes;
 uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 16;
-uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
-uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
 uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
 bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
 uint8 constant DEFAULT_TICK_SPACING = 4;
@@ -33,10 +31,5 @@ function maxSettlementFee(uint256 index) pure returns (uint256) {
 /// @dev Returns the max LIF for the given lltv and liquidationCursor.
 function maxLif(uint256 lltv, uint256 liquidationCursor) pure returns (uint256) {
     return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(liquidationCursor, WAD - lltv, WAD));
-}
-
-/// @dev Returns true if the max LIF for the given lltv and liquidationCursor is at most 2 WAD.
-function isMaxLifAllowed(uint256 lltv, uint256 liquidationCursor) pure returns (bool) {
-    return lltv <= WAD && (lltv == WAD || liquidationCursor <= ((WAD / 2 + 1) * WAD - 1) / (WAD - lltv));
 }
 // forgefmt: disable-end

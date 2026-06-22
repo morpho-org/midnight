@@ -3,8 +3,6 @@
 pragma solidity ^0.8.0;
 
 import {
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
     WAD,
     MAX_CONTINUOUS_FEE,
     MAX_SETTLEMENT_FEE_0_DAYS,
@@ -15,7 +13,7 @@ import {
     MAX_SETTLEMENT_FEE_180_DAYS,
     MAX_SETTLEMENT_FEE_360_DAYS
 } from "../src/libraries/ConstantsLib.sol";
-import {BaseTest, LLTV_0} from "./BaseTest.sol";
+import {BaseTest, LLTV_0, LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH} from "./BaseTest.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
