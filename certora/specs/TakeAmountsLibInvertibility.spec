@@ -95,7 +95,7 @@ rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert buyerAssets == targetBuyerAssets;
 }
@@ -110,7 +110,7 @@ rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAsse
 
     uint256 buyerAssets;
     uint256 sellerAssets;
-    buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+    buyerAssets, sellerAssets, _, _, _, _ = take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert sellerAssets == targetSellerAssets;
 }
