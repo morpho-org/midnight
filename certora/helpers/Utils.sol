@@ -8,6 +8,7 @@ import {
     CALLBACK_SUCCESS,
     LIQUIDATION_CURSOR_LOW,
     LIQUIDATION_CURSOR_HIGH,
+    MAX_COLLATERALS_PER_BORROWER,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../../src/libraries/ConstantsLib.sol";
@@ -60,5 +61,9 @@ contract Utils {
 
     function liquidationCursorHigh() external pure returns (uint256) {
         return LIQUIDATION_CURSOR_HIGH;
+    }
+
+    function maxCollateralsPerBorrower() external pure returns (uint256) {
+        return MAX_COLLATERALS_PER_BORROWER;
     }
 }

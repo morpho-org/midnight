@@ -5,9 +5,9 @@ pragma solidity >=0.5.0;
 import {Offer, Market} from "../../interfaces/IMidnight.sol";
 
 struct Take {
-    uint256 units;
     Offer offer;
     bytes ratifierData;
+    uint256 units;
 }
 
 enum PermitKind {

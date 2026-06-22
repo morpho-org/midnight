@@ -20,7 +20,21 @@ import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
 import {WAD} from "../libraries/ConstantsLib.sol";
 
+/// @dev For each offer, the buy/sell functions will take min("units needed to fill target units / assets",
+/// takes[i].units, "units still consumable in takes[i].offer") units.
+/// @dev Only touched offers are checked to point to the same market. The collateral is supplied/withdrawn from the
+/// market of the first offer.
+/// @dev Buy/sell functions skip the offer if the take reverted. This allows to not fully revert if more liquidity was
+/// available in other offers passed as argument.
+/// @dev This bundler and the msg.sender (if different from the taker/onBehalf) should be authorized by taker/onBehalf
+/// on Midnight.
+/// @dev msg.sender is always the tokens payer (for buy, supplyCollateral and repay), and receiver is always the tokens
+/// receiver (for sell and withdraw collateral).
+/// @dev The bundler contract must have an allowance to pull enough tokens from msg.sender.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
+/// @dev Offers are taken in the order they are passed. One sensible strategy is to sort them by price (increasing to
+/// buy, decreasing to sell).
+/// @dev takes.units should prevent taking more than what is takeable w.r.t. the callback / the balances / the health.
 /// @dev Unusable with tokens that revert on such a sequence: approve(..., 0); approve(..., type(uint256).max).
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
@@ -36,16 +50,12 @@ contract MidnightBundles is IMidnightBundles {
 
     /// EXTERNAL ///
 
-    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev This function should only be called with the same market for all takes.
-    /// @dev The collateral transfers always use the first offer's market.
-    /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if ConsumableUnitsLib reverts.
-    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev This function pulls maxBuyerAssets from the msg.sender and transfers back the remaining tokens at the end.
     /// @dev The msg.sender will pay at most maxBuyerAssets.
     /// @dev Total loan assets transferred from msg.sender is
     /// filledBuyerAssets + filledBuyerAssets * referralFeePct / (WAD - referralFeePct).
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals, etc.
     function buyWithUnitsTargetAndWithdrawCollateral(
         uint256 targetUnits,
         uint256 maxBuyerAssets,
@@ -104,16 +114,10 @@ contract MidnightBundles is IMidnightBundles {
         SafeTransferLib.safeTransfer(loanToken, msg.sender, maxBuyerAssets - filledBuyerAssets - referralFeeAssets);
     }
 
-    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev This function should only be called with the same market for all takes.
-    /// @dev The collateral transfers always use the first offer's market.
-    /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if ConsumableUnitsLib reverts.
-    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev The receiver will receive at least minSellerAssets.
     /// @dev Total loan assets received by the receiver is
     /// filledSellerAssets - filledSellerAssets * referralFeePct / WAD.
+    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first token of collateralSupplies etc.
     function supplyCollateralAndSellWithUnitsTarget(
         uint256 targetUnits,
         uint256 minSellerAssets,
@@ -168,15 +172,11 @@ contract MidnightBundles is IMidnightBundles {
         SafeTransferLib.safeTransfer(loanToken, receiver, filledSellerAssets - referralFeeAssets);
     }
 
-    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev This function should only be called with the same market for all takes.
-    /// @dev The collateral transfers always use the first offer's market.
-    /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
-    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
     /// @dev Total loan assets transferred from msg.sender is targetBuyerAssets.
     /// @dev The taker will gain at least minUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals etc.
     function buyWithAssetsTargetAndWithdrawCollateral(
         uint256 targetBuyerAssets,
         uint256 minUnits,
@@ -239,16 +239,10 @@ contract MidnightBundles is IMidnightBundles {
         if (referralFeeAssets > 0) SafeTransferLib.safeTransfer(loanToken, referralFeeRecipient, referralFeeAssets);
     }
 
-    /// @dev The taker must have authorized this bundler and the msg.sender (if different from the taker) on Midnight.
-    /// @dev This function should only be called with the same market for all takes.
-    /// @dev The collateral transfers always use the first offer's market.
-    /// @dev Skips every reason why take can revert (including ones that are not asynchrony related).
-    /// @dev Reverts if TakeAmountsLib or ConsumableUnitsLib reverts.
-    /// @dev If taking an offer reverts, the bundler will completely skip this offer.
-    /// @dev The msg.sender should have approved the bundler to transfer enough collateral.
     /// @dev Total loan assets received by the receiver is targetSellerAssets.
     /// @dev The taker will lose at most maxUnits.
     /// @dev The referral fee changes the amount that must be filled, which can change the average taking price.
+    /// @dev msg.sender will pay collateralWithdrawals[0].assets of the first token of collateralSupplies etc.
     function supplyCollateralAndSellWithAssetsTarget(
         uint256 targetSellerAssets,
         uint256 maxUnits,
@@ -307,11 +301,11 @@ contract MidnightBundles is IMidnightBundles {
         SafeTransferLib.safeTransfer(loanToken, receiver, targetSellerAssets);
     }
 
-    /// @dev The onBehalf must have authorized this contract and the msg.sender (if different from onBehalf) on
-    /// Midnight.
     /// @dev The msg.sender must have approved the contract to transfer assets of the market's loan token.
     /// @dev Fee = assets * pct / WAD; units repaid = assets - fee.
     /// @dev To fully repay a debt D, pass assets = floor(D * WAD / (WAD - pct)).
+    /// @dev The collateralReceiver will receive collateralWithdrawals[0].assets of the first token of
+    /// collateralWithdrawals etc.
     function repayAndWithdrawCollateral(
         Market memory market,
         uint256 assets,
@@ -366,7 +360,7 @@ contract MidnightBundles is IMidnightBundles {
     }
 
     /// @dev Skips the approval entirely to save gas when the current allowance is already 2^95 - 1 (value chosen
-    /// because some token like COMP and UNI on ethereum have a max allowance of type(uint96).max).
+    /// because some tokens like COMP and UNI on Ethereum have a max allowance of type(uint96).max).
     /// @dev Resets to 0 before re-approving to support USDT like tokens.
     function forceApproveMax(address token, address spender) internal {
         if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;

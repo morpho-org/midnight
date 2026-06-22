@@ -25,15 +25,6 @@ import {
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
     LIQUIDATION_CURSOR_LOW,
-    LLTV_0,
-    LLTV_1,
-    LLTV_2,
-    LLTV_3,
-    LLTV_4,
-    LLTV_5,
-    LLTV_6,
-    LLTV_7,
-    LLTV_8,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
@@ -42,6 +33,17 @@ import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+
+/// @dev The LLTV tiers registered in tests, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
+uint256 constant LLTV_0 = 0.385e18;
+uint256 constant LLTV_1 = 0.625e18;
+uint256 constant LLTV_2 = 0.77e18;
+uint256 constant LLTV_3 = 0.86e18;
+uint256 constant LLTV_4 = 0.915e18;
+uint256 constant LLTV_5 = 0.945e18;
+uint256 constant LLTV_6 = 0.965e18;
+uint256 constant LLTV_7 = 0.98e18;
+uint256 constant LLTV_8 = 1e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -73,6 +75,11 @@ abstract contract BaseTest is Test {
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
+
+        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
+        for (uint256 i = 0; i < tiers.length; i++) {
+            midnight.addLltv(tiers[i]);
+        }
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -183,6 +190,7 @@ abstract contract BaseTest is Test {
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
         lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.continuousFeeCap = type(uint256).max;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -208,6 +216,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.start = vm.getBlockTimestamp();
         badBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         badBorrowerOffer.tick = MAX_TICK;
+        badBorrowerOffer.continuousFeeCap = type(uint256).max;
 
         vm.prank(badBorrower);
 
@@ -231,9 +240,9 @@ abstract contract BaseTest is Test {
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(address(this), true, badBorrower);
-        deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
-        midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
-        assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debt(toId(market), badBorrower));
+        midnight.repay(market, midnight.debt(toId(market), badBorrower), badBorrower, address(0), hex"");
+        assertEq(midnight.debt(toId(market), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
@@ -307,15 +316,24 @@ abstract contract BaseTest is Test {
     }
 
     function _setupMarketOffer(Market memory market) internal view returns (Offer memory borrowerOffer) {
+        borrowerOffer = _setupMarketOffer(market, type(uint256).max);
+    }
+
+    function _setupMarketOffer(Market memory market, uint256 maxUnits)
+        internal
+        view
+        returns (Offer memory borrowerOffer)
+    {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = maxUnits;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();
         borrowerOffer.tick = MAX_TICK;
+        borrowerOffer.continuousFeeCap = type(uint256).max;
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
