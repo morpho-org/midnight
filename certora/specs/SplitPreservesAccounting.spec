@@ -71,10 +71,10 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     // Path 1: take the full amount A.
     take(e, offer, ratifierData, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    uint128 creditOfBuyer1 = credit(id, buyer);
-    uint128 debtOfBuyer1 = debt(id, buyer);
-    uint128 creditOfSeller1 = credit(id, seller);
-    uint128 debtOfSeller1 = debt(id, seller);
+    uint128 creditBuyer1 = credit(id, buyer);
+    uint128 debtBuyer1 = debt(id, buyer);
+    uint128 creditSeller1 = credit(id, seller);
+    uint128 debtSeller1 = debt(id, seller);
     uint128 totalUnits1 = totalUnits(id);
     uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
     uint128 sellerLossFactor1 = lastLossFactor(id, seller);
@@ -89,10 +89,10 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
 
     take(e, offer, ratifierData, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    assert creditOfBuyer1 == credit(id, buyer);
-    assert debtOfBuyer1 == debt(id, buyer);
-    assert creditOfSeller1 == credit(id, seller);
-    assert debtOfSeller1 == debt(id, seller);
+    assert creditBuyer1 == credit(id, buyer);
+    assert debtBuyer1 == debt(id, buyer);
+    assert creditSeller1 == credit(id, seller);
+    assert debtSeller1 == debt(id, seller);
     assert totalUnits1 == totalUnits(id);
     assert buyerLossFactor1 == lastLossFactor(id, buyer);
     assert sellerLossFactor1 == lastLossFactor(id, seller);
