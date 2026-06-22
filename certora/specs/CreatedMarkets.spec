@@ -47,7 +47,8 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 
 definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
 
-definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = lltv <= WAD() && (lltv == WAD() || to_mathint(liquidationCursor) * (to_mathint(WAD()) - to_mathint(lltv)) <= (to_mathint(WAD()) / 2 + 1) * to_mathint(WAD()) - 1);
+// For allowed LLTV tiers and enabled liquidationCursors, only the lowest LLTV tier can exceed 2 WAD at a cursor below WAD.
+definition maxLifAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) returns bool = lltv != 385 * WAD() / 1000 || liquidationCursor <= 813008130081300814;
 
 /// RULES ///
 
@@ -76,9 +77,20 @@ strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i
 strong invariant createdMarketsHaveEnabledLiquidationCursor(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => currentContract.isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor];
 
+// Show that enabled liquidationCursors are at most WAD.
+strong invariant enabledLiquidationCursorsAreBounded(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
+
 // Show that a created market has maxLif <= 2 WAD for every collateral.
 strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor);
+    marketIsCreated(market) => i < market.collateralParams.length => maxLifAtMostTwoWad(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor)
+    {
+        preserved with (env e) {
+            requireInvariant createdMarketsHaveAllowedLltv(market, i);
+            requireInvariant createdMarketsHaveEnabledLiquidationCursor(market, i);
+            requireInvariant enabledLiquidationCursorsAreBounded(market.collateralParams[i].liquidationCursor);
+        }
+    }
 
 // Show that a created market cannot be deleted.
 rule marketCannotBeDeleted(env e, method f, calldataarg args, Midnight.Market market) {
