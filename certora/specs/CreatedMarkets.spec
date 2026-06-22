@@ -6,6 +6,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function tickSpacing(bytes32) external returns (uint8) envfree;
+    function isLltvAllowed(uint256) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
     function Utils.liquidationCursorLow() external returns (uint256) envfree;
@@ -48,8 +49,6 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-definition isLltvAllowed(uint256 lltv) returns bool = lltv == 385 * WAD() / 1000 || lltv == 625 * WAD() / 1000 || lltv == 770 * WAD() / 1000 || lltv == 860 * WAD() / 1000 || lltv == 915 * WAD() / 1000 || lltv == 945 * WAD() / 1000 || lltv == 965 * WAD() / 1000 || lltv == 980 * WAD() / 1000 || lltv == WAD();
-
 definition isMaxLifAllowed(uint256 lltv, uint256 maxLif) returns bool = maxLif == Utils.maxLif(lltv, Utils.liquidationCursorLow()) || maxLif == Utils.maxLif(lltv, Utils.liquidationCursorHigh());
 
 /// RULES ///
@@ -66,9 +65,18 @@ strong invariant createdMarketsHaveSortedCollaterals(Midnight.Market market, uin
 strong invariant createdMarketsHaveNonZeroCollaterals(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].token != 0;
 
+// Show that an allowed LLTV tier is at most WAD, which holds because tiers can only be added with lltv <= WAD.
+strong invariant allowedLltvIsLessThanOrEqualToOne(uint256 lltv)
+    isLltvAllowed(lltv) => lltv <= WAD();
+
 // Show that a created market has lltv <= WAD.
 strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD();
+    marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD()
+    {
+        preserved {
+            requireInvariant allowedLltvIsLessThanOrEqualToOne(market.collateralParams[i].lltv);
+        }
+    }
 
 // Show that a created market only has allowed LLTV tiers.
 strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i)
