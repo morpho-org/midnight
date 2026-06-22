@@ -14,7 +14,7 @@ bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 
 bytes constant MARKET_TYPE =
     "Market(address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 bytes constant OFFER_TYPE =
-    "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets)";
+    "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets,uint256 continuousFeeCap)";
 
 contract HashLibTest is Test {
     function testCollateralParamsTypeHash() public pure {

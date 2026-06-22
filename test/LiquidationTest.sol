@@ -583,7 +583,25 @@ contract LiquidationTest is BaseTest {
         assertLe(remainingDebt, newMaxDebt + 3, "position should be approximately just healthy after max repayment");
     }
 
-    /// @dev When rcfThreshold >= remaining repayable after max repayment, full liquidation is allowed pre-maturity.
+    function testLiquidateAccumulatesWithdrawable(uint256 units, uint256 repaid) public {
+        units = bound(units, 100, MAX_UNITS);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        vm.warp(market.maturity + TIME_TO_MAX_LIF); // post-maturity: liquidatable with no recovery close factor cap.
+        Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
+
+        repaid = bound(repaid, 1, units / 8); // two equal repays stay within debt and collateral capacity.
+
+        assertEq(midnight.withdrawable(id), 0, "withdrawable before");
+
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
+        assertEq(midnight.withdrawable(id), repaid, "withdrawable after first liquidation");
+
+        midnight.liquidate(market, 0, 0, repaid, borrower, true, address(this), address(0), "");
+        assertEq(midnight.withdrawable(id), 2 * repaid, "withdrawable after second liquidation");
+    }
+
+    /// @dev When rcfThreshold >= remaining payable after max repayment, full liquidation is allowed pre-maturity.
     function testRcfThresholdAllowsFullLiquidation(uint256 units, uint256 liquidationOraclePrice, uint256 rcfThreshold)
         public
     {

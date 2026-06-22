@@ -145,6 +145,20 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
 }
 
+/// When lastAccrual is already at block.timestamp, updatePosition preserves continuousFeeCredit.
+rule updatePositionPreservesContinuousFeeCreditWhenLastAccrualIsUpToDate(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require currentContract.position[id][user].lastAccrual == e.block.timestamp, "lastAccrual is up to date";
+
+    uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
+    updatePosition(e, market, user);
+    uint128 continuousFeeCreditAfter = currentContract.marketState[id].continuousFeeCredit;
+
+    assert continuousFeeCreditAfter == continuousFeeCreditBefore;
+}
+
 /// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address borrower, bytes data) {
     bytes32 id = summaryToId(market);

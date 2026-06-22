@@ -6,6 +6,7 @@ import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
 
@@ -264,6 +265,9 @@ contract SettlementFeeTest is BaseTest {
         vm.assume(fee > 0);
         withdrawAmount = bound(withdrawAmount, 1, fee);
         address receiver = makeAddr("receiver");
+
+        vm.expectEmit();
+        emit EventsLib.ClaimSettlementFee(feeClaimer, address(loanToken), withdrawAmount, receiver);
 
         vm.prank(feeClaimer);
         midnight.claimSettlementFee(address(loanToken), withdrawAmount, receiver);
