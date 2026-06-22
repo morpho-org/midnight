@@ -6,7 +6,7 @@ import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMid
 import {IEnterGate, ILiquidatorGate} from "../src/interfaces/IGate.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR_LOW} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 
 contract WhitelistGate is IEnterGate, ILiquidatorGate {
@@ -50,7 +50,7 @@ contract GateTest is BaseTest {
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
-                    liquidationCursor: LIQUIDATION_CURSOR_LOW
+                    liquidationCursor: LIQUIDATION_CURSOR
                 })
             );
         market.collateralParams = sortCollateralParams(market.collateralParams);
@@ -63,7 +63,7 @@ contract GateTest is BaseTest {
                     token: address(collateralToken1),
                     lltv: 0.77e18,
                     oracle: address(oracle1),
-                    liquidationCursor: LIQUIDATION_CURSOR_LOW
+                    liquidationCursor: LIQUIDATION_CURSOR
                 })
             );
         gatedMarket.collateralParams = sortCollateralParams(gatedMarket.collateralParams);

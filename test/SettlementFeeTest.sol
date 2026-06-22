@@ -8,7 +8,7 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 // The maximum debt from a take must fit in uint128, and the required collateral (debt / lltv)
 // must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3.
@@ -44,7 +44,7 @@ contract SettlementFeeTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -53,7 +53,7 @@ contract SettlementFeeTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );

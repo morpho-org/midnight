@@ -44,9 +44,8 @@ uint256 constant LLTV_6 = 0.965e18;
 uint256 constant LLTV_7 = 0.98e18;
 uint256 constant LLTV_8 = 1e18;
 
-/// @dev The default liquidationCursors enabled in tests.
-uint256 constant LIQUIDATION_CURSOR_LOW = 0.25e18;
-uint256 constant LIQUIDATION_CURSOR_HIGH = 0.5e18;
+/// @dev The default liquidationCursor enabled in tests.
+uint256 constant LIQUIDATION_CURSOR = 0.3e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -79,9 +78,8 @@ abstract contract BaseTest is Test {
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
 
-        // Enable the default liquidationCursors at deployment time.
-        midnight.addLiquidationCursor(LIQUIDATION_CURSOR_LOW);
-        midnight.addLiquidationCursor(LIQUIDATION_CURSOR_HIGH);
+        // Enable the default liquidationCursor at deployment time.
+        midnight.addLiquidationCursor(LIQUIDATION_CURSOR);
 
         uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
         for (uint256 i = 0; i < tiers.length; i++) {
@@ -305,7 +303,7 @@ abstract contract BaseTest is Test {
                 address(uint160(uint256(keccak256(abi.encode(market.collateralParams[i].token, i)))));
             uint256 lltv = allowedLltv(market.collateralParams[i].lltv);
             collateralParams[i].lltv = lltv;
-            collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR_LOW;
+            collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR;
         }
         collateralParams = sortCollateralParams(collateralParams);
         market.collateralParams = collateralParams;

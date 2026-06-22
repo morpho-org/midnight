@@ -7,7 +7,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 /// @dev Integration tests for tick spacing enforcement in take() and spacing governance.
 contract TickGatingTest is BaseTest {
@@ -26,7 +26,7 @@ contract TickGatingTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -35,7 +35,7 @@ contract TickGatingTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );

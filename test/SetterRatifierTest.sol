@@ -8,7 +8,7 @@ import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract SetterRatifierTest is BaseTest {
     SetterRatifier internal setterRatifier;
@@ -24,7 +24,10 @@ contract SetterRatifierTest is BaseTest {
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams = new CollateralParams[](1);
         market.collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: 0.77e18,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
 
         offer.market = market;

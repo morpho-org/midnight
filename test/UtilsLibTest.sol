@@ -5,18 +5,7 @@ import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 import {WAD, maxLif} from "../src/libraries/ConstantsLib.sol";
-import {
-    LLTV_0,
-    LLTV_1,
-    LLTV_2,
-    LLTV_3,
-    LLTV_4,
-    LLTV_5,
-    LLTV_6,
-    LLTV_7,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH
-} from "./BaseTest.sol";
+import {LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7} from "./BaseTest.sol";
 
 contract UtilsLibTest is Test {
     int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
@@ -197,7 +186,7 @@ contract UtilsLibTest is Test {
     // This test makes sure that the computation of maxRepaid (for RCF) is not too imprecise.
     function testRcfBound() public pure {
         uint256[8] memory lltvs = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7];
-        uint256[2] memory liquidationCursors = [LIQUIDATION_CURSOR_LOW, LIQUIDATION_CURSOR_HIGH];
+        uint256[2] memory liquidationCursors = [uint256(0.25e18), 0.5e18];
         for (uint256 i = 0; i < lltvs.length; i++) {
             uint256 lltv = lltvs[i];
             for (uint256 j = 0; j < liquidationCursors.length; j++) {
@@ -207,7 +196,7 @@ contract UtilsLibTest is Test {
             }
         }
         // Also ensure that the bound is close to the max bound.
-        uint256 lifHigh7 = maxLif(LLTV_7, LIQUIDATION_CURSOR_HIGH);
+        uint256 lifHigh7 = maxLif(LLTV_7, 0.5e18);
         assertGt(WAD * WAD / (WAD * WAD - lifHigh7 * LLTV_7), 90);
     }
 }

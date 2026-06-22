@@ -17,7 +17,7 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -49,7 +49,7 @@ contract OtherFunctionsTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -58,7 +58,7 @@ contract OtherFunctionsTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
@@ -377,7 +377,7 @@ contract OtherFunctionsTest is BaseTest {
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
             lltv: 0.77e18,
-            liquidationCursor: 0.25e18,
+            liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
 
@@ -401,7 +401,7 @@ contract OtherFunctionsTest is BaseTest {
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
             lltv: 0.77e18,
-            liquidationCursor: 0.25e18,
+            liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
 
@@ -430,7 +430,7 @@ contract OtherFunctionsTest is BaseTest {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
             collateralParams[i] = CollateralParams({
-                token: address(token), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(_oracle)
+                token: address(token), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(_oracle)
             });
         }
         collateralParams = sortCollateralParams(collateralParams);
@@ -487,10 +487,10 @@ contract OtherFunctionsTest is BaseTest {
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
-            token: address(uint160(2)), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle1)
+            token: address(uint160(2)), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle1)
         });
         collateralParams[1] = CollateralParams({
-            token: address(uint160(1)), lltv: 0.77e18, liquidationCursor: 0.25e18, oracle: address(oracle2)
+            token: address(uint160(1)), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle2)
         });
         _market.collateralParams = collateralParams;
         vm.expectRevert(IMidnight.CollateralParamsNotSorted.selector);
@@ -504,7 +504,10 @@ contract OtherFunctionsTest is BaseTest {
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, liquidationCursor: 0.25e18, oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
         vm.expectRevert(IMidnight.LltvNotAllowed.selector);
@@ -519,7 +522,10 @@ contract OtherFunctionsTest is BaseTest {
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, liquidationCursor: 0.25e18, oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
         vm.expectRevert(IMidnight.LltvNotAllowed.selector);
@@ -645,7 +651,7 @@ contract OtherFunctionsTest is BaseTest {
     // LiquidationCursor validation tests.
 
     function testInvalidLiquidationCursor(uint256 liquidationCursor) public {
-        vm.assume(liquidationCursor != 0.25e18 && liquidationCursor != 0.5e18);
+        vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
         uint256 lltv = 0.77e18;
 
         Market memory _market;
@@ -661,34 +667,22 @@ contract OtherFunctionsTest is BaseTest {
         midnight.touchMarket(_market);
     }
 
-    function testValidLifLiquidationCursor025() public {
+    function testValidLifLiquidationCursor() public {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, liquidationCursor: 0.25e18, oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
 
         midnight.touchMarket(_market);
-        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with liquidationCursor 0.25");
-    }
-
-    function testValidLifLiquidationCursor05() public {
-        uint256 lltv = 0.77e18;
-        Market memory _market;
-        _market.loanToken = address(loanToken);
-        _market.maturity = vm.getBlockTimestamp() + 200;
-        CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, liquidationCursor: 0.5e18, oracle: address(oracle1)
-        });
-        _market.collateralParams = collateralParams;
-
-        midnight.touchMarket(_market);
-        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with liquidationCursor 0.5");
+        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with enabled liquidationCursor");
     }
 
     function testMarketStateGetter(Market memory _market, uint256 _defaultContinuousFee) public {

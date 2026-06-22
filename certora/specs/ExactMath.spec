@@ -11,7 +11,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 liquidationCursor) {
     require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
-    require liquidationCursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
+    require liquidationCursor <= WAD(), "enabled liquidationCursors are at most WAD, see addLiquidationCursor";
     assert lltv * maxLif(lltv, liquidationCursor) <= WAD() * WAD();
 }
 
@@ -20,16 +20,9 @@ rule maxLifIsAtLeastWad(uint256 lltv, uint256 liquidationCursor) {
     assert maxLif(lltv, liquidationCursor) >= WAD();
 }
 
-/// Check that maxLif <= 2*WAD for valid liquidationCursor values
-rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 liquidationCursor) {
-    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
-    require liquidationCursor <= WAD() / 2, "see LIQUIDATION_CURSOR_HIGH in ConstantsLib";
-    assert maxLif(lltv, liquidationCursor) <= 2 * WAD();
-}
-
 /// Check that maxLif * lltv <= WAD * (WAD - 1) for valid liquidationCursor values
 rule lifTimesLltvStrictBound(uint256 lltv, uint256 liquidationCursor) {
-    require liquidationCursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
+    require liquidationCursor <= WAD(), "enabled liquidationCursors are at most WAD, see addLiquidationCursor";
     assert lltv < WAD() => lltv * maxLif(lltv, liquidationCursor) <= WAD() * (WAD() - 1);
 }
 

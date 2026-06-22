@@ -11,7 +11,7 @@ import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {StdStorage, stdStorage} from "../lib/forge-std/src/StdStorage.sol";
@@ -41,7 +41,7 @@ contract TakeTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -50,7 +50,7 @@ contract TakeTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );

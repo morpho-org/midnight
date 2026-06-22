@@ -12,7 +12,7 @@ import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 /// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`.
 /// `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
@@ -35,7 +35,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken1),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -44,7 +44,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
                 CollateralParams({
                     token: address(collateralToken2),
                     lltv: 0.77e18,
-                    liquidationCursor: 0.25e18,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
