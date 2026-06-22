@@ -74,7 +74,7 @@ contract MaxAmountsTest is BaseTest {
         take(amount, lender, borrowerOffer);
 
         assertEq(midnight.totalUnits(id), amount, "total units at max");
-        assertEq(midnight.debtOf(id, borrower), amount, "debt at max");
+        assertEq(midnight.debt(id, borrower), amount, "debt at max");
     }
 
     function testTakeAboveMaxAmountReverts() public {

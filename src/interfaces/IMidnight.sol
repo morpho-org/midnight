@@ -170,8 +170,8 @@ interface IMidnight {
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
-    function creditOf(bytes32 id, address user) external view returns (uint128);
-    function debtOf(bytes32 id, address user) external view returns (uint128);
+    function credit(bytes32 id, address user) external view returns (uint128);
+    function debt(bytes32 id, address user) external view returns (uint128);
     function totalUnits(bytes32 id) external view returns (uint128);
     function lossFactor(bytes32 id) external view returns (uint128);
     function tickSpacing(bytes32 id) external view returns (uint8);

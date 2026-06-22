@@ -7,8 +7,8 @@ methods {
     function withdrawable(bytes32) external returns (uint128) envfree;
     function settlementFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function continuousFee(bytes32) external returns (uint32) envfree;
-    function creditOf(bytes32, address) external returns (uint128) envfree;
-    function debtOf(bytes32, address) external returns (uint128) envfree;
+    function credit(bytes32, address) external returns (uint128) envfree;
+    function debt(bytes32, address) external returns (uint128) envfree;
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
@@ -63,10 +63,10 @@ strong invariant marketLossFactorIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => currentContract.marketState[id].lossFactor == 0;
 
 strong invariant marketCreditIsEmptyIfNotCreated(bytes32 id, address user)
-    !marketIsCreated(id) => creditOf(id, user) == 0;
+    !marketIsCreated(id) => credit(id, user) == 0;
 
 strong invariant marketDebtIsEmptyIfNotCreated(bytes32 id, address user)
-    !marketIsCreated(id) => debtOf(id, user) == 0;
+    !marketIsCreated(id) => debt(id, user) == 0;
 
 strong invariant marketCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => userHasEmptyCollateralBitmap(id, user);
