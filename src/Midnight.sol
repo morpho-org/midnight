@@ -51,7 +51,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
 /// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
-/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuious fee is decreased
+/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuous fee is decreased
 /// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
 /// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee.
@@ -76,8 +76,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers to open small positions / liquidators to leave small positions that might not be
-/// profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic aspect.
+/// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
+/// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
+/// aspect.
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
 /// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -670,7 +671,7 @@ contract Midnight is IMidnight {
             if (!postMaturityMode) {
                 uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
-                // The imprecision in this computation is at most a few hundreds collateral or loan token assets.
+                // The imprecision in this computation is at most a few hundred collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
