@@ -245,21 +245,40 @@ contract SettersTest is BaseTest {
 
     // LiquidationCursor tests
 
-    function testInitialLiquidationCursors(uint256 liquidationCursor) public view {
-        // BaseTest enables only LIQUIDATION_CURSOR at deployment time; nothing else is enabled.
-        vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
-        assertTrue(midnight.isLiquidationCursorEnabled(LIQUIDATION_CURSOR), "default liquidationCursor enabled");
-        assertFalse(midnight.isLiquidationCursorEnabled(liquidationCursor), "other liquidationCursor not enabled");
-    }
-
     function testAddLiquidationCursorSuccess(uint256 liquidationCursor) public {
         liquidationCursor = bound(liquidationCursor, 0, WAD);
+        // Use a cursor that isn't enabled at deployment, so market creation is initially rejected.
+        vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
 
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: 0.77e18,
+            liquidationCursor: liquidationCursor,
+            oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        // A market using a not-yet-enabled liquidationCursor is rejected.
+        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        midnight.touchMarket(market);
+
+        // Enabling it emits the event and flips the mapping.
         vm.expectEmit();
         emit EventsLib.AddLiquidationCursor(liquidationCursor);
         midnight.addLiquidationCursor(liquidationCursor);
-
         assertTrue(midnight.isLiquidationCursorEnabled(liquidationCursor), "liquidationCursor enabled");
+
+        // The same market can now be created.
+        midnight.touchMarket(market);
+        assertTrue(midnight.tickSpacing(toId(market)) > 0, "market created with added liquidationCursor");
     }
 
     function testAddLiquidationCursorOnlyRoleSetter(address rdm, uint256 liquidationCursor) public {
@@ -274,57 +293,6 @@ contract SettersTest is BaseTest {
         liquidationCursor = bound(liquidationCursor, WAD + 1, type(uint256).max);
         vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
         midnight.addLiquidationCursor(liquidationCursor);
-    }
-
-    function testAddLiquidationCursorEnablesMarketCreation() public {
-        // A liquidationCursor that is not enabled is rejected, then becomes valid once added.
-        uint256 liquidationCursor = 0.375e18;
-        uint256 lltv = 0.77e18;
-
-        CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, liquidationCursor: liquidationCursor, oracle: address(oracle1)
-        });
-        Market memory market = Market({
-            loanToken: address(loanToken),
-            maturity: vm.getBlockTimestamp() + 1 days,
-            collateralParams: collateralParams,
-            rcfThreshold: 0,
-            enterGate: address(0),
-            liquidatorGate: address(0)
-        });
-
-        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
-        midnight.touchMarket(market);
-
-        midnight.addLiquidationCursor(liquidationCursor);
-
-        midnight.touchMarket(market);
-        assertEq(midnight.tickSpacing(toId(market)) > 0, true, "market created with added liquidationCursor");
-    }
-
-    function testTouchMarketAllowsCursorAboveHighWhenMaxLifAtMostTwoWad() public {
-        uint256 liquidationCursor = 0.75e18;
-        midnight.addLiquidationCursor(liquidationCursor);
-
-        CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        collateralParams[0] = CollateralParams({
-            token: address(collateralToken1),
-            lltv: LLTV_0,
-            liquidationCursor: liquidationCursor,
-            oracle: address(oracle1)
-        });
-        Market memory market = Market({
-            loanToken: address(loanToken),
-            maturity: vm.getBlockTimestamp() + 1 days,
-            collateralParams: collateralParams,
-            rcfThreshold: 0,
-            enterGate: address(0),
-            liquidatorGate: address(0)
-        });
-
-        midnight.touchMarket(market);
-        assertEq(midnight.tickSpacing(toId(market)) > 0, true, "market created with cursor above high");
     }
 
     function testTouchMarketRejectsMaxLifAboveTwoWad() public {
