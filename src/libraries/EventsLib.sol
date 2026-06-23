@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Market, Offer} from "../interfaces/IMidnight.sol";
+import {Market} from "../interfaces/IMidnight.sol";
 
 /// @dev id_ is used to avoid naming conflicts in indexers.
 library EventsLib {
