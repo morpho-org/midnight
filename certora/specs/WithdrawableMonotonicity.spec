@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function toId(Midnight.Market) external returns (bytes32);
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+}
+
+function toId(env e, Midnight.Market market) returns bytes32 {
+    return Utils.hashMarket(market);
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {

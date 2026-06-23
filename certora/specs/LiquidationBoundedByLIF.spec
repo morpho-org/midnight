@@ -14,7 +14,7 @@ methods {
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     // Deterministic toId summary using a wrapper that extracts all scalar Market fields.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Skip market creation logic: removes the collateral-validation loop.
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);

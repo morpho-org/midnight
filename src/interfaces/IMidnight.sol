@@ -3,6 +3,8 @@
 pragma solidity >=0.5.0;
 
 struct Market {
+    uint256 initialChainId;
+    address midnight;
     address loanToken;
     CollateralParams[] collateralParams;
     uint256 maturity;
@@ -77,8 +79,10 @@ interface IMidnight {
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
     error InvalidFeeIndex();
+    error InvalidInitialChainId();
     error InvalidLltv();
     error InvalidMaxLif();
+    error InvalidMidnight();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
@@ -171,7 +175,6 @@ interface IMidnight {
     function lastLossFactor(bytes32 id, address user) external view returns (uint128);
     function collateralBitmap(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
-    function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
     function credit(bytes32 id, address user) external view returns (uint128);
     function debt(bytes32 id, address user) external view returns (uint128);

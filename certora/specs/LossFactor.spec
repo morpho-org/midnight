@@ -14,8 +14,8 @@ methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId needed to link market arguments to stored state.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;

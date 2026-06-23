@@ -8,11 +8,15 @@ methods {
     function settlementFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
-    function toId(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function Utils.maxSettlementFee(uint256 index) external returns (uint256) envfree;
 
     // Over-approximate view functions.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
+}
+
+function toId(env e, Midnight.Market market) returns bytes32 {
+    return Utils.hashMarket(market);
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the settlementFee intervals in Midnight.sol.

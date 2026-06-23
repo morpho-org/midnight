@@ -19,7 +19,7 @@ methods {
     function _.price() external => ghostPrice(calledContract) expect(uint256);
 
     // Summary for deterministic toId for the global market.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // This function is checked manually to not cause a division by zero.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -74,9 +74,9 @@ function equalsGlobalMarket(Midnight.Market market) returns (bool) {
     return market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
+function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && midnight == currentContract) {
+    if (equalsGlobalMarket(market) && market.midnight == currentContract) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";

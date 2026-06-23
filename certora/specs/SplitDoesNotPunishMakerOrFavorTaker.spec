@@ -13,7 +13,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghostMulDivUp(a, b, d);
 
     // Summarize toId: deterministic hash preserves market-to-id relationship without adding assumptions.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Assume that the markets are already created.
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);

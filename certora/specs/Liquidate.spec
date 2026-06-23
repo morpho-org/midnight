@@ -18,14 +18,14 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => summaryMulDivUp(a, b, denominator);
 
     // IdLib summary: remember the last id returned by toId.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 }
 
 /// HELPERS ///
 
 persistent ghost bytes32 liqId;
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns bytes32 {
+function summaryToId(Midnight.Market market) returns bytes32 {
     bytes32 id;
     liqId = id;
     return id;

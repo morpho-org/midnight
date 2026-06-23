@@ -16,7 +16,7 @@ methods {
     // Under this assumption we can prove that a healthy borrower cannot get unhealthy by any action on the contract.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Summarize mulDivDown and mulDivUp to simplify the verification task.
     // Use a ghost function that ensures mulDivDown/Up behaves deterministically and add only the axioms about mulDiv that are needed to prove the desired property.
@@ -25,7 +25,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function _.havocAll() external => HAVOC_ALL;
 
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => transferCallback();
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => transferCallback();
@@ -138,9 +138,9 @@ function getGlobalMarket() returns (Midnight.Market) {
     return market;
 }
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
+function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && midnight == currentContract) {
+    if (equalsGlobalMarket(market) && market.midnight == currentContract) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";
