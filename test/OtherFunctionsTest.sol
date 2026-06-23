@@ -17,7 +17,7 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, LLTV, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -48,7 +48,7 @@ contract OtherFunctionsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
@@ -57,7 +57,7 @@ contract OtherFunctionsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
@@ -376,7 +376,7 @@ contract OtherFunctionsTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
@@ -400,7 +400,7 @@ contract OtherFunctionsTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
@@ -430,7 +430,7 @@ contract OtherFunctionsTest is BaseTest {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
             collateralParams[i] = CollateralParams({
-                token: address(token), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(_oracle)
+                token: address(token), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(_oracle)
             });
         }
         collateralParams = sortCollateralParams(collateralParams);
@@ -487,10 +487,10 @@ contract OtherFunctionsTest is BaseTest {
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
-            token: address(uint160(2)), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle1)
+            token: address(uint160(2)), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle1)
         });
         collateralParams[1] = CollateralParams({
-            token: address(uint160(1)), lltv: 0.77e18, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle2)
+            token: address(uint160(1)), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle2)
         });
         _market.collateralParams = collateralParams;
         vm.expectRevert(IMidnight.CollateralParamsNotSorted.selector);
@@ -652,7 +652,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testInvalidLiquidationCursor(uint256 liquidationCursor) public {
         vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
-        uint256 lltv = 0.77e18;
+        uint256 lltv = LLTV;
 
         Market memory _market;
         _market.loanToken = address(loanToken);
@@ -668,7 +668,7 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testValidLifLiquidationCursor() public {
-        uint256 lltv = 0.77e18;
+        uint256 lltv = LLTV;
         Market memory _market;
         _market.loanToken = address(loanToken);
         _market.maturity = vm.getBlockTimestamp() + 100;

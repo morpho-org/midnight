@@ -13,7 +13,7 @@ import {
     MAX_SETTLEMENT_FEE_180_DAYS,
     MAX_SETTLEMENT_FEE_360_DAYS
 } from "../src/libraries/ConstantsLib.sol";
-import {BaseTest, LLTV_0, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
@@ -123,7 +123,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });
@@ -252,10 +252,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1),
-            lltv: 0.77e18,
-            liquidationCursor: liquidationCursor,
-            oracle: address(oracle1)
+            token: address(collateralToken1), lltv: LLTV, liquidationCursor: liquidationCursor, oracle: address(oracle1)
         });
         Market memory market = Market({
             loanToken: address(loanToken),
@@ -299,10 +296,14 @@ contract SettersTest is BaseTest {
         uint256 liquidationCursor = 0.814e18;
         midnight.addLiquidationCursor(liquidationCursor);
 
+        // A low LLTV combined with this liquidationCursor yields a maxLif above 2 WAD.
+        uint256 lowLltv = 0.385e18;
+        midnight.addLltv(lowLltv);
+
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: LLTV_0,
+            lltv: lowLltv,
             liquidationCursor: liquidationCursor,
             oracle: address(oracle1)
         });
@@ -376,7 +377,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });
@@ -436,7 +437,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });
@@ -493,7 +494,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });
@@ -523,7 +524,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });
@@ -559,7 +560,7 @@ contract SettersTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
+            lltv: LLTV,
             liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(oracle1)
         });

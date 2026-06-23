@@ -19,7 +19,7 @@ import {
     PermitKind
 } from "../src/periphery/interfaces/IMidnightBundles.sol";
 import {Permit2 as VendorPermit2} from "./vendor/Permit2.sol";
-import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract MidnightBundlesTest is BaseTest {
     using UtilsLib for uint256;
@@ -51,7 +51,7 @@ contract MidnightBundlesTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
@@ -60,7 +60,7 @@ contract MidnightBundlesTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })

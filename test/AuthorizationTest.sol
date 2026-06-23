@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IMidnight, Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
-import {BaseTest, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -24,7 +24,7 @@ contract AuthorizationTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })

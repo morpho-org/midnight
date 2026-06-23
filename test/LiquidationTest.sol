@@ -14,7 +14,7 @@ import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT, LLTV_8, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, MAX_TEST_AMOUNT, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {stdError} from "../lib/forge-std/src/StdError.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
 
@@ -49,7 +49,7 @@ contract LiquidationTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
@@ -58,7 +58,7 @@ contract LiquidationTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.86e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
@@ -968,13 +968,14 @@ contract LiquidationTest is BaseTest {
     function testLiquidatePreMaturityLltvWad(uint256 units) public {
         units = bound(units, 2, MAX_UNITS);
 
-        // Override market to use LLTV_8 = WAD on collateral 0.
+        // Override market to use LLTV = WAD on collateral 0.
+        midnight.addLltv(WAD);
         delete market.collateralParams;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: LLTV_8,
+                    lltv: WAD,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })

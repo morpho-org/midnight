@@ -7,7 +7,7 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {BaseTest, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {BaseTest, LLTV, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
 
@@ -28,7 +28,7 @@ contract ContinuousFeeTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
+                    lltv: LLTV,
                     liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
