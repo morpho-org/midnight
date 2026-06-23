@@ -28,7 +28,6 @@ methods {
 
 /// HELPERS ///
 
-
 definition WAD() returns uint256 = 10 ^ 18;
 
 definition CBP() returns uint256 = 10 ^ 12;
