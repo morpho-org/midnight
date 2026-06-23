@@ -15,6 +15,7 @@ import {
 import {IERC20Permit} from "./interfaces/IERC20Permit.sol";
 import {IPermit2} from "./interfaces/IPermit2.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {IdLib} from "../libraries/IdLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
@@ -43,9 +44,11 @@ contract MidnightBundles is IMidnightBundles {
 
     address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address public immutable MIDNIGHT;
+    uint256 public immutable INITIAL_CHAIN_ID;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
+        INITIAL_CHAIN_ID = IMidnight(_midnight).INITIAL_CHAIN_ID();
     }
 
     /// EXTERNAL ///
@@ -80,7 +83,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market, INITIAL_CHAIN_ID, MIDNIGHT) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
@@ -147,7 +150,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market, INITIAL_CHAIN_ID, MIDNIGHT) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
@@ -204,7 +207,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market, INITIAL_CHAIN_ID, MIDNIGHT) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 TakeAmountsLib.buyerAssetsToUnits(
                     MIDNIGHT, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
@@ -275,7 +278,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market, INITIAL_CHAIN_ID, MIDNIGHT) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 TakeAmountsLib.sellerAssetsToUnits(
                     MIDNIGHT, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets

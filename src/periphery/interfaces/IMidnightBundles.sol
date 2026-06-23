@@ -47,6 +47,7 @@ interface IMidnightBundles {
     /// STORAGE GETTERS ///
     function PERMIT2() external view returns (address);
     function MIDNIGHT() external view returns (address);
+    function INITIAL_CHAIN_ID() external view returns (uint256);
 
     // forgefmt: disable-start
     /// FUNCTIONS ///
