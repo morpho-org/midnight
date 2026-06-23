@@ -132,11 +132,12 @@ interface IMidnight {
     function isLltvEnabled(uint256 lltv) external view returns (bool);
     function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
 
+    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
+
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
     function tickSpacingSetter() external view returns (address);
-    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
 
     /// MULTICALL ///
     function multicall(bytes[] memory calls) external;
