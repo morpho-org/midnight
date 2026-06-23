@@ -3,9 +3,8 @@
 using Utils as Utils;
 
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
-    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     function roleSetter() external returns (address) envfree;
     function feeSetter() external returns (address) envfree;
@@ -29,11 +28,6 @@ methods {
 
 /// HELPERS ///
 
-ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
-
-function summaryToId(Midnight.Market market) returns bytes32 {
-    return marketHash(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
-}
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -278,7 +272,7 @@ rule feeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, addre
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     address feeClaimerBefore = feeClaimer();
     bool marketIsCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);

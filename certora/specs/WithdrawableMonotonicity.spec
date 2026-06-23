@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-methods {
-    function multicall(bytes[]) external => HAVOC_ALL DELETE;
+using Utils as Utils;
 
-    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
+    function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
 }
 
-ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
-
-function summaryToId(Midnight.Market market) returns bytes32 {
-    return marketHash(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
-}
 
 rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     repay(e, market, units, onBehalf, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
@@ -24,7 +20,7 @@ rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, ad
 }
 
 rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
@@ -34,7 +30,7 @@ rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 colla
 }
 
 rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256 unitsInput, address onBehalf, address receiver) {
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     withdraw(e, market, unitsInput, onBehalf, receiver);
     uint256 withdrawableAfter = withdrawable(id);
@@ -42,7 +38,7 @@ rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256
 }
 
 rule claimContinuousFeeDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256 amount, address receiver) {
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     claimContinuousFee(e, market, amount, receiver);
     uint256 withdrawableAfter = withdrawable(id);

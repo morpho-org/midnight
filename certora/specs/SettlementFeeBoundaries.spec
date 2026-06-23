@@ -3,9 +3,8 @@
 using Utils as Utils;
 
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
-
-    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     function settlementFee(bytes32 id, uint256 timeToMaturity) external returns (uint256) envfree;
     function feeSetter() external returns (address) envfree;
@@ -16,11 +15,6 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
-
-function summaryToId(Midnight.Market market) returns bytes32 {
-    return marketHash(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
-}
 
 /// Breakpoint time in seconds for index 0..6, mirroring the settlementFee intervals in Midnight.sol.
 definition breakpointTime(uint256 index) returns uint256 = index == 0 ? 0 : index == 1 ? 86400 : index == 2 ? 7 * 86400 : index == 3 ? 30 * 86400 : index == 4 ? 90 * 86400 : index == 5 ? 180 * 86400 : index == 6 ? 360 * 86400 : 0;
@@ -73,7 +67,7 @@ invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
 /// When a market is created, its settlement fees are set to the default settlement fees of its loan token.
 rule newMarketSettlementFeesMatchDefault(env e, Midnight.Market market, uint256 index) {
     require index <= 6, "index out of bounds";
-    bytes32 id = summaryToId(market);
+    bytes32 id = Utils.toId(market);
     require tickSpacing(id) == 0, "market not yet created";
 
     uint256 expectedSettlementFee = defaultSettlementFee(market.loanToken, index);
