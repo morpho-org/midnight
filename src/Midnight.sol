@@ -617,6 +617,7 @@ contract Midnight is IMidnight {
     /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not
     /// activated.
     /// @dev Returns the seized assets, the repaid units, and the bad debt.
+    /// @dev Because of reentrancy, the returned values may not reflect the total change since before the liquidate.
     function liquidate(
         Market calldata market,
         uint256 collateralIndex,
