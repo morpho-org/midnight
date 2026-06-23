@@ -189,6 +189,7 @@ contract TakeTest is BaseTest {
             units,
             taker,
             offer,
+            hex"",
             buyerAssets,
             sellerAssets,
             existingConsumed + units,

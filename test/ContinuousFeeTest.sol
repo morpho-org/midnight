@@ -283,6 +283,7 @@ contract ContinuousFeeTest is BaseTest {
             exitAmount,
             lender,
             _makeBuyOffer(keccak256("lender-exit")),
+            hex"",
             takeAssets,
             takeAssets,
             exitAmount,

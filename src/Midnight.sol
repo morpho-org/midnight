@@ -453,6 +453,7 @@ contract Midnight is IMidnight {
             units,
             taker,
             offer,
+            ratifierData,
             buyerAssets,
             sellerAssets,
             newConsumed,
