@@ -3,8 +3,8 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -36,24 +36,24 @@ methods {
 rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, market);
 
-    uint256 creditBefore = creditOf(id, user);
+    uint256 creditBefore = credit(id, user);
     uint128 updatedUserCredit;
     uint128 newPendingFee;
     uint128 userFee;
     updatedUserCredit, newPendingFee, userFee = updatePositionView(e, market, id, user);
 
-    uint256 anyCredit = creditOf(anyId, anyUser);
-    uint256 anyDebt = debtOf(anyId, anyUser);
+    uint256 anyCredit = credit(anyId, anyUser);
+    uint256 anyDebt = debt(anyId, anyUser);
     uint256 feeAmountBefore = continuousFeeCredit(id);
 
     updatePosition(e, market, user);
 
-    assert debtOf(anyId, anyUser) == anyDebt;
-    assert (anyId != id) || (anyUser != user) => creditOf(anyId, anyUser) == anyCredit;
-    assert creditOf(id, user) == updatedUserCredit;
+    assert debt(anyId, anyUser) == anyDebt;
+    assert (anyId != id) || (anyUser != user) => credit(anyId, anyUser) == anyCredit;
+    assert credit(id, user) == updatedUserCredit;
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
-    assert creditOf(id, user) <= creditBefore;
+    assert credit(id, user) <= creditBefore;
 }
 
 /// WITHDRAW ///
@@ -67,15 +67,15 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
     uint128 userFee;
     updatedUserCredit, _, userFee = updatePositionView(e, market, id, onBehalf);
 
-    uint256 anyCredit = creditOf(anyId, anyUser);
-    uint256 anyDebt = debtOf(anyId, anyUser);
+    uint256 anyCredit = credit(anyId, anyUser);
+    uint256 anyDebt = debt(anyId, anyUser);
     uint256 feeAmountBefore = continuousFeeCredit(id);
 
     withdraw(e, market, units, onBehalf, receiver);
 
-    assert creditOf(id, onBehalf) == updatedUserCredit - units;
-    assert debtOf(anyId, anyUser) == anyDebt;
-    assert (anyId != id) || (anyUser != onBehalf) => creditOf(anyId, anyUser) == anyCredit;
+    assert credit(id, onBehalf) == updatedUserCredit - units;
+    assert debt(anyId, anyUser) == anyDebt;
+    assert (anyId != id) || (anyUser != onBehalf) => credit(anyId, anyUser) == anyCredit;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
 }
 
@@ -90,22 +90,22 @@ rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units,
     makerCreditBefore, _, _ = updatePositionView(e, offer.market, id, offer.maker);
     uint128 takerCreditBefore;
     takerCreditBefore, _, _ = updatePositionView(e, offer.market, id, taker);
-    mathint makerNetBefore = to_mathint(makerCreditBefore) - to_mathint(debtOf(id, offer.maker));
-    mathint takerNetBefore = to_mathint(takerCreditBefore) - to_mathint(debtOf(id, taker));
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
+    mathint makerNetBefore = makerCreditBefore - debt(id, offer.maker);
+    mathint takerNetBefore = takerCreditBefore - debt(id, taker);
+    uint256 otherCreditBefore = credit(anyId, anyUser);
+    uint256 otherDebtBefore = debt(anyId, anyUser);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    mathint makerNetAfter = to_mathint(creditOf(id, offer.maker)) - to_mathint(debtOf(id, offer.maker));
-    mathint takerNetAfter = to_mathint(creditOf(id, taker)) - to_mathint(debtOf(id, taker));
+    mathint makerNetAfter = credit(id, offer.maker) - debt(id, offer.maker);
+    mathint takerNetAfter = credit(id, taker) - debt(id, taker);
 
     mathint makerDelta = offer.buy ? units : -units;
     assert makerNetAfter == makerNetBefore + makerDelta;
     mathint takerDelta = offer.buy ? -units : units;
     assert takerNetAfter == takerNetBefore + takerDelta;
-    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debtOf(anyId, anyUser) == otherDebtBefore;
-    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => creditOf(anyId, anyUser) == otherCreditBefore;
+    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => debt(anyId, anyUser) == otherDebtBefore;
+    assert anyId != id || (anyUser != offer.maker && anyUser != taker) => credit(anyId, anyUser) == otherCreditBefore;
 }
 
 /// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
@@ -115,17 +115,17 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     bytes32 id = toId(e, offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
-    uint256 buyerDebtBefore = debtOf(id, buyer);
+    uint256 buyerDebtBefore = debt(id, buyer);
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert creditOf(id, buyer) > buyerUpdatedCreditBefore => debtOf(id, buyer) == 0;
-    assert creditOf(id, buyer) >= buyerUpdatedCreditBefore;
-    assert creditOf(id, buyer) <= buyerUpdatedCreditBefore + units;
-    assert debtOf(id, buyer) <= buyerDebtBefore;
-    assert debtOf(id, buyer) >= buyerDebtBefore - units;
+    assert credit(id, buyer) > buyerUpdatedCreditBefore => debt(id, buyer) == 0;
+    assert credit(id, buyer) >= buyerUpdatedCreditBefore;
+    assert credit(id, buyer) <= buyerUpdatedCreditBefore + units;
+    assert debt(id, buyer) <= buyerDebtBefore;
+    assert debt(id, buyer) >= buyerDebtBefore - units;
 }
 
 /// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
@@ -135,17 +135,17 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     bytes32 id = toId(e, offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
-    uint256 sellerDebtBefore = debtOf(id, seller);
+    uint256 sellerDebtBefore = debt(id, seller);
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert debtOf(id, seller) > sellerDebtBefore => creditOf(id, seller) == 0;
-    assert debtOf(id, seller) >= sellerDebtBefore;
-    assert debtOf(id, seller) <= sellerDebtBefore + units;
-    assert creditOf(id, seller) <= sellerUpdatedCreditBefore;
-    assert creditOf(id, seller) >= sellerUpdatedCreditBefore - units;
+    assert debt(id, seller) > sellerDebtBefore => credit(id, seller) == 0;
+    assert debt(id, seller) >= sellerDebtBefore;
+    assert debt(id, seller) <= sellerDebtBefore + units;
+    assert credit(id, seller) <= sellerUpdatedCreditBefore;
+    assert credit(id, seller) >= sellerUpdatedCreditBefore - units;
 }
 
 /// REPAY ///
@@ -154,15 +154,15 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
 rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = toId(e, market);
 
-    uint256 debtBefore = debtOf(id, onBehalf);
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
+    uint256 debtBefore = debt(id, onBehalf);
+    uint256 otherCreditBefore = credit(anyId, anyUser);
+    uint256 otherDebtBefore = debt(anyId, anyUser);
 
     repay(e, market, units, onBehalf, callback, data);
 
-    assert debtOf(id, onBehalf) == debtBefore - units;
-    assert creditOf(anyId, anyUser) == otherCreditBefore;
-    assert anyUser != onBehalf || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
+    assert debt(id, onBehalf) == debtBefore - units;
+    assert credit(anyId, anyUser) == otherCreditBefore;
+    assert anyUser != onBehalf || anyId != id => debt(anyId, anyUser) == otherDebtBefore;
 }
 
 /// LIQUIDATE ///
@@ -172,17 +172,17 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
 rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool postMaturityMode) {
     bytes32 id = toId(e, market);
 
-    uint256 debtBefore = debtOf(id, borrower);
-    uint256 otherCreditBefore = creditOf(anyId, anyUser);
-    uint256 otherDebtBefore = debtOf(anyId, anyUser);
+    uint256 debtBefore = debt(id, borrower);
+    uint256 otherCreditBefore = credit(anyId, anyUser);
+    uint256 otherDebtBefore = debt(anyId, anyUser);
 
     uint256 seizedResult;
     uint256 repaidResult;
     seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert debtOf(id, borrower) <= debtBefore - repaidResult;
-    assert creditOf(anyId, anyUser) == otherCreditBefore;
-    assert anyUser != borrower || anyId != id => debtOf(anyId, anyUser) == otherDebtBefore;
+    assert debt(id, borrower) <= debtBefore - repaidResult;
+    assert credit(anyId, anyUser) == otherCreditBefore;
+    assert anyUser != borrower || anyId != id => debt(anyId, anyUser) == otherDebtBefore;
 }
 
 /// ALL OTHER FUNCTIONS ///
@@ -197,11 +197,11 @@ filtered {
         && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
         && f.selector != sig:updatePosition(Midnight.Market, address).selector
 } {
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
     f(e, args);
-    assert creditOf(id, user) == creditBefore;
-    assert debtOf(id, user) == debtBefore;
+    assert credit(id, user) == creditBefore;
+    assert debt(id, user) == debtBefore;
 }
 
 /// SUPPLY COLLATERAL ///

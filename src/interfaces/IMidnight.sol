@@ -155,20 +155,20 @@ interface IMidnight {
     function claimContinuousFee(Market memory market, uint256 amount, address receiver) external;
 
     /// ENTRY-POINTS ///
-    function take(Offer memory offer, bytes memory ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes memory takerCallbackData) external returns (uint256, uint256);
+    function take(Offer memory offer, bytes memory ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes memory takerCallbackData) external returns (uint256 buyerAssets, uint256 sellerAssets);
     function withdraw(Market memory market, uint256 units, address onBehalf, address receiver) external;
     function repay(Market memory market, uint256 units, address onBehalf, address callback, bytes memory data) external;
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
-    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes memory data) external returns (uint256, uint256);
+    function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes memory data) external returns (uint256 outputSeizedAssets, uint256 outputRepaidUnits);
     function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
     function touchMarket(Market memory market) external returns (bytes32);
 
     /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
-    function updatePositionView(Market memory market, bytes32 id, address user) external view returns (uint128, uint128, uint128);
-    function updatePosition(Market memory market, address user) external returns (uint128, uint128, uint128);
+    function updatePositionView(Market memory market, bytes32 id, address user) external view returns (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee);
+    function updatePosition(Market memory market, address user) external returns (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee);
 
     /// OTHER VIEW FUNCTIONS ///
     function lastLossFactor(bytes32 id, address user) external view returns (uint128);
@@ -176,8 +176,8 @@ interface IMidnight {
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
     function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
-    function creditOf(bytes32 id, address user) external view returns (uint128);
-    function debtOf(bytes32 id, address user) external view returns (uint128);
+    function credit(bytes32 id, address user) external view returns (uint128);
+    function debt(bytes32 id, address user) external view returns (uint128);
     function totalUnits(bytes32 id) external view returns (uint128);
     function lossFactor(bytes32 id) external view returns (uint128);
     function tickSpacing(bytes32 id) external view returns (uint8);

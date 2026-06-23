@@ -249,7 +249,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, taker), units);
+        assertEq(midnight.debt(id, taker), units);
     }
 
     function testRepayAuthorization(address authorized) public {
@@ -275,7 +275,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(authorized);
         midnight.repay(market, units, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), 0);
+        assertEq(midnight.debt(id, borrower), 0);
     }
 
     function testSetConsumedAuthorization(address user, address authorized) public {
@@ -328,6 +328,6 @@ contract AuthorizationTest is BaseTest {
         // Borrower can take for themselves (no authorization needed)
         take(units, borrower, offer);
 
-        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.debt(id, borrower), units);
     }
 }

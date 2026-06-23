@@ -123,8 +123,8 @@ contract GateTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should have credit");
-        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should have debt");
+        assertGt(midnight.credit(gatedId, lender), 0, "lender should have credit");
+        assertGt(midnight.debt(gatedId, borrower), 0, "borrower should have debt");
     }
 
     function testEnterGateAllowsTakeWhenLenderHadCreditBefore(uint256 units) public {
@@ -134,7 +134,7 @@ contract GateTest is BaseTest {
         collateralize(gatedMarket, borrower, units);
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should already have credit");
+        assertGt(midnight.credit(gatedId, lender), 0, "lender should already have credit");
 
         gate.setWhitelisted(lender, false);
         gate.setWhitelisted(borrower, false);
@@ -149,7 +149,7 @@ contract GateTest is BaseTest {
         collateralize(gatedMarket, borrower, units);
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should already have debt");
+        assertGt(midnight.debt(gatedId, borrower), 0, "borrower should already have debt");
 
         gate.setWhitelisted(lender, false);
         gate.setWhitelisted(borrower, false);
@@ -184,7 +184,7 @@ contract GateTest is BaseTest {
 
         take(units, borrower, otherBorrowerOffer);
 
-        assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have exited debt");
+        assertEq(midnight.debt(gatedId, borrower), 0, "borrower should have exited debt");
     }
 
     function testNoGateCheckWhenBothExit(uint256 units) public {
@@ -224,7 +224,7 @@ contract GateTest is BaseTest {
         deal(address(loanToken), otherBorrower, units);
         take(units, otherBorrower, exitOffer);
 
-        assertEq(midnight.debtOf(gatedId, otherBorrower), 0, "otherBorrower should have exited");
+        assertEq(midnight.debt(gatedId, otherBorrower), 0, "otherBorrower should have exited");
     }
 
     function testNoGateCheckOnRepay(uint256 units) public {
@@ -241,7 +241,7 @@ contract GateTest is BaseTest {
         vm.prank(borrower);
         midnight.repay(gatedMarket, units, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
+        assertEq(midnight.debt(gatedId, borrower), 0, "borrower should have repaid");
     }
 
     function testNoGateCheckOnWithdraw(uint256 units) public {
@@ -261,7 +261,7 @@ contract GateTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(gatedMarket, units, lender, lender);
 
-        assertEq(midnight.creditOf(gatedId, lender), 0, "lender should have withdrawn");
+        assertEq(midnight.credit(gatedId, lender), 0, "lender should have withdrawn");
     }
 
     // --- Liquidator gate tests ---
@@ -317,7 +317,7 @@ contract GateTest is BaseTest {
         take(units, borrower, ungatedLenderOffer);
 
         bytes32 ungatedId = toId(market);
-        assertGt(midnight.debtOf(ungatedId, borrower), 0);
+        assertGt(midnight.debt(ungatedId, borrower), 0);
     }
 
     // --- Market identity tests ---

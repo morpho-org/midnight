@@ -5,7 +5,7 @@ using Midnight as midnight;
 
 methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
-    function midnight.debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function midnight.debt(bytes32 id, address user) external returns (uint128) envfree;
     function midnight.isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function midnight.tickSpacing(bytes32 id) external returns (uint8) envfree;
 
@@ -45,7 +45,7 @@ rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, 
     require referralFeePct < WAD(), "PctExceeded";
 
     bytes32 id = summaryToId(market);
-    uint256 debtBefore = midnight.debtOf(id, onBehalf);
+    uint256 debtBefore = midnight.debt(id, onBehalf);
 
     uint256 wMinusP = assert_uint256(WAD() - referralFeePct);
     uint256 assets = summaryMulDivDown(U, WAD(), wMinusP);
@@ -59,5 +59,5 @@ rule repayAndWithdrawCollateralRepaysTargetUnits(env e, Midnight.Market market, 
 
     repayAndWithdrawCollateral(e, market, assets, onBehalf, loanTokenPermit, collateralWithdrawals, collateralReceiver, referralFeePct, referralFeeRecipient);
 
-    assert midnight.debtOf(id, onBehalf) == debtBefore - U;
+    assert midnight.debt(id, onBehalf) == debtBefore - U;
 }
