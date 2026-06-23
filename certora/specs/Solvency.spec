@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function claimableSettlementFee(address token) external returns (uint256) envfree;
@@ -73,11 +76,9 @@ ghost mapping(bytes32 => address) loantoken;
 // Mapping from market id and collateral index to the corresponding collateral token.
 ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
-ghost hash(address, uint256, uint256, address) returns bytes32;
-
 function CVL_toId(Midnight.Market market) returns bytes32 {
-    // Deterministically derive the market id.
-    bytes32 id = hash(market.loanToken, market.maturity, market.chainId, market.midnight);
+    // Deterministically derive the market id from the full market.
+    bytes32 id = Utils.hashMarket(market);
 
     // Assume the market id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.
