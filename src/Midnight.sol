@@ -206,6 +206,7 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
     mapping(uint256 lltv => bool) public isLltvAllowed;
+    mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
     address public roleSetter;
     address public feeSetter;
     address public feeClaimer;
