@@ -65,8 +65,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
 /// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
 /// between both modes.
-/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount is capped
-/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount
+/// is capped by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
@@ -81,8 +81,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
 /// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
 /// aspect.
-/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the computed maxLif
-/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
+/// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
@@ -168,7 +168,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter, as well as add LLTV tiers and liquidation cursors.
+/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter, as well as add LLTV
+/// tiers and liquidation cursors.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
