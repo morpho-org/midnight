@@ -130,6 +130,8 @@ interface IMidnight {
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
     function isLltvEnabled(uint256 lltv) external view returns (bool);
+    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
+
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
