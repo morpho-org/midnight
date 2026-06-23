@@ -102,6 +102,8 @@ persistent ghost bool healthyOrLockedBeforeCallbacks;
 // global variable to track which market and borrower we're testing.
 persistent ghost address globalMarketLoanToken;
 
+persistent ghost uint256 globalMarketChainId;
+
 persistent ghost uint256 globalMarketCollateralLength;
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
@@ -129,7 +131,7 @@ persistent ghost address globalBorrower;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function getGlobalMarket() returns (Midnight.Market) {
@@ -140,7 +142,7 @@ function getGlobalMarket() returns (Midnight.Market) {
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && market.midnight == currentContract) {
+    if (equalsGlobalMarket(market)) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";
