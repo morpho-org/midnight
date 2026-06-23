@@ -276,13 +276,14 @@ contract ContinuousFeeTest is BaseTest {
         emit EventsLib.UpdatePosition(
             id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
         );
+        Offer memory offer = _makeBuyOffer(keccak256("lender-exit"));
         vm.expectEmit();
         emit EventsLib.Take(
             lender,
             id,
             exitAmount,
             lender,
-            _makeBuyOffer(keccak256("lender-exit")),
+            keccak256(abi.encode(offer)),
             hex"",
             takeAssets,
             takeAssets,
@@ -292,11 +293,9 @@ contract ContinuousFeeTest is BaseTest {
             exitAmount,
             exitAmount,
             lender,
-            otherLender,
-            address(0),
-            hex""
+            otherLender
         );
-        take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
+        take(exitAmount, lender, offer); // lender is taker = seller
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
         assertEq(midnight.credit(id, lender), creditAfterAccrual - exitAmount, "credit after exit");

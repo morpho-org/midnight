@@ -452,7 +452,7 @@ contract Midnight is IMidnight {
             id,
             units,
             taker,
-            offer,
+            keccak256(abi.encode(offer)),
             ratifierData,
             buyerAssets,
             sellerAssets,
@@ -462,9 +462,7 @@ contract Midnight is IMidnight {
             buyerCreditIncrease,
             sellerCreditDecrease,
             receiver,
-            payer,
-            takerCallback,
-            takerCallbackData
+            payer
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);

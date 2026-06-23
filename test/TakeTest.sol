@@ -188,7 +188,7 @@ contract TakeTest is BaseTest {
             id,
             units,
             taker,
-            offer,
+            keccak256(abi.encode(offer)),
             hex"",
             buyerAssets,
             sellerAssets,
@@ -198,9 +198,7 @@ contract TakeTest is BaseTest {
             units - existingDebt,
             existingCredit,
             receiver,
-            address(payerCallback),
-            offerIsBuy ? address(0) : address(payerCallback),
-            hex""
+            address(payerCallback)
         );
 
         vm.prank(caller);
