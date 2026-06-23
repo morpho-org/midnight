@@ -5,7 +5,7 @@
 // All other Solidity divisions in the codebase use non-zero denominators:
 // - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
 // - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
-// - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
+// - liquidate: divides by TIME_TO_MAX_LIF (60 minutes = 3600).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
 // Therefore, we only look for division by zero in mulDivDown and mulDivUp in this file.
