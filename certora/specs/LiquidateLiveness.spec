@@ -210,7 +210,7 @@ function lowLltvScaffolding(Midnight.Market market, bytes32 id, address borrower
     uint256 maxLifJ = getMaxLif(collateralIndex, market.collateralParams);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
     uint128 collatJ = collateral(id, borrower, collateralIndex);
-    require maxLifJ * lltvJ <= WAD() * (WAD() - 1), "maxLif*lltv <= WAD*(WAD-1) (lifTimesLltvStrictBound) => WAD*WAD - maxLif*lltv >= WAD >= 1";
+    assert maxLifJ * lltvJ <= WAD() * (WAD() - 1), "maxLif*lltv <= WAD*(WAD-1) (lifTimesLltvStrictBound) => WAD*WAD - maxLif*lltv >= WAD >= 1";
     require ghostMulDivUp(ghostMulDivUp(collatJ, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLifJ) > ghostMulDivDown(ghostMulDivDown(collatJ, priceJ, ORACLE_PRICE_SCALE()), lltvJ, WAD()), "recoveryJ > maxDebtContribJ (seized lltv < WAD, collatJ*priceJ >= ORACLE_PRICE_SCALE)";
 }
 
