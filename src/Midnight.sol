@@ -65,7 +65,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
 /// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
 /// between both modes.
-/// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount is capped
 /// by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
