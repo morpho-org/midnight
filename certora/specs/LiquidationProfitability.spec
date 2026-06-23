@@ -31,7 +31,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
-definition TIME_TO_MAX_LIF() returns uint256 = 900; // 15 min
+definition TIME_TO_MAX_LIF() returns uint256 = 3600; // 60 min
 
 persistent ghost summaryPrice(address) returns uint256;
 
@@ -67,7 +67,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// LIF CHARACTERIZATION ///
 
-/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 15 min post-maturity (profitability).
+/// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 60 min post-maturity (profitability).
 rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
@@ -83,11 +83,11 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit floor rounding on seizedAssets) at the oracle price.
     assert (seizedResult + 1) * price >= repaidResult * ORACLE_PRICE_SCALE();
 
-    // lif == maxLif when in normal mode or when >= 15 min post-maturity: full liquidation incentive factor applies.
+    // lif == maxLif when in normal mode or when >= 60 min post-maturity: full liquidation incentive factor applies.
     assert maxLifReached => (seizedResult + 1) * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > repaidResult * maxLif * ORACLE_PRICE_SCALE();
 }
 
-/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 15 min post-maturity (profitability).
+/// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 60 min post-maturity (profitability).
 rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
@@ -103,6 +103,6 @@ rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collatera
     // lif >= WAD: liquidator receives collateral worth at least the repaid debt (up to 1 unit ceil rounding on repaidUnits) at the oracle price.
     assert seizedResult * price > (repaidResult - 1) * ORACLE_PRICE_SCALE();
 
-    // lif == maxLif when in normal mode or when >= 15 min post-maturity: full liquidation incentive factor applies.
+    // lif == maxLif when in normal mode or when >= 60 min post-maturity: full liquidation incentive factor applies.
     assert maxLifReached => seizedResult * price * WAD() + ORACLE_PRICE_SCALE() * WAD() > (repaidResult - 1) * maxLif * ORACLE_PRICE_SCALE();
 }

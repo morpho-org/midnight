@@ -217,6 +217,7 @@ contract EIP712 is IEIP712 {
         _CACHED_DOMAIN_SEPARATOR = _buildDomainSeparator(_TYPE_HASH, _HASHED_NAME);
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function DOMAIN_SEPARATOR() public view override returns (bytes32) {
         return
             block.chainid == _CACHED_CHAIN_ID

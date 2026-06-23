@@ -110,7 +110,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Signature memory sig = signAuthorization(auth, otherBorrower);
 
         vm.expectEmit();
-        emit SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, otherBorrower);
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, otherBorrower);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
