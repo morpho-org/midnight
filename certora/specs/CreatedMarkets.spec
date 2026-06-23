@@ -6,7 +6,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function tickSpacing(bytes32) external returns (uint8) envfree;
-    function isLltvAllowed(uint256) external returns (bool) envfree;
+    function isLltvEnabled(uint256) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
@@ -61,28 +61,12 @@ strong invariant createdMarketsHaveSortedCollaterals(Midnight.Market market, uin
 strong invariant createdMarketsHaveNonZeroCollaterals(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].token != 0;
 
-// Show that an allowed LLTV tier is at most WAD, which holds because tiers can only be added with lltv <= WAD.
-strong invariant allowedLltvIsLessThanOrEqualToOne(uint256 lltv)
-    isLltvAllowed(lltv) => lltv <= WAD();
-
-// Show that a created market has lltv <= WAD.
-strong invariant createdMarketsHaveLltvLessThanOrEqualToOne(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD()
-    {
-        preserved {
-            requireInvariant allowedLltvIsLessThanOrEqualToOne(market.collateralParams[i].lltv);
-        }
-    }
-
-// Show that a created market only has allowed LLTV tiers.
-strong invariant createdMarketsHaveAllowedLltv(Midnight.Market market, uint256 i)
-    marketIsCreated(market) => i < market.collateralParams.length => isLltvAllowed(market.collateralParams[i].lltv);
+// Show that a created market only has enabled LLTV tiers.
+strong invariant createdMarketsHaveEnabledLltv(Midnight.Market market, uint256 i)
+    marketIsCreated(market) => i < market.collateralParams.length => isLltvEnabled(market.collateralParams[i].lltv);
 
 strong invariant createdMarketsHaveEnabledLiquidationCursor(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => currentContract.isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor];
-
-strong invariant enabledLiquidationCursorsAreBounded(uint256 liquidationCursor)
-    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
 
 strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => Utils.maxLif(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD();

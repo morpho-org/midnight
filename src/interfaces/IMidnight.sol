@@ -83,7 +83,7 @@ interface IMidnight {
     error InvalidOfferCaps();
     error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
-    error LltvNotAllowed();
+    error LltvNotEnabled();
     error MakerCreditOrDebtIncreased();
     error MarketLossFactorMaxedOut();
     error MarketNotCreated();
@@ -129,7 +129,7 @@ interface IMidnight {
     function defaultSettlementFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
-    function isLltvAllowed(uint256 lltv) external view returns (bool);
+    function isLltvEnabled(uint256 lltv) external view returns (bool);
     function roleSetter() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);

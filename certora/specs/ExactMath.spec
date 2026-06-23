@@ -10,7 +10,7 @@ methods {
 definition WAD() returns uint256 = 10 ^ 18;
 
 rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 liquidationCursor) {
-    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
+    require lltv <= WAD(), "see rule createdMarketsHaveEnabledLltv";
     require liquidationCursor <= WAD(), "enabled liquidationCursors are at most WAD, see addLiquidationCursor";
     assert lltv * maxLif(lltv, liquidationCursor) <= WAD() * WAD();
 }

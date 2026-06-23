@@ -205,7 +205,7 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
-    mapping(uint256 lltv => bool) public isLltvAllowed;
+    mapping(uint256 lltv => bool) public isLltvEnabled;
     mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
     address public roleSetter;
     address public feeSetter;
@@ -259,11 +259,11 @@ contract Midnight is IMidnight {
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
-    /// @dev Allows a new LLTV tier. Tiers can only be added, never removed.
+    /// @dev Enables a new LLTV tier. Tiers can only be added, never removed.
     function addLltv(uint256 lltv) external {
         require(msg.sender == roleSetter, OnlyRoleSetter());
         require(lltv <= WAD, InvalidLltv());
-        isLltvAllowed[lltv] = true;
+        isLltvEnabled[lltv] = true;
         emit EventsLib.AddLltv(lltv);
     }
 
@@ -679,10 +679,8 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = maxLif(
-                market.collateralParams[collateralIndex].lltv,
-                market.collateralParams[collateralIndex].liquidationCursor
-            );
+            uint256 lltv = market.collateralParams[collateralIndex].lltv;
+            uint256 _maxLif = maxLif(lltv, market.collateralParams[collateralIndex].liquidationCursor);
             uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
@@ -694,7 +692,6 @@ contract Midnight is IMidnight {
             }
 
             if (!postMaturityMode) {
-                uint256 lltv = market.collateralParams[collateralIndex].lltv;
                 // Note that debt >= maxDebt in this branch.
                 // lif * lltv >= WAD * WAD means LIF * LLTV >= 1, so the RCF is inactive (see LIQUIDATIONS).
                 uint256 maxRepaid = lif * lltv < WAD * WAD
@@ -804,11 +801,10 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
-                require(isLltvAllowed[lltv], LltvNotAllowed());
-                require(
-                    isLiquidationCursorEnabled[market.collateralParams[i].liquidationCursor], InvalidLiquidationCursor()
-                );
-                require(maxLif(lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD, InvalidMaxLif());
+                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
+                require(isLltvEnabled[lltv], LltvNotEnabled());
+                require(isLiquidationCursorEnabled[liquidationCursor], InvalidLiquidationCursor());
+                require(maxLif(lltv, liquidationCursor) <= 2 * WAD, InvalidMaxLif());
                 previousCollateralToken = collateralToken;
             }
 

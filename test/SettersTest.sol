@@ -80,13 +80,13 @@ contract SettersTest is BaseTest {
 
     function testAddLltvSuccess(uint256 lltv) public {
         lltv = bound(lltv, 0, WAD);
-        vm.assume(!midnight.isLltvAllowed(lltv));
+        vm.assume(!midnight.isLltvEnabled(lltv));
 
         vm.expectEmit();
         emit EventsLib.AddLltv(lltv);
 
         midnight.addLltv(lltv);
-        assertTrue(midnight.isLltvAllowed(lltv));
+        assertTrue(midnight.isLltvEnabled(lltv));
     }
 
     function testAddLltvOnlyRoleSetter(address rdm, uint256 lltv) public {

@@ -39,7 +39,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
-// Proven in CreatedMarkets.spec (createdMarketsHaveLltvLessThanOrEqualToOne)
+// Proven in CreatedMarkets.spec (createdMarketsHaveEnabledLltv)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {

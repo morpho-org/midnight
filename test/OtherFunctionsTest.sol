@@ -497,7 +497,7 @@ contract OtherFunctionsTest is BaseTest {
         midnight.touchMarket(_market);
     }
 
-    function testLltvNotAllowedAboveWad(uint256 lltv) public {
+    function testLltvNotEnabledAboveWad(uint256 lltv) public {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Market memory _market;
         _market.loanToken = address(loanToken);
@@ -510,12 +510,12 @@ contract OtherFunctionsTest is BaseTest {
             oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
-        vm.expectRevert(IMidnight.LltvNotAllowed.selector);
+        vm.expectRevert(IMidnight.LltvNotEnabled.selector);
         midnight.touchMarket(_market);
     }
 
-    function testLltvNotAllowedBelowWad() public {
-        // 0.5e18 is not an allowed LLTV tier
+    function testLltvNotEnabledBelowWad() public {
+        // 0.5e18 is not an enabled LLTV tier
         uint256 lltv = 0.5e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
@@ -528,7 +528,7 @@ contract OtherFunctionsTest is BaseTest {
             oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
-        vm.expectRevert(IMidnight.LltvNotAllowed.selector);
+        vm.expectRevert(IMidnight.LltvNotEnabled.selector);
         midnight.touchMarket(_market);
     }
 
