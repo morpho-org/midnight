@@ -3,6 +3,7 @@
 pragma solidity >=0.5.0;
 
 struct Market {
+    uint256 chainId;
     address midnight;
     address loanToken;
     CollateralParams[] collateralParams;
@@ -78,6 +79,7 @@ interface IMidnight {
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
     error InvalidFeeIndex();
+    error InvalidChainId();
     error InvalidLltv();
     error InvalidMaxLif();
     error InvalidMidnight();

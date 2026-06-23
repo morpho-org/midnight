@@ -23,6 +23,7 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(vm.getBlockTimestamp() + 1000 days);
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
         market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100 days;
         market.collateralParams

@@ -297,6 +297,7 @@ abstract contract BaseTest is Test {
             collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
         }
         collateralParams = sortCollateralParams(collateralParams);
+        market.chainId = block.chainid;
         market.midnight = address(midnight);
         market.collateralParams = collateralParams;
         market.maturity = bound(market.maturity, 0, vm.getBlockTimestamp() + 100 * 365 days);

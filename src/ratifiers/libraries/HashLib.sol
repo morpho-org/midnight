@@ -7,9 +7,9 @@ import {Offer, Market, CollateralParams} from "../../interfaces/IMidnight.sol";
 /// @dev keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)").
 bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
 /// @dev keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE)).
-bytes32 constant MARKET_TYPEHASH = 0x9726017d91c6ee720433cc66705fc8e73c66a5b54318610634e0615c1050c039;
+bytes32 constant MARKET_TYPEHASH = 0xc66c045aa2394a02e2976962976ec58c79108ae7fbb1ecc974c9724678b56264;
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant OFFER_TYPEHASH = 0x36b9157a5f6ca813c3e19022b1ae38bcc92474337a2905509648965b6bb25b92;
+bytes32 constant OFFER_TYPEHASH = 0x5e7c764a0f2411d16dd65139c973cbe0fe976b6d0736823e17aef319f652e7f8;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -21,28 +21,28 @@ library HashLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0xf060e448a16febf6d574124babc538caa4e2b16b7d984b9a43138450fff6e487;
-            if (height == 1) return 0xdb7fcde9ede9a072d4b90099b7d70d3b078b8bd68eb7ebd656a7377363ac16e7;
-            if (height == 2) return 0x685d7c4569230738727c18fe3466e230e88e3910efa807662f1ace69be578cf8;
-            if (height == 3) return 0xc7447f9389248ec66fb8e2da0f33f2a75f14d028a260253ebd269062964a0ff0;
-            if (height == 4) return 0xdb2881d2334835a88923d1750f18f66230be7ad26cf6e365b8b66573a488f758;
-            if (height == 5) return 0xf998c5d024660a141601215a4c840a1e93cb734577da1f536f2e309eab9daa62;
-            if (height == 6) return 0x1a1546d3ee2cdcb87df2ba14cc402269536c5eb1a058559eea6b20b33886fec1;
-            if (height == 7) return 0xb970a1682bb961ff3038be80f6f0aa47a27ba955017ef22e1692da56a6fd583e;
-            if (height == 8) return 0xf44dac05caf7ffd668d73b72ba37867a3ed437ef625cfb517749609ab3e99683;
-            if (height == 9) return 0x8cd5c1d1c9277864113deaf1b2459d6688762fae010b3a6fd4ddd5befb85cf12;
-            return 0xebc93f3cf5dec43925a753dde4ca54c3615b34688066417d28200bd8c1ba7b5a;
+            if (height == 0) return 0x04931ea05149e935551af887e04668a4235aa7fefe5a1307699fc36de5da3604;
+            if (height == 1) return 0x636eec88d23afdd7c5ecd3689cddd4a578f3640022a4f4b36532b1bb873870d9;
+            if (height == 2) return 0xb3b200d8a87156dd298add6829190724360e913ea2a544cf8770a83b1a85b68e;
+            if (height == 3) return 0x9959f9ee7df42c7c3a42ae48edb3544cb9672653eb4c9ad5190aa9ac194e13cc;
+            if (height == 4) return 0x859439b1a679d2b8d78d092af16a3e3abd30ccae9d29e12183c61dbd89069798;
+            if (height == 5) return 0x3b62f568d54c69f46baa3db29d9d16daa670a421eca545015e2c4d6ac5e2ab4b;
+            if (height == 6) return 0x06b027b3e518caa75c38007c1e4cffc92d314d528eb7ed63b28f6cbb250d6221;
+            if (height == 7) return 0x1948d59b3835088b65d9f7048f26cfcf508f9a750de32e7830b6f99c8915905a;
+            if (height == 8) return 0xfb12ec1a894c5cc36be99898bcc4c23d45713b8920d21ddf94ba0053fec835b4;
+            if (height == 9) return 0xee136fb578b4eea50b5929361278f0a09f97371d5c44ebb73b07785150f3c202;
+            return 0xdbd2c72ce0b8a438efba0500c50090d842804420fa9eb5819a265105ccf446d4;
         } else {
-            if (height == 11) return 0x0c284c1a76381ce275f1394cd25f795fd7f331e06dec54d7eed31d7092c1fbc8;
-            if (height == 12) return 0x2ac3bffae03e78dd4603a0e8702488b52bc2fa271b5e27cd58cd84f7bcc57e6a;
-            if (height == 13) return 0x42b99a1129d92a79d6757afb25f893eff4f31a3fb550be942b8abc31be8d4ace;
-            if (height == 14) return 0xdc8ec2491b7d8a693bd943aa90f544bcc3d03bdbf4ca11effc5ad64f5a54761e;
-            if (height == 15) return 0x6079f350a9f94248af09b389dde6562618f19dae07095660978985dc3767f683;
-            if (height == 16) return 0x8b2ea640243d598efc46c59303ff8853b43e9150ca72cb9bdd42bcb4a3e1e13c;
-            if (height == 17) return 0xbfadafebb38539f93a87280ecbc0dddf246a91a5bb6f279ab13e2dda19e1c639;
-            if (height == 18) return 0x9f1c3865762ee804df5d75220040b2164dfcd8ca336af4a0645a12fdbbbaf765;
-            if (height == 19) return 0x0d7255859b43f915c7eb1c6001be9a750c1bd2f9bc55528a97029143770dda95;
-            if (height == 20) return 0xf6ff0d681e5c27abedfcc9572b58e1c8314950e031448ee4954dc2573e3ff889;
+            if (height == 11) return 0x8201cbae421a17b9d8116ce28ecd13378b22d0257e9daca65ea354dc7b852e0a;
+            if (height == 12) return 0xb76e7eedf6cb4dfd2a913d292be9bbcdcdf6bc457e789306cc23a6917faca3d2;
+            if (height == 13) return 0x911f1aca18bfbc4e142c04b2020d972507d4b9d6b2fbef339bc48d33a438be9e;
+            if (height == 14) return 0xf8b8028014cfa85c41a0b5af6dd4d5e6c7236dab5886ee4f21e845ec4205443d;
+            if (height == 15) return 0xd517d3bc505b0209f539cf985e6252f0e57975ec5c8e3a93d97366f39c8cbbc5;
+            if (height == 16) return 0x35940ca810d4b02086a4d695dfaf04195c5a0fcb776e97c1349a8a0472b7bec8;
+            if (height == 17) return 0x44c0e3ddcf369c808911a5c78a3d7e87fa115a23cc40147b5fc40064c5560213;
+            if (height == 18) return 0x032fe7574172aadd1fb6c40e9deacfec41a48e2fc8de3574c67331c10e7b3a1f;
+            if (height == 19) return 0x3f80439b44bef469ff2390bdf0fd5469db472bb6748c6de9e5e2cd86d602c301;
+            if (height == 20) return 0x61068a1b8ffb6dd774e8a9634cb46a7a214dd84189e255072577c8541c543fd4;
             revert TreeTooHigh();
         }
     }
@@ -103,6 +103,7 @@ library HashLib {
         return keccak256(
             abi.encode(
                 MARKET_TYPEHASH,
+                market.chainId,
                 market.midnight,
                 market.loanToken,
                 collateralParamsHash,

@@ -8,6 +8,7 @@ import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 // toMarket is tested in OtherFunctionsTest.sol, to test actual implementation (avoid introducing mocks).
 contract IdLibTest is Test {
     function baseMarket() internal pure returns (Market memory market) {
+        market.chainId = 1;
         market.midnight = address(1);
         market.loanToken = address(2);
         market.collateralParams = new CollateralParams[](1);
@@ -17,6 +18,13 @@ contract IdLibTest is Test {
         market.rcfThreshold = 456;
         market.enterGate = address(5);
         market.liquidatorGate = address(6);
+    }
+
+    function testToIdIsSensitiveToChainId() public pure {
+        Market memory market1 = baseMarket();
+        Market memory market2 = baseMarket();
+        market2.chainId = 2;
+        assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
     }
 
     function testToIdIsSensitiveToMidnight() public pure {

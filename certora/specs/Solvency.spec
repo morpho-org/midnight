@@ -73,11 +73,11 @@ ghost mapping(bytes32 => address) loantoken;
 // Mapping from market id and collateral index to the corresponding collateral token.
 ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
-ghost hash(address, uint256, address) returns bytes32;
+ghost hash(address, uint256, uint256, address) returns bytes32;
 
 function CVL_toId(Midnight.Market market) returns bytes32 {
     // Deterministically derive the market id.
-    bytes32 id = hash(market.loanToken, market.maturity, market.midnight);
+    bytes32 id = hash(market.loanToken, market.maturity, market.chainId, market.midnight);
 
     // Assume the market id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.

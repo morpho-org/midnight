@@ -16,10 +16,10 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-ghost marketHash(address, address, uint256, uint256, address, address) returns bytes32;
+ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
 
 function summaryToId(Midnight.Market market) returns bytes32 {
-    return marketHash(market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
+    return marketHash(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
 }
 
 /// Breakpoint time in seconds for index 0..6, mirroring the settlementFee intervals in Midnight.sol.

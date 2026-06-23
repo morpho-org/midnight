@@ -29,10 +29,10 @@ methods {
 
 /// HELPERS ///
 
-ghost marketHash(address, address, uint256, uint256, address, address) returns bytes32;
+ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
 
 function summaryToId(Midnight.Market market) returns bytes32 {
-    return marketHash(market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
+    return marketHash(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
 }
 
 definition WAD() returns uint256 = 10 ^ 18;

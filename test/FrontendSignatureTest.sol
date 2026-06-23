@@ -10,9 +10,9 @@ import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 // Paste from frontend output.
 address constant ACCOUNT = 0x6133Fd1B38C7D9ad120a6fC0D0f7b03d4F6E9658;
-uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0x802fd190b74cfb8998a0bbeeb95b1d26d761b777c00d4ca17d02251cfb2ff224;
-bytes32 constant SIG_S = 0x252ae8e0d8e5c6b9b74986044c5c2c5c198d9fa9e155f4579cc769cbac1f74c1;
+uint8 constant SIG_V = 28;
+bytes32 constant SIG_R = 0x70edf1a8f911f5f66575f3f9a2f8a4ac5b7ce80da66fe6a9f1d3a1f527fb7d04;
+bytes32 constant SIG_S = 0x32e9f29d8f20c1116b3c1484b203d2e5e6c295161de512569ca5502fd110cb36;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
@@ -25,6 +25,7 @@ contract FrontendSignatureTest is Test {
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.chainId = 1;
         offer.market.midnight = address(0);
         offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
         offer.market.collateralParams = collateralParams;

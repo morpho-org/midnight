@@ -772,6 +772,7 @@ contract Midnight is IMidnight {
     function touchMarket(Market memory market) public returns (bytes32) {
         bytes32 id = IdLib.toId(market);
         if (marketState[id].tickSpacing == 0) {
+            require(market.chainId == block.chainid, InvalidChainId());
             require(market.midnight == address(this), InvalidMidnight());
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
