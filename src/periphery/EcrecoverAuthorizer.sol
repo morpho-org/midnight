@@ -42,7 +42,8 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
             authorization.authorizer,
             authorization.authorized,
             authorization.isAuthorized,
-            authorization.nonce
+            authorization.nonce,
+            signer
         );
 
         IMidnight(MIDNIGHT)
