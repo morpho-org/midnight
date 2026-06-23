@@ -10,7 +10,6 @@ methods {
     function claimableSettlementFee(address token) external returns (uint256) envfree;
 }
 
-
 rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
     bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
