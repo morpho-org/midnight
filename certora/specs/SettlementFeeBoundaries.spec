@@ -16,7 +16,6 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-
 ghost marketHash(uint256, address, address, uint256, uint256, address, address) returns bytes32;
 
 function summaryToId(Midnight.Market market) returns bytes32 {
