@@ -264,7 +264,7 @@ contract SettersTest is BaseTest {
         });
 
         // A market using a not-yet-enabled liquidationCursor is rejected.
-        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        vm.expectRevert(IMidnight.LiquidationCursorNotEnabled.selector);
         midnight.touchMarket(market);
 
         // Enabling it emits the event and flips the mapping.

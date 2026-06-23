@@ -650,7 +650,7 @@ contract OtherFunctionsTest is BaseTest {
 
     // LiquidationCursor validation tests.
 
-    function testInvalidLiquidationCursor(uint256 liquidationCursor) public {
+    function testLiquidationCursorNotEnabled(uint256 liquidationCursor) public {
         vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
         uint256 lltv = LLTV;
 
@@ -663,7 +663,7 @@ contract OtherFunctionsTest is BaseTest {
         });
         _market.collateralParams = collateralParams;
 
-        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        vm.expectRevert(IMidnight.LiquidationCursorNotEnabled.selector);
         midnight.touchMarket(_market);
     }
 

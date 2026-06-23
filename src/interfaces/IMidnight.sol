@@ -82,6 +82,7 @@ interface IMidnight {
     error InvalidMaxLif();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
+    error LiquidationCursorNotEnabled();
     error LiquidatorGatedFromLiquidating();
     error LltvNotEnabled();
     error MakerCreditOrDebtIncreased();
@@ -130,8 +131,6 @@ interface IMidnight {
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
     function isLltvEnabled(uint256 lltv) external view returns (bool);
-    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
-
     function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
 
     function roleSetter() external view returns (address);

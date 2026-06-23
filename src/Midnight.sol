@@ -804,7 +804,7 @@ contract Midnight is IMidnight {
                 uint256 lltv = market.collateralParams[i].lltv;
                 uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
                 require(isLltvEnabled[lltv], LltvNotEnabled());
-                require(isLiquidationCursorEnabled[liquidationCursor], InvalidLiquidationCursor());
+                require(isLiquidationCursorEnabled[liquidationCursor], LiquidationCursorNotEnabled());
                 require(maxLif(lltv, liquidationCursor) <= 2 * WAD, InvalidMaxLif());
                 previousCollateralToken = collateralToken;
             }
