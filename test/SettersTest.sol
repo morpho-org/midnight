@@ -35,7 +35,7 @@ contract SettersTest is BaseTest {
 
     function testConstructorEvent() public {
         vm.expectEmit();
-        emit EventsLib.Constructor(address(this), block.chainid);
+        emit EventsLib.Constructor(address(this));
 
         new Midnight();
     }
@@ -125,7 +125,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
@@ -301,7 +300,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
@@ -360,7 +358,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: address(0),
             maturity: vm.getBlockTimestamp() + 1 days,
@@ -416,7 +413,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
@@ -445,7 +441,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
@@ -480,7 +475,6 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
         });
         Market memory market = Market({
-            initialChainId: midnight.INITIAL_CHAIN_ID(),
             midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,

@@ -12,7 +12,7 @@ import {Market} from "../src/interfaces/IMidnight.sol";
 
 bytes constant COLLATERAL_PARAMS_TYPE = "CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)";
 bytes constant MARKET_TYPE =
-    "Market(uint256 initialChainId,address midnight,address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
+    "Market(address midnight,address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 bytes constant OFFER_TYPE =
     "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint256 maxUnits,uint256 maxAssets,uint256 continuousFeeCap)";
 
@@ -37,7 +37,6 @@ contract HashLibTest is Test {
         bytes32 expectedHash = keccak256(
             abi.encode(
                 MARKET_TYPEHASH,
-                market.initialChainId,
                 market.midnight,
                 market.loanToken,
                 keccak256(abi.encodePacked(collateralParamsHashes)),

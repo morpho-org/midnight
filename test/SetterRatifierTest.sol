@@ -21,7 +21,6 @@ contract SetterRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         Market memory market;
         market.loanToken = address(loanToken);
-        market.initialChainId = midnight.INITIAL_CHAIN_ID();
         market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams = new CollateralParams[](1);

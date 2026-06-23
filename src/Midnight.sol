@@ -179,9 +179,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev credit, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
 /// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
-/// @dev INITIAL_CHAIN_ID is captured at construction and must be embedded in every market together with this Midnight
-/// address, so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a
-/// hard-fork there can be some market id clashes.
 /// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
 /// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
 /// (Shanghai).
@@ -189,10 +186,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
-
-    /// IMMUTABLES ///
-
-    uint256 public immutable INITIAL_CHAIN_ID;
 
     /// STORAGE ///
 
@@ -213,8 +206,7 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        INITIAL_CHAIN_ID = block.chainid;
-        emit EventsLib.Constructor(msg.sender, INITIAL_CHAIN_ID);
+        emit EventsLib.Constructor(msg.sender);
     }
 
     /// MULTICALL ///
@@ -778,10 +770,9 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the market id and creates the market if it doesn't exist yet.
     function touchMarket(Market memory market) public returns (bytes32) {
-        require(market.initialChainId == INITIAL_CHAIN_ID, InvalidInitialChainId());
-        require(market.midnight == address(this), InvalidMidnight());
         bytes32 id = IdLib.toId(market);
         if (marketState[id].tickSpacing == 0) {
+            require(market.midnight == address(this), InvalidMidnight());
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());

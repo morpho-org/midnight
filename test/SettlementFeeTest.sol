@@ -38,7 +38,6 @@ contract SettlementFeeTest is BaseTest {
         vm.warp(vm.getBlockTimestamp() + 1000 days); // to be able to come back in time enough
 
         market.loanToken = address(loanToken);
-        market.initialChainId = midnight.INITIAL_CHAIN_ID();
         market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 1 days; // TTM = 1 day (exactly at breakpoint)
         market.collateralParams
