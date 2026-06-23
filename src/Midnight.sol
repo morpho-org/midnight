@@ -179,7 +179,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev credit, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
 /// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
-/// @dev Market ids can clash after a hard-fork since they are identified with the chain id at their creation.
+/// @dev Market ids are scoped by market.chainId; identical markets on chains sharing a chain id may share ids.
 /// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
 /// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
 /// (Shanghai).
@@ -322,10 +322,9 @@ contract Midnight is IMidnight {
     }
 
     function claimContinuousFee(Market memory market, uint256 amount, address receiver) external {
-        bytes32 id = IdLib.toId(market);
+        bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
 
         _marketState.continuousFeeCredit -= UtilsLib.toUint128(amount);
         _marketState.totalUnits -= UtilsLib.toUint128(amount);
@@ -841,8 +840,7 @@ contract Midnight is IMidnight {
     /// @dev Slashes the position and accrues the continuous fee.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePosition(Market memory market, address user) external returns (uint128, uint128, uint128) {
-        bytes32 id = IdLib.toId(market);
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        bytes32 id = touchMarket(market);
         return _updatePosition(market, id, user);
     }
 
