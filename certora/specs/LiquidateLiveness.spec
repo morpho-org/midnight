@@ -54,16 +54,11 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
+definition getPrice(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? ghostPrice(params[0].oracle) : collateralIndex == 1 ? ghostPrice(params[1].oracle) : ghostPrice(params[2].oracle);
 
-definition getPrice(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 =
-    collateralIndex == 0 ? ghostPrice(params[0].oracle) : collateralIndex == 1 ? ghostPrice(params[1].oracle) : ghostPrice(params[2].oracle);
+definition getLltv(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? params[0].lltv : collateralIndex == 1 ? params[1].lltv : params[2].lltv;
 
-definition getLltv(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 =
-    collateralIndex == 0 ? params[0].lltv : collateralIndex == 1 ? params[1].lltv : params[2].lltv;
-
-definition getMaxLif(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 =
-    collateralIndex == 0 ? params[0].maxLif : collateralIndex == 1 ? params[1].maxLif : params[2].maxLif;
-
+definition getMaxLif(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? params[0].maxLif : collateralIndex == 1 ? params[1].maxLif : params[2].maxLif;
 
 // Assume the market is already created.
 function summaryToId(Midnight.Market market) returns bytes32 {
