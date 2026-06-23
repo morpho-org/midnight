@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMidnight, Market, Offer} from "../interfaces/IMidnight.sol";
+import {IMidnight, Market} from "../interfaces/IMidnight.sol";
 import {IERC20} from "../interfaces/IERC20.sol";
 import {
     IMidnightBundles,
