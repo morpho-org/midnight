@@ -125,8 +125,6 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
     require forall uint256 i. i < market.collateralParams.length => maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";
 
-    require market.collateralParams[collateralIndex].lltv < WAD() => to_mathint(maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor)) * to_mathint(market.collateralParams[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
-
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";
     require summaryGetBit(currentContract.position[globalId][borrower].collateralBitmap, collateralIndex), "Assumption: liquidated collateral was activated";

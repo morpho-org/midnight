@@ -15,15 +15,8 @@ rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 liquidationCursor)
     assert lltv * maxLif(lltv, liquidationCursor) <= WAD() * WAD();
 }
 
-/// Check that maxLif >= WAD
 rule maxLifIsAtLeastWad(uint256 lltv, uint256 liquidationCursor) {
     assert maxLif(lltv, liquidationCursor) >= WAD();
-}
-
-/// Check that maxLif * lltv <= WAD * (WAD - 1) for valid liquidationCursor values
-rule lifTimesLltvStrictBound(uint256 lltv, uint256 liquidationCursor) {
-    require liquidationCursor <= WAD(), "enabled liquidationCursors are at most WAD, see addLiquidationCursor";
-    assert lltv < WAD() => lltv * maxLif(lltv, liquidationCursor) <= WAD() * (WAD() - 1);
 }
 
 /// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)

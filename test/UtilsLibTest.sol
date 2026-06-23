@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {Test, stdError} from "../lib/forge-std/src/Test.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {LN_ONE_PLUS_DELTA, MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
-import {WAD, maxLif} from "../src/libraries/ConstantsLib.sol";
 
 contract UtilsLibTest is Test {
     int256 internal constant WEXP_LN2 = 0.693147180559945309e18;
