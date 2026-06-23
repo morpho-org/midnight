@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
+import {UtilsLib} from "./UtilsLib.sol";
+
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 6744;
 // Minimum representable price increment in WAD (1e-7 WAD). Tick prices are rounded to multiples of this value.
@@ -16,7 +18,7 @@ library TickLib {
     /// @dev Returns x / d rounded to the nearest integer with ties rounded down, without checking for overflow.
     function divHalfDownUnchecked(uint256 x, uint256 d) internal pure returns (uint256) {
         unchecked {
-            return (x + (d - 1) / 2) / d;
+            return (x + UtilsLib.sub(d, 1) / 2) / d;
         }
     }
 
@@ -51,7 +53,7 @@ library TickLib {
         }
     }
 
-    /// @dev Among the ticks than are multiples of spacing, returns the lowest one with a price higher or equal.
+    /// @dev Among the ticks that are multiples of spacing, returns the lowest one with a price higher or equal.
     /// @dev spacing should divide MAX_TICK.
     function priceToTick(uint256 price, uint256 spacing) internal pure returns (uint256) {
         require(price <= 1e18, PriceGreaterThanOne());
@@ -64,6 +66,6 @@ library TickLib {
                 else high = mid;
             }
         }
-        return (low + spacing - 1) / spacing * spacing;
+        return UtilsLib.sub(low + spacing, 1) / spacing * spacing;
     }
 }
