@@ -43,6 +43,8 @@ contract OtherFunctionsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
@@ -310,6 +312,8 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchMarket(_market);
         Market memory marketFromId = midnight.toMarket(_id);
+        assertEq(_market.initialChainId, marketFromId.initialChainId, "initialChainId");
+        assertEq(_market.midnight, marketFromId.midnight, "midnight");
         assertEq(_market.loanToken, marketFromId.loanToken, "loanToken");
         assertEq(_market.maturity, marketFromId.maturity, "maturity");
         assertEq(_market.collateralParams.length, marketFromId.collateralParams.length, "collateralParams length");
@@ -321,11 +325,11 @@ contract OtherFunctionsTest is BaseTest {
         }
     }
 
-    function testToId(Market memory _market) public view {
+    function testIdLibToId(Market memory _market) public view {
         _market = validMarket(_market);
 
         bytes32 expected = toId(_market);
-        bytes32 actual = midnight.toId(_market);
+        bytes32 actual = IdLib.toId(_market);
         assertEq(actual, expected, "toId mismatch");
     }
 
@@ -340,7 +344,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.chainId(newChainId);
 
         assertEq(midnight.INITIAL_CHAIN_ID(), capturedChainId, "INITIAL_CHAIN_ID changed");
-        assertEq(midnight.toId(_market), idBefore, "toId changed");
+        assertEq(toId(_market), idBefore, "toId changed");
         Market memory roundTrip = midnight.toMarket(idBefore);
         assertEq(keccak256(abi.encode(roundTrip)), keccak256(abi.encode(_market)), "stored market lost");
 
@@ -353,6 +357,24 @@ contract OtherFunctionsTest is BaseTest {
     function testToMarketRevertsIfNotCreated(bytes32 _id) public {
         vm.expectRevert(IMidnight.MarketNotCreated.selector);
         midnight.toMarket(_id);
+    }
+
+    function testTouchMarketInvalidInitialChainId(Market memory _market) public {
+        vm.assume(_market.collateralParams.length > 0);
+        _market = validMarket(_market);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID() + 1;
+
+        vm.expectRevert(IMidnight.InvalidInitialChainId.selector);
+        midnight.touchMarket(_market);
+    }
+
+    function testTouchMarketInvalidMidnight(Market memory _market) public {
+        vm.assume(_market.collateralParams.length > 0);
+        _market = validMarket(_market);
+        _market.midnight = address(0);
+
+        vm.expectRevert(IMidnight.InvalidMidnight.selector);
+        midnight.touchMarket(_market);
     }
 
     function testSstore2CodeStartsWithStop(Market memory _market) public {
@@ -379,6 +401,8 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
+        marketWithRevertingOracle.initialChainId = midnight.INITIAL_CHAIN_ID();
+        marketWithRevertingOracle.midnight = address(midnight);
         marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
@@ -403,6 +427,8 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
+        marketWithRevertingOracle.initialChainId = midnight.INITIAL_CHAIN_ID();
+        marketWithRevertingOracle.midnight = address(midnight);
         marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
@@ -431,6 +457,8 @@ contract OtherFunctionsTest is BaseTest {
         }
         collateralParams = sortCollateralParams(collateralParams);
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = collateralParams;
         _market.rcfThreshold = 0;
@@ -440,6 +468,8 @@ contract OtherFunctionsTest is BaseTest {
         maturity = bound(maturity, vm.getBlockTimestamp() + 100 * 365 days + 1, type(uint256).max);
         Market memory longMarket;
         longMarket.loanToken = address(loanToken);
+        longMarket.initialChainId = midnight.INITIAL_CHAIN_ID();
+        longMarket.midnight = address(midnight);
         longMarket.maturity = maturity;
         longMarket.collateralParams = market.collateralParams;
 
@@ -450,6 +480,8 @@ contract OtherFunctionsTest is BaseTest {
     function testZeroCollaterals() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = new CollateralParams[](0);
         vm.expectRevert(IMidnight.NoCollateralParams.selector);
@@ -480,6 +512,8 @@ contract OtherFunctionsTest is BaseTest {
     function testCollateralsNotSorted() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
@@ -497,6 +531,8 @@ contract OtherFunctionsTest is BaseTest {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -512,6 +548,8 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.5e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -648,6 +686,8 @@ contract OtherFunctionsTest is BaseTest {
 
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] =
@@ -662,6 +702,8 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -677,6 +719,8 @@ contract OtherFunctionsTest is BaseTest {
         uint256 lltv = 0.77e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 200;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -781,7 +825,7 @@ contract RepayCallback {
         external
         returns (bytes32)
     {
-        require(marketId == IdLib.toId(market, block.chainid, msg.sender), "wrong marketId");
+        require(marketId == IdLib.toId(market), "wrong marketId");
         recordedId = marketId;
         _recordedMarket = market;
         recordedData = data;

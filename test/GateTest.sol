@@ -43,6 +43,8 @@ contract GateTest is BaseTest {
         gate = new WhitelistGate();
 
         market.loanToken = address(loanToken);
+        market.initialChainId = midnight.INITIAL_CHAIN_ID();
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
@@ -56,6 +58,8 @@ contract GateTest is BaseTest {
         market.collateralParams = sortCollateralParams(market.collateralParams);
 
         gatedMarket.loanToken = address(loanToken);
+        gatedMarket.initialChainId = midnight.INITIAL_CHAIN_ID();
+        gatedMarket.midnight = address(midnight);
         gatedMarket.maturity = vm.getBlockTimestamp() + 100;
         gatedMarket.collateralParams
             .push(

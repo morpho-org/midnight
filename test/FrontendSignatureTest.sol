@@ -9,10 +9,10 @@ import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 // Paste from frontend output.
-address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
+address constant ACCOUNT = 0x6133Fd1B38C7D9ad120a6fC0D0f7b03d4F6E9658;
 uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0xb7a8c34b3aa87d799f2bd6e01a36c6a48673313015c592fc4137043b37ee80c6;
-bytes32 constant SIG_S = 0x5161ce684b17e81a0b297441856e8d8b498c541116fd6dde5d87e5624b847afb;
+bytes32 constant SIG_R = 0xbdd5b0f61aafd17bcae94af84e87a9d7d80c3a54eb4e6ffb0b5efc78da812a01;
+bytes32 constant SIG_S = 0x7b05c5581f10b0a79ac1bd89dfbf226e1c47921b9d68cfba47e5cd98d16a4c63;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
@@ -25,6 +25,8 @@ contract FrontendSignatureTest is Test {
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.initialChainId = 1;
+        offer.market.midnight = address(0);
         offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
         offer.market.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
