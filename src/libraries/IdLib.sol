@@ -34,7 +34,6 @@ library IdLib {
     }
 
     /// @dev Stores the market in the code of the contract at its id-derived address.
-    /// @dev Uses zero as salt because chainId and midnight are part of the encoded market.
     function storeInCode(Market memory market) internal returns (address create2Address) {
         bytes memory creationCode = abi.encodePacked(SSTORE2_PREFIX, abi.encode(market));
         assembly ("memory-safe") {
