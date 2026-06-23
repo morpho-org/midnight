@@ -198,7 +198,8 @@ contract TakeTest is BaseTest {
             existingCredit,
             receiver,
             address(payerCallback),
-            offerIsBuy ? address(0) : address(payerCallback)
+            offerIsBuy ? address(0) : address(payerCallback),
+            hex""
         );
 
         vm.prank(caller);

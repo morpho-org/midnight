@@ -462,7 +462,8 @@ contract Midnight is IMidnight {
             sellerCreditDecrease,
             receiver,
             payer,
-            takerCallback
+            takerCallback,
+            takerCallbackData
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
