@@ -16,15 +16,6 @@ bytes constant AUTHORIZATION_TYPE =
 bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
 
 contract EcrecoverAuthorizerTest is BaseTest {
-    event SetIsAuthorized(
-        address indexed caller,
-        address indexed authorizer,
-        address indexed authorized,
-        bool isAuthorized,
-        uint256 nonce,
-        address signer
-    );
-
     function testAuthorizationTypeHash() public pure {
         assertEq(AUTHORIZATION_TYPEHASH, keccak256(AUTHORIZATION_TYPE));
     }
