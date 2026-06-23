@@ -276,7 +276,7 @@ contract Midnight is IMidnight {
         emit EventsLib.AddLiquidationCursor(liquidationCursor);
     }
 
-    /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
+    /// @dev Refines the tick spacing of a market. Cannot increase (more ticks become accessible).
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(marketState[id].tickSpacing > 0, MarketNotCreated());
