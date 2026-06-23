@@ -267,7 +267,7 @@ contract Midnight is IMidnight {
         emit EventsLib.AddLltv(lltv);
     }
 
-    /// @dev Enables a liquidationCursor for use at market creation. LiquidationCursors can only be enabled, never
+    /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never
     /// disabled. touchMarket checks the resulting maxLif for each market.
     function addLiquidationCursor(uint256 liquidationCursor) external {
         require(msg.sender == roleSetter, OnlyRoleSetter());
