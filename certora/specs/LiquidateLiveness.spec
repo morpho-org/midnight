@@ -215,8 +215,8 @@ function lowLltvScaffolding(Midnight.Market market, bytes32 id, address borrower
     uint256 maxLifJ = getMaxLif(collateralIndex, market.collateralParams);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
     uint128 collatJ = collateral(id, borrower, collateralIndex);
-    require maxLifJ * lltvJ <= WAD() * (WAD() - 1), "maxLif*lltv <= WAD*(WAD-1) (lifTimesLltvStrictBound) => WAD*WAD - maxLif*lltv >= WAD >= 1";
-    require ghostMulDivUp(ghostMulDivUp(collatJ, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLifJ) > ghostMulDivDown(ghostMulDivDown(collatJ, priceJ, ORACLE_PRICE_SCALE()), lltvJ, WAD()), "recoveryJ > maxDebtContribJ (seized lltv < WAD, collatJ*priceJ >= ORACLE_PRICE_SCALE)";
+    assert maxLifJ * lltvJ <= WAD() * (WAD() - 1), "maxLif*lltv <= WAD*(WAD-1) (lifTimesLltvStrictBound) => WAD*WAD - maxLif*lltv >= WAD >= 1";
+    assert ghostMulDivUp(ghostMulDivUp(collatJ, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLifJ) > ghostMulDivDown(ghostMulDivDown(collatJ, priceJ, ORACLE_PRICE_SCALE()), lltvJ, WAD()), "recoveryJ > maxDebtContribJ (seized lltv < WAD, collatJ*priceJ >= ORACLE_PRICE_SCALE)";
 }
 
 /// REPAY PATH (repaidUnits > 0, seizedAssets = 0) ///
@@ -267,6 +267,7 @@ rule unhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market market,
     // maxRepaid (RCF check) = mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv), lif = maxLif here.
     // Reconstructed bit-for-bit so the bound matches the RCF check exactly; denominator > 0 and debtAfter >= maxDebt from lowLltvScaffolding.
     mathint maxRepaid = ghostMulDivUp(assert_uint256(debtAfter - maxDebt), assert_uint256(WAD() * WAD()), assert_uint256(WAD() * WAD() - maxLif * lltv));
+    assert maxRepaid > 0, "it's possible to repay at least one unit";
 
     require repaidUnits > 0;
     require repaidUnits <= maxRepaid, "RCF check passes";
@@ -353,6 +354,7 @@ rule seizeUnhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market ma
     // maxRepaid (RCF check) = mulDivUp(debtAfter - maxDebt, WAD*WAD, WAD*WAD - lif*lltv),
     // lif = maxLif here. Reconstructed bit-for-bit so the bound matches the contract's RCF check exactly.
     mathint maxRepaid = ghostMulDivUp(assert_uint256(debtAfter - maxDebt), assert_uint256(WAD() * WAD()), assert_uint256(WAD() * WAD() - maxLif * lltv));
+    assert maxRepaid > 0, "it's possible to repay at least one unit";
 
     mathint repaidUnits = ghostMulDivUp(ghostMulDivUp(seizedAssets, priceJ, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
