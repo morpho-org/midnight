@@ -210,7 +210,12 @@ contract Midnight is IMidnight {
     address public feeSetter;
     address public feeClaimer;
     address public tickSpacingSetter;
-    mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
+mapping(uint256 lltv => bool) public isLltvAllowed;
+mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
+address public roleSetter;
+address public feeSetter;
+address public feeClaimer;
+address public tickSpacingSetter;
 
     /// CONSTRUCTOR ///
 
