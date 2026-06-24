@@ -33,7 +33,7 @@ methods {
 
 persistent ghost address globalMarketLoanToken;
 
-// Assume at most 3 collaterals for performance reasons.
+// Assume 3 collaterals for performance reasons.
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
 
@@ -69,7 +69,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < 3 => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length <= 3 && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == 3 && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
