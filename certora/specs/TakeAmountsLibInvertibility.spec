@@ -13,7 +13,7 @@ methods {
     function TakeAmountsLibHarness.buyerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
     function TakeAmountsLibHarness.sellerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
 
-    // Deterministic id: same Market => same id. Matches what take() and TakeAmountsLib observe (both reach IdLib.toId via IdLib.toId / Midnight.touchMarket).
+    // Deterministic toId function.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic price: the same tick yields the same price for both the library and take().
