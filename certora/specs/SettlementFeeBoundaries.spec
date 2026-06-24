@@ -43,6 +43,12 @@ invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
         preserved touchMarket(Midnight.Market market) with (env e) {
             requireInvariant defaultSettlementFeePerIndexBound(market.loanToken, index);
         }
+        preserved claimContinuousFee(Midnight.Market market, uint256 amount, address receiver) with (env e) {
+            requireInvariant defaultSettlementFeePerIndexBound(market.loanToken, index);
+        }
+        preserved updatePosition(Midnight.Market market, address user) with (env e) {
+            requireInvariant defaultSettlementFeePerIndexBound(market.loanToken, index);
+        }
         preserved withdraw(Midnight.Market market, uint256 units, address onBehalf, address receiver) with (env e) {
             requireInvariant defaultSettlementFeePerIndexBound(market.loanToken, index);
         }

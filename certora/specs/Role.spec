@@ -273,7 +273,7 @@ rule feeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, addre
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
     bytes32 id = Utils.toId(market);
     address feeClaimerBefore = feeClaimer();
-    bool marketIsCreated = marketIsCreated(id);
+    bool marketWasCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
     uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
@@ -283,7 +283,9 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
 
     claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketIsCreated && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted => e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted && !marketWasCreated => amount == 0;
+    assert marketWasCreated && e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore => !reverted;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;

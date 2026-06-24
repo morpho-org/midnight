@@ -15,6 +15,7 @@ methods {
 
     // Deterministic toId needed to link market arguments to stored state.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
