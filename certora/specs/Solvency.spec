@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+using Utils as Utils;
+
 methods {
+    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function claimableSettlementFee(address token) external returns (uint256) envfree;
@@ -10,7 +13,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivUp(a, b, denominator);
 
     // Summarize toId, this adds no assumption but allows to retrieve the loan token from the market id.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => CVL_toId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => CVL_toId(market);
 
     // Summaries for complex internals irrelevant to token balance tracking.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -73,11 +76,11 @@ ghost mapping(bytes32 => address) loantoken;
 // Mapping from market id and collateral index to the corresponding collateral token.
 ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
-ghost hash(address, uint256, uint256, address) returns bytes32;
+ghost hash(bytes32) returns bytes32;
 
-function CVL_toId(Midnight.Market market, uint256 chainId, address midnight) returns bytes32 {
-    // Deterministically derive the market id.
-    bytes32 id = hash(market.loanToken, market.maturity, chainId, midnight);
+function CVL_toId(Midnight.Market market) returns bytes32 {
+    // Deterministically derive an arbitrary market id from the full market.
+    bytes32 id = hash(Utils.hashMarket(market));
 
     // Assume the market id already maps to this loan token.
     // We could also initialize on first use, but then token(0) handling needs extra constraints.

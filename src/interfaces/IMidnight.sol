@@ -3,6 +3,8 @@
 pragma solidity >=0.5.0;
 
 struct Market {
+    uint256 chainId;
+    address midnight;
     address loanToken;
     CollateralParams[] collateralParams;
     uint256 maturity;
@@ -76,9 +78,11 @@ interface IMidnight {
     error ContinuousFeeAboveOfferCap();
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
+    error InvalidChainId();
     error InvalidFeeIndex();
     error InvalidLltv();
     error InvalidMaxLif();
+    error InvalidMidnight();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
     error LiquidatorGatedFromLiquidating();
@@ -117,9 +121,6 @@ interface IMidnight {
     error WrongSellCallbackReturnValue();
 
     // forgefmt: disable-start
-    /// IMMUTABLES ///
-    function INITIAL_CHAIN_ID() external view returns (uint256);
-
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
     function marketState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 settlementFeeCbp0, uint16 settlementFeeCbp1, uint16 settlementFeeCbp2, uint16 settlementFeeCbp3, uint16 settlementFeeCbp4, uint16 settlementFeeCbp5, uint16 settlementFeeCbp6, uint32 continuousFee, uint8 tickSpacing);
@@ -171,7 +172,6 @@ interface IMidnight {
     function lastLossFactor(bytes32 id, address user) external view returns (uint128);
     function collateralBitmap(bytes32 id, address user) external view returns (uint128);
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128);
-    function toId(Market memory market) external view returns (bytes32);
     function toMarket(bytes32 id) external view returns (Market memory);
     function credit(bytes32 id, address user) external view returns (uint128);
     function debt(bytes32 id, address user) external view returns (uint128);

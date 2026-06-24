@@ -15,10 +15,10 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
     // Deterministic toId summary using a wrapper that extracts all scalar Market fields.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
-    // Skip market creation logic: removes the collateral-validation loop.
-    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    // Sound because the protocol doesn't use toMarket.
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Token transfers happen after return values are computed; irrelevant to the assertion.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;

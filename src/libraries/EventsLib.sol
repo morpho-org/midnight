@@ -7,7 +7,7 @@ import {Market} from "../interfaces/IMidnight.sol";
 /// @dev id_ is used to avoid naming conflicts in indexers.
 library EventsLib {
     // forgefmt: disable-start
-    event Constructor(address indexed roleSetter, uint256 initialChainId);
+    event Constructor(address indexed roleSetter);
     event SetRoleSetter(address indexed roleSetter);
     event SetFeeSetter(address indexed feeSetter);
     event SetTickSpacingSetter(address indexed tickSpacingSetter);

@@ -19,7 +19,7 @@ methods {
     function _.price() external => ghostPrice(calledContract) expect(uint256);
 
     // Summary for deterministic toId for the global market.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // This function is checked manually to not cause a division by zero.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -32,6 +32,8 @@ methods {
 /// GHOSTS ///
 
 persistent ghost address globalMarketLoanToken;
+
+persistent ghost uint256 globalMarketChainId;
 
 // Assume 3 collaterals for performance reasons.
 
@@ -69,12 +71,12 @@ definition WAD() returns uint256 = 10 ^ 18;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < 3 => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == 3 && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == 3 && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
+function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && midnight == currentContract) {
+    if (equalsGlobalMarket(market)) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";
