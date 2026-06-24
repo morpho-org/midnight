@@ -282,6 +282,7 @@ contract AuthorizationTest is BaseTest {
 
     function testSetConsumedAuthorization(address user, address authorized) public {
         vm.assume(user != authorized);
+        vm.assume(!midnight.isAuthorized(user, authorized));
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
@@ -298,6 +299,7 @@ contract AuthorizationTest is BaseTest {
 
     function testSetIsAuthorizedAuthorization(address user, address authorized, address newAuthorized) public {
         vm.assume(user != authorized);
+        vm.assume(!midnight.isAuthorized(user, authorized));
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
