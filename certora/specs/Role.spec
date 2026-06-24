@@ -6,7 +6,7 @@ methods {
     function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function roleSetter() external returns (address) envfree;
+    function configurator() external returns (address) envfree;
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
@@ -55,93 +55,93 @@ function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
 }
 
-/// ROLE SETTER: LIVENESS ///
+/// CONFIGURATOR: LIVENESS ///
 
-rule roleSetterCanChangeRoleSetter(env e, address newRoleSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeConfigurator(env e, address newConfigurator) {
+    address configuratorBefore = configurator();
 
-    setRoleSetter@withrevert(e, newRoleSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
-    assert !lastReverted => roleSetter() == newRoleSetter;
+    setConfigurator@withrevert(e, newConfigurator);
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
+    assert !lastReverted => configurator() == newConfigurator;
 }
 
-rule roleSetterCanChangeFeeSetter(env e, address newFeeSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeFeeSetter(env e, address newFeeSetter) {
+    address configuratorBefore = configurator();
 
     setFeeSetter@withrevert(e, newFeeSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => feeSetter() == newFeeSetter;
 }
 
-rule roleSetterCanChangeFeeClaimer(env e, address newFeeClaimer) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeFeeClaimer(env e, address newFeeClaimer) {
+    address configuratorBefore = configurator();
 
     setFeeClaimer@withrevert(e, newFeeClaimer);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => feeClaimer() == newFeeClaimer;
 }
 
-rule roleSetterCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
+    address configuratorBefore = configurator();
 
     setTickSpacingSetter@withrevert(e, newTickSpacingSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
-rule roleSetterCanAddLltv(env e, uint256 lltv) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanAddLltv(env e, uint256 lltv) {
+    address configuratorBefore = configurator();
 
     addLltv@withrevert(e, lltv);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0 && lltv <= WAD();
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && lltv <= WAD();
     assert !lastReverted => isLltvAllowed(lltv);
 }
 
-/// ROLE SETTER: ACCESS CONTROL ///
+/// CONFIGURATOR: ACCESS CONTROL ///
 
-rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
-    address roleSetterBefore = roleSetter();
+rule onlyConfiguratorCanChangeConfigurator(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert roleSetter() != roleSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setRoleSetter(address).selector;
+    assert configurator() != configuratorBefore => e.msg.sender == configuratorBefore && f.selector == sig:setConfigurator(address).selector;
 }
 
-rule onlyRoleSetterCanChangeFeeSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeFeeSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address feeSetterBefore = feeSetter();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert feeSetter() != feeSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeSetter(address).selector;
+    assert feeSetter() != feeSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setFeeSetter(address).selector;
 }
 
-rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeFeeClaimer(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address feeClaimerBefore = feeClaimer();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert feeClaimer() != feeClaimerBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeClaimer(address).selector;
+    assert feeClaimer() != feeClaimerBefore => e.msg.sender == configuratorBefore && f.selector == sig:setFeeClaimer(address).selector;
 }
 
-rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeTickSpacingSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address tickSpacingSetterBefore = tickSpacingSetter();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
+    assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
 
-/// Allowed LLTV tiers can only be added by the role setter, and never removed.
-rule onlyRoleSetterCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+/// Allowed LLTV tiers can only be added by the configurator, and never removed.
+rule onlyConfiguratorCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
     bool allowedBefore = isLltvAllowed(lltv);
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert isLltvAllowed(lltv) != allowedBefore => allowedBefore == false && e.msg.sender == roleSetterBefore && f.selector == sig:addLltv(uint256).selector;
+    assert isLltvAllowed(lltv) != allowedBefore => allowedBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:addLltv(uint256).selector;
 }
 
 /// FEE SETTER: LIVENESS ///

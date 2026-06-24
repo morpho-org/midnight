@@ -62,7 +62,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
   It also checks that `take` requires the caller to be the taker or authorized by them, and that `setIsAuthorized` changes only the targeted pair.
 - [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
 - [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
-  The role setter and only the role setter can reassign each role.
+  The configurator and only the configurator can reassign each role.
   The fee setter can set market and default settlement and continuous fees, and once a market is created only the fee setter can change the fees.
   The tick-spacing setter and only the tick-spacing setter can set a market's tick spacing.
   The fee claimer and only the fee claimer can claim settlement and continuous fees.
