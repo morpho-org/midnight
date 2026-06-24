@@ -78,8 +78,8 @@ interface IMidnight {
     error ContinuousFeeAboveOfferCap();
     error FeeNotMultipleOfFeeCbp();
     error InconsistentInput();
-    error InvalidFeeIndex();
     error InvalidChainId();
+    error InvalidFeeIndex();
     error InvalidLltv();
     error InvalidMaxLif();
     error InvalidMidnight();
