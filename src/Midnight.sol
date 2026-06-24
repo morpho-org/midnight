@@ -810,7 +810,7 @@ contract Midnight is IMidnight {
         return id;
     }
 
-    /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
+    /// UPDATE POSITION ///
 
     /// @dev Expects the id to correspond to the market's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
@@ -869,11 +869,62 @@ contract Midnight is IMidnight {
         return (newCredit, newPendingFee, accruedFee);
     }
 
+    /// HELPERS ///
+
+    /// @dev This function should be called with the id corresponding to the market.
+    /// @dev This function does not call any oracle if debt is 0.
+    /// @dev Expects the id to correspond to the market's id.
+    function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
+        Position storage _position = position[id][borrower];
+        uint256 _debt = _position.debt;
+        uint256 maxDebt;
+        if (_debt > 0) {
+            uint128 _collateralBitmap = _position.collateralBitmap;
+            while (_collateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(_collateralBitmap);
+                CollateralParams memory collateralParam = market.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                _collateralBitmap = _collateralBitmap.clearBit(i);
+            }
+        }
+        return maxDebt >= _debt;
+    }
+
+    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
+    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+        MarketState storage _marketState = marketState[id];
+        require(_marketState.tickSpacing > 0, MarketNotCreated());
+
+        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
+
+        // forgefmt: disable-start
+        (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
+                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
+        // forgefmt: disable-end
+
+        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+    }
+
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
         return position[id][user].credit > 0;
     }
 
-    /// OTHER VIEW FUNCTIONS ///
+    /// @dev Reverts if the id is not a valid id of a touched market.
+    /// @dev Returns the market corresponding to the given id.
+    function toMarket(bytes32 id) external view returns (Market memory) {
+        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        address create2Address = address(uint160(uint256(id)));
+        return abi.decode(create2Address.code, (Market));
+    }
+
+    /// STORAGE GETTERS ///
 
     function credit(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].credit;
@@ -901,14 +952,6 @@ contract Midnight is IMidnight {
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
         return position[id][user].collateral[index];
-    }
-
-    /// @dev Reverts if the id is not a valid id of a touched market.
-    /// @dev Returns the market corresponding to the given id.
-    function toMarket(bytes32 id) external view returns (Market memory) {
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
-        address create2Address = address(uint160(uint256(id)));
-        return abi.decode(create2Address.code, (Market));
     }
 
     function totalUnits(bytes32 id) external view returns (uint128) {
@@ -951,46 +994,5 @@ contract Midnight is IMidnight {
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
-    }
-
-    /// @dev This function should be called with the id corresponding to the market.
-    /// @dev This function does not call any oracle if debt is 0.
-    /// @dev Expects the id to correspond to the market's id.
-    function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
-        Position storage _position = position[id][borrower];
-        uint256 _debt = _position.debt;
-        uint256 maxDebt;
-        if (_debt > 0) {
-            uint128 _collateralBitmap = _position.collateralBitmap;
-            while (_collateralBitmap != 0) {
-                uint256 i = UtilsLib.msb(_collateralBitmap);
-                CollateralParams memory collateralParam = market.collateralParams[i];
-                uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(collateralParam.lltv, WAD);
-                _collateralBitmap = _collateralBitmap.clearBit(i);
-            }
-        }
-        return maxDebt >= _debt;
-    }
-
-    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
-    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        MarketState storage _marketState = marketState[id];
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
-
-        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
-
-        // forgefmt: disable-start
-        (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
-                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
-        // forgefmt: disable-end
-
-        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
 }
