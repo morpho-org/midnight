@@ -31,11 +31,9 @@ methods {
 
 /// GHOSTS ///
 
-// Reuse part of the setup of Healthiness.spec.
-
 persistent ghost address globalMarketLoanToken;
 
-persistent ghost uint256 globalMarketCollateralLength;
+// Assume at most 3 collaterals for performance reasons.
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
 
@@ -68,10 +66,10 @@ ghost ghostPrice(address) returns uint256;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
+definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < 3 => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.loanToken == globalMarketLoanToken && market.collateralParams.length <= 3 && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
