@@ -186,22 +186,23 @@ contract TakeTest is BaseTest {
 
         vm.expectEmit();
         emit EventsLib.Take(
-            caller,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            hex"",
             units,
             taker,
-            maker,
-            offerIsBuy,
-            group,
+            receiver,
             buyerAssets,
             sellerAssets,
             existingConsumed + units,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            units - existingDebt,
-            existingCredit,
-            receiver,
-            address(payerCallback)
+            address(payerCallback),
+            caller
         );
 
         vm.prank(caller);
