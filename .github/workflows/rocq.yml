@@ -15,7 +15,7 @@ jobs:
 
       - name: Check proofs and assumptions
         run: |
-          docker run --rm -v "$PWD:$PWD" -w "$PWD" rocq/rocq-prover@sha256:b85a80a11bb65c7c843f91c7cbcce282f22ee397c9ca42f123d568ab6cef68b0 sh -lc '
+          docker run --rm -v "$PWD:$PWD" -w "$PWD" rocq/rocq-prover@sha256:b85a80a11bb65c7c843f91c7cbcce282f22ee397c9ca42f123d568ab6cef68b0 bash -ec '
             # Assume .v files are independent.
             # Do not check admits in the module'\''s dependencies.
             for file in rocq/*.v; do
