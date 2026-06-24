@@ -167,7 +167,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// ROLES
 /// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, and add LLTV
-/// tiers. @dev The fee setter can set the default and per-market settlement fee and continuous fee.
+/// tiers.
+/// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
 /// @dev The tick spacing setter can decrease the tick spacing of a market.
