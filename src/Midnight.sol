@@ -442,19 +442,22 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Take(
             msg.sender,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            ratifierData,
             units,
             taker,
-            offer.maker,
-            offer.buy,
-            offer.group,
             buyerAssets,
             sellerAssets,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
             receiver,
             payer
         );
