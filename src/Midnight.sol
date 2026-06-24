@@ -166,7 +166,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter, and add LLTV tiers.
+/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, and add LLTV
+/// tiers.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -198,7 +199,7 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
     mapping(uint256 lltv => bool) public isLltvAllowed;
-    address public roleSetter;
+    address public configurator;
     address public feeSetter;
     address public feeClaimer;
     address public tickSpacingSetter;
@@ -206,7 +207,7 @@ contract Midnight is IMidnight {
     /// CONSTRUCTOR ///
 
     constructor() {
-        roleSetter = msg.sender;
+        configurator = msg.sender;
         emit EventsLib.Constructor(msg.sender);
     }
 
@@ -225,33 +226,33 @@ contract Midnight is IMidnight {
 
     /// ADMIN FUNCTIONS ///
 
-    function setRoleSetter(address newRoleSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
-        roleSetter = newRoleSetter;
-        emit EventsLib.SetRoleSetter(newRoleSetter);
+    function setConfigurator(address newConfigurator) external {
+        require(msg.sender == configurator, OnlyConfigurator());
+        configurator = newConfigurator;
+        emit EventsLib.SetConfigurator(newConfigurator);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     function setFeeClaimer(address newFeeClaimer) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
     function setTickSpacingSetter(address newTickSpacingSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         tickSpacingSetter = newTickSpacingSetter;
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
     /// @dev Allows a new LLTV tier. Tiers can only be added, never removed.
     function addLltv(uint256 lltv) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         require(lltv <= WAD, InvalidLltv());
         isLltvAllowed[lltv] = true;
         emit EventsLib.AddLltv(lltv);
@@ -441,19 +442,22 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Take(
             msg.sender,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            ratifierData,
             units,
             taker,
-            offer.maker,
-            offer.buy,
-            offer.group,
             buyerAssets,
             sellerAssets,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
             receiver,
             payer
         );

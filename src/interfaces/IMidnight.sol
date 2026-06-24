@@ -98,7 +98,7 @@ interface IMidnight {
     error OfferNotStarted();
     error OnlyFeeClaimer();
     error OnlyFeeSetter();
-    error OnlyRoleSetter();
+    error OnlyConfigurator();
     error OnlyTickSpacingSetter();
     error RatifierFailed();
     error RatifierUnauthorized();
@@ -130,7 +130,7 @@ interface IMidnight {
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
     function isLltvAllowed(uint256 lltv) external view returns (bool);
-    function roleSetter() external view returns (address);
+    function configurator() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
     function tickSpacingSetter() external view returns (address);
@@ -139,7 +139,7 @@ interface IMidnight {
     function multicall(bytes[] memory calls) external;
 
     /// ADMIN FUNCTIONS ///
-    function setRoleSetter(address newRoleSetter) external;
+    function setConfigurator(address newConfigurator) external;
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
