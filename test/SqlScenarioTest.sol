@@ -58,7 +58,7 @@ contract SqlScenarioTest is BaseTest {
     // ── Event type selectors
     // ─────────────────────────────────────────────────
     bytes32 internal constant SEL_TAKE = keccak256(
-        "Take(address,bytes32,uint256,address,address,bool,bytes32,uint256,uint256,uint256,uint256,uint256,uint256,uint256,address,address)"
+        "Take(bytes32,bytes32,bool,address,bytes32,address,bytes,uint256,address,address,uint256,uint256,uint256,uint256,uint256,address,address)"
     );
     bytes32 internal constant SEL_UPDATE_POS = keccak256("UpdatePosition(bytes32,address,uint256,uint256,uint256)");
     bytes32 internal constant SEL_WITHDRAW = keccak256("Withdraw(address,bytes32,uint256,address,address,uint256)");
@@ -402,10 +402,11 @@ contract SqlScenarioTest is BaseTest {
 
     function _decodeTake(Vm.Log memory log, uint256 bn, uint256 idx) internal {
         bytes32 _id = log.topics[1];
-        address taker = address(uint160(uint256(log.topics[2])));
-        address maker = address(uint160(uint256(log.topics[3])));
-        // data slots (0-indexed): 0=caller, 1=units, 2=offerIsBuy, 3=group, 4=buyerAssets,
-        // 5=sellerAssets, 6=consumed, 7=buyerPFI, 8=sellerPFD, 9=buyerCI, 10=sellerCD, 11=receiver, 12=payer
+        address maker = address(uint160(uint256(log.topics[2])));
+        address taker = address(uint160(uint256(log.topics[3])));
+        // data slots (0-indexed): 0=offerHash, 1=offerIsBuy, 2=group, 3=ratifier, 4=ratifierData(offset),
+        // 5=units, 6=receiver, 7=buyerAssets, 8=sellerAssets, 9=consumed, 10=buyerPFI, 11=sellerPFD, 12=payer,
+        // 13=caller
         bytes memory d = log.data;
         string memory body = string.concat(
             _sb("id_", _b32s(_id)),
@@ -414,28 +415,24 @@ contract SqlScenarioTest is BaseTest {
             _c,
             _sb("taker", _as(taker)),
             _c,
-            _nb("offerisbuy", _word(d, 2) != 0 ? "true" : "false"),
+            _nb("offerisbuy", _word(d, 1) != 0 ? "true" : "false"),
             _c,
-            _sn("buyerassets", uint256(_word(d, 4))),
+            _sn("buyerassets", uint256(_word(d, 7))),
             _c,
-            _sn("sellerassets", uint256(_word(d, 5))),
+            _sn("sellerassets", uint256(_word(d, 8))),
             _c,
-            _sn("units", uint256(_word(d, 1)))
+            _sn("units", uint256(_word(d, 5)))
         );
         body = string.concat(
             body,
             _c,
-            _sb("group", _b32s(_word(d, 3))),
+            _sb("group", _b32s(_word(d, 2))),
             _c,
-            _sn("consumed", uint256(_word(d, 6))),
+            _sn("consumed", uint256(_word(d, 9))),
             _c,
-            _sn("buyerpendingfeeincrease", uint256(_word(d, 7))),
+            _sn("buyerpendingfeeincrease", uint256(_word(d, 10))),
             _c,
-            _sn("sellerpendingfeedecrease", uint256(_word(d, 8))),
-            _c,
-            _sn("buyercreditincrease", uint256(_word(d, 9))),
-            _c,
-            _sn("sellercreditdecrease", uint256(_word(d, 10)))
+            _sn("sellerpendingfeedecrease", uint256(_word(d, 11)))
         );
         body = string.concat(body, _c, _sn("evt_block_number", bn), _c, _sn("evt_index", idx));
         jTake = _app(jTake, body);

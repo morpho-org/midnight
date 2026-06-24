@@ -5,44 +5,36 @@
 
 WITH
 
--- ── Credit ────────────────────────────────────────────────────────────────────
--- buyer in Take: +buyerCreditIncrease
--- seller in Take: -sellerCreditDecrease
--- Withdraw: -units
--- UpdatePosition: -creditDecrease (slashing + continuous-fee accrual)
+-- ── Credit & debt (net position) ───────────────────────────────────────────────
+-- The Take event no longer logs buyerCreditIncrease / sellerCreditDecrease, so
+-- credit and debt can't be summed independently. But a position never holds credit
+-- and debt at the same time: take repays debt before adding credit and consumes
+-- credit before adding debt; withdraw and updatePosition only cut credit; repay and
+-- liquidate only cut debt. So net = credit - debt fully determines both:
+--   credit = max(0, net),  debt = max(0, -net)
+-- and every net delta uses only fields still present in the events.
+--
+-- net up   (add_):  buyer in Take +units, Repay +units, Liquidate +(badDebt+repaidUnits)
+-- net down (sub_):  seller in Take +units, Withdraw +units, UpdatePosition +creditDecrease
 
-credit_deltas AS (
-    SELECT id_, IF(offerisbuy, maker, taker) AS user, buyercreditincrease AS add_, UINT256 '0' AS sub_
+net_deltas AS (
+    SELECT id_, IF(offerisbuy, maker, taker) AS user, units AS add_, UINT256 '0' AS sub_
     FROM midnight.midnight_evt_take
     UNION ALL
-    SELECT id_, IF(offerisbuy, taker, maker) AS user, UINT256 '0' AS add_, sellercreditdecrease AS sub_
+    SELECT id_, IF(offerisbuy, taker, maker) AS user, UINT256 '0' AS add_, units AS sub_
     FROM midnight.midnight_evt_take
+    UNION ALL
+    SELECT id_, onbehalf AS user, units, UINT256 '0'
+    FROM midnight.midnight_evt_repay
+    UNION ALL
+    SELECT id_, borrower AS user, baddebt + repaidunits, UINT256 '0'
+    FROM midnight.midnight_evt_liquidate
     UNION ALL
     SELECT id_, onbehalf AS user, UINT256 '0', units
     FROM midnight.midnight_evt_withdraw
     UNION ALL
     SELECT id_, user, UINT256 '0', creditdecrease
     FROM midnight.midnight_evt_updateposition
-),
-
--- ── Debt ──────────────────────────────────────────────────────────────────────
--- seller in Take: +(units - sellerCreditDecrease)  [new debt, after exhausting credit]
--- buyer  in Take: -(units - buyerCreditIncrease)   [repays existing debt]
--- Repay: -units
--- Liquidate: -(badDebt + repaidUnits)
-
-debt_deltas AS (
-    SELECT id_, IF(offerisbuy, taker, maker) AS user, units - sellercreditdecrease AS add_, UINT256 '0' AS sub_
-    FROM midnight.midnight_evt_take
-    UNION ALL
-    SELECT id_, IF(offerisbuy, maker, taker) AS user, UINT256 '0' AS add_, units - buyercreditincrease AS sub_
-    FROM midnight.midnight_evt_take
-    UNION ALL
-    SELECT id_, onbehalf AS user, UINT256 '0', units
-    FROM midnight.midnight_evt_repay
-    UNION ALL
-    SELECT id_, borrower AS user, UINT256 '0', baddebt + repaidunits
-    FROM midnight.midnight_evt_liquidate
 ),
 
 -- ── Pending fee ───────────────────────────────────────────────────────────────
@@ -67,14 +59,10 @@ pending_fee_deltas AS (
 
 -- ── Aggregate the three running fields ───────────────────────────────────────
 
-credit_per_user AS (
-    SELECT id_, user, SUM(add_) - SUM(sub_) AS credit
-    FROM credit_deltas GROUP BY id_, user
-),
-
-debt_per_user AS (
-    SELECT id_, user, SUM(add_) - SUM(sub_) AS debt
-    FROM debt_deltas GROUP BY id_, user
+-- Keep up_ and down_ unsigned (no underflow); net = up_ - down_ at the end.
+credit_debt_per_user AS (
+    SELECT id_, user, SUM(add_) AS up_, SUM(sub_) AS down_
+    FROM net_deltas GROUP BY id_, user
 ),
 
 pending_fee_per_user AS (
@@ -122,9 +110,7 @@ last_loss_factor AS (
 -- ── All (id, user) pairs that ever had any activity ───────────────────────────
 
 all_users AS (
-    SELECT DISTINCT id_, user FROM credit_deltas
-    UNION
-    SELECT DISTINCT id_, user FROM debt_deltas
+    SELECT DISTINCT id_, user FROM net_deltas
     UNION
     SELECT DISTINCT id_, user FROM pending_fee_deltas
 )
@@ -132,14 +118,13 @@ all_users AS (
 SELECT
     u.id_,
     u.user,
-    COALESCE(c.credit,            UINT256 '0') AS credit,
-    COALESCE(d.debt,              UINT256 '0') AS debt,
+    IF(cd.up_ >= cd.down_, cd.up_ - cd.down_, UINT256 '0') AS credit,
+    IF(cd.down_ >= cd.up_, cd.down_ - cd.up_, UINT256 '0') AS debt,
     COALESCE(p.pending_fee,       UINT256 '0') AS pending_fee,
     COALESCE(llf.last_loss_factor,UINT256 '0') AS last_loss_factor,
     COALESCE(lu.last_accrual,     UINT256 '0') AS last_accrual
 FROM all_users u
-LEFT JOIN credit_per_user      c   ON c.id_   = u.id_ AND c.user   = u.user
-LEFT JOIN debt_per_user        d   ON d.id_   = u.id_ AND d.user   = u.user
+LEFT JOIN credit_debt_per_user cd  ON cd.id_  = u.id_ AND cd.user  = u.user
 LEFT JOIN pending_fee_per_user p   ON p.id_   = u.id_ AND p.user   = u.user
 LEFT JOIN last_loss_factor     llf ON llf.id_ = u.id_ AND llf.user = u.user
 LEFT JOIN last_update_pos      lu  ON lu.id_  = u.id_ AND lu.user  = u.user

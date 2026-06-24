@@ -61,7 +61,6 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
         "take.json",
         ["buyerassets", "sellerassets", "units", "consumed",
          "buyerpendingfeeincrease", "sellerpendingfeedecrease",
-         "buyercreditincrease", "sellercreditdecrease",
          "evt_block_number", "evt_index"],
         ["offerisbuy"],
         ["id_", "maker", "taker", "group"],
