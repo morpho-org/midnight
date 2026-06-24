@@ -71,6 +71,10 @@ strong invariant createdMarketsHaveEnabledLiquidationCursor(Midnight.Market mark
 strong invariant createdMarketsHaveMaxLifAtMostTwoWad(Midnight.Market market, uint256 i)
     marketIsCreated(market) => i < market.collateralParams.length => Utils.maxLif(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD();
 
+// Show that, except for the special LLTV = 1 case, a created market satisfies lltv * maxLif <= 0.999 * WAD * WAD.
+strong invariant createdMarketsRespectMaxLifBound(Midnight.Market market, uint256 i)
+    marketIsCreated(market) => i < market.collateralParams.length => (market.collateralParams[i].lltv == WAD() || market.collateralParams[i].lltv * Utils.maxLif(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 999 * 10 ^ 15 * WAD());
+
 // Show that a created market cannot be deleted.
 rule marketCannotBeDeleted(env e, method f, calldataarg args, Midnight.Market market) {
     require marketIsCreated(market), "Assume that the market is created";
