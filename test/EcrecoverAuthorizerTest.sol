@@ -34,7 +34,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
             authorized: authorized,
             isAuthorized: isAuth,
             nonce: ecrecoverAuthorizer.nonce(authorizer),
-            deadline: block.timestamp + 1 days
+            deadline: vm.getBlockTimestamp() + 1 days
         });
     }
 
@@ -57,6 +57,9 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, borrower);
 
+        vm.expectEmit();
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, borrower);
+
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), true);
@@ -64,6 +67,9 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
         auth = makeAuthorization(borrower, lender, false);
         sig = signAuthorization(auth, borrower);
+
+        vm.expectEmit();
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, false, auth.nonce, borrower);
 
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
@@ -85,6 +91,20 @@ contract EcrecoverAuthorizerTest is BaseTest {
         assertEq(ecrecoverAuthorizer.nonce(borrower), 1);
     }
 
+    function testEcrecoverAuthorizerEventEmitsSigner() public {
+        vm.startPrank(borrower);
+        midnight.setIsAuthorized(address(ecrecoverAuthorizer), true, borrower);
+        midnight.setIsAuthorized(otherBorrower, true, borrower);
+        vm.stopPrank();
+
+        Authorization memory auth = makeAuthorization(borrower, lender, true);
+        Signature memory sig = signAuthorization(auth, otherBorrower);
+
+        vm.expectEmit();
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, otherBorrower);
+        ecrecoverAuthorizer.setIsAuthorized(auth, sig);
+    }
+
     function testEcrecoverAuthorizerInvalidSignature() public {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
@@ -98,7 +118,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
     function testEcrecoverAuthorizerExpired() public {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
-        auth.deadline = block.timestamp - 1;
+        auth.deadline = vm.getBlockTimestamp() - 1;
         Signature memory sig = signAuthorization(auth, borrower);
 
         vm.expectRevert(IEcrecoverAuthorizer.Expired.selector);

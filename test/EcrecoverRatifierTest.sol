@@ -21,7 +21,7 @@ contract EcrecoverRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         offer.maker = maker;
         offer.ratifier = address(ecrecoverRatifier);
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
     }
 
     function testDomainSeparator() public view {
@@ -74,15 +74,6 @@ contract EcrecoverRatifierTest is BaseTest {
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
-    }
-
-    function testIsRatifiedNotMidnight() public {
-        Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
-        bytes memory ratifierData = buildRatifierData(_root, lender);
-
-        vm.expectRevert(IEcrecoverRatifier.NotMidnight.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
     }
 
     function testIsRatifiedUnauthorizedSigner() public {
@@ -144,7 +135,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes32 _root = HashLib.hashOffer(offer);
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
-        vm.expectEmit(true, true, false, true, address(ecrecoverRatifier));
+        vm.expectEmit();
         emit IEcrecoverRatifier.CancelRoot(lender, lender, _root);
         vm.prank(lender);
         ecrecoverRatifier.cancelRoot(lender, _root);

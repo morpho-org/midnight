@@ -3,15 +3,15 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => CVL_toId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => CVL_toId(market);
 
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
-    function continuousFeeCredit(bytes32 id) external returns (uint256) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
@@ -39,7 +39,7 @@ function CVL_toId(Midnight.Market market) returns bytes32 {
 definition WAD() returns uint256 = 10 ^ 18;
 
 // The buyer's pendingFee increases by floor(creditIncrease * continuousFee * timeToMaturity / WAD).
-rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     address buyer = offer.buy ? offer.maker : taker;
 
     bytes32 id;
@@ -48,22 +48,22 @@ rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, uint256 un
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.market, id, buyer);
 
-    require pendingFee(id, buyer) <= creditOf(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require pendingFee(id, buyer) <= credit(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     require id == lastId, "id should be derived from market";
 
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = creditOf(id, buyer) - postUpdateCredit;
+    mathint creditDelta = credit(id, buyer) - postUpdateCredit;
 
     assert pendingFee(id, buyer) == postUpdatePendingFee + (creditDelta * contFee * timeToMaturity) / WAD();
 }
 
 // When a seller's credit decreases via a take, their pendingFee decreases by ceil(PendingFee * creditDelta / postUpdateCredit).
-rule pendingFeeDecreasesProportionallyForSeller(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule pendingFeeDecreasesProportionallyForSeller(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     address seller = offer.buy ? taker : offer.maker;
 
     bytes32 id;
@@ -74,11 +74,11 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, Midnight.Offer offer, uin
 
     require postUpdateCredit > 0 || postUpdatePendingFee == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     require id == lastId, "id should be derived from market";
 
-    uint256 creditAfter = creditOf(id, seller);
+    uint256 creditAfter = credit(id, seller);
     uint256 pendingFeeAfter = pendingFee(id, seller);
 
     require creditAfter > 0 || pendingFeeAfter == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";
@@ -107,7 +107,7 @@ rule pendingFeeDecreasesProportionallyOnWithdraw(env e, Midnight.Market market, 
 }
 
 // take() increases continuousFeeCredit by exactly the sum of the accrued fees of the buyer and seller.
-rule continuousFeeCreditIncreasesByAccruedFees(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule continuousFeeCreditIncreasesByAccruedFees(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
@@ -120,7 +120,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, Midnight.Offer offer, uint
 
     uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     require id == lastId, "id should be derived from market";
 
@@ -128,7 +128,7 @@ rule continuousFeeCreditIncreasesByAccruedFees(env e, Midnight.Offer offer, uint
 }
 
 // take should not change the return values of updatePositionView (i.e., post-update credit, pending fee, and accrued fee) of a third party.
-rule takeDoesNotAffectThirdParties(env e, Midnight.Offer offer, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes ratifierData, address user) {
+rule takeDoesNotAffectThirdParties(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
 
@@ -140,7 +140,7 @@ rule takeDoesNotAffectThirdParties(env e, Midnight.Offer offer, uint256 units, a
     uint256 userAccruedFeeBefore;
     postUpdateCreditBefore, postUpdatePendingFeeBefore, userAccruedFeeBefore = updatePositionView(e, offer.market, id, user);
 
-    take(e, offer, units, taker, receiver, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     require id == lastId, "id should be derived from market";
 

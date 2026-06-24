@@ -3,18 +3,20 @@
 using Utils as Utils;
 
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function roleSetter() external returns (address) envfree;
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
+    function isLltvAllowed(uint256 lltv) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function withdrawable(bytes32 id) external returns (uint256) envfree;
-    function Utils.maxTradingFee(uint256 index) external returns (uint256) envfree;
+    function claimableSettlementFee(address token) external returns (uint256) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
+    function Utils.maxSettlementFee(uint256 index) external returns (uint256) envfree;
 
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -26,15 +28,17 @@ methods {
 
 /// HELPERS ///
 
+definition WAD() returns uint256 = 10 ^ 18;
+
 definition CBP() returns uint256 = 10 ^ 12;
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
-definition marketTradingFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].tradingFeeCbp0 : index == 1 ? currentContract.marketState[id].tradingFeeCbp1 : index == 2 ? currentContract.marketState[id].tradingFeeCbp2 : index == 3 ? currentContract.marketState[id].tradingFeeCbp3 : index == 4 ? currentContract.marketState[id].tradingFeeCbp4 : index == 5 ? currentContract.marketState[id].tradingFeeCbp5 : currentContract.marketState[id].tradingFeeCbp6;
+definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = index == 0 ? currentContract.marketState[id].settlementFeeCbp0 : index == 1 ? currentContract.marketState[id].settlementFeeCbp1 : index == 2 ? currentContract.marketState[id].settlementFeeCbp2 : index == 3 ? currentContract.marketState[id].settlementFeeCbp3 : index == 4 ? currentContract.marketState[id].settlementFeeCbp4 : index == 5 ? currentContract.marketState[id].settlementFeeCbp5 : currentContract.marketState[id].settlementFeeCbp6;
 
-definition marketTradingFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketTradingFeeCbp(id, index) * CBP());
+definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
-definition defaultTradingFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultTradingFeeCbp[loanToken][index] * CBP());
+definition defaultSettlementFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultSettlementFeeCbp[loanToken][index] * CBP());
 
 ghost mapping(address => mapping(address => mathint)) tokenBalance;
 
@@ -85,6 +89,14 @@ rule roleSetterCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
+rule roleSetterCanAddLltv(env e, uint256 lltv) {
+    address roleSetterBefore = roleSetter();
+
+    addLltv@withrevert(e, lltv);
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0 && lltv <= WAD();
+    assert !lastReverted => isLltvAllowed(lltv);
+}
+
 /// ROLE SETTER: ACCESS CONTROL ///
 
 rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
@@ -122,29 +134,39 @@ rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args)
     assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
 
-/// FEE SETTER: LIVENESS ///
+/// Allowed LLTV tiers can only be added by the role setter, and never removed.
+rule onlyRoleSetterCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+    bool allowedBefore = isLltvAllowed(lltv);
+    address roleSetterBefore = roleSetter();
 
-rule feeSetterCanSetMarketTradingFee(env e, bytes32 id, uint256 index, uint256 newTradingFee) {
-    address feeSetterBefore = feeSetter();
-    bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % CBP() == 0;
-    bool marketIsCreated = marketIsCreated(id);
+    f(e, args);
 
-    setMarketTradingFee@withrevert(e, id, index, newTradingFee);
-    bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && marketIsCreated;
-    assert !reverted => marketTradingFee(id, index) == newTradingFee;
+    assert isLltvAllowed(lltv) != allowedBefore => allowedBefore == false && e.msg.sender == roleSetterBefore && f.selector == sig:addLltv(uint256).selector;
 }
 
-rule feeSetterCanSetDefaultTradingFee(env e, address loanToken, uint256 index, uint256 newTradingFee) {
+/// FEE SETTER: LIVENESS ///
+
+rule feeSetterCanSetMarketSettlementFee(env e, bytes32 id, uint256 index, uint256 newSettlementFee) {
     address feeSetterBefore = feeSetter();
     bool validIndex = index <= 6;
-    bool validFee = validIndex && newTradingFee <= Utils.maxTradingFee(index) && newTradingFee % CBP() == 0;
+    bool validFee = validIndex && newSettlementFee <= Utils.maxSettlementFee(index) && newSettlementFee % CBP() == 0;
+    bool marketIsCreated = marketIsCreated(id);
 
-    setDefaultTradingFee@withrevert(e, loanToken, index, newTradingFee);
+    setMarketSettlementFee@withrevert(e, id, index, newSettlementFee);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee && marketIsCreated;
+    assert !reverted => marketSettlementFee(id, index) == newSettlementFee;
+}
+
+rule feeSetterCanSetDefaultSettlementFee(env e, address loanToken, uint256 index, uint256 newSettlementFee) {
+    address feeSetterBefore = feeSetter();
+    bool validIndex = index <= 6;
+    bool validFee = validIndex && newSettlementFee <= Utils.maxSettlementFee(index) && newSettlementFee % CBP() == 0;
+
+    setDefaultSettlementFee@withrevert(e, loanToken, index, newSettlementFee);
     bool reverted = lastReverted;
     assert !reverted <=> e.msg.sender == feeSetterBefore && e.msg.value == 0 && validFee;
-    assert !reverted => defaultTradingFee(loanToken, index) == newTradingFee;
+    assert !reverted => defaultSettlementFee(loanToken, index) == newSettlementFee;
 }
 
 rule feeSetterCanSetMarketContinuousFee(env e, bytes32 id, uint256 newContinuousFee) {
@@ -167,7 +189,7 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
 }
 
 /// FEE SETTER: ACCESS CONTROL ///
-/// Trading fee access control is covered in TradingFeeBoundaries.spec.
+/// Settlement fee access control is covered in SettlementFeeBoundaries.spec.
 
 /// Once a market is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeMarketContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
@@ -218,9 +240,9 @@ rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f
 
 /// FEE CLAIMER: ACCESS CONTROL ///
 
-/// Only the fee claimer can successfully call claimTradingFee.
-rule onlyFeeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver) {
-    claimTradingFee(e, token, amount, receiver);
+/// Only the fee claimer can successfully call claimSettlementFee.
+rule onlyFeeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, address receiver) {
+    claimSettlementFee(e, token, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
@@ -232,26 +254,26 @@ rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 
 
 /// FEE CLAIMER: LIVENESS ///
 
-rule feeClaimerCanClaimTradingFee(env e, address token, uint256 amount, address receiver, address user) {
+rule feeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, address receiver, address user) {
     address feeClaimerBefore = feeClaimer();
-    uint256 claimableBefore = claimableTradingFee(token);
+    uint256 claimableBefore = claimableSettlementFee(token);
     mathint midnightBalanceBefore = tokenBalance[token][currentContract];
     mathint receiverBalanceBefore = tokenBalance[token][receiver];
     mathint userBalanceBefore = tokenBalance[token][user];
 
-    claimTradingFee@withrevert(e, token, amount, receiver);
+    claimSettlementFee@withrevert(e, token, amount, receiver);
     bool reverted = lastReverted;
     assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= claimableBefore;
-    assert !reverted => claimableTradingFee(token) == claimableBefore - amount;
+    assert !reverted => claimableSettlementFee(token) == claimableBefore - amount;
     assert !reverted => tokenBalance[token][currentContract] == midnightBalanceBefore - (receiver == currentContract ? 0 : amount);
     assert !reverted => tokenBalance[token][receiver] == receiverBalanceBefore + (receiver == currentContract ? 0 : amount);
     assert !reverted => user != currentContract && user != receiver => tokenBalance[token][user] == userBalanceBefore;
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     address feeClaimerBefore = feeClaimer();
-    bool marketIsCreated = marketIsCreated(id);
+    bool marketWasCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
     uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
@@ -261,7 +283,8 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
 
     claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketIsCreated && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted => e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert marketWasCreated && e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore => !reverted;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;

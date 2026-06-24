@@ -20,7 +20,9 @@ contract MaxAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -67,14 +69,14 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 
         take(amount, lender, borrowerOffer);
 
         assertEq(midnight.totalUnits(id), amount, "total units at max");
-        assertEq(midnight.debtOf(id, borrower), amount, "debt at max");
+        assertEq(midnight.debt(id, borrower), amount, "debt at max");
     }
 
     function testTakeAboveMaxAmountReverts() public {
@@ -94,7 +96,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
         borrowerOffer.maxUnits = type(uint256).max;
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 

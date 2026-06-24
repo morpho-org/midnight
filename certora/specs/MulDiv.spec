@@ -7,9 +7,11 @@ methods {
 
 /* these proves the axiom used in the other specs */
 
-rule mulDivZero(uint256 b, uint256 d) {
+rule mulDivZero(uint256 a, uint256 b, uint256 d) {
     assert mulDivDown(0, b, d) == 0;
     assert mulDivUp(0, b, d) == 0;
+    assert mulDivDown(a, 0, d) == 0;
+    assert mulDivUp(a, 0, d) == 0;
 }
 
 rule mulDivMonotoneA(uint256 a1, uint256 a2, uint256 b, uint256 d) {
@@ -32,6 +34,24 @@ rule mulDivAddDownDown(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     assert mulDivDown(a1, b, d) + mulDivDown(a2, b, d) <= mulDivDown(a1plusa2, b, d);
 }
 
+// Sub-additivity upper bound for mulDivDown: floor((a1+a2)*b/d) <= floor(a1*b/d) + floor(a2*b/d) + 1.
+rule mulDivAddDownDownTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivDown(a1plusa2, b, d) <= mulDivDown(a1, b, d) + mulDivDown(a2, b, d) + 1;
+}
+
+// Super-additivity upper bound for mulDivUp: ceil((a1+a2)*b/d) <= ceil(a1*b/d) + ceil(a2*b/d).
+rule mulDivAddUpUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivUp(a1plusa2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d);
+}
+
+// Super-additivity lower bound for mulDivUp: ceil(a1*b/d) + ceil(a2*b/d) <= ceil((a1+a2)*b/d) + 1.
+rule mulDivAddUpUpTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivUp(a1, b, d) + mulDivUp(a2, b, d) <= mulDivUp(a1plusa2, b, d) + 1;
+}
+
 rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     uint256 a1plusa2 = require_uint256(a1 + a2);
     assert mulDivDown(a1, b, d) + mulDivUp(a2, b, d) >= mulDivDown(a1plusa2, b, d);
@@ -45,15 +65,17 @@ rule mulDivInverseUpDown(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(mulDivDown(a, b, d), d, b) <= a;
 }
 
-rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv, uint256 WAD) {
-    assert lltv * lif <= WAD * WAD => mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif);
-}
-
 rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
     assert a <= d => mulDivDown(a, b, d) <= b;
     assert a <= d => mulDivUp(a, b, d) <= b;
     assert b <= d => mulDivDown(a, b, d) <= a;
     assert b <= d => mulDivUp(a, b, d) <= a;
+}
+
+// Identity (b = d = x): floor(a*x/x) = ceil(a*x/x) = a.
+rule mulDivIdentity(uint256 a, uint256 x) {
+    assert x != 0 => mulDivDown(a, x, x) == a;
+    assert x != 0 => mulDivUp(a, x, x) == a;
 }
 
 rule mulDivDownRoundsDown(uint256 a, uint256 b, uint256 d) {
@@ -74,4 +96,9 @@ rule mulDivUpTightBound(uint256 a, uint256 b, uint256 d) {
 
 rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) * d <= a * b + d - 1;
+}
+
+rule mulDivResidualBound(uint256 a, uint256 b, uint256 d) {
+    assert a <= d && b <= d => a - mulDivDown(a, b, d) <= d - b;
+    assert a <= d && b <= d => a - mulDivUp(a, b, d) <= d - b;
 }

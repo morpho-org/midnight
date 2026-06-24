@@ -5,19 +5,19 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function withdrawable(bytes32 id) external returns (uint256) envfree;
-    function totalUnits(bytes32 id) external returns (uint256) envfree;
-    function claimableTradingFee(address token) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
+    function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function claimableSettlementFee(address token) external returns (uint256) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
     // Over-approximate view functions.
@@ -54,32 +54,32 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
-    require x == 0 => r == 0;
-    require d > 0 && y <= d => r <= x;
-    require d > 0 && x <= d && y <= d => x - r <= d - y;
+    require x == 0 => r == 0, "see mulDivZero";
+    require d > 0 && y <= d => r <= x, "see mulDivArgumentLesserThanDenominator";
+    require d > 0 && x <= d && y <= d => x - r <= d - y, "see mulDivResidualBound";
     return r;
 }
 
-rule takeInputOutputConsistency(env e, Midnight.Offer offer, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) {
+rule takeInputOutputConsistency(env e, Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiver, address takerCallbackAddress, bytes takerCallbackData) {
     uint256 buyerAssetsOutput;
     uint256 sellerAssetsOutput;
 
-    uint256 claimableBefore = claimableTradingFee(offer.market.loanToken);
+    uint256 claimableBefore = claimableSettlementFee(offer.market.loanToken);
 
-    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData, ratifierData);
+    buyerAssetsOutput, sellerAssetsOutput = take(e, offer, ratifierData, unitsInput, taker, receiver, takerCallbackAddress, takerCallbackData);
 
     // If the input is zero, all the output arguments are zero.
     assert unitsInput == 0 => buyerAssetsOutput == 0 && sellerAssetsOutput == 0;
 
-    // The claimable trading fee increases by exactly the spread.
-    assert claimableTradingFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
+    // The claimable settlement fee increases by exactly the spread.
+    assert claimableSettlementFee(offer.market.loanToken) == claimableBefore + buyerAssetsOutput - sellerAssetsOutput;
 }
 
-rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool healthyPath) {
+rule liquidateInputOutputConsistency(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     uint256 seizedAssetsOutput;
     uint256 repaidUnitsOutput;
 
-    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, healthyPath, receiver, callback, data);
+    seizedAssetsOutput, repaidUnitsOutput = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     // At most one of the input arguments can be zero.
     assert seizedAssets == 0 || repaidUnits == 0;
@@ -109,13 +109,13 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
     require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
 
     f(e, args);
 
-    assert creditOf(id, user) <= creditBefore;
-    assert debtOf(id, user) <= debtBefore;
+    assert credit(id, user) <= creditBefore;
+    assert debt(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -135,13 +135,13 @@ strong invariant continuousFeeBounded(bytes32 id)
     }
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user)
+    pendingFee(id, user) <= credit(id, user)
     {
         preserved with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
         }
-        preserved take(Midnight.Offer offer, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData, bytes ratifierData) with (env e) {
+        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
@@ -150,7 +150,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
-    assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
+    assert credit(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
@@ -158,4 +158,4 @@ strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    creditOf(id, user) == 0 || debtOf(id, user) == 0;
+    credit(id, user) == 0 || debt(id, user) == 0;

@@ -2,21 +2,38 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
-import {console} from "forge-std/Test.sol";
+import {console} from "../lib/forge-std/src/Test.sol";
 import {TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {MAX_TICK, PRICE_ROUNDING_STEP} from "../src/libraries/TickLib.sol";
 
 contract TickLibTest is BaseTest {
     using UtilsLib for uint256;
 
     // Tick to price
 
+    function testPriceRoundingStep() public pure {
+        assertEq(PRICE_ROUNDING_STEP, 0.0000001e18);
+    }
+
     function testTickToPriceMinMax() public pure {
+        assertEq(MAX_TICK, 6744, "max tick");
         assertEq(TickLib.tickToPrice(0), 0, "tick 0");
-        assertEq(TickLib.tickToPrice(2), 1e12, "first non-zero tick");
-        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 1e12, "tick max - 2 just below par");
+        assertEq(TickLib.tickToPrice(2), 0.0000001e18, "first non-zero tick");
+        assertEq(TickLib.tickToPrice(MAX_TICK - 2), 1e18 - 0.0000001e18, "tick max - 2 just below par");
         assertEq(TickLib.tickToPrice(MAX_TICK), 1e18, "tick max");
+    }
+
+    function expR(int256 r) internal pure returns (int256) {
+        int256 secondTerm = r * r / (2 * 1e18);
+        int256 thirdTerm = secondTerm * r / (3 * 1e18);
+        return 1e18 + r + secondTerm + thirdTerm;
+    }
+
+    function testWExpOffsetProperty() public pure {
+        int256 ln2 = 0.693147180559945309e18;
+        int256 offset = 0.32261121498945987e18;
+        assertEq(2 * expR(-offset), expR(ln2 - offset - 1));
     }
 
     function testTickMonotonicity() public pure {
@@ -117,8 +134,8 @@ contract TickLibTest is BaseTest {
             totalRelErrorWad += relErrorWad;
             maxRelErrorWad = max(maxRelErrorWad, relErrorWad);
 
-            // 3-term Taylor in wExp yields max ~1.4 bps absolute error; 2 bps threshold leaves headroom.
-            assertLe(absErrorWad, 0.00014e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
+            // 3-term Taylor in wExp yields sub-2 bps absolute error.
+            assertLe(absErrorWad, 0.0002e18, string.concat("Tick ", vm.toString(tick), " error exceeds 2 bps"));
             if (solPrice > 0.01e18) {
                 assertLe(relErrorWad, 0.0007e18, string.concat("Tick ", vm.toString(tick), " error exceeds 7 bps"));
             }

@@ -32,6 +32,8 @@ function buildTypes(height: number) {
       { name: "oracle", type: "address" },
     ],
     Market: [
+      { name: "chainId", type: "uint256" },
+      { name: "midnight", type: "address" },
       { name: "loanToken", type: "address" },
       { name: "collateralParams", type: "CollateralParams[]" },
       { name: "maturity", type: "uint256" },
@@ -54,6 +56,7 @@ function buildTypes(height: number) {
       { name: "reduceOnly", type: "bool" },
       { name: "maxUnits", type: "uint256" },
       { name: "maxAssets", type: "uint256" },
+      { name: "continuousFeeCap", type: "uint256" },
     ],
   };
 }
@@ -61,6 +64,8 @@ function buildTypes(height: number) {
 function defaultOffer(number: string) {
   return {
     market: {
+      chainId: "1",
+      midnight: ZERO_ADDR,
       loanToken: "0x" + number.repeat(40),
       collateralParams: [{token: ZERO_ADDR, lltv: "0", maxLif: "0", oracle: ZERO_ADDR}],
       maturity: "0",
@@ -81,6 +86,7 @@ function defaultOffer(number: string) {
     reduceOnly: false,
     maxUnits: "0",
     maxAssets: "0",
+    continuousFeeCap: "0",
   };
 }
 

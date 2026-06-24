@@ -43,7 +43,9 @@ contract GateTest is BaseTest {
         gate = new WhitelistGate();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -56,7 +58,9 @@ contract GateTest is BaseTest {
         market.collateralParams = sortCollateralParams(market.collateralParams);
 
         gatedMarket.loanToken = address(loanToken);
-        gatedMarket.maturity = block.timestamp + 100;
+        gatedMarket.chainId = block.chainid;
+        gatedMarket.midnight = address(midnight);
+        gatedMarket.maturity = vm.getBlockTimestamp() + 100;
         gatedMarket.collateralParams
             .push(
                 CollateralParams({
@@ -77,7 +81,7 @@ contract GateTest is BaseTest {
         lenderOffer.maxUnits = type(uint256).max;
         lenderOffer.market = gatedMarket;
         lenderOffer.ratifier = address(dummyRatifier);
-        lenderOffer.expiry = block.timestamp + 200;
+        lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
 
         borrowerOffer.buy = false;
@@ -86,7 +90,7 @@ contract GateTest is BaseTest {
         borrowerOffer.maxUnits = type(uint256).max;
         borrowerOffer.market = gatedMarket;
         borrowerOffer.ratifier = address(dummyRatifier);
-        borrowerOffer.expiry = block.timestamp + 200;
+        borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.tick = MAX_TICK;
 
         deal(address(loanToken), lender, type(uint256).max);
@@ -123,8 +127,8 @@ contract GateTest is BaseTest {
 
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should have credit");
-        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should have debt");
+        assertGt(midnight.credit(gatedId, lender), 0, "lender should have credit");
+        assertGt(midnight.debt(gatedId, borrower), 0, "borrower should have debt");
     }
 
     function testEnterGateAllowsTakeWhenLenderHadCreditBefore(uint256 units) public {
@@ -134,7 +138,7 @@ contract GateTest is BaseTest {
         collateralize(gatedMarket, borrower, units);
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.creditOf(gatedId, lender), 0, "lender should already have credit");
+        assertGt(midnight.credit(gatedId, lender), 0, "lender should already have credit");
 
         gate.setWhitelisted(lender, false);
         gate.setWhitelisted(borrower, false);
@@ -149,7 +153,7 @@ contract GateTest is BaseTest {
         collateralize(gatedMarket, borrower, units);
         take(units, lender, borrowerOffer);
 
-        assertGt(midnight.debtOf(gatedId, borrower), 0, "borrower should already have debt");
+        assertGt(midnight.debt(gatedId, borrower), 0, "borrower should already have debt");
 
         gate.setWhitelisted(lender, false);
         gate.setWhitelisted(borrower, false);
@@ -175,7 +179,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.maxUnits = type(uint256).max;
         otherBorrowerOffer.market = gatedMarket;
         otherBorrowerOffer.ratifier = address(dummyRatifier);
-        otherBorrowerOffer.expiry = block.timestamp + 200;
+        otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         otherBorrowerOffer.tick = MAX_TICK;
 
         collateralize(gatedMarket, otherBorrower, units);
@@ -184,7 +188,7 @@ contract GateTest is BaseTest {
 
         take(units, borrower, otherBorrowerOffer);
 
-        assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have exited debt");
+        assertEq(midnight.debt(gatedId, borrower), 0, "borrower should have exited debt");
     }
 
     function testNoGateCheckWhenBothExit(uint256 units) public {
@@ -202,7 +206,7 @@ contract GateTest is BaseTest {
         otherLenderOffer.maxUnits = type(uint256).max;
         otherLenderOffer.market = gatedMarket;
         otherLenderOffer.ratifier = address(dummyRatifier);
-        otherLenderOffer.expiry = block.timestamp + 200;
+        otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         otherLenderOffer.tick = MAX_TICK;
 
         take(units, otherBorrower, otherLenderOffer);
@@ -218,13 +222,13 @@ contract GateTest is BaseTest {
         exitOffer.maxUnits = type(uint256).max;
         exitOffer.market = gatedMarket;
         exitOffer.ratifier = address(dummyRatifier);
-        exitOffer.expiry = block.timestamp + 200;
+        exitOffer.expiry = vm.getBlockTimestamp() + 200;
         exitOffer.tick = MAX_TICK;
 
         deal(address(loanToken), otherBorrower, units);
         take(units, otherBorrower, exitOffer);
 
-        assertEq(midnight.debtOf(gatedId, otherBorrower), 0, "otherBorrower should have exited");
+        assertEq(midnight.debt(gatedId, otherBorrower), 0, "otherBorrower should have exited");
     }
 
     function testNoGateCheckOnRepay(uint256 units) public {
@@ -241,7 +245,7 @@ contract GateTest is BaseTest {
         vm.prank(borrower);
         midnight.repay(gatedMarket, units, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(gatedId, borrower), 0, "borrower should have repaid");
+        assertEq(midnight.debt(gatedId, borrower), 0, "borrower should have repaid");
     }
 
     function testNoGateCheckOnWithdraw(uint256 units) public {
@@ -261,7 +265,7 @@ contract GateTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(gatedMarket, units, lender, lender);
 
-        assertEq(midnight.creditOf(gatedId, lender), 0, "lender should have withdrawn");
+        assertEq(midnight.credit(gatedId, lender), 0, "lender should have withdrawn");
     }
 
     // --- Liquidator gate tests ---
@@ -311,13 +315,13 @@ contract GateTest is BaseTest {
         ungatedLenderOffer.maxUnits = type(uint256).max;
         ungatedLenderOffer.market = market;
         ungatedLenderOffer.ratifier = address(dummyRatifier);
-        ungatedLenderOffer.expiry = block.timestamp + 200;
+        ungatedLenderOffer.expiry = vm.getBlockTimestamp() + 200;
         ungatedLenderOffer.tick = MAX_TICK;
 
         take(units, borrower, ungatedLenderOffer);
 
         bytes32 ungatedId = toId(market);
-        assertGt(midnight.debtOf(ungatedId, borrower), 0);
+        assertGt(midnight.debt(ungatedId, borrower), 0);
     }
 
     // --- Market identity tests ---

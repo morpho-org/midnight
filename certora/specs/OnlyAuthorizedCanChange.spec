@@ -3,25 +3,19 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function toId(Midnight.Market market) external returns (bytes32) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint256) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint256) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function consumed(address user, bytes32 group) external returns (uint256) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize internal functions that use opcodes causing HAVOC (CREATE2, low-level calls).
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Summarize complex internal functions irrelevant to authorization checks.
-    function tradingFee(bytes32, uint256) internal returns (uint256) => NONDET;
+    // Over-approximate view functions for prover performance.
+    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-
-    // Summarize TickLib functions.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
-
-    // Summarize UtilsLib functions.
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -32,7 +26,7 @@ methods {
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.isRatified(Midnight.Offer offer, bytes) external => CVL_isRatified(offer) expect(bytes32);
-    function _.onFlashLoan(address[], uint256[], address, bytes) external => NONDET;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
@@ -49,8 +43,6 @@ function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
     return result;
 }
 
-definition noAccrual(env e, bytes32 id, address borrower) returns bool = currentContract.position[id][borrower].pendingFee == 0 || e.block.timestamp == currentContract.position[id][borrower].lastAccrual;
-
 /// CREDIT AND DEBT CHANGE RULES ///
 
 /// An unauthorized caller cannot change a user's credit and debt except via liquidate and updatePosition.
@@ -58,11 +50,11 @@ definition noAccrual(env e, bytes32 id, address borrower) returns bool = current
 rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndUpdatePosition(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector && f.selector != sig:updatePosition(Midnight.Market, address).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
     f(e, args);
-    uint256 creditAfter = creditOf(id, user);
-    uint256 debtAfter = debtOf(id, user);
+    uint256 creditAfter = credit(id, user);
+    uint256 debtAfter = debt(id, user);
 
     assert (creditAfter == creditBefore && debtAfter == debtBefore) || userIsAuthorized || makerRatified[user];
 }
@@ -86,7 +78,7 @@ rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataa
 /// An unauthorized caller cannot change a user's consumed except via take.
 /// For take, unauthorizedTakeFails, takeRequiresMakerConsent, and takeOnlyAuthorizedCanChangeDebt show that take can only change this consumed: consumed[offer.maker][offer.group], only with the right authorizations.
 /// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant consumed changes are not covered.
-rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, uint256, address, address, address, bytes, bytes).selector } {
+rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
     uint256 consumedBefore = consumed(user, group);
@@ -112,9 +104,9 @@ rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, addr
 /// ACCESS CONTROL ///
 
 /// take requires the caller to be the taker or authorized by the taker
-rule unauthorizedTakeFails(env e, Midnight.Offer offer, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, bytes ratifierData) {
+rule unauthorizedTakeFails(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     bool senderAuthorized = isAuthorized(taker, e.msg.sender);
-    take(e, offer, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData, ratifierData);
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
     assert e.msg.sender == taker || senderAuthorized;
 }

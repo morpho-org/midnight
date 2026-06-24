@@ -5,6 +5,7 @@ import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMid
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {BaseTest} from "./BaseTest.sol";
 
@@ -19,7 +20,9 @@ contract TickGatingTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
-        market.maturity = block.timestamp + 100;
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
+        market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
@@ -50,7 +53,7 @@ contract TickGatingTest is BaseTest {
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
         offer.maxUnits = type(uint256).max;
-        offer.expiry = block.timestamp + 200;
+        offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = tick;
     }
 
@@ -70,7 +73,7 @@ contract TickGatingTest is BaseTest {
         deal(address(loanToken), lender, units.mulDivUp(price, WAD));
         collateralize(market, borrower, units);
         take(units, borrower, offer);
-        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.credit(id, lender), units);
     }
 
     function testTakeRevertsAtInaccessibleTick() public {
@@ -82,7 +85,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", hex"");
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
     }
 
     function testTakeRevertsAtSpacing2InaccessibleTick() public {
@@ -97,7 +100,7 @@ contract TickGatingTest is BaseTest {
 
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", hex"");
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
     }
 
     // --- Spacing refinement enables previously inaccessible ticks ---
@@ -114,14 +117,14 @@ contract TickGatingTest is BaseTest {
         // Should fail at spacing 4.
         vm.prank(borrower);
         vm.expectRevert(IMidnight.TickNotAccessible.selector);
-        midnight.take(offer, units, borrower, borrower, address(0), hex"", hex"");
+        midnight.take(offer, hex"", units, borrower, borrower, address(0), hex"");
 
         // Refine to spacing 2.
         midnight.setMarketTickSpacing(id, 2);
 
         // Now should succeed.
         take(units, borrower, offer);
-        assertEq(midnight.creditOf(id, lender), units);
+        assertEq(midnight.credit(id, lender), units);
     }
 
     // --- setMarketTickSpacing governance ---
@@ -138,6 +141,9 @@ contract TickGatingTest is BaseTest {
 
         vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
         midnight.setMarketTickSpacing(id, 0);
+
+        vm.expectEmit();
+        emit EventsLib.SetMarketTickSpacing(id, 1);
 
         midnight.setMarketTickSpacing(id, 1);
         vm.expectRevert(IMidnight.InvalidTickSpacing.selector);
@@ -179,6 +185,6 @@ contract TickGatingTest is BaseTest {
         collateralize(market, borrower, units);
         take(units, borrower, offer2);
 
-        assertEq(midnight.creditOf(id, lender), 2 * units);
+        assertEq(midnight.credit(id, lender), 2 * units);
     }
 }

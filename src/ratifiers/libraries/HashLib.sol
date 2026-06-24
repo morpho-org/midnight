@@ -7,9 +7,9 @@ import {Offer, Market, CollateralParams} from "../../interfaces/IMidnight.sol";
 /// @dev keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)").
 bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
 /// @dev keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE)).
-bytes32 constant MARKET_TYPEHASH = 0x358117e98511cc3df97175dca58053b06675b43ad090b0553f8a1eff008b6e2e;
+bytes32 constant MARKET_TYPEHASH = 0xc66c045aa2394a02e2976962976ec58c79108ae7fbb1ecc974c9724678b56264;
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant OFFER_TYPEHASH = 0x980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c;
+bytes32 constant OFFER_TYPEHASH = 0x5e7c764a0f2411d16dd65139c973cbe0fe976b6d0736823e17aef319f652e7f8;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -21,35 +21,34 @@ library HashLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0x2b9ee710e1977dfc5778fe18c905ccc1d9e144baf3ba83be732d4da65ecb73e3;
-            if (height == 1) return 0x3cc16189b92a85898f1d5c6e87282c8ded7c1c93b2323d5e85ae10c5f4b2b220;
-            if (height == 2) return 0x6de37d3e570afa293a8107d4b6b1d9547616c04f42164d009c89194787b2ffa6;
-            if (height == 3) return 0xba3ea2ddfbf40a906fcd1b9506dbd344c062e8dcba8b5c902ceb13339f45a358;
-            if (height == 4) return 0xe5faa865e93bc1b7b8fdf91980f54682d649683b014edd6c54b642f5a0c96977;
-            if (height == 5) return 0xeda50f61dd2a827c6ff9fbfcd54335628dcaa78aaa4f2d118c60886219cdce2b;
-            if (height == 6) return 0x54e2c9cc40cdc0e9ad530cf2be298f952f57af2b18b02f88274a9bbab359d23a;
-            if (height == 7) return 0xc9d81859d60d6b21c688f4be93ca83e3be222728bb156ef5f4cf497f879f1e29;
-            if (height == 8) return 0xd59b0c4544e0c60c8611eab0aaa402575f14ee784d22289c5d57f48c422a62d6;
-            if (height == 9) return 0xccad21701f34f08bb8398a3dbc77e20e4c9c424930f3a8b31485bf059e2bdb20;
-            return 0x8a42dfb49807647bfc49c906aef322aa0239d40e4cb675761e141bc7bfa530da;
+            if (height == 0) return 0x04931ea05149e935551af887e04668a4235aa7fefe5a1307699fc36de5da3604;
+            if (height == 1) return 0x636eec88d23afdd7c5ecd3689cddd4a578f3640022a4f4b36532b1bb873870d9;
+            if (height == 2) return 0xb3b200d8a87156dd298add6829190724360e913ea2a544cf8770a83b1a85b68e;
+            if (height == 3) return 0x9959f9ee7df42c7c3a42ae48edb3544cb9672653eb4c9ad5190aa9ac194e13cc;
+            if (height == 4) return 0x859439b1a679d2b8d78d092af16a3e3abd30ccae9d29e12183c61dbd89069798;
+            if (height == 5) return 0x3b62f568d54c69f46baa3db29d9d16daa670a421eca545015e2c4d6ac5e2ab4b;
+            if (height == 6) return 0x06b027b3e518caa75c38007c1e4cffc92d314d528eb7ed63b28f6cbb250d6221;
+            if (height == 7) return 0x1948d59b3835088b65d9f7048f26cfcf508f9a750de32e7830b6f99c8915905a;
+            if (height == 8) return 0xfb12ec1a894c5cc36be99898bcc4c23d45713b8920d21ddf94ba0053fec835b4;
+            if (height == 9) return 0xee136fb578b4eea50b5929361278f0a09f97371d5c44ebb73b07785150f3c202;
+            return 0xdbd2c72ce0b8a438efba0500c50090d842804420fa9eb5819a265105ccf446d4;
         } else {
-            if (height == 11) return 0x2adc0d948b2e3ecb642661590d2eec36d4e71e9acf382deb6574371800caf198;
-            if (height == 12) return 0xf5845dfaed016de272342f346346a49d4b1694f622144d420558a38e46ac9dad;
-            if (height == 13) return 0x3d7df854e6294bf433b64bbb8d0a82fa875a87b45b0016db27fc5752e54126ad;
-            if (height == 14) return 0x72a991a101708716ff427c524404ab44f4d4d1f4e7e76c0ae8b967222164b348;
-            if (height == 15) return 0x762c88fc52cf78a54401d247790f1bdb619d51d3458d1415c20d1422197cecc4;
-            if (height == 16) return 0x8ede2209e94c8d5f8379d733dc8712b71a3888c1c4b70f3d6b22285f70bf4286;
-            if (height == 17) return 0x425b18f07b3ac2f641977d2c294590565dd40b5d8414610568dca64628399975;
-            if (height == 18) return 0x7e7d98718c0180e882e5963b9bd49810096912c273dfa38d8afdd6d39fde86ec;
-            if (height == 19) return 0x8d35d491a29d846489e19688efff3c4cc7dbd54458058d49b30294074539f0b9;
-            if (height == 20) return 0x824e385eea1953bcbc783bf900b18aa6fba129b6908765e986cf0968b491ec4f;
+            if (height == 11) return 0x8201cbae421a17b9d8116ce28ecd13378b22d0257e9daca65ea354dc7b852e0a;
+            if (height == 12) return 0xb76e7eedf6cb4dfd2a913d292be9bbcdcdf6bc457e789306cc23a6917faca3d2;
+            if (height == 13) return 0x911f1aca18bfbc4e142c04b2020d972507d4b9d6b2fbef339bc48d33a438be9e;
+            if (height == 14) return 0xf8b8028014cfa85c41a0b5af6dd4d5e6c7236dab5886ee4f21e845ec4205443d;
+            if (height == 15) return 0xd517d3bc505b0209f539cf985e6252f0e57975ec5c8e3a93d97366f39c8cbbc5;
+            if (height == 16) return 0x35940ca810d4b02086a4d695dfaf04195c5a0fcb776e97c1349a8a0472b7bec8;
+            if (height == 17) return 0x44c0e3ddcf369c808911a5c78a3d7e87fa115a23cc40147b5fc40064c5560213;
+            if (height == 18) return 0x032fe7574172aadd1fb6c40e9deacfec41a48e2fc8de3574c67331c10e7b3a1f;
+            if (height == 19) return 0x3f80439b44bef469ff2390bdf0fd5469db472bb6748c6de9e5e2cd86d602c301;
+            if (height == 20) return 0x61068a1b8ffb6dd774e8a9634cb46a7a214dd84189e255072577c8541c543fd4;
             revert TreeTooHigh();
         }
     }
 
     /// @dev Verifies a Merkle proof using the leaf index to determine the left/right position of each sibling.
-    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex. In practice the height is capped at 20
-    /// by offerTreeTypeHash.
+    /// @dev Works for offer-tree heights up to 256, the bit-width of leafIndex.
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
         internal
         pure
@@ -104,6 +103,8 @@ library HashLib {
         return keccak256(
             abi.encode(
                 MARKET_TYPEHASH,
+                market.chainId,
+                market.midnight,
                 market.loanToken,
                 collateralParamsHash,
                 market.maturity,
@@ -132,7 +133,8 @@ library HashLib {
                 offer.ratifier,
                 offer.reduceOnly,
                 offer.maxUnits,
-                offer.maxAssets
+                offer.maxAssets,
+                offer.continuousFeeCap
             )
         );
     }
