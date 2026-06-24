@@ -3,7 +3,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => CVL_toId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => CVL_toId(market);
 
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -11,7 +11,7 @@ methods {
     function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 

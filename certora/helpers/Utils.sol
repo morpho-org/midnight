@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Offer, Market} from "../../src/interfaces/IMidnight.sol";
 import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
+import {IdLib} from "../../src/libraries/IdLib.sol";
 import {
     CALLBACK_SUCCESS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -12,6 +13,10 @@ import {
 } from "../../src/libraries/ConstantsLib.sol";
 
 contract Utils {
+    function toId(Market memory market) external pure returns (bytes32) {
+        return IdLib.toId(market);
+    }
+
     function hashMarket(Market memory market) external pure returns (bytes32) {
         return keccak256(abi.encode(market));
     }

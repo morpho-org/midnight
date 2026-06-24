@@ -9,11 +9,11 @@ import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 // Paste from frontend output (sign-root.ts), regenerated after the CollateralParams.maxLif -> liquidationCursor type
-// change and continuousFeeCap addition.
+// change, continuousFeeCap addition, and Market chainId/midnight addition.
 address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0x44bce959b3a15de43189cdf1d973e26a63f6046a38e25582a1200b09b843045d;
-bytes32 constant SIG_S = 0x0d6d5b67b21ed763d9dbf0632e727cccc54d33513972eb0f78473e5717d3514d;
+bytes32 constant SIG_R = 0x44869d97f3a1c6591ae44f9ddab733a7032a2daed167f003c37afbb9e7096e08;
+bytes32 constant SIG_S = 0x7f24fc0da2550b6cee7b89840f17fb2cf0760b12d5a43c7d254fbf9581a9f7a4;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
@@ -26,6 +26,8 @@ contract FrontendSignatureTest is Test {
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.chainId = 1;
+        offer.market.midnight = address(0);
         offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
         offer.market.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;

@@ -238,8 +238,8 @@ abstract contract BaseTest is Test {
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Market memory market) internal view returns (bytes32) {
-        return IdLib.toId(market, block.chainid, address(midnight));
+    function toId(Market memory market) internal pure returns (bytes32) {
+        return IdLib.toId(market);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -284,6 +284,8 @@ abstract contract BaseTest is Test {
             collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR;
         }
         collateralParams = sortCollateralParams(collateralParams);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.collateralParams = collateralParams;
         market.maturity = bound(market.maturity, 0, vm.getBlockTimestamp() + 100 * 365 days);
         return market;

@@ -15,6 +15,7 @@ import {
 import {IERC20Permit} from "./interfaces/IERC20Permit.sol";
 import {IPermit2} from "./interfaces/IPermit2.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {IdLib} from "../libraries/IdLib.sol";
 import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 import {ConsumableUnitsLib} from "./ConsumableUnitsLib.sol";
@@ -80,7 +81,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
@@ -147,7 +148,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledUnits < targetUnits; i++) {
             require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 targetUnits - filledUnits,
                 takes[i].units,
@@ -204,7 +205,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledBuyerAssets;
         for (uint256 i; i < takes.length && filledBuyerAssets < targetFilledBuyerAssets; i++) {
             require(!takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 TakeAmountsLib.buyerAssetsToUnits(
                     MIDNIGHT, id, takes[i].offer, targetFilledBuyerAssets - filledBuyerAssets
@@ -275,7 +276,7 @@ contract MidnightBundles is IMidnightBundles {
         uint256 filledSellerAssets;
         for (uint256 i; i < takes.length && filledSellerAssets < targetFilledSellerAssets; i++) {
             require(takes[i].offer.buy, InconsistentSide());
-            require(IMidnight(MIDNIGHT).toId(takes[i].offer.market) == id, InconsistentMarket());
+            require(IdLib.toId(takes[i].offer.market) == id, InconsistentMarket());
             uint256 unitsToTake = min(
                 TakeAmountsLib.sellerAssetsToUnits(
                     MIDNIGHT, id, takes[i].offer, targetFilledSellerAssets - filledSellerAssets

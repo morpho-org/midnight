@@ -35,7 +35,7 @@ contract SettersTest is BaseTest {
 
     function testConstructorEvent() public {
         vm.expectEmit();
-        emit EventsLib.Constructor(address(this), block.chainid);
+        emit EventsLib.Constructor(address(this));
 
         new Midnight();
     }
@@ -128,6 +128,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -256,6 +258,8 @@ contract SettersTest is BaseTest {
             token: address(collateralToken1), lltv: LLTV, liquidationCursor: liquidationCursor, oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -309,6 +313,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -383,6 +389,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -443,6 +451,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(0),
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: cols,
@@ -500,6 +510,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
@@ -530,6 +542,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
@@ -566,6 +580,8 @@ contract SettersTest is BaseTest {
             oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,

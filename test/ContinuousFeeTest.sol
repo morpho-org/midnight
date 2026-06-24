@@ -23,6 +23,8 @@ contract ContinuousFeeTest is BaseTest {
         vm.warp(vm.getBlockTimestamp() + 1000 days);
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100 days;
         market.collateralParams
             .push(
@@ -558,15 +560,24 @@ contract ContinuousFeeTest is BaseTest {
         assertEq(midnight.continuousFeeCredit(id), expectedContinuousFeeCredit, "continuousFeeCredit");
     }
 
-    function testUpdatePositionRevertsIfMarketNotCreated() public {
-        vm.expectRevert(IMidnight.MarketNotCreated.selector);
-        midnight.updatePosition(market, borrower);
+    function testUpdatePositionTouchesMarketIfNotCreated() public {
+        assertEq(midnight.tickSpacing(id), 0, "market not created before");
+
+        (uint128 credit, uint128 pendingFee, uint128 accruedFee) = midnight.updatePosition(market, borrower);
+
+        assertEq(credit, 0, "credit");
+        assertEq(pendingFee, 0, "pendingFee");
+        assertEq(accruedFee, 0, "accruedFee");
+        assertGt(midnight.tickSpacing(id), 0, "market created after");
     }
 
-    function testClaimContinuousFeeRevertsIfMarketNotCreated() public {
+    function testClaimContinuousFeeTouchesMarketIfNotCreated() public {
+        assertEq(midnight.tickSpacing(id), 0, "market not created before");
+
         vm.prank(feeClaimer);
-        vm.expectRevert(IMidnight.MarketNotCreated.selector);
         midnight.claimContinuousFee(market, 0, feeClaimer);
+
+        assertGt(midnight.tickSpacing(id), 0, "market created after");
     }
 
     function testLastAccrualZeroForFreshPosition() public {

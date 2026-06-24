@@ -23,10 +23,10 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => ghostMulDivDown(x, y, d);
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Sound because the protocol doesn't use toMarket.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Tokens are assumed to not reenter, for performance reasons.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
@@ -119,7 +119,17 @@ rule marketIsCreatedAfterLiquidate(env e, Midnight.Market market, uint256 collat
     assert marketIsCreated(market);
 }
 
-// Markets can only be created by: touchMarket, take, withdraw, repay, supplyCollateral, withdrawCollateral or liquidate.
+rule marketIsCreatedAfterClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver) {
+    claimContinuousFee(e, market, amount, receiver);
+    assert marketIsCreated(market);
+}
+
+rule marketIsCreatedAfterUpdatePosition(env e, Midnight.Market market, address user) {
+    updatePosition(e, market, user);
+    assert marketIsCreated(market);
+}
+
+// Markets can only be created by: touchMarket, take, withdraw, repay, supplyCollateral, withdrawCollateral, liquidate, claimContinuousFee or updatePosition.
 rule onlyTouchMarketCreatesMarket(env e, method f, calldataarg args, Midnight.Market market)
 filtered {
     f -> f.selector != sig:touchMarket(Midnight.Market).selector
@@ -129,6 +139,8 @@ filtered {
         && f.selector != sig:supplyCollateral(Midnight.Market, uint256, uint256, address).selector
         && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
         && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
+        && f.selector != sig:claimContinuousFee(Midnight.Market, uint256, address).selector
+        && f.selector != sig:updatePosition(Midnight.Market, address).selector
 } {
     require !marketIsCreated(market), "Assume that the market is not created";
     f(e, args);

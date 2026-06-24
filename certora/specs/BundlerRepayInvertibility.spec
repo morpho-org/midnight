@@ -10,7 +10,7 @@ methods {
     function midnight.tickSpacing(bytes32 id) external returns (uint8) envfree;
 
     // Deterministic market id (same pattern as Midnight.spec / TakeAmountsLibInvertibility.spec).
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic mulDivDown.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
