@@ -45,6 +45,8 @@ contract LiquidationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
@@ -1014,7 +1016,7 @@ contract LiquidationTest is BaseTest {
         bytes memory data,
         uint256 badDebt
     ) public returns (bytes32) {
-        require(_id == IdLib.toId(_market, block.chainid, msg.sender), "wrong id");
+        require(_id == IdLib.toId(_market), "wrong id");
         recordedCaller = _caller;
         recordedId = _id;
         recordedMarket = _market;

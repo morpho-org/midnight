@@ -9,7 +9,7 @@ methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId summary.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Callbacks and token transfers reached by take/repay/liquidate/flashLoan use the default AUTO summary
     // (HAVOC_ECF), which assumes the callees do not re-enter Midnight and so leave the debt unchanged.
