@@ -33,9 +33,15 @@ def adapt_sql(sql: str) -> str:
     # to_unixtime must come before the CAST regex (the CAST may wrap it)
     sql = sql.replace("to_unixtime(evt_block_time)", "evt_block_time")
     sql = re.sub(r"UINT256 '(\d+)'", r"\1", sql)
+    sql = re.sub(r"\bINT256 '(-?\d+)'", r"\1", sql)
     sql = re.sub(r"BIGINT '(\d+)'", r"\1", sql)
     sql = re.sub(
         r"(?i)\bCAST\(([^)]+)\s+AS\s+uint256\)",
+        lambda m: f"CAST({m.group(1)} AS BIGINT)",
+        sql,
+    )
+    sql = re.sub(
+        r"(?i)\bCAST\(([^)]+)\s+AS\s+int256\)",
         lambda m: f"CAST({m.group(1)} AS BIGINT)",
         sql,
     )
@@ -60,7 +66,7 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
     "midnight_evt_take": (
         "take.json",
         ["buyerassets", "sellerassets", "units", "consumed",
-         "buyerpendingfeeincrease", "sellerpendingfeedecrease",
+         "buyerpendingfeeincrease", "sellerpendingfeedecrease", "totalunitsdelta",
          "evt_block_number", "evt_index"],
         ["offerisbuy"],
         ["id_", "maker", "taker", "group"],

@@ -6,24 +6,23 @@
 WITH
 
 -- ── totalUnits ────────────────────────────────────────────────────────────────
--- Take:             +(buyerCreditIncrease - sellerCreditDecrease)
--- Withdraw:         -units
--- Liquidate:        -badDebt
+-- Take logs the signed delta totalUnitsDelta (= buyerCreditIncrease - sellerCreditDecrease).
+-- Withdraw:           -units
+-- Liquidate:          -badDebt
 -- ClaimContinuousFee: -amount
 
 total_units_deltas AS (
-    SELECT id_, buyercreditincrease AS add_, sellercreditdecrease AS sub_
-    FROM midnight.midnight_evt_take
+    SELECT id_, totalunitsdelta AS delta      FROM midnight.midnight_evt_take
     UNION ALL
-    SELECT id_, UINT256 '0', units          FROM midnight.midnight_evt_withdraw
+    SELECT id_, - CAST(units AS INT256)       FROM midnight.midnight_evt_withdraw
     UNION ALL
-    SELECT id_, UINT256 '0', baddebt        FROM midnight.midnight_evt_liquidate
+    SELECT id_, - CAST(baddebt AS INT256)     FROM midnight.midnight_evt_liquidate
     UNION ALL
-    SELECT id_, UINT256 '0', amount         FROM midnight.midnight_evt_claimcontinuousfee
+    SELECT id_, - CAST(amount AS INT256)      FROM midnight.midnight_evt_claimcontinuousfee
 ),
 
 total_units AS (
-    SELECT id_, SUM(add_) - SUM(sub_) AS total_units
+    SELECT id_, SUM(delta) AS total_units
     FROM total_units_deltas GROUP BY id_
 ),
 
@@ -180,7 +179,7 @@ tick_spacing AS (
 
 SELECT
     m.id_,
-    COALESCE(tu.total_units,               UINT256 '0') AS total_units,
+    COALESCE(tu.total_units,               INT256 '0') AS total_units,
     COALESCE(lf.loss_factor,               UINT256 '0') AS loss_factor,
     COALESCE(w.withdrawable,               UINT256 '0') AS withdrawable,
     COALESCE(cfc.continuous_fee_credit,    UINT256 '0') AS continuous_fee_credit,
