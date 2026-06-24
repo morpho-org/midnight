@@ -32,6 +32,6 @@ function maxSettlementFee(uint256 index) pure returns (uint256) {
 
 /// @dev Returns the max LIF for the given lltv and cursor.
 function maxLif(uint256 lltv, uint256 cursor) pure returns (uint256) {
-    return UtilsLib.mulDivDown(WAD, WAD, WAD - UtilsLib.mulDivDown(cursor, WAD - lltv, WAD));
+    return UtilsLib.mulDivDown(WAD, WAD, UtilsLib.sub(WAD, UtilsLib.mulDivDown(cursor, UtilsLib.sub(WAD, lltv), WAD)));
 }
 // forgefmt: disable-end

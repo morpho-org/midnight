@@ -18,6 +18,11 @@ library UtilsLib {
         }
     }
 
+    /// @dev Returns x - y.
+    function sub(uint256 x, uint256 y) internal pure returns (uint256) {
+        return x - y;
+    }
+
     /// @dev Returns (x * y) / d rounded down.
     function mulDivDown(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
         return (x * y) / d;
@@ -25,7 +30,7 @@ library UtilsLib {
 
     /// @dev Returns (x * y) / d rounded up.
     function mulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256) {
-        return (x * y + (d - 1)) / d;
+        return (x * y + sub(d, 1)) / d;
     }
 
     function toUint128(uint256 x) internal pure returns (uint128) {
@@ -36,7 +41,7 @@ library UtilsLib {
 
     function countBits(uint128 x) internal pure returns (uint256) {
         unchecked {
-            x = x - ((x >> 1) & 0x55555555555555555555555555555555);
+            x = toUint128(sub(x, (x >> 1) & 0x55555555555555555555555555555555));
             x = (x & 0x33333333333333333333333333333333) + ((x >> 2) & 0x33333333333333333333333333333333);
             x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f;
             return (x * 0x01010101010101010101010101010101) >> 120;

@@ -316,7 +316,7 @@ contract Midnight is IMidnight {
 
     function claimSettlementFee(address token, uint256 amount, address receiver) external {
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        claimableSettlementFee[token] -= amount;
+        claimableSettlementFee[token] = UtilsLib.sub(claimableSettlementFee[token], amount);
         emit EventsLib.ClaimSettlementFee(msg.sender, token, amount, receiver);
         SafeTransferLib.safeTransfer(token, receiver, amount);
     }
@@ -326,9 +326,11 @@ contract Midnight is IMidnight {
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
 
-        _marketState.continuousFeeCredit -= UtilsLib.toUint128(amount);
-        _marketState.totalUnits -= UtilsLib.toUint128(amount);
-        _marketState.withdrawable -= UtilsLib.toUint128(amount);
+        _marketState.continuousFeeCredit =
+            UtilsLib.toUint128(UtilsLib.sub(_marketState.continuousFeeCredit, UtilsLib.toUint128(amount)));
+        _marketState.totalUnits = UtilsLib.toUint128(UtilsLib.sub(_marketState.totalUnits, UtilsLib.toUint128(amount)));
+        _marketState.withdrawable =
+            UtilsLib.toUint128(UtilsLib.sub(_marketState.withdrawable, UtilsLib.toUint128(amount)));
 
         emit EventsLib.ClaimContinuousFee(msg.sender, id, amount, receiver);
 
@@ -374,7 +376,7 @@ contract Midnight is IMidnight {
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 _settlementFee = settlementFee(id, timeToMaturity);
-        uint256 sellerPrice = offer.buy ? offerPrice - _settlementFee : offerPrice;
+        uint256 sellerPrice = offer.buy ? UtilsLib.sub(offerPrice, _settlementFee) : offerPrice;
         uint256 buyerPrice = sellerPrice + _settlementFee;
         uint256 buyerAssets = offer.buy ? units.mulDivDown(buyerPrice, WAD) : units.mulDivUp(buyerPrice, WAD);
         uint256 sellerAssets = offer.buy ? units.mulDivDown(sellerPrice, WAD) : units.mulDivUp(sellerPrice, WAD);
@@ -397,7 +399,7 @@ contract Midnight is IMidnight {
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
-        uint256 sellerDebtIncrease = units - sellerCreditDecrease;
+        uint256 sellerDebtIncrease = UtilsLib.sub(units, sellerCreditDecrease);
         uint128 buyerPendingFeeIncrease =
             UtilsLib.toUint128(buyerCreditIncrease.mulDivDown(_marketState.continuousFee * timeToMaturity, WAD));
         uint128 sellerPendingFeeDecrease = sellerPos.credit > 0
@@ -420,17 +422,19 @@ contract Midnight is IMidnight {
             SellerGatedFromIncreasingDebt()
         );
 
-        buyerPos.debt -= UtilsLib.toUint128(units - buyerCreditIncrease);
+        buyerPos.debt = UtilsLib.toUint128(
+            UtilsLib.sub(buyerPos.debt, UtilsLib.toUint128(UtilsLib.sub(units, buyerCreditIncrease)))
+        );
         buyerPos.pendingFee += buyerPendingFeeIncrease;
         buyerPos.credit += UtilsLib.toUint128(buyerCreditIncrease);
 
-        sellerPos.pendingFee -= sellerPendingFeeDecrease;
-        sellerPos.credit -= UtilsLib.toUint128(sellerCreditDecrease);
+        sellerPos.pendingFee = UtilsLib.toUint128(UtilsLib.sub(sellerPos.pendingFee, sellerPendingFeeDecrease));
+        sellerPos.credit = UtilsLib.toUint128(UtilsLib.sub(sellerPos.credit, UtilsLib.toUint128(sellerCreditDecrease)));
         sellerPos.debt += UtilsLib.toUint128(sellerDebtIncrease);
 
         _marketState.totalUnits =
-            UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
-        claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
+            UtilsLib.toUint128(UtilsLib.sub(_marketState.totalUnits + buyerCreditIncrease, sellerCreditDecrease));
+        claimableSettlementFee[offer.market.loanToken] += UtilsLib.sub(buyerAssets, sellerAssets);
 
         consumed[offer.maker][offer.group] = newConsumed;
 
@@ -469,7 +473,9 @@ contract Midnight is IMidnight {
             );
         }
 
-        SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, address(this), buyerAssets - sellerAssets);
+        SafeTransferLib.safeTransferFrom(
+            offer.market.loanToken, payer, address(this), UtilsLib.sub(buyerAssets, sellerAssets)
+        );
         SafeTransferLib.safeTransferFrom(offer.market.loanToken, payer, receiver, sellerAssets);
 
         if (sellerCallback != address(0)) {
@@ -505,11 +511,12 @@ contract Midnight is IMidnight {
         uint128 pendingFeeDecrease;
         if (_position.credit > 0) {
             pendingFeeDecrease = UtilsLib.toUint128(_position.pendingFee.mulDivUp(units, _position.credit));
-            _position.pendingFee -= pendingFeeDecrease;
+            _position.pendingFee = UtilsLib.toUint128(UtilsLib.sub(_position.pendingFee, pendingFeeDecrease));
         }
-        _position.credit -= UtilsLib.toUint128(units);
-        _marketState.withdrawable -= UtilsLib.toUint128(units);
-        _marketState.totalUnits -= UtilsLib.toUint128(units);
+        _position.credit = UtilsLib.toUint128(UtilsLib.sub(_position.credit, UtilsLib.toUint128(units)));
+        _marketState.withdrawable =
+            UtilsLib.toUint128(UtilsLib.sub(_marketState.withdrawable, UtilsLib.toUint128(units)));
+        _marketState.totalUnits = UtilsLib.toUint128(UtilsLib.sub(_marketState.totalUnits, UtilsLib.toUint128(units)));
 
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
@@ -522,7 +529,8 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
 
-        position[id][onBehalf].debt -= UtilsLib.toUint128(units);
+        position[id][onBehalf].debt =
+            UtilsLib.toUint128(UtilsLib.sub(position[id][onBehalf].debt, UtilsLib.toUint128(units)));
         marketState[id].withdrawable += UtilsLib.toUint128(units);
 
         address payer = callback != address(0) ? callback : msg.sender;
@@ -575,7 +583,7 @@ contract Midnight is IMidnight {
         address collateralToken = market.collateralParams[collateralIndex].token;
 
         Position storage _position = position[id][onBehalf];
-        uint256 newCollateral = _position.collateral[collateralIndex] - assets;
+        uint256 newCollateral = UtilsLib.sub(_position.collateral[collateralIndex], assets);
         _position.collateral[collateralIndex] = UtilsLib.toUint128(newCollateral);
 
         if (newCollateral == 0 && assets > 0) {
@@ -642,17 +650,25 @@ contract Midnight is IMidnight {
 
         if (badDebt > 0) {
             // forge-lint: disable-next-item(unsafe-typecast) as badDebt <= _position.debt
-            _position.debt -= uint128(badDebt);
+            _position.debt = UtilsLib.toUint128(UtilsLib.sub(_position.debt, uint128(badDebt)));
             uint256 _totalUnits = _marketState.totalUnits;
             uint256 _lossFactor = _marketState.lossFactor;
             _marketState.lossFactor = UtilsLib.toUint128(
-                type(uint128).max - (type(uint128).max - _lossFactor).mulDivDown(_totalUnits - badDebt, _totalUnits)
+                UtilsLib.sub(
+                    type(uint128).max,
+                    UtilsLib.sub(type(uint128).max, _lossFactor)
+                        .mulDivDown(UtilsLib.sub(_totalUnits, badDebt), _totalUnits)
+                )
             );
-            _marketState.totalUnits -= UtilsLib.toUint128(badDebt);
+            _marketState.totalUnits =
+                UtilsLib.toUint128(UtilsLib.sub(_marketState.totalUnits, UtilsLib.toUint128(badDebt)));
             _marketState.continuousFeeCredit = _lossFactor < type(uint128).max
                 ? UtilsLib.toUint128(
                     _marketState.continuousFeeCredit
-                        .mulDivDown(type(uint128).max - _marketState.lossFactor, type(uint128).max - _lossFactor)
+                        .mulDivDown(
+                            UtilsLib.sub(type(uint128).max, _marketState.lossFactor),
+                            UtilsLib.sub(type(uint128).max, _lossFactor)
+                        )
                 )
                 : 0;
         }
@@ -660,7 +676,10 @@ contract Midnight is IMidnight {
         if (repaidUnits > 0 || seizedAssets > 0) {
             uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
             uint256 lif = postMaturityMode
-                ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
+                ? UtilsLib.min(
+                    _maxLif,
+                    WAD + UtilsLib.sub(_maxLif, WAD) * UtilsLib.sub(block.timestamp, market.maturity) / TIME_TO_MAX_LIF
+                )
                 : _maxLif;
 
             if (seizedAssets > 0) {
@@ -674,7 +693,7 @@ contract Midnight is IMidnight {
                 // Note that debt >= maxDebt in this branch.
                 // The imprecision in this computation is at most a few hundred collateral or loan token assets.
                 uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
+                    ? UtilsLib.sub(_position.debt, maxDebt).mulDivUp(WAD * WAD, UtilsLib.sub(WAD * WAD, lif * lltv))
                     : type(uint256).max;
                 require(
                     repaidUnits <= maxRepaid
@@ -684,13 +703,15 @@ contract Midnight is IMidnight {
                 );
             }
 
-            uint128 newCollateral = _position.collateral[collateralIndex] - UtilsLib.toUint128(seizedAssets);
+            uint128 newCollateral = UtilsLib.toUint128(
+                UtilsLib.sub(_position.collateral[collateralIndex], UtilsLib.toUint128(seizedAssets))
+            );
             _position.collateral[collateralIndex] = newCollateral;
             if (newCollateral == 0 && seizedAssets > 0) {
                 _position.collateralBitmap = _position.collateralBitmap.clearBit(collateralIndex);
             }
             _marketState.withdrawable += UtilsLib.toUint128(repaidUnits);
-            _position.debt -= UtilsLib.toUint128(repaidUnits);
+            _position.debt = UtilsLib.toUint128(UtilsLib.sub(_position.debt, UtilsLib.toUint128(repaidUnits)));
         }
 
         address payer = callback != address(0) ? callback : msg.sender;
@@ -822,19 +843,31 @@ contract Midnight is IMidnight {
         uint128 _credit = _position.credit;
         uint128 _lastLossFactor = _position.lastLossFactor;
         uint256 postSlashCredit = _lastLossFactor < type(uint128).max
-            ? _credit.mulDivDown(type(uint128).max - marketState[id].lossFactor, type(uint128).max - _lastLossFactor)
+            ? _credit.mulDivDown(
+                UtilsLib.sub(type(uint128).max, marketState[id].lossFactor),
+                UtilsLib.sub(type(uint128).max, _lastLossFactor)
+            )
             : 0;
         uint128 _pendingFee = _position.pendingFee;
-        uint256 postSlashPendingFee =
-            _credit > 0 ? _pendingFee - _pendingFee.mulDivUp(_credit - postSlashCredit, _credit) : 0;
+        uint256 postSlashPendingFee = _credit > 0
+            ? UtilsLib.sub(_pendingFee, _pendingFee.mulDivUp(UtilsLib.sub(_credit, postSlashCredit), _credit))
+            : 0;
         uint256 accrualEnd = UtilsLib.min(block.timestamp, market.maturity);
         uint128 _lastAccrual = _position.lastAccrual;
         // forge-lint: disable-next-item(unsafe-typecast) as fee <= pending <= credit which are uint128 position fields
         uint128 fee = _lastAccrual < market.maturity
-            ? uint128(postSlashPendingFee.mulDivDown(accrualEnd - _lastAccrual, market.maturity - _lastAccrual))
+            ? uint128(
+                postSlashPendingFee.mulDivDown(
+                    UtilsLib.sub(accrualEnd, _lastAccrual), UtilsLib.sub(market.maturity, _lastAccrual)
+                )
+            )
             : 0;
         // forge-lint: disable-next-item(unsafe-typecast) as credit and pending are <= uint128 position fields
-        return (uint128(postSlashCredit) - fee, uint128(postSlashPendingFee) - fee, fee);
+        return (
+            UtilsLib.toUint128(UtilsLib.sub(uint128(postSlashCredit), fee)),
+            UtilsLib.toUint128(UtilsLib.sub(uint128(postSlashPendingFee), fee)),
+            fee
+        );
     }
 
     /// @dev Slashes the position and accrues the continuous fee.
@@ -854,8 +887,8 @@ contract Midnight is IMidnight {
         Position storage _position = position[id][user];
         (uint128 newCredit, uint128 newPendingFee, uint128 accruedFee) = updatePositionView(market, id, user);
 
-        uint128 creditDecrease = _position.credit - newCredit;
-        uint128 pendingFeeDecrease = _position.pendingFee - newPendingFee;
+        uint128 creditDecrease = UtilsLib.toUint128(UtilsLib.sub(_position.credit, newCredit));
+        uint128 pendingFeeDecrease = UtilsLib.toUint128(UtilsLib.sub(_position.pendingFee, newPendingFee));
 
         _position.credit = newCredit;
         _position.lastLossFactor = marketState[id].lossFactor;
@@ -990,6 +1023,7 @@ contract Midnight is IMidnight {
                                         (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
         // forgefmt: disable-end
 
-        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+        return (feeLower * UtilsLib.sub(end, timeToMaturity) + feeUpper * UtilsLib.sub(timeToMaturity, start))
+            / UtilsLib.sub(end, start);
     }
 }
