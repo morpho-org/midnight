@@ -281,6 +281,7 @@ contract ContinuousFeeTest is BaseTest {
         Offer memory offer = _makeBuyOffer(keccak256("lender-exit"));
         vm.expectEmit();
         emit EventsLib.Take(
+            lender,
             keccak256(abi.encode(offer)),
             id,
             offer.buy,
@@ -290,15 +291,14 @@ contract ContinuousFeeTest is BaseTest {
             hex"",
             exitAmount,
             lender,
-            lender,
             takeAssets,
             takeAssets,
             exitAmount,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
             int256(0),
-            otherLender,
-            lender
+            lender,
+            otherLender
         );
         take(exitAmount, lender, offer); // lender is taker = seller
 
