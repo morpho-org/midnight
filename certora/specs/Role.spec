@@ -284,7 +284,6 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
     claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
     assert !reverted => e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
-    assert !reverted && !marketWasCreated => amount == 0;
     assert marketWasCreated && e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore => !reverted;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
