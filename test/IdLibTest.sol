@@ -20,28 +20,34 @@ contract IdLibTest is Test {
         market.liquidatorGate = address(6);
     }
 
-    function testToIdIsSensitiveToChainId() public pure {
+    function testToIdIsSensitiveToMarketParams() public pure {
         Market memory market1 = baseMarket();
         Market memory market2 = baseMarket();
         market2.chainId = 2;
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
-    }
 
-    function testToIdIsSensitiveToMidnight() public pure {
-        Market memory market1 = baseMarket();
-        Market memory market2 = baseMarket();
+        market2 = baseMarket();
         market2.midnight = address(7);
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
-    }
 
-    function testToIdIsSensitiveToMarketParams() public pure {
-        Market memory market1 = baseMarket();
-        Market memory market2 = baseMarket();
+        market2 = baseMarket();
         market2.loanToken = address(8);
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
 
         market2 = baseMarket();
         market2.collateralParams[0].token = address(9);
+        assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
+
+        market2 = baseMarket();
+        market2.collateralParams[0].lltv = 0.5e18;
+        assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
+
+        market2 = baseMarket();
+        market2.collateralParams[0].maxLif = 1.2e18;
+        assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
+
+        market2 = baseMarket();
+        market2.collateralParams[0].oracle = address(12);
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
 
         market2 = baseMarket();
