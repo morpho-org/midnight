@@ -694,8 +694,9 @@ contract Midnight is IMidnight {
 
             if (!postMaturityMode) {
                 // Note that debt >= maxDebt in this branch.
-                // lif * lltv >= WAD * WAD means LIF * LLTV >= 1, so the RCF is inactive (see LIQUIDATIONS).
-                uint256 maxRepaid = lif * lltv < WAD * WAD
+                // For lltv == WAD, the RCF is inactive (see LIQUIDATIONS).
+                // For lltv < WAD, maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation.
+                uint256 maxRepaid = lltv < WAD
                     ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
                     : type(uint256).max;
                 require(
@@ -806,6 +807,7 @@ contract Midnight is IMidnight {
                 require(isLltvEnabled[lltv], LltvNotEnabled());
                 require(isLiquidationCursorEnabled[liquidationCursor], LiquidationCursorNotEnabled());
                 require(maxLif(lltv, liquidationCursor) <= 2 * WAD, InvalidMaxLif());
+                require(lltv == WAD || lltv * maxLif(lltv, liquidationCursor) <= 0.999 ether * WAD, MaxLifTooHigh());
                 previousCollateralToken = collateralToken;
             }
 

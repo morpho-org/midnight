@@ -89,6 +89,7 @@ interface IMidnight {
     error MarketLossFactorMaxedOut();
     error MarketNotCreated();
     error MaturityTooFar();
+    error MaxLifTooHigh();
     error NoCollateralParams();
     error NotBorrower();
     error NotLiquidatable();

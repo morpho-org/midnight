@@ -246,7 +246,8 @@ contract SettersTest is BaseTest {
     // LiquidationCursor tests
 
     function testAddLiquidationCursorSuccess(uint256 liquidationCursor) public {
-        liquidationCursor = bound(liquidationCursor, 0, WAD);
+        // Keep the cursor in a range where maxLif stays within the bounds enforced at market creation for LLTV.
+        liquidationCursor = bound(liquidationCursor, 0, 0.99e18);
         // Use a cursor that isn't enabled at deployment, so market creation is initially rejected.
         vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
 
