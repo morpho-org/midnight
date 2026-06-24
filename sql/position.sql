@@ -6,14 +6,6 @@
 WITH
 
 -- ── Credit & debt (net position) ───────────────────────────────────────────────
--- The Take event no longer logs buyerCreditIncrease / sellerCreditDecrease, so
--- credit and debt can't be summed independently. But a position never holds credit
--- and debt at the same time: take repays debt before adding credit and consumes
--- credit before adding debt; withdraw and updatePosition only cut credit; repay and
--- liquidate only cut debt. So net = credit - debt fully determines both:
---   credit = max(0, net),  debt = max(0, -net)
--- and every net delta uses only fields still present in the events.
---
 -- net up   (add_):  buyer in Take +units, Repay +units, Liquidate +(badDebt+repaidUnits)
 -- net down (sub_):  seller in Take +units, Withdraw +units, UpdatePosition +creditDecrease
 
