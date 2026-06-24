@@ -17,13 +17,13 @@ jobs:
         with:
           custom_image: rocq/rocq-prover:9.1
           custom_script: |
-            mkdir -p /tmp/rocq
             # Assume .v files are independent.
             # Do not check admits in the module's dependencies.
             for file in rocq/*.v; do
               module="$(basename "$file" .v)"
-              rocq compile -noglob -o "/tmp/rocq/$module.vo" "$file"
-              if rocq check -silent --output-context "/tmp/rocq/$module.vo" 2>&1 | grep -F "    $module."; then
+              rocq compile -o "/tmp/$module.vo" "$file"
+              output="$(rocq check -silent --output-context "/tmp/$module.vo" 2>&1)"
+              if printf '%s\n' "$output" | grep -F "    $module."; then
                 exit 1
               fi
             done
