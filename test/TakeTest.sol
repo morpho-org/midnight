@@ -186,6 +186,7 @@ contract TakeTest is BaseTest {
 
         vm.expectEmit();
         emit EventsLib.Take(
+            caller,
             keccak256(abi.encode(offer)),
             id,
             offer.buy,
@@ -195,15 +196,15 @@ contract TakeTest is BaseTest {
             hex"",
             units,
             taker,
-            receiver,
             buyerAssets,
             sellerAssets,
             existingConsumed + units,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
+            // forge-lint: disable-next-line(unsafe-typecast)
             int256(units - existingDebt) - int256(existingCredit),
-            address(payerCallback),
-            caller
+            receiver,
+            address(payerCallback)
         );
 
         vm.prank(caller);

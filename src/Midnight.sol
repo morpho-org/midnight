@@ -440,6 +440,7 @@ contract Midnight is IMidnight {
         address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         emit EventsLib.Take(
+            msg.sender,
             keccak256(abi.encode(offer)),
             id,
             offer.buy,
@@ -449,15 +450,15 @@ contract Midnight is IMidnight {
             ratifierData,
             units,
             taker,
-            receiver,
             buyerAssets,
             sellerAssets,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
+            // forge-lint: disable-next-line(unsafe-typecast)
             int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
-            payer,
-            msg.sender
+            receiver,
+            payer
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
