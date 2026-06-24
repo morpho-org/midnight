@@ -22,7 +22,7 @@ contract SetterRatifier is ISetterRatifier {
         MIDNIGHT = _midnight;
     }
 
-    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) public {
+    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootRatified[maker][root] = newIsRootRatified;
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);

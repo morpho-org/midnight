@@ -9,7 +9,7 @@ methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Position/marketState getters used to express protocol invariants as preconditions.
-    function creditOf(bytes32, address) external returns (uint128) envfree;
+    function credit(bytes32, address) external returns (uint128) envfree;
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastLossFactor(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
@@ -102,7 +102,7 @@ rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, callda
     bytes32 id = summaryToId(market);
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
-    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit";
+    require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit";
     require lastLossFactor(id, user) <= lossFactor(id), "see lastLossFactorLeqMarketLossFactor";
     require lastAccrual(id, user) <= require_uint128(e.block.timestamp), "lastAccrual <= block.timestamp by timestamp monotonicity";
 

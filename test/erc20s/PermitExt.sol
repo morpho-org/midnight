@@ -13,6 +13,7 @@ abstract contract PermitExt {
         _name = name_;
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(
             abi.encode(

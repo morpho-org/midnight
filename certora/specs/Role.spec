@@ -9,6 +9,7 @@ methods {
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
+    function isLltvAllowed(uint256 lltv) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
@@ -25,6 +26,8 @@ methods {
 }
 
 /// HELPERS ///
+
+definition WAD() returns uint256 = 10 ^ 18;
 
 definition CBP() returns uint256 = 10 ^ 12;
 
@@ -85,6 +88,14 @@ rule roleSetterCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
+rule roleSetterCanAddLltv(env e, uint256 lltv) {
+    address roleSetterBefore = roleSetter();
+
+    addLltv@withrevert(e, lltv);
+    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0 && lltv <= WAD();
+    assert !lastReverted => isLltvAllowed(lltv);
+}
+
 /// ROLE SETTER: ACCESS CONTROL ///
 
 rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
@@ -120,6 +131,16 @@ rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args)
     f(e, args);
 
     assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
+}
+
+/// Allowed LLTV tiers can only be added by the role setter, and never removed.
+rule onlyRoleSetterCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+    bool allowedBefore = isLltvAllowed(lltv);
+    address roleSetterBefore = roleSetter();
+
+    f(e, args);
+
+    assert isLltvAllowed(lltv) != allowedBefore => allowedBefore == false && e.msg.sender == roleSetterBefore && f.selector == sig:addLltv(uint256).selector;
 }
 
 /// FEE SETTER: LIVENESS ///

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {
+    WAD,
     MAX_CONTINUOUS_FEE,
     MAX_SETTLEMENT_FEE_0_DAYS,
     MAX_SETTLEMENT_FEE_1_DAY,
@@ -75,6 +76,30 @@ contract SettersTest is BaseTest {
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
+    }
+
+    function testAddLltvSuccess(uint256 lltv) public {
+        lltv = bound(lltv, 0, WAD);
+        vm.assume(!midnight.isLltvAllowed(lltv));
+
+        vm.expectEmit();
+        emit EventsLib.AddLltv(lltv);
+
+        midnight.addLltv(lltv);
+        assertTrue(midnight.isLltvAllowed(lltv));
+    }
+
+    function testAddLltvOnlyRoleSetter(address rdm, uint256 lltv) public {
+        vm.assume(rdm != address(this));
+        vm.prank(rdm);
+        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        midnight.addLltv(lltv);
+    }
+
+    function testAddLltvInvalidLltv(uint256 lltv) public {
+        lltv = bound(lltv, WAD + 1, type(uint256).max);
+        vm.expectRevert(IMidnight.InvalidLltv.selector);
+        midnight.addLltv(lltv);
     }
 
     function testSetSettlementFeeSuccess(
@@ -162,7 +187,7 @@ contract SettersTest is BaseTest {
     function testSetMarketSettlementFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, maxSettlementFee(index) + 1, 1e18);
-        vm.expectRevert(IMidnight.SettlementFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.SettlementFeeAboveMax.selector);
         midnight.setMarketSettlementFee(id, index, feeTooHigh);
     }
 
@@ -305,7 +330,7 @@ contract SettersTest is BaseTest {
     function testSetDefaultSettlementFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, maxSettlementFee(index) + 1, 1e18);
-        vm.expectRevert(IMidnight.SettlementFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.SettlementFeeAboveMax.selector);
         midnight.setDefaultSettlementFee(loanToken, index, feeTooHigh);
     }
 
@@ -422,10 +447,10 @@ contract SettersTest is BaseTest {
         midnight.touchMarket(market);
         bytes32 id = toId(market);
 
-        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         midnight.setMarketContinuousFee(id, fee);
 
-        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         midnight.setDefaultContinuousFee(address(loanToken), fee);
     }
 
