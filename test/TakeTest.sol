@@ -201,6 +201,7 @@ contract TakeTest is BaseTest {
             existingConsumed + units,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
+            int256(units - existingDebt) - int256(existingCredit),
             address(payerCallback),
             caller
         );

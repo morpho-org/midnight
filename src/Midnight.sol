@@ -455,6 +455,7 @@ contract Midnight is IMidnight {
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
+            int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
             payer,
             msg.sender
         );
