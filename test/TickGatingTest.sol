@@ -159,7 +159,7 @@ contract TickGatingTest is BaseTest {
 
     function testSetTickSpacingSetterOnlyOwner() public {
         vm.prank(lender);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.setTickSpacingSetter(lender);
     }
 

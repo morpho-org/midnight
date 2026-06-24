@@ -29,8 +29,8 @@ contract SettersTest is BaseTest {
         assertEq(maxSettlementFee(6), MAX_SETTLEMENT_FEE_360_DAYS, "360 days max settlement fee");
     }
 
-    function testInitialRoleSetter() public view {
-        assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
+    function testInitialConfigurator() public view {
+        assertEq(midnight.configurator(), address(this), "deployer should be initial configurator");
     }
 
     function testConstructorEvent() public {
@@ -40,19 +40,19 @@ contract SettersTest is BaseTest {
         new Midnight();
     }
 
-    function testSetRoleSetterSuccess(address rdm) public {
+    function testSetConfiguratorSuccess(address rdm) public {
         vm.expectEmit();
-        emit EventsLib.SetRoleSetter(rdm);
+        emit EventsLib.SetConfigurator(rdm);
 
-        midnight.setRoleSetter(rdm);
-        assertEq(midnight.roleSetter(), rdm, "role setter should be transferred");
+        midnight.setConfigurator(rdm);
+        assertEq(midnight.configurator(), rdm, "configurator should be transferred");
     }
 
-    function testSetRoleSetterOnlyRoleSetter(address rdm) public {
+    function testSetConfiguratorOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
-        midnight.setRoleSetter(makeAddr("newRoleSetter"));
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
+        midnight.setConfigurator(makeAddr("newConfigurator"));
     }
 
     function testSetFeeSetterSuccess(address feeSetter) public {
@@ -71,10 +71,10 @@ contract SettersTest is BaseTest {
         assertEq(midnight.tickSpacingSetter(), tickSpacingSetter);
     }
 
-    function testSetFeeSetterOnlyRoleSetter(address rdm) public {
+    function testSetFeeSetterOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
@@ -89,10 +89,10 @@ contract SettersTest is BaseTest {
         assertTrue(midnight.isLltvEnabled(lltv));
     }
 
-    function testAddLltvOnlyRoleSetter(address rdm, uint256 lltv) public {
+    function testAddLltvOnlyConfigurator(address rdm, uint256 lltv) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.addLltv(lltv);
     }
 
@@ -238,10 +238,10 @@ contract SettersTest is BaseTest {
         assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
 
-    function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
+    function testSetFeeClaimerOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.setFeeClaimer(makeAddr("newRecipient"));
     }
 
@@ -283,11 +283,11 @@ contract SettersTest is BaseTest {
         assertTrue(midnight.tickSpacing(toId(market)) > 0, "market created with added liquidationCursor");
     }
 
-    function testAddLiquidationCursorOnlyRoleSetter(address rdm, uint256 liquidationCursor) public {
+    function testAddLiquidationCursorOnlyConfigurator(address rdm, uint256 liquidationCursor) public {
         vm.assume(rdm != address(this));
         liquidationCursor = bound(liquidationCursor, 0, WAD);
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.addLiquidationCursor(liquidationCursor);
     }
 
