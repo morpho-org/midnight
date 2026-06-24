@@ -179,9 +179,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev credit, pendingFee, and lastLossFactor are not up to date. Use updatePositionView to get the up-to-date
 /// values.
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
-/// @dev INITIAL_CHAIN_ID is captured at construction and used in place of block.chainid when computing market ids,
-/// so a hard fork that changes block.chainid does not strand existing accounting. But as a result, after a hard-fork
-/// there can be some market id clashes.
+/// @dev Markets use their creation chainId, so after a chain fork two markets on different chains can have the same id.
 /// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
 /// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
 /// (Shanghai).
@@ -189,10 +187,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
-
-    /// IMMUTABLES ///
-
-    uint256 public immutable INITIAL_CHAIN_ID;
 
     /// STORAGE ///
 
@@ -213,8 +207,7 @@ contract Midnight is IMidnight {
 
     constructor() {
         roleSetter = msg.sender;
-        INITIAL_CHAIN_ID = block.chainid;
-        emit EventsLib.Constructor(msg.sender, INITIAL_CHAIN_ID);
+        emit EventsLib.Constructor(msg.sender);
     }
 
     /// MULTICALL ///
@@ -329,10 +322,9 @@ contract Midnight is IMidnight {
     }
 
     function claimContinuousFee(Market memory market, uint256 amount, address receiver) external {
-        bytes32 id = toId(market);
+        bytes32 id = touchMarket(market);
         MarketState storage _marketState = marketState[id];
         require(msg.sender == feeClaimer, OnlyFeeClaimer());
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
 
         _marketState.continuousFeeCredit -= UtilsLib.toUint128(amount);
         _marketState.totalUnits -= UtilsLib.toUint128(amount);
@@ -779,8 +771,10 @@ contract Midnight is IMidnight {
 
     /// @dev Returns the market id and creates the market if it doesn't exist yet.
     function touchMarket(Market memory market) public returns (bytes32) {
-        bytes32 id = toId(market);
+        bytes32 id = IdLib.toId(market);
         if (marketState[id].tickSpacing == 0) {
+            require(market.chainId == block.chainid, InvalidChainId());
+            require(market.midnight == address(this), InvalidMidnight());
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
@@ -809,7 +803,7 @@ contract Midnight is IMidnight {
             _marketState.settlementFeeCbp5 = _defaultSettlementFeeCbp[5];
             _marketState.settlementFeeCbp6 = _defaultSettlementFeeCbp[6];
             _marketState.continuousFee = defaultContinuousFee[market.loanToken];
-            IdLib.storeInCode(market, INITIAL_CHAIN_ID);
+            IdLib.storeInCode(market);
 
             emit EventsLib.MarketCreated(market, id);
         }
@@ -847,8 +841,7 @@ contract Midnight is IMidnight {
     /// @dev Slashes the position and accrues the continuous fee.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePosition(Market memory market, address user) external returns (uint128, uint128, uint128) {
-        bytes32 id = toId(market);
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        bytes32 id = touchMarket(market);
         return _updatePosition(market, id, user);
     }
 
@@ -908,10 +901,6 @@ contract Midnight is IMidnight {
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
         return position[id][user].collateral[index];
-    }
-
-    function toId(Market memory market) public view returns (bytes32) {
-        return IdLib.toId(market, INITIAL_CHAIN_ID, address(this));
     }
 
     /// @dev Reverts if the id is not a valid id of a touched market.

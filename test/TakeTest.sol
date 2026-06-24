@@ -35,6 +35,8 @@ contract TakeTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
@@ -1513,7 +1515,7 @@ contract BorrowCallback is ISellCallback {
         address receiver,
         bytes memory data
     ) external returns (bytes32) {
-        require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
+        require(id == IdLib.toId(market), "wrong id");
         recordedId = id;
         _recordedMarket = market;
         recordedSeller = seller;
@@ -1548,7 +1550,7 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         address,
         bytes memory data
     ) external returns (bytes32) {
-        require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
+        require(id == IdLib.toId(market), "wrong id");
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
         address collateralToken = market.collateralParams[collateralIndex].token;
@@ -1605,7 +1607,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         external
         returns (bytes32)
     {
-        require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
+        require(id == IdLib.toId(market), "wrong id");
         if (!reentered) {
             uint256 idx = storedCollateralIndex;
             address collateralToken = market.collateralParams[idx].token;
@@ -1654,7 +1656,7 @@ contract LendCallback is IBuyCallback {
         address buyer,
         bytes memory data
     ) external returns (bytes32) {
-        require(id == IdLib.toId(market, block.chainid, msg.sender), "wrong id");
+        require(id == IdLib.toId(market), "wrong id");
         recordedId = id;
         _recordedMarket = market;
         recordedBuyer = buyer;

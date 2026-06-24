@@ -45,10 +45,10 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => CVL_safeTransfer();
 
     // Bitmap operations (msb, clearBit, setBit) are provided by BitmapSummaries.spec.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // The function toMarket is not used by the protocol.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);

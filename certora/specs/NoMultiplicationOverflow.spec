@@ -14,7 +14,7 @@ methods {
     function _.price() external => boundedPrice(calledContract) expect(uint256);
 
     // Deterministic toId: links call-site markets to validated state from touchMarket.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
