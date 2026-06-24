@@ -809,6 +809,8 @@ contract Midnight is IMidnight {
         return id;
     }
 
+    /// UPDATE POSITION ///
+
     /// @dev Expects the id to correspond to the market's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
     function updatePositionView(Market memory market, bytes32 id, address user)
@@ -866,6 +868,8 @@ contract Midnight is IMidnight {
         return (newCredit, newPendingFee, accruedFee);
     }
 
+    /// HELPERS ///
+
     /// @dev This function should be called with the id corresponding to the market.
     /// @dev This function does not call any oracle if debt is 0.
     /// @dev Expects the id to correspond to the market's id.
@@ -911,7 +915,15 @@ contract Midnight is IMidnight {
         return position[id][user].credit > 0;
     }
 
-    /// EXTERNAL GETTERS ///
+    /// @dev Reverts if the id is not a valid id of a touched market.
+    /// @dev Returns the market corresponding to the given id.
+    function toMarket(bytes32 id) external view returns (Market memory) {
+        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        address create2Address = address(uint160(uint256(id)));
+        return abi.decode(create2Address.code, (Market));
+    }
+
+    /// STORAGE GETTERS ///
 
     function credit(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].credit;
@@ -981,13 +993,5 @@ contract Midnight is IMidnight {
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
-    }
-
-    /// @dev Reverts if the id is not a valid id of a touched market.
-    /// @dev Returns the market corresponding to the given id.
-    function toMarket(bytes32 id) external view returns (Market memory) {
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
-        address create2Address = address(uint160(uint256(id)));
-        return abi.decode(create2Address.code, (Market));
     }
 }
