@@ -448,15 +448,16 @@ contract Midnight is IMidnight {
         address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
 
         emit EventsLib.Take(
-            msg.sender,
+            _hashOffer(offer),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            ratifierData,
             units,
             taker,
-            keccak256(abi.encode(offer)),
-            offer.maker,
-            offer.buy,
-            offer.group,
-            ratifierData,
+            receiver,
             buyerAssets,
             sellerAssets,
             newConsumed,
@@ -464,8 +465,8 @@ contract Midnight is IMidnight {
             sellerPendingFeeDecrease,
             buyerCreditIncrease,
             sellerCreditDecrease,
-            receiver,
-            payer
+            payer,
+            msg.sender
         );
 
         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
@@ -879,6 +880,10 @@ contract Midnight is IMidnight {
 
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
         return position[id][user].credit > 0;
+    }
+
+    function _hashOffer(Offer memory offer) internal pure returns (bytes32) {
+        return keccak256(abi.encode(offer));
     }
 
     /// OTHER VIEW FUNCTIONS ///
