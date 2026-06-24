@@ -12,12 +12,13 @@ Definition ceil_div (numerator denominator : Z) : Z :=
 If:
 - maxRepaid is computed as:
   ceil((debt - maxDebt) * WAD^2 / (WAD^2 - lif * lltv))
+- repaid is the amount actually repaid: min(maxRepaid, debt)
 - seizedAssets is computed as:
-  floor(floor(maxRepaid * lif / WAD) * ORACLE_PRICE_SCALE / price)
+  floor(floor(repaid * lif / WAD) * ORACLE_PRICE_SCALE / price)
 - maxDebt is computed from the current collateral as:
   otherCollatContribution + floor(floor(collat * price / ORACLE_PRICE_SCALE) * lltv / WAD)
 
-then after liquidating maxRepaid, the borrower is healthy:
+then after liquidating repaid, the borrower is healthy:
   newDebt <= newMaxDebt
 
 This proof is entirely over integer arithmetic.
@@ -26,27 +27,28 @@ The assumptions that the collateral seized does not exceed the current collatera
 *)
 
 Definition max_repaid_liquidation_leaves_healthy_statement : Prop :=
-  forall debt maxDebt otherCollatContribution collat seizedAssets price lltv lif maxRepaid,
-    0 < price ->
-    0 <= debt -> 0 <= otherCollatContribution ->
-    0 <= collat -> 0 <= seizedAssets -> seizedAssets <= collat ->
-    0 <= lltv -> 0 <= lif ->
-    lif * lltv < WAD * WAD ->
-    maxDebt =
+  forall debt otherCollatContribution collat price lltv lif,
+    let maxDebt :=
       otherCollatContribution
-      + (collat * price / ORACLE_PRICE_SCALE) * lltv / WAD ->
-    seizedAssets =
-      (maxRepaid * lif / WAD * ORACLE_PRICE_SCALE) / price ->
-    maxRepaid =
+      + (collat * price / ORACLE_PRICE_SCALE) * lltv / WAD in
+    let maxRepaid :=
       ceil_div ((debt - maxDebt) * (WAD * WAD))
-        (WAD * WAD - lif * lltv) ->
-    maxDebt <= debt ->
-    let newDebt := debt - maxRepaid in
+        (WAD * WAD - lif * lltv) in
+    let repaid := Z.min maxRepaid debt in
+    let seizedAssets :=
+      (repaid * lif / WAD * ORACLE_PRICE_SCALE) / price in
+    let newDebt := debt - repaid in
     let newMaxDebt :=
       otherCollatContribution
-      + ((collat - seizedAssets) * price / ORACLE_PRICE_SCALE) * lltv / WAD
-    in
-    newDebt <= newMaxDebt.
+      + ((collat - seizedAssets) * price / ORACLE_PRICE_SCALE) * lltv / WAD in
+    0 < price ->
+    0 <= debt -> 0 <= otherCollatContribution ->
+    0 <= collat ->
+    0 <= lltv -> 0 <= lif ->
+    lif * lltv < WAD * WAD ->
+    maxDebt <= debt ->
+    seizedAssets <= collat ->
+    0 <= newDebt /\ newDebt <= newMaxDebt.
 
 (* -------------------------------------------------------------------------- *)
 (* Generic integer-division lemmas                                             *)
@@ -252,69 +254,113 @@ Theorem max_repaid_liquidation_leaves_healthy :
   max_repaid_liquidation_leaves_healthy_statement.
 Proof.
   unfold max_repaid_liquidation_leaves_healthy_statement.
-  intros debt maxDebt otherCollatContribution collat seizedAssets price lltv lif maxRepaid
-    Hprice Hdebt Hother Hcollat HseizedNonneg HseizedLe Hlltv Hlif
-    Hden HmaxDebtEq HseizedEq HmaxRepaidEq HgapNonneg.
+  intros debt otherCollatContribution collat price lltv lif.
+  set (maxDebt := otherCollatContribution + collat * price / ORACLE_PRICE_SCALE * lltv / WAD).
+  set (maxRepaid := ceil_div ((debt - maxDebt) * (WAD * WAD)) (WAD * WAD - lif * lltv)).
+  set (repaid := Z.min maxRepaid debt).
+  set (seizedAssets := repaid * lif / WAD * ORACLE_PRICE_SCALE / price).
+  set (newDebt := debt - repaid).
+  set (newMaxDebt := otherCollatContribution + (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD).
+  intros Hprice Hdebt Hother Hcollat Hlltv Hlif Hden HmaxDebtLeDebt HseizedLeCollat.
   assert (HWAD : 0 < WAD) by apply WAD_pos.
   assert (Hscale : 0 < ORACLE_PRICE_SCALE) by apply ORACLE_PRICE_SCALE_pos.
-
-  assert (HmaxDebt : 0 <= maxDebt).
+  assert (Hden_pos : 0 < WAD * WAD - lif * lltv) by nia.
+  assert (HmaxDebt_nonneg : 0 <= maxDebt).
   {
-    rewrite HmaxDebtEq.
+    subst maxDebt.
     assert (HcollatValue_nonneg : 0 <= collat * price / ORACLE_PRICE_SCALE).
     { apply Z.div_pos; nia. }
-    assert (HcollatContribution_nonneg :
-      0 <= (collat * price / ORACLE_PRICE_SCALE) * lltv / WAD).
+    assert (HcollatContribution_nonneg : 0 <= collat * price / ORACLE_PRICE_SCALE * lltv / WAD).
     { apply Z.div_pos; nia. }
     nia.
   }
-
-  set (gap := debt - maxDebt).
-  set (maxDebtDropBound := ceil_div (maxRepaid * lif * lltv) (WAD * WAD)).
-
-  assert (Hgap_nonneg : 0 <= gap) by (unfold gap; lia).
-  assert (Hden_pos : 0 < WAD * WAD - lif * lltv) by nia.
-
-  assert (HmaxRepaid : 0 <= maxRepaid).
+  assert (HmaxRepaid_nonneg : 0 <= maxRepaid).
   {
-    rewrite HmaxRepaidEq.
+    subst maxRepaid.
     unfold ceil_div.
     apply Z.div_pos; nia.
   }
-
-  assert (HmaxRepaid_def_le :
-    gap * (WAD * WAD) <= maxRepaid * (WAD * WAD - lif * lltv)).
+  assert (Hrepaid_nonneg : 0 <= repaid).
   {
-    rewrite HmaxRepaidEq.
-    unfold gap.
-    apply ceil_div_mul_ge; nia.
+    subst repaid.
+    apply Z.min_glb; assumption.
   }
-
-  assert (Hextra_mul :
-    (maxRepaid - gap) * (WAD * WAD) >= maxRepaid * lif * lltv).
+  assert (Hrepaid_le_debt : repaid <= debt).
   {
-    nia.
+    subst repaid.
+    apply Z.le_min_r.
   }
-
-  assert (HmaxDebtDropBound_le_extra : maxDebtDropBound <= maxRepaid - gap).
-  {
-    unfold maxDebtDropBound.
-    apply ceil_div_le_of_mul_ge; nia.
-  }
-
-  assert (HmaxDebtDrop_le_bound : maxDebt -
-      (otherCollatContribution + ((collat - seizedAssets) * price / ORACLE_PRICE_SCALE) * lltv / WAD)
-      <= maxDebtDropBound).
-  {
-    rewrite HmaxDebtEq.
-    replace (otherCollatContribution + collat * price / ORACLE_PRICE_SCALE * lltv / WAD -
-      (otherCollatContribution + (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD))
-      with (collat * price / ORACLE_PRICE_SCALE * lltv / WAD -
-        (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD) by lia.
-    unfold maxDebtDropBound.
-    eapply max_debt_contribution_drop_bound; eauto; nia.
-  }
-
-  unfold gap in *.
-  lia.
+  split.
+  - subst newDebt; lia.
+  - destruct (Z.leb_spec0 debt maxRepaid) as [Hdebt_le_maxRepaid | HmaxRepaid_lt_debt].
+    + assert (Hrepaid_eq : repaid = debt).
+      { subst repaid. apply Z.min_r. lia. }
+      subst newDebt newMaxDebt.
+      rewrite Hrepaid_eq.
+      assert (Hseized_nonneg : 0 <= seizedAssets).
+      {
+        subst seizedAssets.
+        rewrite Hrepaid_eq.
+        apply Z.div_pos.
+        - apply Z.mul_nonneg_nonneg.
+          + apply Z.div_pos; nia.
+          + lia.
+        - lia.
+      }
+      assert (HnewCollatValue_nonneg : 0 <= (collat - seizedAssets) * price / ORACLE_PRICE_SCALE).
+      { apply Z.div_pos; nia. }
+      assert (HnewContribution_nonneg :
+        0 <= (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD).
+      { apply Z.div_pos; nia. }
+      nia.
+    + assert (Hrepaid_eq : repaid = maxRepaid).
+      { subst repaid. apply Z.min_l. lia. }
+      set (gap := debt - maxDebt).
+      set (maxDebtDropBound := ceil_div (maxRepaid * lif * lltv) (WAD * WAD)).
+      assert (Hgap_nonneg : 0 <= gap) by (unfold gap; lia).
+      assert (HmaxRepaid_def_le :
+        gap * (WAD * WAD) <= maxRepaid * (WAD * WAD - lif * lltv)).
+      {
+        subst maxRepaid.
+        unfold gap.
+        apply ceil_div_mul_ge; nia.
+      }
+      assert (Hextra_mul :
+        (maxRepaid - gap) * (WAD * WAD) >= maxRepaid * lif * lltv).
+      { nia. }
+      assert (HmaxDebtDropBound_le_extra : maxDebtDropBound <= maxRepaid - gap).
+      {
+        unfold maxDebtDropBound.
+        apply ceil_div_le_of_mul_ge; nia.
+      }
+      assert (Hseized_nonneg : 0 <= seizedAssets).
+      {
+        subst seizedAssets.
+        rewrite Hrepaid_eq.
+        apply Z.div_pos.
+        - apply Z.mul_nonneg_nonneg.
+          + apply Z.div_pos; nia.
+          + lia.
+        - lia.
+      }
+      assert (HseizedEq : seizedAssets = maxRepaid * lif / WAD * ORACLE_PRICE_SCALE / price).
+      {
+        subst seizedAssets.
+        rewrite Hrepaid_eq.
+        reflexivity.
+      }
+      assert (HmaxDebtDrop_le_bound : maxDebt - newMaxDebt <= maxDebtDropBound).
+      {
+        subst maxDebt newMaxDebt.
+        replace (otherCollatContribution + collat * price / ORACLE_PRICE_SCALE * lltv / WAD -
+          (otherCollatContribution + (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD))
+          with (collat * price / ORACLE_PRICE_SCALE * lltv / WAD -
+            (collat - seizedAssets) * price / ORACLE_PRICE_SCALE * lltv / WAD) by lia.
+        unfold maxDebtDropBound.
+        eapply max_debt_contribution_drop_bound; eauto; nia.
+      }
+      subst newDebt.
+      rewrite Hrepaid_eq.
+      unfold gap in *.
+      lia.
 Qed.
