@@ -13,12 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: rocq-prover/docker-opam-action@126d4ac196f8133729a1cb0d2aa1ee7106efec58 # v1.5.2
-        with:
-          custom_image: rocq/rocq-prover:9.1
-          custom_script: |
+      - name: Check proofs and assumptions
+        run: |
+          docker run --rm -v "$PWD:$PWD" -w "$PWD" rocq/rocq-prover@sha256:b85a80a11bb65c7c843f91c7cbcce282f22ee397c9ca42f123d568ab6cef68b0 sh -lc '
             # Assume .v files are independent.
-            # Do not check admits in the module's dependencies.
+            # Do not check admits in the module'\''s dependencies.
             for file in rocq/*.v; do
               module="$(basename "$file" .v)"
               rocq compile -o "/tmp/$module.vo" "$file"
@@ -27,3 +26,4 @@ jobs:
                 exit 1
               fi
             done
+          '
