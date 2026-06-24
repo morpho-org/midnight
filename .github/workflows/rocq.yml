@@ -1,0 +1,27 @@
+name: rocq
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    container: rocq/rocq-prover:9.1
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Check proofs and assumptions
+        run: |
+          # Assume .v files are independent.
+          # Do not check admits in the module's dependencies.
+          for file in rocq/*.v; do
+            rocq compile "$file"
+            module="$(basename "$file" .v)"
+            if rocq check -silent --output-context "rocq/$module.vo" 2>&1 | grep -F "    $module."; then
+              exit 1
+            fi
+          done
