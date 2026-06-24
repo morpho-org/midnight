@@ -11,8 +11,8 @@ Each `.sql` file reconstructs one piece of Midnight's on-chain state from events
 | `market_state.sql` | `marketState[id]` — all fields including continuousFeeCredit (recursive CTE) |
 | `consumed.sql` | `consumed[user][group]` |
 | `is_authorized.sql` | `isAuthorized[authorizer][authorized]` |
-| `claimable_trading_fee.sql` | `claimableTradingFee[token]` |
-| `default_trading_fee.sql` | `defaultTradingFeeCbp[loanToken][index]` |
+| `claimable_settlement_fee.sql` | `claimableSettlementFee[token]` |
+| `default_settlement_fee.sql` | `defaultSettlementFeeCbp[loanToken][index]` |
 | `default_continuous_fee.sql` | `defaultContinuousFee[loanToken]` |
 | `roles.sql` | `roleSetter`, `feeSetter`, `feeClaimer`, `tickSpacingSetter` |
 

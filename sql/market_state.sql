@@ -1,6 +1,6 @@
 -- Reconstructs marketState[id] from events.
 -- Fields: total_units, loss_factor, withdrawable, continuous_fee_credit,
---         trading_fee_cbp_0..6, continuous_fee, tick_spacing
+--         settlement_fee_cbp_0..6, continuous_fee, tick_spacing
 -- Platform: Dune Analytics (Trino SQL, native uint256)
 
 WITH
@@ -109,43 +109,43 @@ continuous_fee_credit AS (
     LEFT JOIN claim_after_liq tc ON tc.id_ = ids.id_
 ),
 
--- ── tradingFeeCbp[0..6] and continuousFee ─────────────────────────────────────
+-- ── settlementFeeCbp[0..6] and continuousFee ─────────────────────────────────────
 -- Initial values come from MarketCreated (= defaults at creation time).
--- Override: SetMarketTradingFee / SetMarketContinuousFee.
+-- Override: SetMarketSettlementFee / SetMarketContinuousFee.
 
--- Build a combined stream of (id, index, value) for trading fee per breakpoint.
-trading_fee_stream AS (
+-- Build a combined stream of (id, index, value) for settlement fee per breakpoint.
+settlement_fee_stream AS (
     -- MarketCreated seeds all 7 breakpoints (indices 0-6)
-    SELECT id_, UINT256 '0' AS index, market_tradingfeecbp0 AS fee, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '1', market_tradingfeecbp1, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '2', market_tradingfeecbp2, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '3', market_tradingfeecbp3, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '4', market_tradingfeecbp4, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '5', market_tradingfeecbp5, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    UNION ALL SELECT id_, UINT256 '6', market_tradingfeecbp6, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
-    -- Overrides (newtradingfee is raw; divide by CBP to get stored uint16 value)
+    SELECT id_, UINT256 '0' AS index, market_settlementfeecbp0 AS fee, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '1', market_settlementfeecbp1, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '2', market_settlementfeecbp2, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '3', market_settlementfeecbp3, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '4', market_settlementfeecbp4, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '5', market_settlementfeecbp5, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    UNION ALL SELECT id_, UINT256 '6', market_settlementfeecbp6, evt_block_number, evt_index FROM midnight.midnight_evt_marketcreated
+    -- Overrides (newsettlementfee is raw; divide by CBP to get stored uint16 value)
     UNION ALL
-    SELECT id_, index, newtradingfee / 1000000000000, evt_block_number, evt_index
-    FROM midnight.midnight_evt_setmarkettradingfee
+    SELECT id_, index, newsettlementfee / 1000000000000, evt_block_number, evt_index
+    FROM midnight.midnight_evt_setmarketsettlementfee
 ),
 
-latest_trading_fees AS (
+latest_settlement_fees AS (
     SELECT id_, index,
            MAX_BY(fee, ROW(evt_block_number, evt_index)) AS fee
-    FROM trading_fee_stream GROUP BY id_, index
+    FROM settlement_fee_stream GROUP BY id_, index
 ),
 
-trading_fees_pivoted AS (
+settlement_fees_pivoted AS (
     SELECT
         id_,
-        MAX(CASE WHEN index = UINT256 '0' THEN fee END) AS trading_fee_cbp_0,
-        MAX(CASE WHEN index = UINT256 '1' THEN fee END) AS trading_fee_cbp_1,
-        MAX(CASE WHEN index = UINT256 '2' THEN fee END) AS trading_fee_cbp_2,
-        MAX(CASE WHEN index = UINT256 '3' THEN fee END) AS trading_fee_cbp_3,
-        MAX(CASE WHEN index = UINT256 '4' THEN fee END) AS trading_fee_cbp_4,
-        MAX(CASE WHEN index = UINT256 '5' THEN fee END) AS trading_fee_cbp_5,
-        MAX(CASE WHEN index = UINT256 '6' THEN fee END) AS trading_fee_cbp_6
-    FROM latest_trading_fees GROUP BY id_
+        MAX(CASE WHEN index = UINT256 '0' THEN fee END) AS settlement_fee_cbp_0,
+        MAX(CASE WHEN index = UINT256 '1' THEN fee END) AS settlement_fee_cbp_1,
+        MAX(CASE WHEN index = UINT256 '2' THEN fee END) AS settlement_fee_cbp_2,
+        MAX(CASE WHEN index = UINT256 '3' THEN fee END) AS settlement_fee_cbp_3,
+        MAX(CASE WHEN index = UINT256 '4' THEN fee END) AS settlement_fee_cbp_4,
+        MAX(CASE WHEN index = UINT256 '5' THEN fee END) AS settlement_fee_cbp_5,
+        MAX(CASE WHEN index = UINT256 '6' THEN fee END) AS settlement_fee_cbp_6
+    FROM latest_settlement_fees GROUP BY id_
 ),
 
 -- continuousFee: last value per market
@@ -184,13 +184,13 @@ SELECT
     COALESCE(lf.loss_factor,               UINT256 '0') AS loss_factor,
     COALESCE(w.withdrawable,               UINT256 '0') AS withdrawable,
     COALESCE(cfc.continuous_fee_credit,    UINT256 '0') AS continuous_fee_credit,
-    tf.trading_fee_cbp_0,
-    tf.trading_fee_cbp_1,
-    tf.trading_fee_cbp_2,
-    tf.trading_fee_cbp_3,
-    tf.trading_fee_cbp_4,
-    tf.trading_fee_cbp_5,
-    tf.trading_fee_cbp_6,
+    tf.settlement_fee_cbp_0,
+    tf.settlement_fee_cbp_1,
+    tf.settlement_fee_cbp_2,
+    tf.settlement_fee_cbp_3,
+    tf.settlement_fee_cbp_4,
+    tf.settlement_fee_cbp_5,
+    tf.settlement_fee_cbp_6,
     cf.continuous_fee,
     ts.tick_spacing
 FROM midnight.midnight_evt_marketcreated m
@@ -198,6 +198,6 @@ LEFT JOIN total_units            tu  ON tu.id_  = m.id_
 LEFT JOIN loss_factor            lf  ON lf.id_  = m.id_
 LEFT JOIN withdrawable           w   ON w.id_   = m.id_
 LEFT JOIN continuous_fee_credit  cfc ON cfc.id_ = m.id_
-LEFT JOIN trading_fees_pivoted   tf  ON tf.id_  = m.id_
+LEFT JOIN settlement_fees_pivoted   tf  ON tf.id_  = m.id_
 LEFT JOIN continuous_fee         cf  ON cf.id_  = m.id_
 LEFT JOIN tick_spacing           ts  ON ts.id_  = m.id_

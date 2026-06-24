@@ -100,9 +100,9 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
     "midnight_evt_marketcreated": (
         "marketcreated.json",
         ["market_maturity",
-         "market_tradingfeecbp0", "market_tradingfeecbp1", "market_tradingfeecbp2",
-         "market_tradingfeecbp3", "market_tradingfeecbp4", "market_tradingfeecbp5",
-         "market_tradingfeecbp6", "market_continuousfee",
+         "market_settlementfeecbp0", "market_settlementfeecbp1", "market_settlementfeecbp2",
+         "market_settlementfeecbp3", "market_settlementfeecbp4", "market_settlementfeecbp5",
+         "market_settlementfeecbp6", "market_continuousfee",
          "evt_block_number", "evt_index"],
         [],
         ["id_", "market_loantoken"],
@@ -119,15 +119,15 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
         ["newisauthorized"],
         ["onbehalf", "authorized"],
     ),
-    "midnight_evt_setdefaulttradingfee": (
-        "setdefaulttradingfee.json",
-        ["index", "newtradingfee", "evt_block_number", "evt_index"],
+    "midnight_evt_setdefaultsettlementfee": (
+        "setdefaultsettlementfee.json",
+        ["index", "newsettlementfee", "evt_block_number", "evt_index"],
         [],
         ["loantoken"],
     ),
-    "midnight_evt_setmarkettradingfee": (
-        "setmarkettradingfee.json",
-        ["index", "newtradingfee", "evt_block_number", "evt_index"],
+    "midnight_evt_setmarketsettlementfee": (
+        "setmarketsettlementfee.json",
+        ["index", "newsettlementfee", "evt_block_number", "evt_index"],
         [],
         ["id_"],
     ),
@@ -137,8 +137,8 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
         [],
         ["id_"],
     ),
-    "midnight_evt_claimtradingfee": (
-        "claimtradingfee.json",
+    "midnight_evt_claimsettlementfee": (
+        "claimsettlementfee.json",
         ["amount", "evt_block_number", "evt_index"],
         [],
         ["token"],
@@ -151,7 +151,7 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
     ),
     "midnight_evt_constructor": (
         "constructor.json",
-        ["initialchainid", "evt_block_number", "evt_index"],
+        ["evt_block_number", "evt_index"],
         [],
         ["rolesetter"],
     ),
@@ -183,7 +183,7 @@ EVENT_SCHEMAS: dict[str, tuple[str, list[str], list[str], list[str]]] = {
         "liquidate.json",
         ["seizedassets", "repaidunits", "baddebt",
          "evt_block_number", "evt_index"],
-        ["healthypath"],
+        ["postmaturitymode"],
         ["id_", "collateral", "borrower"],
         ["latestlossfactor", "latestcontinuousfeecredit"],  # uint128 — stored as UHUGEINT to hold values up to MAX_U128
     ),
@@ -333,9 +333,9 @@ def verify_all() -> None:
         ms = exp["market_state"]
         for field in [
             "total_units", "loss_factor", "withdrawable", "continuous_fee_credit",
-            "trading_fee_cbp_0", "trading_fee_cbp_1", "trading_fee_cbp_2",
-            "trading_fee_cbp_3", "trading_fee_cbp_4", "trading_fee_cbp_5",
-            "trading_fee_cbp_6", "continuous_fee", "tick_spacing",
+            "settlement_fee_cbp_0", "settlement_fee_cbp_1", "settlement_fee_cbp_2",
+            "settlement_fee_cbp_3", "settlement_fee_cbp_4", "settlement_fee_cbp_5",
+            "settlement_fee_cbp_6", "continuous_fee", "tick_spacing",
         ]:
             check_int(f"market_state.{field}", r[field], ms[field])
 
@@ -380,34 +380,34 @@ def verify_all() -> None:
             str(exp_val).lower(),
         )
 
-    # ── claimable_trading_fee.sql ─────────────────────────────────────────────
-    print("Verifying claimable_trading_fee.sql …")
-    df_ctf = run_sql(conn, os.path.join(SQL_DIR, "claimable_trading_fee.sql"))
+    # ── claimable_settlement_fee.sql ─────────────────────────────────────────────
+    print("Verifying claimable_settlement_fee.sql …")
+    df_ctf = run_sql(conn, os.path.join(SQL_DIR, "claimable_settlement_fee.sql"))
     loan_token = exp["loan_token_addr"].lower()
     if not df_ctf.empty:
         df_ctf["token"] = df_ctf["token"].str.lower()
     row = df_ctf[df_ctf["token"] == loan_token] if not df_ctf.empty else df_ctf
     if row.empty:
-        check_int("claimable_trading_fee", 0, exp["claimable_trading_fee"])
+        check_int("claimable_settlement_fee", 0, exp["claimable_settlement_fee"])
     else:
         check_int(
-            "claimable_trading_fee",
-            row.iloc[0]["claimable_trading_fee"],
-            exp["claimable_trading_fee"],
+            "claimable_settlement_fee",
+            row.iloc[0]["claimable_settlement_fee"],
+            exp["claimable_settlement_fee"],
         )
 
-    # ── default_trading_fee.sql ───────────────────────────────────────────────
-    print("Verifying default_trading_fee.sql …")
-    df_dtf = run_sql(conn, os.path.join(SQL_DIR, "default_trading_fee.sql"))
+    # ── default_settlement_fee.sql ───────────────────────────────────────────────
+    print("Verifying default_settlement_fee.sql …")
+    df_dtf = run_sql(conn, os.path.join(SQL_DIR, "default_settlement_fee.sql"))
     df_dtf["loan_token"] = df_dtf["loan_token"].str.lower()
     row = df_dtf[(df_dtf["loan_token"] == loan_token) & (df_dtf["index"] == 3)]
     if row.empty:
-        check_int("default_trading_fee_cbp_3", 0, exp["default_trading_fee_cbp_3"])
+        check_int("default_settlement_fee_cbp_3", 0, exp["default_settlement_fee_cbp_3"])
     else:
         check_int(
-            "default_trading_fee_cbp_3",
+            "default_settlement_fee_cbp_3",
             row.iloc[0]["fee_cbp"],
-            exp["default_trading_fee_cbp_3"],
+            exp["default_settlement_fee_cbp_3"],
         )
 
     # ── default_continuous_fee.sql ────────────────────────────────────────────
