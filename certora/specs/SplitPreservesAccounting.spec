@@ -20,8 +20,8 @@ methods {
     // Deterministic hash preserves market-to-id relationship without adding assumptions.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
-    // Assume that the markets are already created.
-    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    // Sound because the protocol doesn't use toMarket.
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Pure helper called with identical args across the three takes; CONSTANT collapses
     // its bit / hashing / arithmetic complexity (no behavioral abstraction).
