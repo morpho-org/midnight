@@ -16,7 +16,7 @@ struct Market {
 struct CollateralParams {
     address token;
     uint256 lltv;
-    uint256 maxLif;
+    uint256 liquidationCursor;
     address oracle;
 }
 
@@ -80,17 +80,20 @@ interface IMidnight {
     error InconsistentInput();
     error InvalidChainId();
     error InvalidFeeIndex();
+    error InvalidLiquidationCursor();
     error InvalidLltv();
     error InvalidMaxLif();
     error InvalidMidnight();
     error InvalidOfferCaps();
     error InvalidTickSpacing();
+    error LiquidationCursorNotEnabled();
     error LiquidatorGatedFromLiquidating();
-    error LltvNotAllowed();
+    error LltvNotEnabled();
     error MakerCreditOrDebtIncreased();
     error MarketLossFactorMaxedOut();
     error MarketNotCreated();
     error MaturityTooFar();
+    error MaxLifTooHigh();
     error NoCollateralParams();
     error NotBorrower();
     error NotLiquidatable();
@@ -129,7 +132,8 @@ interface IMidnight {
     function defaultSettlementFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
     function claimableSettlementFee(address token) external view returns (uint256);
-    function isLltvAllowed(uint256 lltv) external view returns (bool);
+    function isLltvEnabled(uint256 lltv) external view returns (bool);
+    function isLiquidationCursorEnabled(uint256 liquidationCursor) external view returns (bool);
     function configurator() external view returns (address);
     function feeSetter() external view returns (address);
     function feeClaimer() external view returns (address);
@@ -143,7 +147,8 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
-    function addLltv(uint256 lltv) external;
+    function enableLltv(uint256 lltv) external;
+    function enableLiquidationCursor(uint256 liquidationCursor) external;
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external;
     function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external;
     function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external;

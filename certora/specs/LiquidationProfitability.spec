@@ -6,6 +6,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
     // Summary to capture the oracle price so the spec can reference it in assertions.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
@@ -69,7 +70,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// For repaidUnits input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 60 min post-maturity (profitability).
 rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
+    uint256 maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
     bool maxLifReached = !postMaturityMode || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());
@@ -89,7 +90,7 @@ rule liquidationLifRepaidUnits(env e, Midnight.Market market, uint256 collateral
 
 /// For seizedAssets input: lif >= WAD (solvency), and lif == maxLif when in normal mode or when the call is >= 60 min post-maturity (profitability).
 rule liquidationLifSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    uint256 maxLif = market.collateralParams[collateralIndex].maxLif;
+    uint256 maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= WAD(), "see the rule maxLifIsAtLeastWad";
 
     bool maxLifReached = !postMaturityMode || e.block.timestamp >= require_uint256(market.maturity + TIME_TO_MAX_LIF());

@@ -11,7 +11,8 @@ library EventsLib {
     event SetConfigurator(address indexed configurator);
     event SetFeeSetter(address indexed feeSetter);
     event SetTickSpacingSetter(address indexed tickSpacingSetter);
-    event AddLltv(uint256 lltv);
+    event EnableLltv(uint256 lltv);
+    event EnableLiquidationCursor(uint256 liquidationCursor);
     event SetMarketTickSpacing(bytes32 indexed id_, uint256 newTickSpacing);
     event SetMarketSettlementFee(bytes32 indexed id_, uint256 indexed index, uint256 newSettlementFee);
     event SetDefaultSettlementFee(address indexed loanToken, uint256 indexed index, uint256 newSettlementFee);

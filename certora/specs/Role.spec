@@ -10,7 +10,7 @@ methods {
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
-    function isLltvAllowed(uint256 lltv) external returns (bool) envfree;
+    function isLltvEnabled(uint256 lltv) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
@@ -89,12 +89,12 @@ rule configuratorCanChangeTickSpacingSetter(env e, address newTickSpacingSetter)
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
-rule configuratorCanAddLltv(env e, uint256 lltv) {
+rule configuratorCanEnableLltv(env e, uint256 lltv) {
     address configuratorBefore = configurator();
 
-    addLltv@withrevert(e, lltv);
+    enableLltv@withrevert(e, lltv);
     assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && lltv <= WAD();
-    assert !lastReverted => isLltvAllowed(lltv);
+    assert !lastReverted => isLltvEnabled(lltv);
 }
 
 /// CONFIGURATOR: ACCESS CONTROL ///
@@ -134,15 +134,53 @@ rule onlyConfiguratorCanChangeTickSpacingSetter(env e, method f, calldataarg arg
     assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
 
-/// Allowed LLTV tiers can only be added by the configurator, and never removed.
-rule onlyConfiguratorCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
-    bool allowedBefore = isLltvAllowed(lltv);
+/// LLTV TIERS: ACCESS CONTROL ///
+
+/// Enabled LLTV tiers can only be enabled by the configurator, and never removed.
+rule onlyConfiguratorCanEnableLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+    bool enabledBefore = isLltvEnabled(lltv);
     address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert isLltvAllowed(lltv) != allowedBefore => allowedBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:addLltv(uint256).selector;
+    assert isLltvEnabled(lltv) != enabledBefore => enabledBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:enableLltv(uint256).selector;
 }
+
+/// LIQUIDATION CURSORS: LIVENESS ///
+
+rule configuratorCanEnableLiquidationCursor(env e, uint256 liquidationCursor) {
+    address configuratorBefore = configurator();
+
+    enableLiquidationCursor@withrevert(e, liquidationCursor);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && liquidationCursor < WAD();
+    assert !reverted => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// LIQUIDATION CURSORS: ACCESS CONTROL ///
+
+/// Only the configurator can enable a liquidationCursor, and only through enableLiquidationCursor.
+rule onlyConfiguratorCanEnableLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+    address configuratorBefore = configurator();
+
+    f(e, args);
+
+    assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == configuratorBefore && f.selector == sig:enableLiquidationCursor(uint256).selector;
+}
+
+/// LiquidationCursors can only be enabled, never disabled.
+rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+
+    f(e, args);
+
+    assert enabledBefore => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// Every enabled liquidationCursor is strictly below WAD.
+invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
 /// FEE SETTER: LIVENESS ///
 

@@ -65,11 +65,13 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
 /// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
 /// between both modes.
-/// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
-/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount
+/// is capped by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
+/// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
+/// liquidated.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
@@ -79,8 +81,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
 /// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
 /// aspect.
-/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
-/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
+/// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
@@ -166,8 +168,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, and add LLTV
-/// tiers.
+/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as enable
+/// LLTV tiers and liquidation cursors.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -198,7 +200,8 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
-    mapping(uint256 lltv => bool) public isLltvAllowed;
+    mapping(uint256 lltv => bool) public isLltvEnabled;
+    mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
     address public configurator;
     address public feeSetter;
     address public feeClaimer;
@@ -250,15 +253,26 @@ contract Midnight is IMidnight {
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
-    /// @dev Allows a new LLTV tier. Tiers can only be added, never removed.
-    function addLltv(uint256 lltv) external {
+    /// @dev Enables a new LLTV tier. Tiers can only be enabled, never disabled.
+    function enableLltv(uint256 lltv) external {
         require(msg.sender == configurator, OnlyConfigurator());
         require(lltv <= WAD, InvalidLltv());
-        isLltvAllowed[lltv] = true;
-        emit EventsLib.AddLltv(lltv);
+        isLltvEnabled[lltv] = true;
+        emit EventsLib.EnableLltv(lltv);
     }
 
-    /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
+    /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never
+    /// disabled. touchMarket checks the resulting maxLif for each market.
+    /// @dev liquidationCursor is required to be strictly below WAD so that maxLif's denominator
+    /// (WAD - liquidationCursor * (WAD - lltv) / WAD) stays positive for every enabled lltv.
+    function enableLiquidationCursor(uint256 liquidationCursor) external {
+        require(msg.sender == configurator, OnlyConfigurator());
+        require(liquidationCursor < WAD, InvalidLiquidationCursor());
+        isLiquidationCursorEnabled[liquidationCursor] = true;
+        emit EventsLib.EnableLiquidationCursor(liquidationCursor);
+    }
+
+    /// @dev Refines the tick spacing of a market. Cannot increase (more ticks become accessible).
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(marketState[id].tickSpacing > 0, MarketNotCreated());
@@ -633,7 +647,8 @@ contract Midnight is IMidnight {
             uint256 _collateral = _position.collateral[i];
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, maxLif(_collateralParam.lltv, _collateralParam.liquidationCursor))
             );
             _collateralBitmap = _collateralBitmap.clearBit(i);
         }
@@ -662,7 +677,8 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
+            uint256 lltv = market.collateralParams[collateralIndex].lltv;
+            uint256 _maxLif = maxLif(lltv, market.collateralParams[collateralIndex].liquidationCursor);
             uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
@@ -673,13 +689,11 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (!postMaturityMode) {
-                uint256 lltv = market.collateralParams[collateralIndex].lltv;
+            if (!postMaturityMode && lltv < WAD) {
                 // Note that debt >= maxDebt in this branch.
-                // The imprecision in this computation is at most a few hundred collateral or loan token assets.
-                uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
-                    : type(uint256).max;
+                // For lltv == WAD, the RCF is inactive (see LIQUIDATIONS).
+                // For lltv < WAD, maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation.
+                uint256 maxRepaid = (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
@@ -786,12 +800,12 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
-                require(isLltvAllowed[lltv], LltvNotAllowed());
-                require(
-                    market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
-                        || market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
-                    InvalidMaxLif()
-                );
+                require(isLltvEnabled[lltv], LltvNotEnabled());
+                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
+                require(isLiquidationCursorEnabled[liquidationCursor], LiquidationCursorNotEnabled());
+                uint256 _maxLif = maxLif(lltv, liquidationCursor);
+                require(_maxLif <= 2 * WAD, InvalidMaxLif());
+                require(lltv == WAD || lltv * _maxLif <= 0.999 ether * WAD, MaxLifTooHigh());
                 previousCollateralToken = collateralToken;
             }
 

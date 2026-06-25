@@ -13,7 +13,7 @@ contract IdLibTest is Test {
         market.loanToken = address(2);
         market.collateralParams = new CollateralParams[](1);
         market.collateralParams[0] =
-            CollateralParams({token: address(3), lltv: 0.77e18, maxLif: 1.1e18, oracle: address(4)});
+            CollateralParams({token: address(3), lltv: 0.77e18, liquidationCursor: 1.1e18, oracle: address(4)});
         market.maturity = 123;
         market.rcfThreshold = 456;
         market.enterGate = address(5);
@@ -43,7 +43,7 @@ contract IdLibTest is Test {
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
 
         market2 = baseMarket();
-        market2.collateralParams[0].maxLif = 1.2e18;
+        market2.collateralParams[0].liquidationCursor = 1.2e18;
         assertNotEq(IdLib.toId(market1), IdLib.toId(market2));
 
         market2 = baseMarket();
