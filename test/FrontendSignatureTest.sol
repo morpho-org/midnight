@@ -8,12 +8,11 @@ import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
-// Paste from frontend output (sign-root.ts), regenerated after the CollateralParams.maxLif -> liquidationCursor type
-// change, continuousFeeCap addition, and Market chainId/midnight addition.
-address constant ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+// Paste from frontend output (sign-root.ts).
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
 uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0x44869d97f3a1c6591ae44f9ddab733a7032a2daed167f003c37afbb9e7096e08;
-bytes32 constant SIG_S = 0x7f24fc0da2550b6cee7b89840f17fb2cf0760b12d5a43c7d254fbf9581a9f7a4;
+bytes32 constant SIG_R = 0xaec9813941f94ad315c142e361666a5e850e7a42fe416bbdb643d872798a14bc;
+bytes32 constant SIG_S = 0x7afeb8781b2146bb453b4ecfcc1631fa96c78eea2a01fc2428894a5b68525cc0;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 

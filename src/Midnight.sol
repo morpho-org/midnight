@@ -687,13 +687,11 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (!postMaturityMode) {
+            if (!postMaturityMode && lltv < WAD) {
                 // Note that debt >= maxDebt in this branch.
                 // For lltv == WAD, the RCF is inactive (see LIQUIDATIONS).
                 // For lltv < WAD, maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation.
-                uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
-                    : type(uint256).max;
+                uint256 maxRepaid = (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)

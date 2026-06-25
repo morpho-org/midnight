@@ -165,5 +165,5 @@ strong invariant noCreditAndDebt(bytes32 id, address user)
 strong invariant enabledLltvIsLessThanOrEqualToOne(uint256 lltv)
     currentContract.isLltvEnabled[lltv] => lltv <= WAD();
 
-strong invariant enabledLiquidationCursorsAreBounded(uint256 liquidationCursor)
+strong invariant enabledLiquidationCursorsIsLessThanOrEqualToOne(uint256 liquidationCursor)
     currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
