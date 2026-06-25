@@ -11,7 +11,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 liquidationCursor) {
     require lltv <= WAD(), "see rule enabledLltvIsLessThanOrEqualToOne";
-    require liquidationCursor <= WAD(), "see rule enabledLiquidationCursorsIsLessThanOrEqualToOne";
+    require liquidationCursor < WAD(), "see invariant enabledLiquidationCursorsIsLessThanOne";
     assert lltv * maxLif(lltv, liquidationCursor) <= WAD() * WAD();
 }
 

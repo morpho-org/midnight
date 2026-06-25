@@ -147,8 +147,8 @@ interface IMidnight {
     function setFeeSetter(address newFeeSetter) external;
     function setFeeClaimer(address newFeeClaimer) external;
     function setTickSpacingSetter(address newTickSpacingSetter) external;
-    function addLltv(uint256 lltv) external;
-    function addLiquidationCursor(uint256 liquidationCursor) external;
+    function enableLltv(uint256 lltv) external;
+    function enableLiquidationCursor(uint256 liquidationCursor) external;
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external;
     function setMarketSettlementFee(bytes32 id, uint256 index, uint256 newSettlementFee) external;
     function setDefaultSettlementFee(address loanToken, uint256 index, uint256 newSettlementFee) external;

@@ -168,7 +168,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as add
+/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as enable
 /// LLTV tiers and liquidation cursors.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
@@ -253,21 +253,23 @@ contract Midnight is IMidnight {
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
-    /// @dev Enables a new LLTV tier. Tiers can only be added, never removed.
-    function addLltv(uint256 lltv) external {
+    /// @dev Enables a new LLTV tier. Tiers can only be enabled, never disabled.
+    function enableLltv(uint256 lltv) external {
         require(msg.sender == configurator, OnlyConfigurator());
         require(lltv <= WAD, InvalidLltv());
         isLltvEnabled[lltv] = true;
-        emit EventsLib.AddLltv(lltv);
+        emit EventsLib.EnableLltv(lltv);
     }
 
     /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never
     /// disabled. touchMarket checks the resulting maxLif for each market.
-    function addLiquidationCursor(uint256 liquidationCursor) external {
+    /// @dev liquidationCursor is required to be strictly below WAD so that maxLif's denominator
+    /// (WAD - liquidationCursor * (WAD - lltv) / WAD) stays positive for every enabled lltv.
+    function enableLiquidationCursor(uint256 liquidationCursor) external {
         require(msg.sender == configurator, OnlyConfigurator());
-        require(liquidationCursor <= WAD, InvalidLiquidationCursor());
+        require(liquidationCursor < WAD, InvalidLiquidationCursor());
         isLiquidationCursorEnabled[liquidationCursor] = true;
-        emit EventsLib.AddLiquidationCursor(liquidationCursor);
+        emit EventsLib.EnableLiquidationCursor(liquidationCursor);
     }
 
     /// @dev Refines the tick spacing of a market. Cannot increase (more ticks become accessible).
@@ -798,11 +800,12 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
-                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
                 require(isLltvEnabled[lltv], LltvNotEnabled());
+                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
                 require(isLiquidationCursorEnabled[liquidationCursor], LiquidationCursorNotEnabled());
-                require(maxLif(lltv, liquidationCursor) <= 2 * WAD, InvalidMaxLif());
-                require(lltv == WAD || lltv * maxLif(lltv, liquidationCursor) <= 0.999 ether * WAD, MaxLifTooHigh());
+                uint256 _maxLif = maxLif(lltv, liquidationCursor);
+                require(_maxLif <= 2 * WAD, InvalidMaxLif());
+                require(lltv == WAD || lltv * _maxLif <= 0.999 ether * WAD, MaxLifTooHigh());
                 previousCollateralToken = collateralToken;
             }
 

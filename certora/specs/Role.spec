@@ -89,10 +89,10 @@ rule configuratorCanChangeTickSpacingSetter(env e, address newTickSpacingSetter)
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
-rule configuratorCanAddLltv(env e, uint256 lltv) {
+rule configuratorCanEnableLltv(env e, uint256 lltv) {
     address configuratorBefore = configurator();
 
-    addLltv@withrevert(e, lltv);
+    enableLltv@withrevert(e, lltv);
     assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && lltv <= WAD();
     assert !lastReverted => isLltvEnabled(lltv);
 }
@@ -136,37 +136,37 @@ rule onlyConfiguratorCanChangeTickSpacingSetter(env e, method f, calldataarg arg
 
 /// LLTV TIERS: ACCESS CONTROL ///
 
-/// Enabled LLTV tiers can only be added by the configurator, and never removed.
-rule onlyConfiguratorCanAddLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+/// Enabled LLTV tiers can only be enabled by the configurator, and never removed.
+rule onlyConfiguratorCanEnableLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
     bool enabledBefore = isLltvEnabled(lltv);
     address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert isLltvEnabled(lltv) != enabledBefore => enabledBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:addLltv(uint256).selector;
+    assert isLltvEnabled(lltv) != enabledBefore => enabledBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:enableLltv(uint256).selector;
 }
 
 /// LIQUIDATION CURSORS: LIVENESS ///
 
-rule configuratorCanAddLiquidationCursor(env e, uint256 liquidationCursor) {
+rule configuratorCanEnableLiquidationCursor(env e, uint256 liquidationCursor) {
     address configuratorBefore = configurator();
 
-    addLiquidationCursor@withrevert(e, liquidationCursor);
+    enableLiquidationCursor@withrevert(e, liquidationCursor);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && liquidationCursor <= WAD();
+    assert !reverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && liquidationCursor < WAD();
     assert !reverted => currentContract.isLiquidationCursorEnabled[liquidationCursor];
 }
 
 /// LIQUIDATION CURSORS: ACCESS CONTROL ///
 
-/// Only the configurator can enable a liquidationCursor, and only through addLiquidationCursor.
-rule onlyConfiguratorCanAddLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+/// Only the configurator can enable a liquidationCursor, and only through enableLiquidationCursor.
+rule onlyConfiguratorCanEnableLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
     bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
     address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == configuratorBefore && f.selector == sig:addLiquidationCursor(uint256).selector;
+    assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == configuratorBefore && f.selector == sig:enableLiquidationCursor(uint256).selector;
 }
 
 /// LiquidationCursors can only be enabled, never disabled.
@@ -178,9 +178,9 @@ rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liqui
     assert enabledBefore => currentContract.isLiquidationCursorEnabled[liquidationCursor];
 }
 
-/// Every enabled liquidationCursor is at most WAD.
-invariant liquidationCursorsBoundedByOne(uint256 liquidationCursor)
-    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor <= WAD();
+/// Every enabled liquidationCursor is strictly below WAD.
+invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
 /// FEE SETTER: LIVENESS ///
 

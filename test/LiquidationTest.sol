@@ -974,7 +974,7 @@ contract LiquidationTest is BaseTest {
         units = bound(units, 2, MAX_UNITS);
 
         // Override market to use LLTV = WAD on collateral 0.
-        midnight.addLltv(WAD);
+        midnight.enableLltv(WAD);
         delete market.collateralParams;
         market.collateralParams
             .push(

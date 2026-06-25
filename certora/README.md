@@ -13,7 +13,7 @@ Global invariants on positions, markets and accounting.
   Total units always equal the sum of debt plus withdrawable, a user never holds both credit and debt, and a position's pending continuous fee never exceeds its credit.
   Continuous fees stay below `MAX_CONTINUOUS_FEE` at both the default and the market level, and loss factors only ever increase, with each user's bounded by its market's.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable settlement fee by exactly the buyer/seller spread.
-  It also shows that neither credit nor debt can grow once a market's loss factor is maxed out, and that every enabled `LLTV` tier and liquidation cursor is at most `WAD`.
+  It also shows that neither credit nor debt can grow once a market's loss factor is maxed out, and that every enabled `LLTV` tier is at most `WAD` while every enabled liquidation cursor is strictly below `WAD`.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
 - [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
   It checks the claimable settlement fee the same way: up on `take`, down on `claimSettlementFee`, and unchanged otherwise.

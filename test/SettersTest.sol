@@ -78,28 +78,28 @@ contract SettersTest is BaseTest {
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
     }
 
-    function testAddLltvSuccess(uint256 lltv) public {
+    function testEnableLltvSuccess(uint256 lltv) public {
         lltv = bound(lltv, 0, WAD);
         vm.assume(!midnight.isLltvEnabled(lltv));
 
         vm.expectEmit();
-        emit EventsLib.AddLltv(lltv);
+        emit EventsLib.EnableLltv(lltv);
 
-        midnight.addLltv(lltv);
+        midnight.enableLltv(lltv);
         assertTrue(midnight.isLltvEnabled(lltv));
     }
 
-    function testAddLltvOnlyConfigurator(address rdm, uint256 lltv) public {
+    function testEnableLltvOnlyConfigurator(address rdm, uint256 lltv) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyConfigurator.selector);
-        midnight.addLltv(lltv);
+        midnight.enableLltv(lltv);
     }
 
-    function testAddLltvInvalidLltv(uint256 lltv) public {
+    function testEnableLltvInvalidLltv(uint256 lltv) public {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         vm.expectRevert(IMidnight.InvalidLltv.selector);
-        midnight.addLltv(lltv);
+        midnight.enableLltv(lltv);
     }
 
     function testSetSettlementFeeSuccess(
@@ -247,7 +247,7 @@ contract SettersTest is BaseTest {
 
     // LiquidationCursor tests
 
-    function testAddLiquidationCursorSuccess(uint256 liquidationCursor) public {
+    function testEnableLiquidationCursorSuccess(uint256 liquidationCursor) public {
         // Keep the cursor in a range where maxLif stays within the bounds enforced at market creation for LLTV.
         liquidationCursor = bound(liquidationCursor, 0, 0.99e18);
         // Use a cursor that isn't enabled at deployment, so market creation is initially rejected.
@@ -274,8 +274,8 @@ contract SettersTest is BaseTest {
 
         // Enabling it emits the event and flips the mapping.
         vm.expectEmit();
-        emit EventsLib.AddLiquidationCursor(liquidationCursor);
-        midnight.addLiquidationCursor(liquidationCursor);
+        emit EventsLib.EnableLiquidationCursor(liquidationCursor);
+        midnight.enableLiquidationCursor(liquidationCursor);
         assertTrue(midnight.isLiquidationCursorEnabled(liquidationCursor), "liquidationCursor enabled");
 
         // The same market can now be created.
@@ -283,27 +283,27 @@ contract SettersTest is BaseTest {
         assertTrue(midnight.tickSpacing(toId(market)) > 0, "market created with added liquidationCursor");
     }
 
-    function testAddLiquidationCursorOnlyConfigurator(address rdm, uint256 liquidationCursor) public {
+    function testEnableLiquidationCursorOnlyConfigurator(address rdm, uint256 liquidationCursor) public {
         vm.assume(rdm != address(this));
         liquidationCursor = bound(liquidationCursor, 0, WAD);
         vm.prank(rdm);
         vm.expectRevert(IMidnight.OnlyConfigurator.selector);
-        midnight.addLiquidationCursor(liquidationCursor);
+        midnight.enableLiquidationCursor(liquidationCursor);
     }
 
-    function testAddLiquidationCursorAboveOneReverts(uint256 liquidationCursor) public {
-        liquidationCursor = bound(liquidationCursor, WAD + 1, type(uint256).max);
+    function testEnableLiquidationCursorAtOrAboveOneReverts(uint256 liquidationCursor) public {
+        liquidationCursor = bound(liquidationCursor, WAD, type(uint256).max);
         vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
-        midnight.addLiquidationCursor(liquidationCursor);
+        midnight.enableLiquidationCursor(liquidationCursor);
     }
 
     function testTouchMarketRejectsMaxLifAboveTwoWad() public {
         uint256 liquidationCursor = 0.814e18;
-        midnight.addLiquidationCursor(liquidationCursor);
+        midnight.enableLiquidationCursor(liquidationCursor);
 
         // A low LLTV combined with this liquidationCursor yields a maxLif above 2 WAD.
         uint256 lowLltv = 0.385e18;
-        midnight.addLltv(lowLltv);
+        midnight.enableLltv(lowLltv);
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({

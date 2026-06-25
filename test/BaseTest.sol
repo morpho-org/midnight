@@ -67,9 +67,9 @@ abstract contract BaseTest is Test {
         midnight.setTickSpacingSetter(address(this));
 
         // Enable the default liquidationCursor at deployment time.
-        midnight.addLiquidationCursor(LIQUIDATION_CURSOR);
+        midnight.enableLiquidationCursor(LIQUIDATION_CURSOR);
 
-        midnight.addLltv(LLTV);
+        midnight.enableLltv(LLTV);
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
