@@ -23,9 +23,7 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
 
-    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate. Summarize it by a deterministic ghost so
-    // its (bounded) value can be assumed under a quantifier; its own arithmetic is safe and bounded for valid liquidationCursors
-    // (see ExactMath.spec: maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
+    // Summarize maxLif by a deterministic ghost so its value can be assumed under a quantifier.
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 }
 
