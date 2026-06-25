@@ -27,6 +27,12 @@ methods {
     // Hook on mulDivDown and mulDivUp to check that the denominator is not zero, and add the necessary lemmas.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
+
+    // maxLif is recomputed on the fly from (lltv, liquidationCursor) in touchMarket and liquidate. Summarize it by a
+    // deterministic ghost: its value bounds are assumed below (see ExactMath.spec), and its own well-definedness (its
+    // denominator WAD - liquidationCursor * (WAD - lltv) / WAD is positive since enabled liquidationCursors are < WAD)
+    // keeps its internal divisions out of the mulDiv denominator checks.
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 }
 
 /// GHOSTS ///
