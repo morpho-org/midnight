@@ -8,11 +8,11 @@ import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
-// Paste from frontend output.
-address constant ACCOUNT = 0x6133Fd1B38C7D9ad120a6fC0D0f7b03d4F6E9658;
-uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x70edf1a8f911f5f66575f3f9a2f8a4ac5b7ce80da66fe6a9f1d3a1f527fb7d04;
-bytes32 constant SIG_S = 0x32e9f29d8f20c1116b3c1484b203d2e5e6c295161de512569ca5502fd110cb36;
+// Paste from frontend output (sign-root.ts).
+address constant ACCOUNT = 0xFDa6883171208B36122229505FB2D6F30c052311;
+uint8 constant SIG_V = 27;
+bytes32 constant SIG_R = 0xaec9813941f94ad315c142e361666a5e850e7a42fe416bbdb643d872798a14bc;
+bytes32 constant SIG_S = 0x7afeb8781b2146bb453b4ecfcc1631fa96c78eea2a01fc2428894a5b68525cc0;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 

@@ -7,8 +7,6 @@ import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
 import {IdLib} from "../../src/libraries/IdLib.sol";
 import {
     CALLBACK_SUCCESS,
-    LIQUIDATION_CURSOR_LOW,
-    LIQUIDATION_CURSOR_HIGH,
     MAX_COLLATERALS_PER_BORROWER,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
@@ -56,16 +54,8 @@ contract Utils {
         return _maxSettlementFee(index);
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) external pure returns (uint256) {
-        return _maxLif(lltv, cursor);
-    }
-
-    function liquidationCursorLow() external pure returns (uint256) {
-        return LIQUIDATION_CURSOR_LOW;
-    }
-
-    function liquidationCursorHigh() external pure returns (uint256) {
-        return LIQUIDATION_CURSOR_HIGH;
+    function maxLif(uint256 lltv, uint256 liquidationCursor) external pure returns (uint256) {
+        return _maxLif(lltv, liquidationCursor);
     }
 
     function maxCollateralsPerBorrower() external pure returns (uint256) {
