@@ -94,9 +94,6 @@ The collateral bitmap is an optimization: no functional changes compared to the 
 Round-trip properties ensuring that helper computations can reach any target amount.
 
 - [`TakeAmountsLibInvertibility.spec`](specs/TakeAmountsLibInvertibility.spec) checks that `TakeAmountsLib.buyerAssetsToUnits` and `sellerAssetsToUnits` are exact inverses of `take`: feeding the returned units back into `take` produces exactly the target buyer (resp. seller) assets.
-- [`BundlerRepayInvertibility.spec`](specs/BundlerRepayInvertibility.spec) checks the bundler's repay formula.
-  `repayUnitsFormula` proves the pure arithmetic identity: for `assets = floor(D * WAD / (WAD - pct))`, the net units `assets - floor(assets * pct / WAD)` equal `D`.
-  `repayAndWithdrawCollateralRepaysTargetUnits` proves the end-to-end property: calling `repayAndWithdrawCollateral` with those assets decreases the on-chain debt by exactly `U`.
 
 ## Fixed-point math
 
