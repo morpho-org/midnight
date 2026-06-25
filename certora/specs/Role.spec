@@ -47,16 +47,16 @@ definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = asse
 
 definition defaultSettlementFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultSettlementFeeCbp[loanToken][index] * CBP());
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(ghostMulDivDown(a, b, d));
+    return ghostMulDivDown(a, b, d);
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -64,7 +64,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(ghostMulDivUp(a, b, d));
+    return ghostMulDivUp(a, b, d);
 }
 
 ghost mapping(address => mapping(address => mathint)) tokenBalance;
