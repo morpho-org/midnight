@@ -44,7 +44,7 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {
     require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) >= WAD() && maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD(), "proven in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) >= WAD() && maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD(), "see maxLifIsAtLeastWad and createdMarketsHaveMaxLifAtMostTwoWad";
     require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
     return Utils.hashMarket(market);
 }
