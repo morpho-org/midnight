@@ -36,6 +36,8 @@ definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
+definition WAD() returns uint256 = 10 ^ 18;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
@@ -159,3 +161,9 @@ strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
     credit(id, user) == 0 || debt(id, user) == 0;
+
+strong invariant enabledLltvIsLessThanOrEqualToOne(uint256 lltv)
+    currentContract.isLltvEnabled[lltv] => lltv <= WAD();
+
+strong invariant enabledLiquidationCursorsIsLessThanOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();

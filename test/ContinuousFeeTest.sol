@@ -7,7 +7,7 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, LLTV, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 uint256 constant MAX_CREDIT = MAX_TEST_AMOUNT / 4;
 
@@ -30,8 +30,8 @@ contract ContinuousFeeTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -278,26 +278,29 @@ contract ContinuousFeeTest is BaseTest {
         emit EventsLib.UpdatePosition(
             id, lender, credit - creditAfterAccrual, remaining - remainingAfterAccrual, feeUnits
         );
+        Offer memory offer = _makeBuyOffer(keccak256("lender-exit"));
         vm.expectEmit();
         emit EventsLib.Take(
             lender,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            hex"",
             exitAmount,
             lender,
-            otherLender,
-            true,
-            keccak256("lender-exit"),
             takeAssets,
             takeAssets,
             exitAmount,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            exitAmount,
-            exitAmount,
+            int256(0),
             lender,
             otherLender
         );
-        take(exitAmount, lender, _makeBuyOffer(keccak256("lender-exit"))); // lender is taker = seller
+        take(exitAmount, lender, offer); // lender is taker = seller
 
         uint256 expectedRemaining = creditAfterAccrual > 0 ? remainingAfterAccrual - sellerPendingFeeDecrease : 0;
         assertEq(midnight.credit(id, lender), creditAfterAccrual - exitAmount, "credit after exit");

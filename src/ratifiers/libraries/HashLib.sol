@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 
 import {Offer, Market, CollateralParams} from "../../interfaces/IMidnight.sol";
 
-/// @dev keccak256("CollateralParams(address token,uint256 lltv,uint256 maxLif,address oracle)").
-bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0xaf44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af;
+/// @dev keccak256("CollateralParams(address token,uint256 lltv,uint256 liquidationCursor,address oracle)").
+bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0x39ed3f928d24fd00574b1a02aba9c2483abcf5d9a3a366118c9a5aa29885b841;
 /// @dev keccak256(bytes.concat(MARKET_TYPE, COLLATERAL_PARAMS_TYPE)).
-bytes32 constant MARKET_TYPEHASH = 0xc66c045aa2394a02e2976962976ec58c79108ae7fbb1ecc974c9724678b56264;
+bytes32 constant MARKET_TYPEHASH = 0x510b3862f3816a109c9340b76972e8a30984246be06e034ae12ed2934220391a;
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant OFFER_TYPEHASH = 0x5e7c764a0f2411d16dd65139c973cbe0fe976b6d0736823e17aef319f652e7f8;
+bytes32 constant OFFER_TYPEHASH = 0xa316348449d1749c733fbf0befac14d04d6ed14ea8993956f5eb405e6191bb81;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -21,28 +21,28 @@ library HashLib {
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0x04931ea05149e935551af887e04668a4235aa7fefe5a1307699fc36de5da3604;
-            if (height == 1) return 0x636eec88d23afdd7c5ecd3689cddd4a578f3640022a4f4b36532b1bb873870d9;
-            if (height == 2) return 0xb3b200d8a87156dd298add6829190724360e913ea2a544cf8770a83b1a85b68e;
-            if (height == 3) return 0x9959f9ee7df42c7c3a42ae48edb3544cb9672653eb4c9ad5190aa9ac194e13cc;
-            if (height == 4) return 0x859439b1a679d2b8d78d092af16a3e3abd30ccae9d29e12183c61dbd89069798;
-            if (height == 5) return 0x3b62f568d54c69f46baa3db29d9d16daa670a421eca545015e2c4d6ac5e2ab4b;
-            if (height == 6) return 0x06b027b3e518caa75c38007c1e4cffc92d314d528eb7ed63b28f6cbb250d6221;
-            if (height == 7) return 0x1948d59b3835088b65d9f7048f26cfcf508f9a750de32e7830b6f99c8915905a;
-            if (height == 8) return 0xfb12ec1a894c5cc36be99898bcc4c23d45713b8920d21ddf94ba0053fec835b4;
-            if (height == 9) return 0xee136fb578b4eea50b5929361278f0a09f97371d5c44ebb73b07785150f3c202;
-            return 0xdbd2c72ce0b8a438efba0500c50090d842804420fa9eb5819a265105ccf446d4;
+            if (height == 0) return 0x004abfc3a2bdb852bd9e193d58623de158d293bff8df82b2c73762b1449a92da;
+            if (height == 1) return 0x2b907b506023b7da998b4e05205998675021a6698538b52812412353ba1b5b07;
+            if (height == 2) return 0xf3a8fa1ea464758633ee72dfd7bc109d92c69933b1d626583d37c1adc22431f4;
+            if (height == 3) return 0xc7aee773c7436e1047be687b497f42b5d2195ebcf80278aa902f65b99ea8d5f9;
+            if (height == 4) return 0x1ccd280d009a28babd35e45c7ea1bacc4abecbace69d6ca43bd297618af0d6ea;
+            if (height == 5) return 0x976e461f282292a9fc669ed6f8642da97b0853348b8d3b64caf1a63d74535062;
+            if (height == 6) return 0xa16c55d7ca5db454b6c0466c695febf8df2b4084481546a26383a48fb573f20b;
+            if (height == 7) return 0x15fa4f24cac8ee8dbbc17465043a62700395a7c75c4cc475fe241b6a3424b8bb;
+            if (height == 8) return 0x9bf198023231a1c26072e32ee84aa2ed6a1766ca348cceab9bc1065487b6dc82;
+            if (height == 9) return 0x7d723919779d24dfca798d2847418afb9d07dccc8aeed8db0f2e54a765e59630;
+            return 0xd50fde6271f599771c124dc4d2f3058693c7ef675e733ceffb870fe5f2941524;
         } else {
-            if (height == 11) return 0x8201cbae421a17b9d8116ce28ecd13378b22d0257e9daca65ea354dc7b852e0a;
-            if (height == 12) return 0xb76e7eedf6cb4dfd2a913d292be9bbcdcdf6bc457e789306cc23a6917faca3d2;
-            if (height == 13) return 0x911f1aca18bfbc4e142c04b2020d972507d4b9d6b2fbef339bc48d33a438be9e;
-            if (height == 14) return 0xf8b8028014cfa85c41a0b5af6dd4d5e6c7236dab5886ee4f21e845ec4205443d;
-            if (height == 15) return 0xd517d3bc505b0209f539cf985e6252f0e57975ec5c8e3a93d97366f39c8cbbc5;
-            if (height == 16) return 0x35940ca810d4b02086a4d695dfaf04195c5a0fcb776e97c1349a8a0472b7bec8;
-            if (height == 17) return 0x44c0e3ddcf369c808911a5c78a3d7e87fa115a23cc40147b5fc40064c5560213;
-            if (height == 18) return 0x032fe7574172aadd1fb6c40e9deacfec41a48e2fc8de3574c67331c10e7b3a1f;
-            if (height == 19) return 0x3f80439b44bef469ff2390bdf0fd5469db472bb6748c6de9e5e2cd86d602c301;
-            if (height == 20) return 0x61068a1b8ffb6dd774e8a9634cb46a7a214dd84189e255072577c8541c543fd4;
+            if (height == 11) return 0xb1c8d8455bf9b0d65722bc605488eedaf3ca18e32f386c366083af360aed575c;
+            if (height == 12) return 0x62306a7da75b4151cbc5a8c2be14ebd9ef413988ceb26330c2b85ea75df64761;
+            if (height == 13) return 0x4c05f804d2f0a7edc5d767492018eae312b6f8f9649222f8e7a78745783cd45d;
+            if (height == 14) return 0x968c3e8fe32537b97318f74ff109f7e6efa365f25048fc48f474d10981e5d03a;
+            if (height == 15) return 0x9c4b06c4bc414cd5ffb0b3d71fd1450393e79bbe73405f2770ee4489175cf734;
+            if (height == 16) return 0xe225a68d5feb03db447cc58f3a0ff567cfe7446a73cad24e1781a33696066e90;
+            if (height == 17) return 0xa9ef83c85cdc9f01279a32350b39d1e350a51ee9f236a9e6d1be764ec67d2b12;
+            if (height == 18) return 0x083f794c8751fba472222de46673bb4386de88d05495f9d2f2c40d96020a95b3;
+            if (height == 19) return 0xdfc36aba879c79d4ce19d8620a560d41d19bc9b315758ec93c651e92115d238b;
+            if (height == 20) return 0x60f9befb3ea1715092407b29ec59829d55544c89bcd5bde861fef413f2072ddd;
             revert TreeTooHigh();
         }
     }
@@ -78,7 +78,7 @@ library HashLib {
                 COLLATERAL_PARAMS_TYPEHASH,
                 collateralParams.token,
                 collateralParams.lltv,
-                collateralParams.maxLif,
+                collateralParams.liquidationCursor,
                 collateralParams.oracle
             )
         );

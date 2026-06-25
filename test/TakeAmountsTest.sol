@@ -6,7 +6,7 @@ import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
 
 contract TakeAmountsTest is BaseTest {
@@ -29,8 +29,8 @@ contract TakeAmountsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -38,8 +38,8 @@ contract TakeAmountsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );

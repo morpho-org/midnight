@@ -11,7 +11,7 @@ import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {StdStorage, stdStorage} from "../lib/forge-std/src/StdStorage.sol";
@@ -42,8 +42,8 @@ contract TakeTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -51,8 +51,8 @@ contract TakeTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
@@ -187,19 +187,22 @@ contract TakeTest is BaseTest {
         vm.expectEmit();
         emit EventsLib.Take(
             caller,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            hex"",
             units,
             taker,
-            maker,
-            offerIsBuy,
-            group,
             buyerAssets,
             sellerAssets,
             existingConsumed + units,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            units - existingDebt,
-            existingCredit,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256(units - existingDebt) - int256(existingCredit),
             receiver,
             address(payerCallback)
         );

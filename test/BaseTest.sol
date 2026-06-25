@@ -20,7 +20,6 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
-    LIQUIDATION_CURSOR_LOW,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
@@ -30,16 +29,11 @@ import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
-/// @dev The LLTV tiers registered in tests, copied from Morpho Blue's enabled tiers (excluding zero, including WAD).
-uint256 constant LLTV_0 = 0.385e18;
-uint256 constant LLTV_1 = 0.625e18;
-uint256 constant LLTV_2 = 0.77e18;
-uint256 constant LLTV_3 = 0.86e18;
-uint256 constant LLTV_4 = 0.915e18;
-uint256 constant LLTV_5 = 0.945e18;
-uint256 constant LLTV_6 = 0.965e18;
-uint256 constant LLTV_7 = 0.98e18;
-uint256 constant LLTV_8 = 1e18;
+/// @dev The default LLTV enabled in tests.
+uint256 constant LLTV = 0.77e18;
+
+/// @dev The default liquidationCursor enabled in tests.
+uint256 constant LIQUIDATION_CURSOR = 0.3e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -72,10 +66,10 @@ abstract contract BaseTest is Test {
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
 
-        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
-        for (uint256 i = 0; i < tiers.length; i++) {
-            midnight.addLltv(tiers[i]);
-        }
+        // Enable the default liquidationCursor at deployment time.
+        midnight.enableLiquidationCursor(LIQUIDATION_CURSOR);
+
+        midnight.enableLltv(LLTV);
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -277,12 +271,6 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
-    /// @dev Returns an allowed LLTV tier based on a seed value.
-    function allowedLltv(uint256 seed) internal pure returns (uint256) {
-        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
-        return tiers[seed % 9];
-    }
-
     /// @dev Returns a market with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
     function validMarket(Market memory market) internal view returns (Market memory) {
         uint256 len =
@@ -292,9 +280,8 @@ abstract contract BaseTest is Test {
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
                 address(uint160(uint256(keccak256(abi.encode(market.collateralParams[i].token, i)))));
-            uint256 lltv = allowedLltv(market.collateralParams[i].lltv);
-            collateralParams[i].lltv = lltv;
-            collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collateralParams[i].lltv = LLTV;
+            collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR;
         }
         collateralParams = sortCollateralParams(collateralParams);
         market.chainId = block.chainid;
@@ -346,8 +333,12 @@ abstract contract BaseTest is Test {
         return a > b ? a - b : b - a;
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
-        return _maxLif(lltv, cursor);
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal pure returns (uint256) {
+        return _maxLif(lltv, liquidationCursor);
+    }
+
+    function maxLif(CollateralParams memory params) internal pure returns (uint256) {
+        return _maxLif(params.lltv, params.liquidationCursor);
     }
 
     function maxSettlementFee(uint256 index) internal pure returns (uint256) {

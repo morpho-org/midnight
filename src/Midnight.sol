@@ -65,11 +65,13 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
 /// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
 /// between both modes.
-/// @dev In the "normal mode", the liquidation incentive factor (LIF) is maxLif and the liquidation amount is capped
-/// by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount
+/// is capped by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
+/// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
+/// liquidated.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
 /// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
 /// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
@@ -79,8 +81,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
 /// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
 /// aspect.
-/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to maxLif
-/// at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
+/// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
@@ -166,7 +168,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// revert.
 ///
 /// ROLES
-/// @dev The role setter can set the role setter, fee setter, fee claimer, and tick spacing setter, and add LLTV tiers.
+/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as enable
+/// LLTV tiers and liquidation cursors.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -197,8 +200,9 @@ contract Midnight is IMidnight {
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
     mapping(address token => uint256) public claimableSettlementFee;
-    mapping(uint256 lltv => bool) public isLltvAllowed;
-    address public roleSetter;
+    mapping(uint256 lltv => bool) public isLltvEnabled;
+    mapping(uint256 liquidationCursor => bool) public isLiquidationCursorEnabled;
+    address public configurator;
     address public feeSetter;
     address public feeClaimer;
     address public tickSpacingSetter;
@@ -206,7 +210,7 @@ contract Midnight is IMidnight {
     /// CONSTRUCTOR ///
 
     constructor() {
-        roleSetter = msg.sender;
+        configurator = msg.sender;
         emit EventsLib.Constructor(msg.sender);
     }
 
@@ -225,39 +229,50 @@ contract Midnight is IMidnight {
 
     /// ADMIN FUNCTIONS ///
 
-    function setRoleSetter(address newRoleSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
-        roleSetter = newRoleSetter;
-        emit EventsLib.SetRoleSetter(newRoleSetter);
+    function setConfigurator(address newConfigurator) external {
+        require(msg.sender == configurator, OnlyConfigurator());
+        configurator = newConfigurator;
+        emit EventsLib.SetConfigurator(newConfigurator);
     }
 
     function setFeeSetter(address newFeeSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         feeSetter = newFeeSetter;
         emit EventsLib.SetFeeSetter(newFeeSetter);
     }
 
     function setFeeClaimer(address newFeeClaimer) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         feeClaimer = newFeeClaimer;
         emit EventsLib.SetFeeClaimer(newFeeClaimer);
     }
 
     function setTickSpacingSetter(address newTickSpacingSetter) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+        require(msg.sender == configurator, OnlyConfigurator());
         tickSpacingSetter = newTickSpacingSetter;
         emit EventsLib.SetTickSpacingSetter(newTickSpacingSetter);
     }
 
-    /// @dev Allows a new LLTV tier. Tiers can only be added, never removed.
-    function addLltv(uint256 lltv) external {
-        require(msg.sender == roleSetter, OnlyRoleSetter());
+    /// @dev Enables a new LLTV tier. Tiers can only be enabled, never disabled.
+    function enableLltv(uint256 lltv) external {
+        require(msg.sender == configurator, OnlyConfigurator());
         require(lltv <= WAD, InvalidLltv());
-        isLltvAllowed[lltv] = true;
-        emit EventsLib.AddLltv(lltv);
+        isLltvEnabled[lltv] = true;
+        emit EventsLib.EnableLltv(lltv);
     }
 
-    /// @dev Refines the tick spacing of a market. Can not increase (more ticks become accessible).
+    /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never
+    /// disabled. touchMarket checks the resulting maxLif for each market.
+    /// @dev liquidationCursor is required to be strictly below WAD so that maxLif's denominator
+    /// (WAD - liquidationCursor * (WAD - lltv) / WAD) stays positive for every enabled lltv.
+    function enableLiquidationCursor(uint256 liquidationCursor) external {
+        require(msg.sender == configurator, OnlyConfigurator());
+        require(liquidationCursor < WAD, InvalidLiquidationCursor());
+        isLiquidationCursorEnabled[liquidationCursor] = true;
+        emit EventsLib.EnableLiquidationCursor(liquidationCursor);
+    }
+
+    /// @dev Refines the tick spacing of a market. Cannot increase (more ticks become accessible).
     function setMarketTickSpacing(bytes32 id, uint256 newTickSpacing) external {
         require(msg.sender == tickSpacingSetter, OnlyTickSpacingSetter());
         require(marketState[id].tickSpacing > 0, MarketNotCreated());
@@ -441,19 +456,22 @@ contract Midnight is IMidnight {
 
         emit EventsLib.Take(
             msg.sender,
+            keccak256(abi.encode(offer)),
             id,
+            offer.buy,
+            offer.maker,
+            offer.group,
+            offer.ratifier,
+            ratifierData,
             units,
             taker,
-            offer.maker,
-            offer.buy,
-            offer.group,
             buyerAssets,
             sellerAssets,
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            buyerCreditIncrease,
-            sellerCreditDecrease,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
             receiver,
             payer
         );
@@ -629,7 +647,8 @@ contract Midnight is IMidnight {
             uint256 _collateral = _position.collateral[i];
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
-                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE).mulDivUp(WAD, _collateralParam.maxLif)
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, maxLif(_collateralParam.lltv, _collateralParam.liquidationCursor))
             );
             _collateralBitmap = _collateralBitmap.clearBit(i);
         }
@@ -658,7 +677,8 @@ contract Midnight is IMidnight {
         }
 
         if (repaidUnits > 0 || seizedAssets > 0) {
-            uint256 _maxLif = market.collateralParams[collateralIndex].maxLif;
+            uint256 lltv = market.collateralParams[collateralIndex].lltv;
+            uint256 _maxLif = maxLif(lltv, market.collateralParams[collateralIndex].liquidationCursor);
             uint256 lif = postMaturityMode
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
@@ -669,13 +689,11 @@ contract Midnight is IMidnight {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
             }
 
-            if (!postMaturityMode) {
-                uint256 lltv = market.collateralParams[collateralIndex].lltv;
+            if (!postMaturityMode && lltv < WAD) {
                 // Note that debt >= maxDebt in this branch.
-                // The imprecision in this computation is at most a few hundred collateral or loan token assets.
-                uint256 maxRepaid = lltv < WAD
-                    ? (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv)
-                    : type(uint256).max;
+                // For lltv == WAD, the RCF is inactive (see LIQUIDATIONS).
+                // For lltv < WAD, maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation.
+                uint256 maxRepaid = (_position.debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
@@ -782,12 +800,12 @@ contract Midnight is IMidnight {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
-                require(isLltvAllowed[lltv], LltvNotAllowed());
-                require(
-                    market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_LOW)
-                        || market.collateralParams[i].maxLif == maxLif(lltv, LIQUIDATION_CURSOR_HIGH),
-                    InvalidMaxLif()
-                );
+                require(isLltvEnabled[lltv], LltvNotEnabled());
+                uint256 liquidationCursor = market.collateralParams[i].liquidationCursor;
+                require(isLiquidationCursorEnabled[liquidationCursor], LiquidationCursorNotEnabled());
+                uint256 _maxLif = maxLif(lltv, liquidationCursor);
+                require(_maxLif <= 2 * WAD, InvalidMaxLif());
+                require(lltv == WAD || lltv * _maxLif <= 0.999 ether * WAD, MaxLifTooHigh());
                 previousCollateralToken = collateralToken;
             }
 
@@ -809,7 +827,7 @@ contract Midnight is IMidnight {
         return id;
     }
 
-    /// SLASHING AND CONTINUOUS FEE ACCRUAL ///
+    /// UPDATE POSITION ///
 
     /// @dev Expects the id to correspond to the market's id.
     /// @dev Returns the new credit, new pending fee, and accrued fee after having updated the position.
@@ -868,11 +886,62 @@ contract Midnight is IMidnight {
         return (newCredit, newPendingFee, accruedFee);
     }
 
+    /// HELPERS ///
+
+    /// @dev This function should be called with the id corresponding to the market.
+    /// @dev This function does not call any oracle if debt is 0.
+    /// @dev Expects the id to correspond to the market's id.
+    function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
+        Position storage _position = position[id][borrower];
+        uint256 _debt = _position.debt;
+        uint256 maxDebt;
+        if (_debt > 0) {
+            uint128 _collateralBitmap = _position.collateralBitmap;
+            while (_collateralBitmap != 0) {
+                uint256 i = UtilsLib.msb(_collateralBitmap);
+                CollateralParams memory collateralParam = market.collateralParams[i];
+                uint256 price = IOracle(collateralParam.oracle).price();
+                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                    .mulDivDown(collateralParam.lltv, WAD);
+                _collateralBitmap = _collateralBitmap.clearBit(i);
+            }
+        }
+        return maxDebt >= _debt;
+    }
+
+    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
+    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
+        MarketState storage _marketState = marketState[id];
+        require(_marketState.tickSpacing > 0, MarketNotCreated());
+
+        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
+
+        // forgefmt: disable-start
+        (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
+            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
+            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
+            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
+            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
+            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
+                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
+        // forgefmt: disable-end
+
+        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
+    }
+
     function hasCredit(bytes32 id, address user) internal view returns (bool) {
         return position[id][user].credit > 0;
     }
 
-    /// OTHER VIEW FUNCTIONS ///
+    /// @dev Reverts if the id is not a valid id of a touched market.
+    /// @dev Returns the market corresponding to the given id.
+    function toMarket(bytes32 id) external view returns (Market memory) {
+        require(marketState[id].tickSpacing > 0, MarketNotCreated());
+        address create2Address = address(uint160(uint256(id)));
+        return abi.decode(create2Address.code, (Market));
+    }
+
+    /// STORAGE GETTERS ///
 
     function credit(bytes32 id, address user) external view returns (uint128) {
         return position[id][user].credit;
@@ -900,14 +969,6 @@ contract Midnight is IMidnight {
 
     function collateral(bytes32 id, address user, uint256 index) external view returns (uint128) {
         return position[id][user].collateral[index];
-    }
-
-    /// @dev Reverts if the id is not a valid id of a touched market.
-    /// @dev Returns the market corresponding to the given id.
-    function toMarket(bytes32 id) external view returns (Market memory) {
-        require(marketState[id].tickSpacing > 0, MarketNotCreated());
-        address create2Address = address(uint160(uint256(id)));
-        return abi.decode(create2Address.code, (Market));
     }
 
     function totalUnits(bytes32 id) external view returns (uint128) {
@@ -950,46 +1011,5 @@ contract Midnight is IMidnight {
 
     function liquidationLocked(bytes32 id, address user) public view returns (bool) {
         return UtilsLib.tGet(LIQUIDATION_LOCK_SLOT, id, user);
-    }
-
-    /// @dev This function should be called with the id corresponding to the market.
-    /// @dev This function does not call any oracle if debt is 0.
-    /// @dev Expects the id to correspond to the market's id.
-    function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
-        Position storage _position = position[id][borrower];
-        uint256 _debt = _position.debt;
-        uint256 maxDebt;
-        if (_debt > 0) {
-            uint128 _collateralBitmap = _position.collateralBitmap;
-            while (_collateralBitmap != 0) {
-                uint256 i = UtilsLib.msb(_collateralBitmap);
-                CollateralParams memory collateralParam = market.collateralParams[i];
-                uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
-                    .mulDivDown(collateralParam.lltv, WAD);
-                _collateralBitmap = _collateralBitmap.clearBit(i);
-            }
-        }
-        return maxDebt >= _debt;
-    }
-
-    /// @dev Returns the settlement fee using piecewise linear interpolation between breakpoints.
-    function settlementFee(bytes32 id, uint256 timeToMaturity) public view returns (uint256) {
-        MarketState storage _marketState = marketState[id];
-        require(_marketState.tickSpacing > 0, MarketNotCreated());
-
-        if (timeToMaturity >= 360 days) return _marketState.settlementFeeCbp6 * CBP;
-
-        // forgefmt: disable-start
-        (uint256 start, uint256 end, uint256 feeLower, uint256 feeUpper) =
-            timeToMaturity < 1 days   ? (  0 days,   1 days, _marketState.settlementFeeCbp0 * CBP, _marketState.settlementFeeCbp1 * CBP) :
-            timeToMaturity < 7 days   ? (  1 days,   7 days, _marketState.settlementFeeCbp1 * CBP, _marketState.settlementFeeCbp2 * CBP) :
-            timeToMaturity < 30 days  ? (  7 days,  30 days, _marketState.settlementFeeCbp2 * CBP, _marketState.settlementFeeCbp3 * CBP) :
-            timeToMaturity < 90 days  ? ( 30 days,  90 days, _marketState.settlementFeeCbp3 * CBP, _marketState.settlementFeeCbp4 * CBP) :
-            timeToMaturity < 180 days ? ( 90 days, 180 days, _marketState.settlementFeeCbp4 * CBP, _marketState.settlementFeeCbp5 * CBP) :
-                                        (180 days, 360 days, _marketState.settlementFeeCbp5 * CBP, _marketState.settlementFeeCbp6 * CBP);
-        // forgefmt: disable-end
-
-        return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
     }
 }
