@@ -8,9 +8,8 @@ Definition ceil_div (numerator denominator : Z) : Z :=
   (numerator + denominator - 1) / denominator.
 
 (**
-If Solidity's maxDebt underestimates the ideal maxDebt by maxDebtError, then
-the resulting maxRepaid overestimation is bounded by that error amplified by
-1 / (1 - lif * lltv).
+If the ideal max debt is underestimated by maxDebtError, then
+the resulting maxRepaid overestimation is bounded by maxDebtError / (1 - lif * lltv).
 *)
 Definition max_repaid_overestimation_statement : Prop :=
   forall debt idealMaxDebt maxDebtError lltv lif,
