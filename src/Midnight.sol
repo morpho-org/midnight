@@ -344,6 +344,8 @@ contract Midnight is IMidnight {
     /// @dev In particular, if the settlement fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
     /// <= WAD.
+    /// @dev `units` above type(uint128).max can still succeed if all resulting accounting deltas fit, but may revert
+    /// early in price, consumed-cap, or position-accounting computations.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
