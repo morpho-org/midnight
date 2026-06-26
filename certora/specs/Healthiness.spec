@@ -16,16 +16,20 @@ methods {
     // Under this assumption we can prove that a healthy borrower cannot get unhealthy by any action on the contract.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Summarize mulDivDown and mulDivUp to simplify the verification task.
     // Use a ghost function that ensures mulDivDown/Up behaves deterministically and add only the axioms about mulDiv that are needed to prove the desired property.
     // The axioms are proved in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate. Summarize it by a deterministic ghost; its
+    // lltv * maxLif <= WAD * WAD bound is assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
     function _.havocAll() external => HAVOC_ALL;
 
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => transferCallback();
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => transferCallback();
@@ -102,6 +106,8 @@ persistent ghost bool healthyOrLockedBeforeCallbacks;
 // global variable to track which market and borrower we're testing.
 persistent ghost address globalMarketLoanToken;
 
+persistent ghost uint256 globalMarketChainId;
+
 persistent ghost uint256 globalMarketCollateralLength;
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
@@ -110,7 +116,9 @@ persistent ghost mapping(uint256 => address) globalMarketCollateralToken;
 
 persistent ghost mapping(uint256 => uint256) globalMarketCollateralLLTV;
 
-persistent ghost mapping(uint256 => uint256) globalMarketCollateralMaxLif;
+persistent ghost mapping(uint256 => uint256) globalMarketCollateralLiquidationCursor;
+
+persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
 persistent ghost uint256 globalMarketMaturity;
 
@@ -126,10 +134,10 @@ persistent ghost address globalBorrower;
 
 // helper function to check if one of the collateralParams of a market matches the global variables.
 // It checks for the length and also returns true if the index is out of bounds. This allows us to require this for every index.
-definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
+definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function getGlobalMarket() returns (Midnight.Market) {
@@ -138,9 +146,9 @@ function getGlobalMarket() returns (Midnight.Market) {
     return market;
 }
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
+function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && midnight == currentContract) {
+    if (equalsGlobalMarket(market)) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";
@@ -241,7 +249,7 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
 
-    require globalMarketCollateralLLTV[collateralIndex] * globalMarketCollateralMaxLif[collateralIndex] <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
+    require globalMarketCollateralLLTV[collateralIndex] * maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]) <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
     require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
@@ -266,9 +274,9 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
     require axiomDownZero(price, ORACLE_PRICE_SCALE()), "axiom";
     require axiomDownZero(globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(repaidUnitsOut, globalMarketCollateralMaxLif[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(ghostMulDivDown(repaidUnitsOut, globalMarketCollateralMaxLif[collateralIndex], WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomLifLLTV(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralMaxLif[collateralIndex], globalMarketCollateralLLTV[collateralIndex]), "axiom";
+    require axiomInverseUpDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), "axiom";
+    require axiomInverseUpDown(ghostMulDivDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    require axiomLifLLTV(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), globalMarketCollateralLLTV[collateralIndex]), "axiom";
     require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
     require axiomAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
 

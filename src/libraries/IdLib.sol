@@ -22,20 +22,22 @@ library IdLib {
     /// f3        RETURN          []                 mem[0:len] is returned
     bytes constant SSTORE2_PREFIX = hex"600b380380600b5f395ff3";
 
-    function toId(Market memory market, uint256 chainId, address midnight) internal pure returns (bytes32) {
+    function toId(Market memory market) internal pure returns (bytes32) {
         return keccak256(
             abi.encodePacked(
-                uint8(0xff), midnight, chainId, keccak256(abi.encodePacked(SSTORE2_PREFIX, abi.encode(market)))
+                uint8(0xff),
+                market.midnight,
+                uint256(0),
+                keccak256(abi.encodePacked(SSTORE2_PREFIX, abi.encode(market)))
             )
         );
     }
 
-    /// @dev Stores the data in the code of the contract at the given address.
-    /// @dev Uses the given chain id as salt.
-    function storeInCode(Market memory market, uint256 chainId) internal returns (address create2Address) {
+    /// @dev Stores the market in the code of the contract at the address given by the last 20 bytes of its id.
+    function storeInCode(Market memory market) internal returns (address create2Address) {
         bytes memory creationCode = abi.encodePacked(SSTORE2_PREFIX, abi.encode(market));
         assembly ("memory-safe") {
-            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), chainId)
+            create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), 0)
         }
         require(create2Address != address(0), SStore2DeploymentFailed());
     }

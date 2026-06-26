@@ -14,7 +14,7 @@ methods {
     function _.price() external => boundedPrice(calledContract) expect(uint256);
 
     // Deterministic toId: links call-site markets to validated state from touchMarket.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Sound return bound: tickToPrice <= WAD for non-reverting calls.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => boundedTickPrice();
@@ -22,22 +22,27 @@ methods {
     // Summarize mulDivDown and mulDivUp to track overflow.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
+
+    // Summarize maxLif by a deterministic ghost so its value can be assumed under a quantifier.
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 }
 
 /// HELPERS ///
 
 persistent ghost bool mulOverflow;
 
+persistent ghost maxLifGhost(uint256, uint256) returns uint256;
+
 definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
-// Proven in CreatedMarkets.spec (createdMarketsHaveLltvLessThanOrEqualToOne)
+// Proven in CreatedMarkets.spec (createdMarketsHaveEnabledLltv)
 // and ExactMath.spec (maxLifIsAtLeastWad, maxLifIsAtMostTwoWad).
 // Maturity is bounded to uint64 as a realistic timestamp assumption for overflow analysis.
 function summaryToId(Midnight.Market market) returns (bytes32) {
     require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "proven in CreatedMarkets.spec";
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD() && market.collateralParams[i].maxLif <= 2 * WAD(), "proven in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) >= WAD() && maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 2 * WAD(), "see maxLifIsAtLeastWad and createdMarketsHaveMaxLifAtMostTwoWad";
     require market.maturity <= max_uint64, "maturity fits in uint64: realistic timestamp assumption";
     return Utils.hashMarket(market);
 }

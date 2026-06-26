@@ -9,17 +9,17 @@ methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Position/marketState getters used to express protocol invariants as preconditions.
-    function creditOf(bytes32, address) external returns (uint128) envfree;
+    function credit(bytes32, address) external returns (uint128) envfree;
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastLossFactor(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function lossFactor(bytes32) external returns (uint128) envfree;
 
     // Summarize toId to be able to reference the id in the rules.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Sound because the protocol doesn't use toMarket.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Over-approximate view functions for prover performance.
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
@@ -102,7 +102,7 @@ rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, callda
     bytes32 id = summaryToId(market);
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
-    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit";
+    require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit";
     require lastLossFactor(id, user) <= lossFactor(id), "see lastLossFactorLeqMarketLossFactor";
     require lastAccrual(id, user) <= require_uint128(e.block.timestamp), "lastAccrual <= block.timestamp by timestamp monotonicity";
 

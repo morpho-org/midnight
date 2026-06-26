@@ -5,7 +5,7 @@
 // All other Solidity divisions in the codebase use non-zero denominators:
 // - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
 // - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
-// - liquidate: divides by TIME_TO_MAX_LIF (15 minutes = 900).
+// - liquidate: divides by TIME_TO_MAX_LIF (60 minutes = 3600).
 // - tickToPrice: divides by 5e12 or a value greater than 1e18.
 // - wExp, used in tickToPrice: divides by non-zero constants.
 // Therefore, we only look for division by zero in mulDivDown and mulDivUp in this file.
@@ -19,7 +19,7 @@ methods {
     function _.price() external => ghostPrice(calledContract) expect(uint256);
 
     // Summary for deterministic toId for the global market.
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => summaryToId(market, chainId, midnight);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // This function is checked manually to not cause a division by zero.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -27,6 +27,12 @@ methods {
     // Hook on mulDivDown and mulDivUp to check that the denominator is not zero, and add the necessary lemmas.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivDownSummary(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => mulDivUpSummary(x, y, d);
+
+    // maxLif is recomputed on the fly from (lltv, liquidationCursor) in touchMarket and liquidate. Summarize it by a
+    // deterministic ghost: its value bounds are assumed below (see ExactMath.spec), and its own well-definedness (its
+    // denominator WAD - liquidationCursor * (WAD - lltv) / WAD is positive since enabled liquidationCursors are < WAD)
+    // keeps its internal divisions out of the mulDiv denominator checks.
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 }
 
 /// GHOSTS ///
@@ -34,6 +40,8 @@ methods {
 // Reuse part of the setup of Healthiness.spec.
 
 persistent ghost address globalMarketLoanToken;
+
+persistent ghost uint256 globalMarketChainId;
 
 persistent ghost uint256 globalMarketCollateralLength;
 
@@ -43,7 +51,9 @@ persistent ghost mapping(uint256 => address) globalMarketCollateralToken;
 
 persistent ghost mapping(uint256 => uint256) globalMarketCollateralLLTV;
 
-persistent ghost mapping(uint256 => uint256) globalMarketCollateralMaxLif;
+persistent ghost mapping(uint256 => uint256) globalMarketCollateralLiquidationCursor;
+
+persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
 persistent ghost uint256 globalMarketMaturity;
 
@@ -68,15 +78,15 @@ ghost ghostPrice(address) returns uint256;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].maxLif == globalMarketCollateralMaxLif[index]);
+definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
-function summaryToId(Midnight.Market market, uint256 chainId, address midnight) returns (bytes32) {
+function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id;
-    if (equalsGlobalMarket(market) && midnight == currentContract) {
+    if (equalsGlobalMarket(market)) {
         require id == globalId, "toId() is deterministic";
     } else {
         require id != globalId, "toId() is injective";
@@ -116,9 +126,10 @@ rule noDivisionByZeroLiquidate(env e, Midnight.Market market, uint256 collateral
     require equalsGlobalMarket(market);
 
     // Needed for the bitmap loop which calls mulDivUp(WAD, maxLif) for every activated collateral.
-    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].maxLif >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";
+    require forall uint256 i. i < market.collateralParams.length => maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";
 
-    require market.collateralParams[collateralIndex].lltv < WAD() => to_mathint(market.collateralParams[collateralIndex].maxLif) * to_mathint(market.collateralParams[collateralIndex].lltv) <= to_mathint(WAD()) * (to_mathint(WAD()) - 1), "see lifTimesLltvStrictBound in ExactMath.spec";
+    // Needed for the maxRepaid computation, which divides by WAD * WAD - lif * lltv when lltv != WAD. Except for the special LLTV = 1 case, lltv * maxLif <= 0.999 * WAD * WAD < WAD * WAD, so the denominator is non-zero.
+    require forall uint256 i. i < market.collateralParams.length => (market.collateralParams[i].lltv == WAD() || market.collateralParams[i].lltv * maxLifGhost(market.collateralParams[i].lltv, market.collateralParams[i].liquidationCursor) <= 999 * 10 ^ 15 * WAD()), "see createdMarketsRespectMaxLifBound in CreatedMarkets.spec";
 
     // Assume that the collateral price is non-zero and the collateral is active. Otherwise, liquidate may revert with div by zero.
     require ghostPrice(market.collateralParams[collateralIndex].oracle) > 0, "Assumption: the collateral price is not zero";

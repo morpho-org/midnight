@@ -6,7 +6,7 @@ import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 uint256 constant MAX_AMOUNT = type(uint128).max;
 
@@ -20,13 +20,15 @@ contract MaxAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -74,7 +76,7 @@ contract MaxAmountsTest is BaseTest {
         take(amount, lender, borrowerOffer);
 
         assertEq(midnight.totalUnits(id), amount, "total units at max");
-        assertEq(midnight.debtOf(id, borrower), amount, "debt at max");
+        assertEq(midnight.debt(id, borrower), amount, "debt at max");
     }
 
     function testTakeAboveMaxAmountReverts() public {

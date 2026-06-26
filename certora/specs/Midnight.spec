@@ -8,15 +8,15 @@ methods {
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
@@ -35,6 +35,8 @@ methods {
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
+
+definition WAD() returns uint256 = 10 ^ 18;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
@@ -109,13 +111,13 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
     require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
 
     f(e, args);
 
-    assert creditOf(id, user) <= creditBefore;
-    assert debtOf(id, user) <= debtBefore;
+    assert credit(id, user) <= creditBefore;
+    assert debt(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -135,7 +137,7 @@ strong invariant continuousFeeBounded(bytes32 id)
     }
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user)
+    pendingFee(id, user) <= credit(id, user)
     {
         preserved with (env e) {
             requireInvariant continuousFeeBounded(id);
@@ -150,7 +152,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
-    assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
+    assert credit(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
@@ -158,4 +160,10 @@ strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    creditOf(id, user) == 0 || debtOf(id, user) == 0;
+    credit(id, user) == 0 || debt(id, user) == 0;
+
+strong invariant enabledLltvIsLessThanOrEqualToOne(uint256 lltv)
+    currentContract.isLltvEnabled[lltv] => lltv <= WAD();
+
+strong invariant enabledLiquidationCursorsIsLessThanOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();

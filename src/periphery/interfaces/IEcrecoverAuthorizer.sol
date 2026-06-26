@@ -32,7 +32,12 @@ interface IEcrecoverAuthorizer {
 
     /// EVENTS ///
     event SetIsAuthorized(
-        address indexed caller, address indexed authorizer, address indexed authorized, bool isAuthorized, uint256 nonce
+        address indexed caller,
+        address indexed authorizer,
+        address indexed authorized,
+        bool isAuthorized,
+        uint256 nonce,
+        address signer
     );
 
     /// STORAGE GETTERS ///
