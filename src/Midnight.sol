@@ -99,7 +99,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
+/// @dev Fully-consumed asset based offers can still be taken with units > 0 when the consumed assets amount rounds to
+/// zero.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
