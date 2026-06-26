@@ -12,6 +12,11 @@ methods {
     // Ignore the transient stores of LIQUIDATION_LOCK via the tExchange method.
     // These are intentionally happen after the external calls.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+
+    // These functions are over-approximated, except for the reverting behavior. We don't look at the reverting behavior in this file.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
 }
 
 // True when at least one slot was written.
