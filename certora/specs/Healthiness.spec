@@ -108,7 +108,10 @@ persistent ghost address globalMarketLoanToken;
 
 persistent ghost uint256 globalMarketChainId;
 
-persistent ghost uint256 globalMarketCollateralLength;
+persistent ghost uint256 globalMarketCollateralLength {
+    // Limit the number of collateralParams for performance reasons.
+    axiom globalMarketCollateralLength <= 2;
+}
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
 
@@ -137,7 +140,7 @@ persistent ghost address globalBorrower;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function getGlobalMarket() returns (Midnight.Market) {
@@ -251,8 +254,6 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
 
     require globalMarketCollateralLLTV[collateralIndex] * maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]) <= WAD() * WAD(), "Proved in lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec: maxLif is at most 1/lltv";
 
-    require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
-
     Midnight.Market globalMarket = getGlobalMarket();
 
     require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked before call";
@@ -292,8 +293,6 @@ rule stayHealthyLiquidateOtherBorrower(env e, Midnight.Market market, uint256 co
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
 
-    require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
-
     Midnight.Market globalMarket = getGlobalMarket();
     require borrower != globalBorrower || !equalsGlobalMarket(market), "borrower or market differs";
 
@@ -316,8 +315,6 @@ rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.se
     healthyOrLockedBeforeCallbacks = true;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-
-    require globalMarketCollateralLength <= 2, "too many collateralParams for the spec to handle";
 
     Midnight.Market globalMarket = getGlobalMarket();
 
