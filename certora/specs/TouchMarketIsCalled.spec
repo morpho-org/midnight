@@ -12,7 +12,6 @@ methods {
 
     // Over-approximate the heavy functions for prover performance.
     // This is safe here: the worst they could do is fail to record a touchMarket call, which would make a rule fail rather than pass unsoundly.
-    function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
@@ -37,8 +36,16 @@ function recordTouchMarket(Midnight.Market market) returns bytes32 {
 
 /// RULES ///
 
-// Each rule shows that a successful interaction calls touchMarket with its own market, which in turn implies that
-// a reverting touchMarket forces the interaction to revert.
+// Each rule shows that a successful interaction calls touchMarket with its own market, which in turn implies that a reverting touchMarket forces the interaction to revert.
+
+rule claimContinuousFeeCallsTouchMarket(env e, Midnight.Market market, uint256 amount, address receiver) {
+    require !touchMarketCalled, "reset call tracking";
+
+    claimContinuousFee(e, market, amount, receiver);
+
+    assert touchMarketCalled;
+    assert touchedMarketId == Utils.hashMarket(market);
+}
 
 rule takeCallsTouchMarket(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require !touchMarketCalled, "reset call tracking";
@@ -89,6 +96,15 @@ rule liquidateCallsTouchMarket(env e, Midnight.Market market, uint256 collateral
     require !touchMarketCalled, "reset call tracking";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert touchMarketCalled;
+    assert touchedMarketId == Utils.hashMarket(market);
+}
+
+rule updatePositionCallsTouchMarket(env e, Midnight.Market market, address user) {
+    require !touchMarketCalled, "reset call tracking";
+
+    updatePosition(e, market, user);
 
     assert touchMarketCalled;
     assert touchedMarketId == Utils.hashMarket(market);
