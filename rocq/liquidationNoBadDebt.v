@@ -3,7 +3,7 @@ From Stdlib Require Import ZArith Lia Psatz.
 Open Scope Z_scope.
 
 Definition WAD : Z := 10 ^ 18.
-Definition ORACLE_PRICE_SCALE : Z := 10 ^36.
+Definition ORACLE_PRICE_SCALE : Z := 10 ^ 36.
 
 Definition ceil_div (numerator denominator : Z) : Z :=
   (numerator + denominator - 1) / denominator.
