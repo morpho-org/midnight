@@ -46,17 +46,19 @@ Definition liquidation_no_bad_debt_statement : Prop :=
         ceil_div
           (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
           _maxLif) in
-    0 < liquidatedCollatPrice -> 0 < _maxLif ->
+    0 <= liquidatedCollatPrice -> 0 < _maxLif ->
     0 < lif -> lif <= _maxLif ->
     0 <= originalDebt -> 0 <= otherCollateralRepayableUnits ->
     0 <= _collateral -> 0 <= seizedAssets -> seizedAssets <= _collateral ->
     0 <= repaidUnits ->
+    (* Covers the repaidUnits = 0 && seizedAssets = 0 case. *)
     ( repaidUnits =
         ceil_div
           (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
           lif
-      \/ seizedAssets =
-        repaidUnits * lif / WAD * ORACLE_PRICE_SCALE / liquidatedCollatPrice ) ->
+      \/ (0 < liquidatedCollatPrice /\
+          seizedAssets =
+            repaidUnits * lif / WAD * ORACLE_PRICE_SCALE / liquidatedCollatPrice) ) ->
     let newCollateral := _collateral - seizedAssets in
     let newBadDebt := zeroFloorSub (originalDebt - badDebt - repaidUnits)
       (otherCollateralRepayableUnits +
@@ -182,7 +184,7 @@ Qed.
    most the repayable amount of the seized chunk. *)
 Lemma seize_repayableUp_drop_le :
   forall _collateral seizedAssets liquidatedCollatPrice _maxLif,
-    0 < liquidatedCollatPrice -> 0 < _maxLif ->
+    0 <= liquidatedCollatPrice -> 0 < _maxLif ->
     0 <= seizedAssets -> seizedAssets <= _collateral ->
     ceil_div
         (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
@@ -361,10 +363,11 @@ Proof.
         - apply Z.lt_le_incl, WAD_pos.
       }
       lia.
-    - pose proof
+    - destruct Hb2 as [HpricePositive Hb2].
+      pose proof
         (repayableUp_seized_le_repaid
           seizedAssets liquidatedCollatPrice _maxLif lif repaidUnits
-          Hprice HmaxLif Hlif Hlifmax Hrepaid Hb2) as Hd2.
+          HpricePositive HmaxLif Hlif Hlifmax Hrepaid Hb2) as Hd2.
       lia.
   }
   lia.
