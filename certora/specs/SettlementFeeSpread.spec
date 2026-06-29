@@ -1,20 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-using Utils as Utils;
 using SettlementFeeUtils as SettlementFeeUtils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function settlementFee(bytes32, uint256) external returns (uint256) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function SettlementFeeUtils.defaultSettlementFee(address, address, uint256) external returns (uint256) envfree;
 
-    // Summarize the id as a deterministic ghost over the market's primitive fields. The rules each involve a single
-    // market, so they only need the rule and take to derive the same id from the same market; injectivity is not
-    // required. Avoiding keccak(abi.encode(market)) removes the struct-encoding loops/stores (which the added Market
-    // fields made expensive) from the verification condition.
+    // Summarize the id as a deterministic ghost over the market, removing the collateral params array.
+    // This is sound because the rules only use a single market.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic TickLib.tickToPrice summary to be able to reference the price in the rules.
@@ -30,11 +26,7 @@ methods {
     // it reads currentContract's storage instead of being havoc'd to an arbitrary value.
     function _.defaultSettlementFeeCbp(address, uint256) external => DISPATCHER(true);
 
-    // The settlement fee spread only depends on buyerAssets/sellerAssets, which take computes before touching any
-    // position state or making external calls. Summarize the rest of take's body away to cut the prover's work:
-    // these summaries cannot affect the asserted values, but they remove position accounting, the touchMarket maxLif
-    // loop, and the havoc-all external callbacks/transfers from the verification condition.
-    function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
+    // function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 }
 
 persistent ghost ghostToId(uint256, address, address, uint256, uint256, address, address) returns bytes32;
