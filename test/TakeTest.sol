@@ -4,7 +4,13 @@ pragma solidity ^0.8.0;
 
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
-import {WAD, CALLBACK_SUCCESS, MAX_CONTINUOUS_FEE, MAX_SETTLEMENT_FEE_0_DAYS} from "../src/libraries/ConstantsLib.sol";
+import {
+    WAD,
+    MAX_LOSS_FACTOR,
+    CALLBACK_SUCCESS,
+    MAX_CONTINUOUS_FEE,
+    MAX_SETTLEMENT_FEE_0_DAYS
+} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
@@ -102,6 +108,29 @@ contract TakeTest is BaseTest {
     }
 
     // tests.
+
+    function testTakeLossFactorBelowSafetyMargin() public {
+        uint256 units = 1e18;
+        collateralize(market, borrower, units);
+        deal(address(loanToken), lender, units);
+        stdstoreFinder.enable_packed_slots().target(address(midnight)).sig("lossFactor(bytes32)").with_key(id)
+            .checked_write(MAX_LOSS_FACTOR - 1);
+
+        take(units, borrower, lenderOffer);
+
+        assertEq(midnight.debt(id, borrower), units);
+    }
+
+    function testTakeLossFactorAtSafetyMargin() public {
+        uint256 units = 1e18;
+        collateralize(market, borrower, units);
+        deal(address(loanToken), lender, units);
+        stdstoreFinder.enable_packed_slots().target(address(midnight)).sig("lossFactor(bytes32)").with_key(id)
+            .checked_write(MAX_LOSS_FACTOR);
+
+        vm.expectRevert(IMidnight.MarketLossFactorMaxedOut.selector);
+        take(units, borrower, lenderOffer);
+    }
 
     function testTakeEmitsEvent(
         uint256 units,

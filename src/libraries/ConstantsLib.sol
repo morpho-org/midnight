@@ -6,6 +6,7 @@ import {UtilsLib} from "./UtilsLib.sol";
 
 // forgefmt: disable-start
 uint256 constant WAD = 1e18;
+uint256 constant MAX_LOSS_FACTOR = type(uint128).max - WAD;
 uint256 constant ORACLE_PRICE_SCALE = 1e36;
 uint256 constant CBP = 1e12;
 uint256 constant MAX_SETTLEMENT_FEE_0_DAYS = 0.000014e18;

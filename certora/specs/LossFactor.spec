@@ -27,6 +27,8 @@ methods {
 
 /// HELPERS ///
 
+definition WAD() returns uint256 = 10 ^ 18;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
@@ -159,6 +161,28 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     assert newPendingFee + accruedFee == pendingFeeBefore;
     assert credit(id, user) + accruedFee == creditBefore;
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
+}
+
+/// slashedAmount * WAD < credit + WAD means slashedAmount <= ceil(credit / WAD).
+rule updatePositionSlashBoundWhenLossIndexIncreasesByOne(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+    uint128 userLastLossFactor = lastLossFactor(id, user);
+
+    require userLastLossFactor < max_uint128 - WAD(), "assume lastLossFactor is below MAX_LOSS_FACTOR";
+    require currentContract.marketState[id].lossFactor == userLastLossFactor + 1, "assume lossFactor increased by one";
+    require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+
+    mathint creditBefore = credit(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePosition(e, market, user);
+
+    mathint slashedAmount = creditBefore - newCredit - accruedFee;
+
+    assert slashedAmount * WAD() < creditBefore + WAD();
 }
 
 /// When lastAccrual is already at block.timestamp, updatePosition preserves continuousFeeCredit.

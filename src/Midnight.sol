@@ -127,7 +127,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
 /// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
 /// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
-/// reverts when the loss factor is maxed out.
+/// reverts when the loss factor reaches MAX_LOSS_FACTOR.
 /// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
 /// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
@@ -372,7 +372,7 @@ contract Midnight is IMidnight {
         require(taker == msg.sender || isAuthorized[taker][msg.sender], TakerUnauthorized());
         bytes32 id = touchMarket(offer.market);
         MarketState storage _marketState = marketState[id];
-        require(_marketState.lossFactor < type(uint128).max, MarketLossFactorMaxedOut());
+        require(_marketState.lossFactor < MAX_LOSS_FACTOR, MarketLossFactorMaxedOut());
         require((offer.maxAssets == 0) != (offer.maxUnits == 0), InvalidOfferCaps());
         require(_marketState.continuousFee <= offer.continuousFeeCap, ContinuousFeeAboveOfferCap());
         require(offer.tick % _marketState.tickSpacing == 0, TickNotAccessible());
