@@ -572,10 +572,9 @@ contract Midnight is IMidnight {
             require(
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
+            // Calling the oracle prevents activating a collateral whose oracle is reverting.
+                        IOracle(market.collateralParams[collateralIndex].oracle).price();
         }
-
-        // Calling the oracle prevents activating a collateral whose oracle is reverting.
-        IOracle(market.collateralParams[collateralIndex].oracle).price();
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
