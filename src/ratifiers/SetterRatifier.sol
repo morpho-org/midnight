@@ -22,6 +22,8 @@ contract SetterRatifier is ISetterRatifier {
         MIDNIGHT = _midnight;
     }
 
+    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
+    /// tree might not be ratified or unratified by a single call to this function.
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootRatified[maker][root] = newIsRootRatified;
