@@ -22,11 +22,8 @@ methods {
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
-    // SettlementFeeUtils reads the defaults through the IMidnight interface; dispatch the call to Midnight's getter so
-    // it reads currentContract's storage instead of being havoc'd to an arbitrary value.
+    // Dispatch the call to Midnight's getter, because the prover doesn't see that it only calls Midnight.
     function _.defaultSettlementFeeCbp(address, uint256) external => DISPATCHER(true);
-
-    // function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 }
 
 persistent ghost ghostToId(uint256, address, address, uint256, uint256, address, address) returns bytes32;
