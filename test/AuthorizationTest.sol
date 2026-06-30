@@ -211,7 +211,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = uint128(units);
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
@@ -235,7 +235,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = uint128(units);
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
@@ -321,7 +321,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = uint128(units);
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;

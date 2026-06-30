@@ -249,7 +249,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+    function testSetConsumed(address user, bytes32 group, uint128 amount) public {
         vm.expectEmit();
         emit EventsLib.SetConsumed(user, group, amount, user);
 
@@ -258,9 +258,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount, "consumed");
     }
 
-    function testSetConsumedIncreasing(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 0, type(uint256).max - 1);
-        amount1 = bound(amount1, amount0, type(uint256).max);
+    function testSetConsumedIncreasing(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 0, type(uint128).max - 1));
+        amount1 = uint128(bound(amount1, amount0, type(uint128).max));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);
@@ -271,9 +271,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount1, "consumed 1");
     }
 
-    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 1, type(uint256).max);
-        amount1 = bound(amount1, 0, amount0 - 1);
+    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 1, type(uint128).max));
+        amount1 = uint128(bound(amount1, 0, amount0 - 1));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);

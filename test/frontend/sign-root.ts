@@ -54,8 +54,8 @@ function buildTypes(height: number) {
       { name: "receiverIfMakerIsSeller", type: "address" },
       { name: "ratifier", type: "address" },
       { name: "reduceOnly", type: "bool" },
-      { name: "maxUnits", type: "uint256" },
-      { name: "maxAssets", type: "uint256" },
+      { name: "maxUnits", type: "uint128" },
+      { name: "maxAssets", type: "uint128" },
       { name: "continuousFeeCap", type: "uint256" },
     ],
   };

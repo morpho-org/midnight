@@ -98,8 +98,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
-/// @dev A cap of type(uint128).max is recommended for effectively uncapped offers, as large values can create overflows
-/// during asset <-> unit conversion.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
 /// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
@@ -197,7 +195,7 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => MarketState) public marketState;
-    mapping(address user => mapping(bytes32 group => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 group => uint128)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
@@ -449,7 +447,7 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
-        consumed[offer.maker][offer.group] = newConsumed;
+        consumed[offer.maker][offer.group] = UtilsLib.toUint128(newConsumed);
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -756,8 +754,8 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
-    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
+    /// @dev Passing type(uint128).max cancels all offers in the group (and never reverts).
+    function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;
