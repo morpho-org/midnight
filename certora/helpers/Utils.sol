@@ -8,6 +8,7 @@ import {IdLib} from "../../src/libraries/IdLib.sol";
 import {
     CALLBACK_SUCCESS,
     MAX_COLLATERALS_PER_BORROWER,
+    MAX_LOSS_FACTOR,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../../src/libraries/ConstantsLib.sol";
@@ -60,5 +61,9 @@ contract Utils {
 
     function maxCollateralsPerBorrower() external pure returns (uint256) {
         return MAX_COLLATERALS_PER_BORROWER;
+    }
+
+    function maxLossFactor() external pure returns (uint256) {
+        return MAX_LOSS_FACTOR;
     }
 }

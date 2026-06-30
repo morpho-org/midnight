@@ -12,6 +12,7 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLossFactor() external returns (uint256) envfree;
 
     // Deterministic toId needed to link market arguments to stored state.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
@@ -168,7 +169,7 @@ rule updatePositionSlashBoundWhenLossIndexIncreasesByOne(env e, Midnight.Market 
     bytes32 id = summaryToId(market);
     uint128 userLastLossFactor = lastLossFactor(id, user);
 
-    require userLastLossFactor < max_uint128 - WAD(), "assume lastLossFactor is below MAX_LOSS_FACTOR";
+    require userLastLossFactor < Utils.maxLossFactor(), "assume lastLossFactor is below MAX_LOSS_FACTOR";
     require currentContract.marketState[id].lossFactor == userLastLossFactor + 1, "assume lossFactor increased by one";
     require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";

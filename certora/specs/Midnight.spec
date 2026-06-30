@@ -14,6 +14,7 @@ methods {
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLossFactor() external returns (uint256) envfree;
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
@@ -110,7 +111,7 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 }
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
-    require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
+    require currentContract.marketState[id].lossFactor >= Utils.maxLossFactor(), "assume loss factor reached MAX_LOSS_FACTOR";
     uint256 creditBefore = credit(id, user);
     uint256 debtBefore = debt(id, user);
 
