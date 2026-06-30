@@ -192,13 +192,16 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Market market, uint256 co
     assert lastReverted;
 }
 
-/// If the supplied collateral oracle reverts on price, supplyCollateral reverts.
+/// If the supplied collateral oracle reverts on price, activating that collateral through supplyCollateral reverts.
 rule oracleRevertCausesCollatActivationRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf) {
     require singleRevertingOracle == market.collateralParams[collateralIndex].oracle, "oracle is reverting";
 
+    bytes32 id = summaryToId(market);
+    uint128 collateralBefore = collateral(id, onBehalf, collateralIndex);
+
     supplyCollateral@withrevert(e, market, collateralIndex, assets, onBehalf);
 
-    assert assets > 0 && !summaryGetBit(bitmap, revertingCollateralIndex) => lastReverted;
+    assert collateralBefore == 0 && assets > 0 => lastReverted;
 }
 
 /// If an activated collateral oracle reverts on price different than withdrawn collateral, withdrawCollateral reverts when the borrower has debt.

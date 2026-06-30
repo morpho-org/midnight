@@ -390,7 +390,8 @@ contract OtherFunctionsTest is BaseTest {
     }
 
     function testSupplyCollateralRevertsIfOracleReverts(uint256 collateral) public {
-        collateral = bound(collateral, 0, MAX_TEST_AMOUNT);
+        // A positive amount is needed so that the collateral gets activated, which is when the oracle is called.
+        collateral = bound(collateral, 1, MAX_TEST_AMOUNT);
         RevertingOracle revertingOracle = new RevertingOracle();
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
