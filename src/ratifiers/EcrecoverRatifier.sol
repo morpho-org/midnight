@@ -31,6 +31,8 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         emit CancelRoot(msg.sender, maker, root);
     }
 
+    /// @dev Signature malleability is not a problem because root cancellation prevents ratifying a root twice for the
+    /// same maker.
     function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));

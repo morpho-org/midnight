@@ -23,6 +23,7 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         MIDNIGHT = _midnight;
     }
 
+    /// @dev Signature malleability is not a problem thanks to the nonce.
     function setIsAuthorized(Authorization memory authorization, Signature calldata signature) external {
         require(block.timestamp <= authorization.deadline, Expired());
         require(authorization.nonce == nonce[authorization.authorizer]++, InvalidNonce());
