@@ -3,7 +3,9 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => CVL_toId(market);
+    // Summarize the id to a non-deterministic ghost, that stores the last id returned by toId.
+    // The stored id is assumed to be the one in the interactions, which is sound since it's called only once in the rules.
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -25,12 +27,9 @@ methods {
 
 /// HELPERS ///
 
-// IdLib summary: remember the last id returned by toId.
-
 persistent ghost bytes32 lastId;
 
-function CVL_toId(Midnight.Market market) returns bytes32 {
-    // non-deterministic id
+function summaryToId(Midnight.Market market) returns bytes32 {
     bytes32 id;
     lastId = id;
     return id;

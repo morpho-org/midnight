@@ -9,8 +9,8 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function SettlementFeeUtils.defaultSettlementFee(address, address, uint256) external returns (uint256) envfree;
 
-    // Summarize the id as a deterministic ghost over the market, removing the collateral params array.
-    // This is sound because the rules only use a single market.
+    // Summarize the id to a non-deterministic ghost, that stores the last id returned by toId.
+    // The stored id is assumed to be the one in the interactions, which is sound since it's called only once in the rules.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic TickLib.tickToPrice summary to be able to reference the price in the rules.
