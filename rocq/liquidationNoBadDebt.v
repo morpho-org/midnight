@@ -8,59 +8,65 @@ Definition ORACLE_PRICE_SCALE : Z := 10 ^ 36.
 Definition ceil_div (numerator denominator : Z) : Z :=
   (numerator + denominator - 1) / denominator.
 
-(* The per-collateral term the contract subtracts from the debt to measure the
-   realizable bad debt: the debt units repayable by the collateral, valued at
-   the worst-case incentive [maxLif] and rounded up. Mirrors the contract's
-     mulDivUp(mulDivUp(collat, price, ORACLE_PRICE_SCALE), WAD, maxLif). *)
-Definition repayableUp (collat price maxLif : Z) : Z :=
-  ceil_div (ceil_div (collat * price) ORACLE_PRICE_SCALE * WAD) maxLif.
+Definition zeroFloorSub (x y : Z) : Z :=
+  Z.max 0 (x - y).
 
 (* -------------------------------------------------------------------------- *)
 (* Main statement: a liquidation never creates realizable bad debt.           *)
-(* (Proved below as [liquidation_no_bad_debt], after the supporting lemmas.)   *)
+(* (Proved below as liquidation_no_bad_debt, after the supporting lemmas.)     *)
 (* -------------------------------------------------------------------------- *)
 
 (**
-Setup (mirrors [liquidate] in src/Midnight.sol):
+Setup (mirrors liquidate in src/Midnight.sol):
 
-- [collat], [price], [maxLif]: the liquidated collateral.
-- [otherRepayableUp]: the repayable amount of every *other* collateral of the
-  position (>= 0). It does not change during the liquidation, since only the
-  liquidated collateral is reduced.  (The contract accumulates the per
-  collateral repayable amounts with an iterated [zeroFloorSub]; because every
-  term is non-negative this equals one [max 0] of the full sum, which is what
-  [badDebt] below models.)
-- [repayableUp collat price maxLif] is the contract's per-collateral term, i.e.
-  the debt units the collateral can repay at the worst-case incentive maxLif.
-- [badDebt = max(0, debt - totalRepayableUp)] is the realizable bad debt that
-  the contract realizes up-front; afterwards [debtAfterRealization] is the
-  remaining debt.
-- [repaid] (repaidUnits) is then subtracted from the debt, and [seized] from
-  the collateral, linked by the contract's formula in one of the two input
+- _collateral, liquidatedCollatPrice, _maxLif: the liquidated collateral.
+- otherCollateralRepayableUnits: the repayable units of every *other*
+  collateral of the position (>= 0). It does not change during the liquidation,
+  since only the liquidated collateral is reduced. (The contract accumulates
+  these amounts with an iterated zeroFloorSub; because every term is
+  non-negative this equals one zeroFloorSub of the full sum, which is what badDebt
+  below models.)
+- badDebt is the realizable bad debt that the contract realizes up-front.
+- repaidUnits is then subtracted from the debt, and seizedAssets from the
+  collateral, linked by the contract's formula in one of the two input
   modes ("seizedAssets given" or "repaidUnits given"), with the applied
-  incentive factor satisfying 0 < lif <= maxLif.
+  incentive factor satisfying 0 < lif <= _maxLif.
 
 Conclusion: the new realizable bad debt of the position is 0.
 This is an integer-arithmetic proof; it uses no real-number approximation.
-The hypothesis [seized <= collat] does not narrow generality: otherwise the
-collateral subtraction underflows and the whole transaction reverts.
+The hypothesis seizedAssets <= _collateral does not narrow generality:
+otherwise the collateral subtraction underflows and the whole transaction
+reverts.
 *)
 Definition liquidation_no_bad_debt_statement : Prop :=
-  forall debt otherRepayableUp collat seized price maxLif lif repaid,
-    let totalRepayableUp := otherRepayableUp + repayableUp collat price maxLif in
-    let badDebt := Z.max 0 (debt - totalRepayableUp) in
-    let debtAfterRealization := debt - badDebt in
-    let newDebt := debtAfterRealization - repaid in
-    let newTotalRepayableUp :=
-      otherRepayableUp + repayableUp (collat - seized) price maxLif in
-    let newBadDebt := Z.max 0 (newDebt - newTotalRepayableUp) in
-    0 < price -> 0 < maxLif ->
-    0 < lif -> lif <= maxLif ->
-    0 <= debt -> 0 <= otherRepayableUp ->
-    0 <= collat -> 0 <= seized -> seized <= collat ->
-    0 <= repaid ->
-    ( repaid = ceil_div (ceil_div (seized * price) ORACLE_PRICE_SCALE * WAD) lif
-      \/ seized = repaid * lif / WAD * ORACLE_PRICE_SCALE / price ) ->
+  forall originalDebt otherCollateralRepayableUnits _collateral seizedAssets
+    liquidatedCollatPrice _maxLif lif repaidUnits,
+    let badDebt := zeroFloorSub originalDebt
+      (otherCollateralRepayableUnits +
+        ceil_div
+          (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+          _maxLif) in
+    0 <= liquidatedCollatPrice -> 0 < _maxLif ->
+    0 < lif -> lif <= _maxLif ->
+    0 <= originalDebt -> 0 <= otherCollateralRepayableUnits ->
+    0 <= _collateral -> 0 <= seizedAssets -> seizedAssets <= _collateral ->
+    0 <= repaidUnits ->
+    (* Covers the repaidUnits = 0 && seizedAssets = 0 case. *)
+    ( repaidUnits =
+        ceil_div
+          (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+          lif
+      \/ (0 < liquidatedCollatPrice /\
+          seizedAssets =
+            repaidUnits * lif / WAD * ORACLE_PRICE_SCALE / liquidatedCollatPrice) ) ->
+    let newCollateral := _collateral - seizedAssets in
+    let newBadDebt := zeroFloorSub (originalDebt - badDebt - repaidUnits)
+      (otherCollateralRepayableUnits +
+        ceil_div
+          (ceil_div
+            (newCollateral * liquidatedCollatPrice)
+            ORACLE_PRICE_SCALE * WAD)
+          _maxLif) in
     newBadDebt = 0.
 
 (* -------------------------------------------------------------------------- *)
@@ -174,83 +180,139 @@ Qed.
 (* Midnight-specific lemmas                                                    *)
 (* -------------------------------------------------------------------------- *)
 
-(* Seizing [seized] out of [collat] drops the repayable amount by at most the
-   repayable amount of the seized chunk. *)
+(* Seizing seizedAssets out of _collateral drops the repayable amount by at
+   most the repayable amount of the seized chunk. *)
 Lemma seize_repayableUp_drop_le :
-  forall collat seized price maxLif,
-    0 < price -> 0 < maxLif ->
-    0 <= seized -> seized <= collat ->
-    repayableUp collat price maxLif - repayableUp (collat - seized) price maxLif
-      <= repayableUp seized price maxLif.
+  forall _collateral seizedAssets liquidatedCollatPrice _maxLif,
+    0 <= liquidatedCollatPrice -> 0 < _maxLif ->
+    0 <= seizedAssets -> seizedAssets <= _collateral ->
+    ceil_div
+        (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+        _maxLif
+      - ceil_div
+          (ceil_div
+            ((_collateral - seizedAssets) * liquidatedCollatPrice)
+            ORACLE_PRICE_SCALE * WAD)
+          _maxLif
+      <= ceil_div
+          (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+          _maxLif.
 Proof.
-  intros collat seized price maxLif Hprice HmaxLif Hseized Hsc.
+  intros _collateral seizedAssets liquidatedCollatPrice _maxLif
+    Hprice HmaxLif Hseized Hsc.
   assert (Hscale : 0 < ORACLE_PRICE_SCALE) by apply ORACLE_PRICE_SCALE_pos.
   assert (HWAD : 0 < WAD) by apply WAD_pos.
-  unfold repayableUp.
-  set (A := ceil_div (collat * price) ORACLE_PRICE_SCALE).
-  set (B := ceil_div ((collat - seized) * price) ORACLE_PRICE_SCALE).
-  set (S := ceil_div (seized * price) ORACLE_PRICE_SCALE).
-  assert (HB0 : 0 <= B). { apply ceil_div_nonneg; [ exact Hscale | nia ]. }
-  assert (HBA : B <= A). { apply ceil_div_mono; [ exact Hscale | nia ]. }
-  (* Inner subadditivity: A - B <= S. *)
-  assert (Hinner : A - B <= S).
+  assert (HnewCollateralValue :
+    0 <= ceil_div
+      ((_collateral - seizedAssets) * liquidatedCollatPrice)
+      ORACLE_PRICE_SCALE).
+  { apply ceil_div_nonneg; [ exact Hscale | nia ]. }
+  assert (HnewCollateralValueLe :
+    ceil_div
+        ((_collateral - seizedAssets) * liquidatedCollatPrice)
+        ORACLE_PRICE_SCALE
+      <= ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE).
+  { apply ceil_div_mono; [ exact Hscale | nia ]. }
+  assert (Hinner :
+    ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE
+      - ceil_div
+          ((_collateral - seizedAssets) * liquidatedCollatPrice)
+          ORACLE_PRICE_SCALE
+      <= ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE).
   {
-    unfold A, B, S.
-    pose proof (ceil_div_subadd ((collat - seized) * price) (seized * price)
+    pose proof (ceil_div_subadd
+                  ((_collateral - seizedAssets) * liquidatedCollatPrice)
+                  (seizedAssets * liquidatedCollatPrice)
                   ORACLE_PRICE_SCALE Hscale ltac:(nia) ltac:(nia)) as Hsub.
-    replace ((collat - seized) * price + seized * price) with (collat * price) in Hsub by nia.
+    replace
+      ((_collateral - seizedAssets) * liquidatedCollatPrice +
+        seizedAssets * liquidatedCollatPrice)
+      with (_collateral * liquidatedCollatPrice) in Hsub by nia.
     lia.
   }
-  (* Outer drop, then monotonicity in the numerator. *)
-  assert (Hdrop : ceil_div (A * WAD) maxLif - ceil_div (B * WAD) maxLif
-                  <= ceil_div (A * WAD - B * WAD) maxLif).
+  assert (Hdrop :
+    ceil_div
+        (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+        _maxLif
+      - ceil_div
+          (ceil_div
+            ((_collateral - seizedAssets) * liquidatedCollatPrice)
+            ORACLE_PRICE_SCALE * WAD)
+          _maxLif
+      <= ceil_div
+          ((ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD) -
+            (ceil_div
+              ((_collateral - seizedAssets) * liquidatedCollatPrice)
+              ORACLE_PRICE_SCALE * WAD))
+          _maxLif).
   { apply ceil_div_drop; [ exact HmaxLif | nia | nia ]. }
-  assert (Hmono : ceil_div (A * WAD - B * WAD) maxLif <= ceil_div (S * WAD) maxLif).
+  assert (Hmono :
+    ceil_div
+        ((ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD) -
+          (ceil_div
+            ((_collateral - seizedAssets) * liquidatedCollatPrice)
+            ORACLE_PRICE_SCALE * WAD))
+        _maxLif
+      <= ceil_div
+          (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+          _maxLif).
   { apply ceil_div_mono; [ exact HmaxLif | nia ]. }
   lia.
 Qed.
 
 (* In the "repaidUnits given" branch, the contract computes
-     seized = mulDivDown(mulDivDown(repaid, lif, WAD), ORACLE_PRICE_SCALE, price).
-   The repayable amount of that seized chunk is at most repaid,
-   because lif <= maxLif. *)
+     seizedAssets = mulDivDown(mulDivDown(repaidUnits, lif, WAD),
+       ORACLE_PRICE_SCALE, liquidatedCollatPrice).
+   The repayable amount of that seized chunk is at most repaidUnits,
+   because lif <= _maxLif. *)
 Lemma repayableUp_seized_le_repaid :
-  forall seized price maxLif lif repaid,
-    0 < price -> 0 < maxLif -> 0 < lif -> lif <= maxLif -> 0 <= repaid ->
-    seized = repaid * lif / WAD * ORACLE_PRICE_SCALE / price ->
-    repayableUp seized price maxLif <= repaid.
+  forall seizedAssets liquidatedCollatPrice _maxLif lif repaidUnits,
+    0 < liquidatedCollatPrice -> 0 < _maxLif ->
+    0 < lif -> lif <= _maxLif -> 0 <= repaidUnits ->
+    seizedAssets =
+      repaidUnits * lif / WAD * ORACLE_PRICE_SCALE / liquidatedCollatPrice ->
+    ceil_div
+        (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+        _maxLif
+      <= repaidUnits.
 Proof.
-  intros seized price maxLif lif repaid Hprice HmaxLif Hlif Hlifmax Hrepaid Hseized.
+  intros seizedAssets liquidatedCollatPrice _maxLif lif repaidUnits
+    Hprice HmaxLif Hlif Hlifmax Hrepaid Hseized.
   assert (Hscale : 0 < ORACLE_PRICE_SCALE) by apply ORACLE_PRICE_SCALE_pos.
   assert (HWAD : 0 < WAD) by apply WAD_pos.
-  unfold repayableUp.
-  set (q := repaid * lif / WAD).
-  assert (Hseized_eq : seized = q * ORACLE_PRICE_SCALE / price).
-  { rewrite Hseized. unfold q. reflexivity. }
-  assert (Hq0 : 0 <= q). { unfold q. apply Z.div_pos; nia. }
-  assert (Hseized0 : 0 <= seized).
-  { rewrite Hseized_eq. apply Z.div_pos; nia. }
-  (* Inner: ceil(seized*price / OPS) <= q. *)
-  assert (HSq : ceil_div (seized * price) ORACLE_PRICE_SCALE <= q).
+  assert (HrepaidValue : 0 <= repaidUnits * lif / WAD).
+  { apply Z.div_pos; nia. }
+  assert (Hseized0 : 0 <= seizedAssets).
+  { rewrite Hseized. apply Z.div_pos; nia. }
+  assert (HSq :
+    ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE
+      <= repaidUnits * lif / WAD).
   {
     apply ceil_div_le_of_mul_ge.
     - exact Hscale.
     - nia.
-    - rewrite Hseized_eq.
-      pose proof (floor_mul_le (q * ORACLE_PRICE_SCALE) price Hprice ltac:(nia)) as Hf.
+    - rewrite Hseized.
+      pose proof
+        (floor_mul_le
+          (repaidUnits * lif / WAD * ORACLE_PRICE_SCALE)
+          liquidatedCollatPrice Hprice ltac:(nia)) as Hf.
       nia.
   }
-  (* Push through the outer ceil-div and bound by repaid. *)
-  assert (Hmono : ceil_div (ceil_div (seized * price) ORACLE_PRICE_SCALE * WAD) maxLif
-                  <= ceil_div (q * WAD) maxLif).
+  assert (Hmono :
+    ceil_div
+        (ceil_div (seizedAssets * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+        _maxLif
+      <= ceil_div (repaidUnits * lif / WAD * WAD) _maxLif).
   { apply ceil_div_mono; [ exact HmaxLif | nia ]. }
-  assert (Hfinal : ceil_div (q * WAD) maxLif <= repaid).
+  assert (Hfinal :
+    ceil_div (repaidUnits * lif / WAD * WAD) _maxLif <= repaidUnits).
   {
     apply ceil_div_le_of_mul_ge.
     - exact HmaxLif.
     - nia.
-    - pose proof (floor_mul_le (repaid * lif) WAD HWAD ltac:(nia)) as Hf2.
-      unfold q. nia.
+    - pose proof
+        (floor_mul_le (repaidUnits * lif) WAD HWAD ltac:(nia)) as Hf2.
+      nia.
   }
   lia.
 Qed.
@@ -262,35 +324,51 @@ Qed.
 Theorem liquidation_no_bad_debt : liquidation_no_bad_debt_statement.
 Proof.
   unfold liquidation_no_bad_debt_statement.
-  intros debt otherRepayableUp collat seized price maxLif lif repaid.
+  intros originalDebt otherCollateralRepayableUnits _collateral seizedAssets
+    liquidatedCollatPrice _maxLif lif repaidUnits.
   cbv zeta.
-  intros Hprice HmaxLif Hlif Hlifmax Hdebt Hother Hcollat Hseized Hsc Hrepaid Hbranch.
-  (* Core: the repayable-amount drop on the liquidated collateral <= repaid. *)
+  unfold zeroFloorSub.
+  intros Hprice HmaxLif Hlif Hlifmax Hdebt Hother Hcollateral Hseized Hsc Hrepaid Hbranch.
   assert (Hdelta :
-    repayableUp collat price maxLif - repayableUp (collat - seized) price maxLif
-      <= repaid).
+    ceil_div
+        (ceil_div (_collateral * liquidatedCollatPrice) ORACLE_PRICE_SCALE * WAD)
+        _maxLif
+      - ceil_div
+          (ceil_div
+            ((_collateral - seizedAssets) * liquidatedCollatPrice)
+            ORACLE_PRICE_SCALE * WAD)
+          _maxLif
+      <= repaidUnits).
   {
-    pose proof (seize_repayableUp_drop_le collat seized price maxLif
-                  Hprice HmaxLif Hseized Hsc) as Hcore.
+    pose proof
+      (seize_repayableUp_drop_le
+        _collateral seizedAssets liquidatedCollatPrice _maxLif
+        Hprice HmaxLif Hseized Hsc) as Hcore.
     destruct Hbranch as [Hb1 | Hb2].
-    - (* "seizedAssets given": repaid is the same nested mulDivUp as the bad-debt
-         term of [seized], but at the applied [lif] (<= maxLif). Since ceil-div is
-         antitone in the incentive, that repaid is >= the term valued at maxLif. *)
-      assert (Hanti : repayableUp seized price maxLif
-                      <= ceil_div (ceil_div (seized * price) ORACLE_PRICE_SCALE * WAD) lif).
+    - assert (Hanti :
+        ceil_div
+            (ceil_div
+              (seizedAssets * liquidatedCollatPrice)
+              ORACLE_PRICE_SCALE * WAD)
+            _maxLif
+          <= ceil_div
+              (ceil_div
+                (seizedAssets * liquidatedCollatPrice)
+                ORACLE_PRICE_SCALE * WAD)
+              lif).
       {
-        unfold repayableUp.
         apply ceil_div_denom_antitone; [ exact Hlif | exact Hlifmax | ].
         apply Z.mul_nonneg_nonneg.
         - apply ceil_div_nonneg; [ apply ORACLE_PRICE_SCALE_pos | nia ].
         - apply Z.lt_le_incl, WAD_pos.
       }
       lia.
-    - (* "repaidUnits given". *)
-      pose proof (repayableUp_seized_le_repaid seized price maxLif lif repaid
-                    Hprice HmaxLif Hlif Hlifmax Hrepaid Hb2) as Hd2.
+    - destruct Hb2 as [HpricePositive Hb2].
+      pose proof
+        (repayableUp_seized_le_repaid
+          seizedAssets liquidatedCollatPrice _maxLif lif repaidUnits
+          HpricePositive HmaxLif Hlif Hlifmax Hrepaid Hb2) as Hd2.
       lia.
   }
-  (* Conclude: newDebt - newTotalRepayableUp <= 0, hence the max with 0 is 0. *)
   lia.
 Qed.
