@@ -9,8 +9,8 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function SettlementFeeUtils.defaultSettlementFee(address, address, uint256) external returns (uint256) envfree;
 
-    // Summarize to return a non-deterministic, but remember the last id returned.
-    // The stored id is assumed to be the one in the interactions, which is sound since toId is called only once in the rules.
+    // Summarize to return a non-deterministic value, but remember the last id returned.
+    // The stored id is assumed to be the one in the interactions, which is sound since toId is called only once per rule.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic TickLib.tickToPrice summary to be able to reference the price in the rules.
