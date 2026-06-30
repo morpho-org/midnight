@@ -25,6 +25,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         MIDNIGHT = _midnight;
     }
 
+    /// @dev A single tree with offers for multiple makers requires one cancelRoot call per distinct maker.
     function cancelRoot(address maker, bytes32 root) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootCanceled[maker][root] = true;
