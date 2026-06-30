@@ -70,7 +70,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
-/// @dev maxRepaid is rounded up such that it's always possible to liquidate enough to put back the account into health.
+/// @dev maxRepaid is rounded up such that it doesn't prevent to liquidate enough to put back the account into health.
 /// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
 /// liquidated.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
