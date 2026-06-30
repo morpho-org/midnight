@@ -26,10 +26,12 @@ methods {
     function _.defaultSettlementFeeCbp(address, uint256) external => DISPATCHER(true);
 }
 
-persistent ghost ghostToId(uint256, address, address, uint256, uint256, address, address) returns bytes32;
+persistent ghost bytes32 lastId;
 
-function summaryToId(Midnight.Market market) returns (bytes32) {
-    return ghostToId(market.chainId, market.midnight, market.loanToken, market.maturity, market.rcfThreshold, market.enterGate, market.liquidatorGate);
+function summaryToId(Midnight.Market market) returns bytes32 {
+    bytes32 id;
+    lastId = id;
+    return id;
 }
 
 persistent ghost summaryTickToPrice(uint256) returns uint256;
@@ -54,8 +56,8 @@ rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uin
 // The spread between what the buyer pays and what the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
 // Assume that the market is created.
 rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
-    bytes32 id = summaryToId(offer.market);
-    require tickSpacing(id) > 0;
+    bytes32 id;
+    require tickSpacing(id) > 0, "assume that the market is created";
 
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
@@ -66,14 +68,16 @@ rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, 
     uint256 sellerAssets;
     buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
+    require id == lastId, "id should be derived from market";
+
     assert buyerAssets - sellerAssets >= (units * fee) / WAD();
     assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
 }
 
 // Twin rule of settlementFeeSpreadBounds for a market that is not created yet at the start.
 rule settlementFeeSpreadBoundsNotCreatedMarket(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
-    bytes32 id = summaryToId(offer.market);
-    require tickSpacing(id) == 0;
+    bytes32 id;
+    require tickSpacing(id) == 0, "assume that the market is not yet created at the start";
 
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
@@ -82,6 +86,8 @@ rule settlementFeeSpreadBoundsNotCreatedMarket(env e, Midnight.Offer offer, byte
     uint256 buyerAssets;
     uint256 sellerAssets;
     buyerAssets, sellerAssets = take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+
+    require id == lastId, "id should be derived from market";
 
     assert buyerAssets - sellerAssets >= (units * fee) / WAD();
     assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
