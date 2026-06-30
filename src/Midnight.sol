@@ -447,7 +447,8 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
-        consumed[offer.maker][offer.group] = UtilsLib.toUint128(newConsumed);
+        // forge-lint: disable-next-item(unsafe-typecast) as newConsumed <= maxAssets or maxUnits.
+        consumed[offer.maker][offer.group] = uint128(newConsumed);
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
