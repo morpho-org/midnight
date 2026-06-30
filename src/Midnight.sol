@@ -149,7 +149,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on price, liquidate reverts.
-/// @dev If the supplied collateral oracle reverts on price, supplyCollateral reverts.
+/// @dev If the supplied collateral oracle reverts on price, the activation of that collat through supplyCollateral reverts.
 /// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
 /// (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
