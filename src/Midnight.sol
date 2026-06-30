@@ -78,9 +78,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
-/// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
-/// aspect.
+/// @dev Nothing prevents borrowers from opening small positions / takers and liquidators from leaving small positions
+/// that might not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents
+/// the systemic aspect.
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
 /// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
