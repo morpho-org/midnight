@@ -389,7 +389,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
-    function testSupplyCollateralDoesNotCallOracle(uint256 collateral) public {
+    function testSupplyCollateralRevertsIfOracleReverts(uint256 collateral) public {
         collateral = bound(collateral, 0, MAX_TEST_AMOUNT);
         RevertingOracle revertingOracle = new RevertingOracle();
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
@@ -411,6 +411,7 @@ contract OtherFunctionsTest is BaseTest {
         revertingOracle.stopOracle();
 
         deal(address(collateralToken1), address(this), collateral);
+        vm.expectRevert("Oracle should not be called");
         midnight.supplyCollateral(marketWithRevertingOracle, 0, collateral, borrower);
     }
 

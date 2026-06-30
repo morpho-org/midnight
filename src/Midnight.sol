@@ -32,8 +32,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
 /// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
-/// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
-/// supplyCollateral.
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
@@ -151,6 +149,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on price, liquidate reverts.
+/// @dev If the supplied collateral oracle reverts on price, supplyCollateral reverts.
 /// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
 /// (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
@@ -574,6 +573,9 @@ contract Midnight is IMidnight {
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
         }
+
+        // Calling the oracle prevents activating a collateral whose oracle is reverting.
+        IOracle(market.collateralParams[collateralIndex].oracle).price();
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 

@@ -31,6 +31,9 @@ methods {
     // Tokens are assumed to not reenter, for performance reasons.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
+    // The oracle price is irrelevant to market creation.
+    function _.price() external => NONDET;
 }
 
 /// HELPERS ///
