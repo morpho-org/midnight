@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 
 // Proves that successful calls do not overflow in mulDivDown or mulDivUp, given the oracle price is bounded.
 

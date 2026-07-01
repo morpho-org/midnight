@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 
 /* Proves: a position can never carry debt while having no active collateral bit, i.e.:
  *   position[id][user].collateralBitmap == 0  =>  position[id][user].debt == 0

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
