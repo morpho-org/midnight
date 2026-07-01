@@ -1,6 +1,6 @@
 diff -ruN Midnight.sol Midnight.sol
 --- Midnight.sol	2026-07-01 14:36:51.133833036 +0200
-+++ Midnight.sol	2026-07-01 14:37:02.531394268 +0200
++++ Midnight.sol	2026-07-01 14:50:11.914029778 +0200
 @@ -407,8 +407,8 @@
          Position storage buyerPos = position[id][buyer];
          Position storage sellerPos = position[id][seller];
@@ -12,7 +12,7 @@ diff -ruN Midnight.sol Midnight.sol
  
          uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
          uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
-@@ -454,27 +454,6 @@
+@@ -454,28 +454,6 @@
          address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
          address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
  
@@ -37,10 +37,11 @@ diff -ruN Midnight.sol Midnight.sol
 -            receiver,
 -            payer
 -        );
- 
+-
          bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
          if (buyerCallback != address(0)) {
-@@ -929,6 +908,10 @@
+             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
+@@ -929,6 +907,10 @@
          return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
      }
  
