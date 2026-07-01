@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2025 Morpho Association
+
 methods {
     function mulDivDown(uint256 a, uint256 b, uint256 d) external returns (uint256) envfree;
     function mulDivUp(uint256 a, uint256 b, uint256 d) external returns (uint256) envfree;

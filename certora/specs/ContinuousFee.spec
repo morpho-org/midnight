@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2025 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
