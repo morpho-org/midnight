@@ -2,7 +2,7 @@
 # for verification. To avoid touching `src/`, the specs run against a `munged/`
 # copy of `src/` with `applyHarness.patch` applied on top.
 
-munged: $(wildcard ../src/*.sol) $(wildcard ../src/**/*.sol) applyHarness.patch
+munged: $(shell find ../src -name '*.sol') applyHarness.patch
 	rm -rf munged
 	cp -rf ../src munged
 	patch -p0 -d munged < applyHarness.patch
