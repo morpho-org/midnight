@@ -2,11 +2,11 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Midnight} from "../../src/Midnight.sol";
-import {Position, CollateralParams, Market} from "../../src/interfaces/IMidnight.sol";
-import {IOracle} from "../../src/interfaces/IOracle.sol";
-import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {ORACLE_PRICE_SCALE, WAD} from "../../src/libraries/ConstantsLib.sol";
+import {Midnight} from "../munged/Midnight.sol";
+import {Position, CollateralParams, Market} from "../munged/interfaces/IMidnight.sol";
+import {IOracle} from "../munged/interfaces/IOracle.sol";
+import {UtilsLib} from "../munged/libraries/UtilsLib.sol";
+import {ORACLE_PRICE_SCALE, WAD} from "../munged/libraries/ConstantsLib.sol";
 
 contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;

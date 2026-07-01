@@ -81,6 +81,9 @@ jobs:
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc-0.8.34
 
+      - name: Build munged sources
+        run: make -C certora munged
+
       - name: Verify ${{ matrix.conf }}
         run: certoraRun certora/confs/${{ matrix.conf }}.conf
         env:

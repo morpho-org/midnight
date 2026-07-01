@@ -201,8 +201,8 @@ contract TakeTest is BaseTest {
             existingConsumed + units,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            // forge-lint: disable-next-line(unsafe-typecast)
-            int256(units - existingDebt) - int256(existingCredit),
+            units - existingDebt,
+            existingCredit,
             receiver,
             address(payerCallback)
         );

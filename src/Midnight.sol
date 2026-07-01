@@ -470,8 +470,8 @@ contract Midnight is IMidnight {
             newConsumed,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            // forge-lint: disable-next-line(unsafe-typecast)
-            int256(buyerCreditIncrease) - int256(sellerCreditDecrease),
+            buyerCreditIncrease,
+            sellerCreditDecrease,
             receiver,
             payer
         );

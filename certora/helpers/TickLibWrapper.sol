@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {TickLib, MAX_TICK, LN_ONE_PLUS_DELTA, PRICE_ROUNDING_STEP} from "../../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK, LN_ONE_PLUS_DELTA, PRICE_ROUNDING_STEP} from "../munged/libraries/TickLib.sol";
 
 contract TickLibWrapper {
     function lnOnePlusDelta() external pure returns (int256) {

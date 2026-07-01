@@ -2,15 +2,15 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Offer, Market} from "../../src/interfaces/IMidnight.sol";
-import {UtilsLib} from "../../src/libraries/UtilsLib.sol";
-import {IdLib} from "../../src/libraries/IdLib.sol";
+import {Offer, Market} from "../munged/interfaces/IMidnight.sol";
+import {UtilsLib} from "../munged/libraries/UtilsLib.sol";
+import {IdLib} from "../munged/libraries/IdLib.sol";
 import {
     CALLBACK_SUCCESS,
     MAX_COLLATERALS_PER_BORROWER,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
-} from "../../src/libraries/ConstantsLib.sol";
+} from "../munged/libraries/ConstantsLib.sol";
 
 contract Utils {
     function toId(Market memory market) external pure returns (bytes32) {

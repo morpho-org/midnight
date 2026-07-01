@@ -1,0 +1,30 @@
+--- Midnight.sol
++++ Midnight.sol
+@@ -454,27 +454,6 @@
+         address payer = buyerCallback != address(0) ? buyerCallback : (offer.buy ? buyer : msg.sender);
+         address receiver = offer.buy ? receiverIfTakerIsSeller : offer.receiverIfMakerIsSeller;
+ 
+-        emit EventsLib.Take(
+-            msg.sender,
+-            keccak256(abi.encode(offer)),
+-            id,
+-            offer.buy,
+-            offer.maker,
+-            offer.group,
+-            offer.ratifier,
+-            ratifierData,
+-            units,
+-            taker,
+-            buyerAssets,
+-            sellerAssets,
+-            newConsumed,
+-            buyerPendingFeeIncrease,
+-            sellerPendingFeeDecrease,
+-            buyerCreditIncrease,
+-            sellerCreditDecrease,
+-            receiver,
+-            payer
+-        );
+ 
+         bool wasLocked = UtilsLib.tExchange(LIQUIDATION_LOCK_SLOT, id, seller, true);
+         if (buyerCallback != address(0)) {

@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Market} from "../../src/interfaces/IMidnight.sol";
-import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
+import {Market} from "../munged/interfaces/IMidnight.sol";
+import {CALLBACK_SUCCESS} from "../munged/libraries/ConstantsLib.sol";
 
 interface IHavoc {
     function havoc() external;

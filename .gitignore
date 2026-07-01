@@ -2,3 +2,4 @@ cache
 out
 .certora_internal
 .*.cache
+munged

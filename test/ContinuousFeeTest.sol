@@ -296,7 +296,8 @@ contract ContinuousFeeTest is BaseTest {
             exitAmount,
             buyerPendingFeeIncrease,
             sellerPendingFeeDecrease,
-            int256(0),
+            exitAmount,
+            exitAmount,
             lender,
             otherLender
         );
