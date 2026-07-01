@@ -70,6 +70,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
+/// @dev maxRepaid is rounded up such that it doesn't prevent to liquidate enough to put back the account into health.
 /// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
 /// liquidated.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
@@ -78,9 +79,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
-/// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
-/// aspect.
+/// @dev Nothing prevents borrowers from opening small positions / takers and liquidators from leaving small positions
+/// that might not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents
+/// the systemic aspect (liquidations with RCF progressively reducing the position's sizes).
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
 /// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -99,7 +100,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
+/// @dev Fully consumed assets-based offers can still be taken for nonzero units when the asset amount added to
+/// consumed is zero.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
@@ -131,8 +133,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
 /// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
-/// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
-/// healthy after a liquidation in the normal mode.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).

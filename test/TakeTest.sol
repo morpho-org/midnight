@@ -1062,6 +1062,40 @@ contract TakeTest is BaseTest {
         assertGt(midnight.totalUnits(id), totalUnitsBefore);
     }
 
+    // Show that a sell offer with offerPrice = 0 can be taken with units > 0
+    function testBugSellMaxAssetsBypass() public {
+        deal(address(loanToken), lender, 0); // lender pays 0
+        collateralize(market, borrower, 100);
+
+        borrowerOffer.maxUnits = 0;
+        borrowerOffer.maxAssets = 1;
+        borrowerOffer.tick = 0; // offerPrice = 0
+
+        // Fully consume the offer before the take.
+        vm.prank(borrower);
+        midnight.setConsumed(borrowerOffer.group, borrowerOffer.maxAssets, borrower);
+
+        uint256 lenderCreditBefore = midnight.credit(id, lender);
+        uint256 borrowerDebtBefore = midnight.debt(id, borrower);
+        uint256 totalUnitsBefore = midnight.totalUnits(id);
+        uint256 lenderBalBefore = loanToken.balanceOf(lender);
+        uint256 borrowerBalBefore = loanToken.balanceOf(borrower);
+
+        (uint256 buyerAssets, uint256 sellerAssets) = take(1, lender, borrowerOffer);
+
+        assertEq(buyerAssets, 0);
+        assertEq(sellerAssets, 0);
+
+        // Nothing observable to the cap or token balances changed:
+        assertEq(midnight.consumed(borrower, borrowerOffer.group), borrowerOffer.maxAssets);
+        assertEq(loanToken.balanceOf(lender), lenderBalBefore);
+        assertEq(loanToken.balanceOf(borrower), borrowerBalBefore);
+        // But position state strictly changed:
+        assertGt(midnight.credit(id, lender), lenderCreditBefore);
+        assertGt(midnight.debt(id, borrower), borrowerDebtBefore);
+        assertGt(midnight.totalUnits(id), totalUnitsBefore);
+    }
+
     // test ratifier dispatch.
 
     function testTakeByRatificationSameAsMaker(uint256 otherPrivateKey, address sender) public {
