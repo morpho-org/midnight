@@ -191,7 +191,7 @@ contract ContinuousFeeTest is BaseTest {
         borrowOffer.buy = false;
         borrowOffer.maker = otherBorrower;
         borrowOffer.receiverIfMakerIsSeller = otherBorrower;
-        borrowOffer.maxUnits = uint128(credit2);
+        borrowOffer.maxUnits = credit2.toUint128();
         borrowOffer.ratifier = address(dummyRatifier);
         borrowOffer.start = vm.getBlockTimestamp();
         borrowOffer.expiry = vm.getBlockTimestamp();
@@ -607,7 +607,7 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), otherLender, units);
 
         Offer memory offer = _makeBuyOffer(keccak256("buy-max-fee"));
-        offer.maxUnits = uint128(units);
+        offer.maxUnits = units.toUint128();
         offer.continuousFeeCap = continuousFeeCap;
 
         vm.expectRevert(IMidnight.ContinuousFeeAboveOfferCap.selector);
@@ -624,7 +624,7 @@ contract ContinuousFeeTest is BaseTest {
         deal(address(loanToken), otherLender, units);
 
         Offer memory offer = _makeBuyOffer(keccak256("buy-ok-fee"));
-        offer.maxUnits = uint128(units);
+        offer.maxUnits = units.toUint128();
         offer.continuousFeeCap = continuousFeeCap;
 
         take(units, borrower, offer);
