@@ -407,8 +407,8 @@ contract Midnight is IMidnight {
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
 
-        if (hasCredit(id, buyer) || units > buyerPos.debt) _updatePosition(offer.market, id, buyer);
-        if (hasCredit(id, seller)) _updatePosition(offer.market, id, seller);
+        if (position[id][buyer].credit > 0 || units > buyerPos.debt) _updatePosition(offer.market, id, buyer);
+        if (position[id][seller].credit > 0) _updatePosition(offer.market, id, seller);
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
@@ -927,10 +927,6 @@ contract Midnight is IMidnight {
         // forgefmt: disable-end
 
         return (feeLower * (end - timeToMaturity) + feeUpper * (timeToMaturity - start)) / (end - start);
-    }
-
-    function hasCredit(bytes32 id, address user) internal view returns (bool) {
-        return position[id][user].credit > 0;
     }
 
     /// @dev Reverts if the id is not a valid id of a touched market.
