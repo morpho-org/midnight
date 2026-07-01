@@ -407,8 +407,8 @@ contract Midnight is IMidnight {
         Position storage buyerPos = position[id][buyer];
         Position storage sellerPos = position[id][seller];
 
-        if (position[id][buyer].credit > 0 || units > buyerPos.debt) _updatePosition(offer.market, id, buyer);
-        if (position[id][seller].credit > 0) _updatePosition(offer.market, id, seller);
+        if (buyerPos.credit > 0 || units > buyerPos.debt) _updatePosition(offer.market, id, buyer);
+        if (sellerPos.credit > 0) _updatePosition(offer.market, id, seller);
 
         uint256 buyerCreditIncrease = UtilsLib.zeroFloorSub(units, buyerPos.debt);
         uint256 sellerCreditDecrease = UtilsLib.min(units, sellerPos.credit);
