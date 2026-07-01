@@ -7,7 +7,7 @@ import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 library ConsumableUnitsLib {
-    using UtilsLib for uint256;
+    using UtilsLib for uint128;
 
     /// @dev Returns a number of units such that it fully consumes the offer.
     /// @dev Assumes that `id` matches `offer.market`.

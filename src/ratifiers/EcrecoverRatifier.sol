@@ -25,6 +25,8 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         MIDNIGHT = _midnight;
     }
 
+    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
+    /// tree might not be cancelled by a single call to this function.
     function cancelRoot(address maker, bytes32 root) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootCanceled[maker][root] = true;

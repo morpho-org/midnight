@@ -92,8 +92,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
-/// loan token.
+/// @dev To work as expected, all offers in the same group should have the same maker, direction (offer.buy), max values
+/// and loan token.
 ///
 /// OFFER SIZE
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
@@ -195,7 +195,7 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => MarketState) public marketState;
-    mapping(address user => mapping(bytes32 group => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 group => uint128)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
@@ -447,7 +447,8 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
-        consumed[offer.maker][offer.group] = newConsumed;
+        // forge-lint: disable-next-item(unsafe-typecast) as newConsumed <= maxAssets or maxUnits.
+        consumed[offer.maker][offer.group] = uint128(newConsumed);
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -754,8 +755,8 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
-    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
+    /// @dev Passing type(uint128).max cancels all offers in the group (and never reverts).
+    function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;

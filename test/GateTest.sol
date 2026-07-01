@@ -78,7 +78,7 @@ contract GateTest is BaseTest {
 
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.market = gatedMarket;
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -87,7 +87,7 @@ contract GateTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.market = gatedMarket;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -176,7 +176,7 @@ contract GateTest is BaseTest {
         otherBorrowerOffer.buy = false;
         otherBorrowerOffer.maker = otherBorrower;
         otherBorrowerOffer.receiverIfMakerIsSeller = otherBorrower;
-        otherBorrowerOffer.maxUnits = type(uint256).max;
+        otherBorrowerOffer.maxUnits = type(uint128).max;
         otherBorrowerOffer.market = gatedMarket;
         otherBorrowerOffer.ratifier = address(dummyRatifier);
         otherBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -203,7 +203,7 @@ contract GateTest is BaseTest {
         Offer memory otherLenderOffer;
         otherLenderOffer.buy = true;
         otherLenderOffer.maker = otherLender;
-        otherLenderOffer.maxUnits = type(uint256).max;
+        otherLenderOffer.maxUnits = type(uint128).max;
         otherLenderOffer.market = gatedMarket;
         otherLenderOffer.ratifier = address(dummyRatifier);
         otherLenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -219,7 +219,7 @@ contract GateTest is BaseTest {
         exitOffer.buy = false;
         exitOffer.maker = otherLender;
         exitOffer.receiverIfMakerIsSeller = otherLender;
-        exitOffer.maxUnits = type(uint256).max;
+        exitOffer.maxUnits = type(uint128).max;
         exitOffer.market = gatedMarket;
         exitOffer.ratifier = address(dummyRatifier);
         exitOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -312,7 +312,7 @@ contract GateTest is BaseTest {
         Offer memory ungatedLenderOffer;
         ungatedLenderOffer.buy = true;
         ungatedLenderOffer.maker = lender;
-        ungatedLenderOffer.maxUnits = type(uint256).max;
+        ungatedLenderOffer.maxUnits = type(uint128).max;
         ungatedLenderOffer.market = market;
         ungatedLenderOffer.ratifier = address(dummyRatifier);
         ungatedLenderOffer.expiry = vm.getBlockTimestamp() + 200;

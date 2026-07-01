@@ -36,7 +36,7 @@ contract SetterRatifierTest is BaseTest {
         offer.buy = true;
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
     }

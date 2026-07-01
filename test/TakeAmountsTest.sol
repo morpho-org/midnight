@@ -49,7 +49,7 @@ contract TakeAmountsTest is BaseTest {
         id = toId(market);
 
         offer.buy = false;
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.market = market;
         offer.ratifier = address(dummyRatifier);
         offer.expiry = vm.getBlockTimestamp() + 200;
