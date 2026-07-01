@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
@@ -32,8 +32,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
 /// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
-/// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
-/// supplyCollateral.
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
@@ -151,6 +149,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on price, liquidate reverts.
+/// @dev If the supplied collateral oracle reverts on price, the activation of that collateral through supplyCollateral
+/// reverts.
 /// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
 /// (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
@@ -563,18 +563,20 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
         address collateralToken = market.collateralParams[collateralIndex].token;
-
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
-        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
+            // Calling the oracle prevents activating a collateral whose oracle is reverting.
+            IOracle(market.collateralParams[collateralIndex].oracle).price();
             uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
             _position.collateralBitmap = newCollateralBitmap;
             require(
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
         }
+
+        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
