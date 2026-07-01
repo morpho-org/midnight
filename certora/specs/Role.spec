@@ -206,7 +206,7 @@ rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liqui
 }
 
 /// Every enabled liquidationCursor is strictly below WAD.
-invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
+strong invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
     currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
 /// FEE SETTER: LIVENESS ///
