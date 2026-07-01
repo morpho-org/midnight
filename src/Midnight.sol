@@ -563,20 +563,20 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
         address collateralToken = market.collateralParams[collateralIndex].token;
-
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
-        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
+            // Calling the oracle prevents activating a collateral whose oracle is reverting.
+            IOracle(market.collateralParams[collateralIndex].oracle).price();
             uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
             _position.collateralBitmap = newCollateralBitmap;
             require(
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
-            // Calling the oracle prevents activating a collateral whose oracle is reverting.
-            IOracle(market.collateralParams[collateralIndex].oracle).price();
         }
+
+        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
