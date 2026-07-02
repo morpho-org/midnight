@@ -1255,6 +1255,7 @@ contract TakeTest is BaseTest {
         assertEq(toId(BorrowCallback(borrowerOffer.callback).recordedMarket()), id, "market");
         assertEq(BorrowCallback(borrowerOffer.callback).recordedSeller(), borrower, "seller");
         assertEq(BorrowCallback(borrowerOffer.callback).recordedReceiver(), borrower, "receiver");
+        assertEq(BorrowCallback(borrowerOffer.callback).recordedCounterparty(), lender, "counterparty");
         assertEq(
             BorrowCallback(borrowerOffer.callback).recordedSellerAssets(), units.mulDivUp(price, WAD), "sellerAssets"
         );
@@ -1292,6 +1293,7 @@ contract TakeTest is BaseTest {
         assertEq(toId(BorrowCallback(callback).recordedMarket()), id, "market");
         assertEq(BorrowCallback(callback).recordedSeller(), borrower, "seller");
         assertEq(BorrowCallback(callback).recordedReceiver(), borrower, "receiver");
+        assertEq(BorrowCallback(callback).recordedCounterparty(), lender, "counterparty");
         assertEq(BorrowCallback(callback).recordedSellerAssets(), units.mulDivDown(price, WAD), "sellerAssets");
         assertEq(BorrowCallback(callback).recordedUnits(), units, "units");
         assertEq(BorrowCallback(callback).recordedData(), abi.encode(0, collateral, data));
@@ -1395,6 +1397,7 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(lenderOffer.callback).recordedId(), id, "id");
         assertEq(toId(LendCallback(lenderOffer.callback).recordedMarket()), id, "market");
         assertEq(LendCallback(lenderOffer.callback).recordedBuyer(), lenderOffer.maker, "buyer");
+        assertEq(LendCallback(lenderOffer.callback).recordedCounterparty(), borrower, "counterparty");
         assertEq(LendCallback(lenderOffer.callback).recordedBuyerAssets(), assets, "buyerAssets");
         assertEq(LendCallback(lenderOffer.callback).recordedUnits(), units, "units");
         assertEq(LendCallback(lenderOffer.callback).recordedData(), lenderOffer.callbackData);
@@ -1422,6 +1425,7 @@ contract TakeTest is BaseTest {
         assertEq(LendCallback(callback).recordedId(), id, "id");
         assertEq(toId(LendCallback(callback).recordedMarket()), id, "market");
         assertEq(LendCallback(callback).recordedBuyer(), lender, "buyer");
+        assertEq(LendCallback(callback).recordedCounterparty(), borrower, "counterparty");
         assertEq(LendCallback(callback).recordedBuyerAssets(), assets, "buyerAssets");
         assertEq(LendCallback(callback).recordedUnits(), units, "units");
         assertEq(LendCallback(callback).recordedData(), data);
@@ -1522,7 +1526,7 @@ contract TakeTest is BaseTest {
 }
 
 contract InvalidBuyCallback is IBuyCallback {
-    function onBuy(bytes32, Market memory, uint256, uint256, uint256, address, bytes memory)
+    function onBuy(bytes32, Market memory, uint256, uint256, uint256, address, address, bytes memory)
         external
         pure
         returns (bytes32)
@@ -1537,6 +1541,7 @@ contract BorrowCallback is ISellCallback {
     Market internal _recordedMarket;
     address public recordedSeller;
     address public recordedReceiver;
+    address public recordedCounterparty;
     uint256 public recordedSellerAssets;
     uint256 public recordedUnits;
     uint256 public recordedPendingFeeDecrease;
@@ -1549,6 +1554,7 @@ contract BorrowCallback is ISellCallback {
         uint256 pendingFeeDecrease,
         address seller,
         address receiver,
+        address counterparty,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market), "wrong id");
@@ -1556,6 +1562,7 @@ contract BorrowCallback is ISellCallback {
         _recordedMarket = market;
         recordedSeller = seller;
         recordedReceiver = receiver;
+        recordedCounterparty = counterparty;
         recordedSellerAssets = sellerAssets;
         recordedUnits = units;
         recordedData = data;
@@ -1583,6 +1590,7 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         uint256,
         uint256,
         address seller,
+        address,
         address,
         bytes memory data
     ) external returns (bytes32) {
@@ -1639,10 +1647,17 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         storedRepaidUnits = _repaidUnits;
     }
 
-    function onSell(bytes32 id, Market memory market, uint256, uint256, uint256, address seller, address, bytes memory)
-        external
-        returns (bytes32)
-    {
+    function onSell(
+        bytes32 id,
+        Market memory market,
+        uint256,
+        uint256,
+        uint256,
+        address seller,
+        address,
+        address,
+        bytes memory
+    ) external returns (bytes32) {
         require(id == IdLib.toId(market), "wrong id");
         if (!reentered) {
             uint256 idx = storedCollateralIndex;
@@ -1679,6 +1694,7 @@ contract LendCallback is IBuyCallback {
     bytes32 public recordedId;
     Market internal _recordedMarket;
     address public recordedBuyer;
+    address public recordedCounterparty;
     uint256 public recordedBuyerAssets;
     uint256 public recordedUnits;
     uint256 public recordedPendingFeeIncrease;
@@ -1690,12 +1706,14 @@ contract LendCallback is IBuyCallback {
         uint256 units,
         uint256 pendingFeeIncrease,
         address buyer,
+        address counterparty,
         bytes memory data
     ) external returns (bytes32) {
         require(id == IdLib.toId(market), "wrong id");
         recordedId = id;
         _recordedMarket = market;
         recordedBuyer = buyer;
+        recordedCounterparty = counterparty;
         recordedBuyerAssets = buyerAssets;
         recordedUnits = units;
         recordedData = data;
@@ -1710,7 +1728,7 @@ contract LendCallback is IBuyCallback {
 }
 
 contract InvalidSellCallback is ISellCallback {
-    function onSell(bytes32, Market memory, uint256, uint256, uint256, address, address, bytes memory)
+    function onSell(bytes32, Market memory, uint256, uint256, uint256, address, address, address, bytes memory)
         external
         pure
         returns (bytes32)
