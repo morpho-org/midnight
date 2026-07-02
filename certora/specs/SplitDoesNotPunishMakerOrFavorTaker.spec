@@ -19,7 +19,7 @@ methods {
     // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Pure helper called with identical args across the three takes.
+    // View helpers called with identical args across the three takes.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
     function settlementFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
