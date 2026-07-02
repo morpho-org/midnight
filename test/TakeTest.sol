@@ -1144,8 +1144,10 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, emptySig, 0, sender, sender, address(0), hex"");
     }
 
-    function testTakeForwardsTakerToRatifier(address maker, address taker) public {
+    function testTakeForwardsTakerToRatifier(address maker, address taker, address sender) public {
         vm.assume(taker != address(0));
+        vm.assume(sender != address(0));
+        vm.assume(sender != taker);
         vm.assume(maker != taker);
         vm.assume(maker != address(0));
         TakerGatedRatifier ratifier = new TakerGatedRatifier();
@@ -1155,15 +1157,20 @@ contract TakeTest is BaseTest {
         vm.prank(maker);
         midnight.setIsAuthorized(address(ratifier), true, maker);
 
+        // sender takes on behalf of taker, so msg.sender != taker. This checks Midnight forwards the taker argument
+        // and not msg.sender.
+        vm.prank(taker);
+        midnight.setIsAuthorized(sender, true, taker);
+
         // The ratifier only ratifies when it receives the expected taker.
         ratifier.setExpectedTaker(taker);
-        vm.prank(taker);
+        vm.prank(sender);
         midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
 
         // With a different expected taker, ratification fails, proving the actual taker is forwarded.
         ratifier.setExpectedTaker(address(0xdead));
         vm.expectRevert(IMidnight.RatifierFailed.selector);
-        vm.prank(taker);
+        vm.prank(sender);
         midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
     }
 
