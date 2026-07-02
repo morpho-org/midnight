@@ -33,7 +33,7 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         emit CancelRoot(msg.sender, maker, root);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
         (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));
         require(!isRootCanceled[offer.maker][root], RootCanceled());

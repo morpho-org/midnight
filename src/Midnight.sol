@@ -384,7 +384,7 @@ contract Midnight is IMidnight {
             UnusedReceiverMustBeZero()
         );
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFailed());
+        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData, taker) == CALLBACK_SUCCESS, RatifierFailed());
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);

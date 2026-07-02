@@ -1108,7 +1108,7 @@ contract TakeTest is BaseTest {
 
         midnight.setIsAuthorized(address(ratifier), true, address(ratifier));
         bytes memory _ratifierData = abi.encode(otherPrivateKey);
-        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
+        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData, sender)));
         vm.prank(sender);
         midnight.take(lenderOffer, _ratifierData, 0, sender, sender, address(0), hex"");
     }
@@ -1126,7 +1126,7 @@ contract TakeTest is BaseTest {
         vm.prank(maker);
         midnight.setIsAuthorized(address(ratifier), true, maker);
         bytes memory _ratifierData = abi.encode(otherPrivateKey);
-        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData)));
+        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, _ratifierData, sender)));
         vm.prank(sender);
         midnight.take(lenderOffer, _ratifierData, 0, sender, sender, address(0), hex"");
     }
@@ -1722,7 +1722,7 @@ contract InvalidSellCallback is ISellCallback {
 contract IsRatifiedCallback is IRatifier {
     bytes32 public returnValue = CALLBACK_SUCCESS;
 
-    function isRatified(Offer memory, bytes memory) external view returns (bytes32) {
+    function isRatified(Offer memory, bytes memory, address) external view returns (bytes32) {
         return returnValue;
     }
 

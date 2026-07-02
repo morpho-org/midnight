@@ -30,7 +30,7 @@ contract SetterRatifier is ISetterRatifier {
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[]));
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());

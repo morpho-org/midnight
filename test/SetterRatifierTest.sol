@@ -64,7 +64,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
+        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -98,10 +98,10 @@ contract SetterRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRatifier.InvalidProof.selector);
-        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof));
+        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof), address(0));
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof));
+        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 

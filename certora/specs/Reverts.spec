@@ -35,7 +35,7 @@ methods {
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.isRatified(Midnight.Offer, bytes, address) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => CVL_callbackBytes32() expect(bytes32);
     function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
