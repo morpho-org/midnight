@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
@@ -68,7 +68,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
@@ -95,12 +95,12 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert(UtilsLib.CastOverflow.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(amount, lender, borrowerOffer);
     }
 

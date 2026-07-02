@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
 struct Market {
@@ -33,8 +33,8 @@ struct Offer {
     address receiverIfMakerIsSeller;
     address ratifier;
     bool reduceOnly;
-    uint256 maxUnits;
-    uint256 maxAssets; // buyerAssets if offer.buy else sellerAssets
+    uint128 maxUnits;
+    uint128 maxAssets; // buyerAssets if offer.buy else sellerAssets
     uint256 continuousFeeCap;
 }
 
@@ -127,7 +127,7 @@ interface IMidnight {
     /// STORAGE GETTERS ///
     function position(bytes32 id, address user) external view returns (uint128 credit, uint128 pendingFee, uint128 lastLossFactor, uint128 lastAccrual, uint128 debt, uint128 collateralBitmap);
     function marketState(bytes32 id) external view returns (uint128 totalUnits, uint128 lossFactor, uint128 withdrawable, uint128 continuousFeeCredit, uint16 settlementFeeCbp0, uint16 settlementFeeCbp1, uint16 settlementFeeCbp2, uint16 settlementFeeCbp3, uint16 settlementFeeCbp4, uint16 settlementFeeCbp5, uint16 settlementFeeCbp6, uint32 continuousFee, uint8 tickSpacing);
-    function consumed(address user, bytes32 group) external view returns (uint256);
+    function consumed(address user, bytes32 group) external view returns (uint128);
     function isAuthorized(address authorizer, address authorized) external view returns (bool);
     function defaultSettlementFeeCbp(address loanToken, uint256 index) external view returns (uint16);
     function defaultContinuousFee(address loanToken) external view returns (uint32);
@@ -164,7 +164,7 @@ interface IMidnight {
     function supplyCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf) external;
     function withdrawCollateral(Market memory market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) external;
     function liquidate(Market memory market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes memory data) external returns (uint256 outputSeizedAssets, uint256 outputRepaidUnits);
-    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external;
+    function setConsumed(bytes32 group, uint128 amount, address onBehalf) external;
     function setIsAuthorized(address authorized, bool newIsAuthorized, address onBehalf) external;
     function flashLoan(address[] memory tokens, uint256[] memory assets, address callback, bytes memory data) external;
     function touchMarket(Market memory market) external returns (bytes32);

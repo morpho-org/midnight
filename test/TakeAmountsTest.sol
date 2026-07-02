@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -49,7 +49,7 @@ contract TakeAmountsTest is BaseTest {
         id = toId(market);
 
         offer.buy = false;
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.market = market;
         offer.ratifier = address(dummyRatifier);
         offer.expiry = vm.getBlockTimestamp() + 200;
