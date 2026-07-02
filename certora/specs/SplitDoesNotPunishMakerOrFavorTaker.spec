@@ -19,12 +19,15 @@ methods {
     // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Pure helper called with identical args across the three takes; CONSTANT collapses
-    // its bit / hashing / arithmetic complexity (no behavioral abstraction).
+    // View function called with identical args across the three takes.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => CONSTANT;
+
+    // Assume constant settlement fee: it doesn't change anything for the makers, for the takers they can already clearly benefit from lower settlement fees.
+    function settlementFee(bytes32, uint256) internal returns (uint256) => CONSTANT;
 
     // Over-approximate view functions.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
+    function updatePositionView(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 
     // Over-approximate transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
