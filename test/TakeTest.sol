@@ -1144,6 +1144,29 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, emptySig, 0, sender, sender, address(0), hex"");
     }
 
+    function testTakeForwardsTakerToRatifier(address maker, address taker) public {
+        vm.assume(taker != address(0));
+        vm.assume(maker != taker);
+        vm.assume(maker != address(0));
+        TakerGatedRatifier ratifier = new TakerGatedRatifier();
+        lenderOffer.maker = maker;
+        lenderOffer.ratifier = address(ratifier);
+
+        vm.prank(maker);
+        midnight.setIsAuthorized(address(ratifier), true, maker);
+
+        // The ratifier only ratifies when it receives the expected taker.
+        ratifier.setExpectedTaker(taker);
+        vm.prank(taker);
+        midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
+
+        // With a different expected taker, ratification fails, proving the actual taker is forwarded.
+        ratifier.setExpectedTaker(address(0xdead));
+        vm.expectRevert(IMidnight.RatifierFailed.selector);
+        vm.prank(taker);
+        midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
+    }
+
     function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
         vm.assume(maker != sender);
         vm.assume(maker != address(0));
@@ -1728,5 +1751,21 @@ contract IsRatifiedCallback is IRatifier {
 
     function setReturnValue(bytes32 _returnValue) external {
         returnValue = _returnValue;
+    }
+}
+
+contract TakerGatedRatifier is IRatifier {
+    address public expectedTaker;
+
+    function setExpectedTaker(address _expectedTaker) external {
+        expectedTaker = _expectedTaker;
+    }
+
+    function isRatified(Offer memory, bytes memory, address taker) external view returns (bytes32) {
+        if (taker == expectedTaker) {
+            return CALLBACK_SUCCESS;
+        } else {
+            return bytes32(0);
+        }
     }
 }
