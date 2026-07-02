@@ -12,25 +12,21 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each hash order during merkle proof verification.
-/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract SetterRatifier is ISetterRatifier {
-    address public immutable MIDNIGHT;
-
     mapping(address maker => mapping(bytes32 root => bool)) public isRootRatified;
-
-    constructor(address _midnight) {
-        MIDNIGHT = _midnight;
-    }
 
     /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
     /// tree might not be ratified or unratified by a single call to this function.
-    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
-        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
-        isRootRatified[maker][root] = newIsRootRatified;
-        emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
+    function setIsRootRatified(Offer memory offer, bytes32 root, bool newIsRootRatified) external {
+        require(
+            offer.maker == msg.sender || IMidnight(offer.market.midnight).isAuthorized(offer.maker, msg.sender),
+            Unauthorized()
+        );
+        isRootRatified[offer.maker][root] = newIsRootRatified;
+        emit SetIsRootRatified(msg.sender, offer.maker, root, newIsRootRatified);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[]));
         require(HashLib.isLeaf(root, HashLib.hashOffer(offer), leafIndex, proof), InvalidProof());

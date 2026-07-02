@@ -15,25 +15,21 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
-/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract EcrecoverRatifier is IEcrecoverRatifier {
-    address public immutable MIDNIGHT;
-
     mapping(address maker => mapping(bytes32 root => bool)) public isRootCanceled;
-
-    constructor(address _midnight) {
-        MIDNIGHT = _midnight;
-    }
 
     /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
     /// tree might not be cancelled by a single call to this function.
-    function cancelRoot(address maker, bytes32 root) external {
-        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
-        isRootCanceled[maker][root] = true;
-        emit CancelRoot(msg.sender, maker, root);
+    function cancelRoot(Offer memory offer, bytes32 root) external {
+        require(
+            offer.maker == msg.sender || IMidnight(offer.market.midnight).isAuthorized(offer.maker, msg.sender),
+            Unauthorized()
+        );
+        isRootCanceled[offer.maker][root] = true;
+        emit CancelRoot(msg.sender, offer.maker, root);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData) external view returns (bytes32) {
         (Signature memory sig, bytes32 root, uint256 leafIndex, bytes32[] memory proof) =
             abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[]));
         require(!isRootCanceled[offer.maker][root], RootCanceled());
@@ -43,7 +39,10 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
         require(_signer != address(0), InvalidSignature());
-        require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), Unauthorized());
+        require(
+            _signer == offer.maker || IMidnight(offer.market.midnight).isAuthorized(offer.maker, _signer),
+            Unauthorized()
+        );
         return CALLBACK_SUCCESS;
     }
 }

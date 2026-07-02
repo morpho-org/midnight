@@ -12,6 +12,7 @@ declare global {
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const ZERO_B32 = "0x" + "00".repeat(32);
 const RATIFIER = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB";
+const MIDNIGHT = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
 const HEIGHT = 2;
 
 /** EIP-712 type definitions matching EcrecoverRatifier's verification logic. */
@@ -65,7 +66,7 @@ function defaultOffer(number: string) {
   return {
     market: {
       chainId: "1",
-      midnight: ZERO_ADDR,
+      midnight: MIDNIGHT,
       loanToken: "0x" + number.repeat(40),
       collateralParams: [{token: ZERO_ADDR, lltv: "0", liquidationCursor: "0", oracle: ZERO_ADDR}],
       maturity: "0",

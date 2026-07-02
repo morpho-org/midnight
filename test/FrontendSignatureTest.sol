@@ -11,22 +11,24 @@ import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 // Paste from frontend output (sign-root.ts).
 address constant ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 uint8 constant SIG_V = 27;
-bytes32 constant SIG_R = 0xeb511490094f44ed91b79ebc436cc7c7e6d282e657bc39797a98ce2dd3826be0;
-bytes32 constant SIG_S = 0x58ec81dc273626bd4ea660bd5682a5860eed1e37927ee8cce469ef7261f9c183;
+bytes32 constant SIG_R = 0x55ab120abf79487ea602c48ca4575f802a0b5c8b55446debf5f981ffb070a814;
+bytes32 constant SIG_S = 0x4a841ffcda5147b7bdbcb4dd0781ad5d8e7075740e2a58405a71353da4125885;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
+address constant MIDNIGHT_AUTHORIZER = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC;
 
 contract FrontendSignatureTest is Test {
     function setUp() public {
         vm.chainId(1);
-        EcrecoverRatifier impl = new EcrecoverRatifier(address(this));
+        EcrecoverRatifier impl = new EcrecoverRatifier();
         vm.etch(RATIFIER, address(impl).code);
+        vm.etch(MIDNIGHT_AUTHORIZER, address(this).code);
     }
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         offer.market.chainId = 1;
-        offer.market.midnight = address(0);
+        offer.market.midnight = MIDNIGHT_AUTHORIZER;
         offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
         offer.market.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
@@ -69,7 +71,7 @@ contract FrontendSignatureTest is Test {
         assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), _root, 0, proof0);
-        bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
+        bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
         assertEq(result, CALLBACK_SUCCESS);
     }
 

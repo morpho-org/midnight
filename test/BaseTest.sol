@@ -59,7 +59,7 @@ abstract contract BaseTest is Test {
 
     function setUp() public virtual {
         midnight = new Midnight();
-        ecrecoverRatifier = new EcrecoverRatifier(address(midnight));
+        ecrecoverRatifier = new EcrecoverRatifier();
         ecrecoverAuthorizer = new EcrecoverAuthorizer(address(midnight));
         dummyRatifier = new DummyRatifier();
 

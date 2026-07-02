@@ -3,6 +3,7 @@
 pragma solidity >=0.5.0;
 
 import {IRatifier} from "../../interfaces/IRatifier.sol";
+import {Offer} from "../../interfaces/IMidnight.sol";
 
 struct Signature {
     uint8 v;
@@ -24,9 +25,8 @@ interface IEcrecoverRatifier is IRatifier {
     event CancelRoot(address indexed caller, address indexed maker, bytes32 indexed root);
 
     /// FUNCTIONS ///
-    function cancelRoot(address maker, bytes32 root) external;
+    function cancelRoot(Offer memory offer, bytes32 root) external;
 
     /// STORAGE GETTERS ///
-    function MIDNIGHT() external view returns (address);
     function isRootCanceled(address maker, bytes32 root) external view returns (bool);
 }

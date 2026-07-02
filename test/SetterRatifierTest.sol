@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
+import {Midnight} from "../src/Midnight.sol";
 import {SetterRatifier} from "../src/ratifiers/SetterRatifier.sol";
 import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
@@ -15,7 +16,7 @@ contract SetterRatifierTest is BaseTest {
 
     function setUp() public override {
         super.setUp();
-        setterRatifier = new SetterRatifier(address(midnight));
+        setterRatifier = new SetterRatifier();
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -42,13 +43,14 @@ contract SetterRatifierTest is BaseTest {
     }
 
     function testSetIsRootRatifiedMaker() public {
+        Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256("root");
 
         vm.expectEmit();
         emit ISetterRatifier.SetIsRootRatified(lender, lender, _root, true);
 
         vm.prank(lender);
-        setterRatifier.setIsRootRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(offer, _root, true);
 
         assertTrue(setterRatifier.isRootRatified(lender, _root));
     }
@@ -61,10 +63,10 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(borrower, true, lender);
 
         vm.prank(borrower);
-        setterRatifier.setIsRootRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(offer, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)), address(0));
+        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -78,7 +80,7 @@ contract SetterRatifierTest is BaseTest {
         midnight.setIsAuthorized(borrower, true, lender);
 
         vm.prank(borrower);
-        setterRatifier.setIsRootRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(offer, _root, true);
 
         vm.prank(borrower);
         midnight.take(offer, abi.encode(_root, 0, new bytes32[](0)), 0, borrower, borrower, address(0), hex"");
@@ -94,22 +96,38 @@ contract SetterRatifierTest is BaseTest {
         proof[0] = HashLib.hashOffer(leftOffer);
 
         vm.prank(lender);
-        setterRatifier.setIsRootRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(leftOffer, _root, true);
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRatifier.InvalidProof.selector);
-        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof), address(0));
+        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof));
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof), address(0));
+        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testSetIsRootRatifiedUnauthorizedOnBehalf() public {
+        Offer memory offer = makeOffer(lender);
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
         vm.expectRevert(ISetterRatifier.Unauthorized.selector);
-        setterRatifier.setIsRootRatified(lender, _root, true);
+        setterRatifier.setIsRootRatified(offer, _root, true);
+    }
+
+    function testSetIsRootRatifiedUsesOfferMarketMidnightForAuthorization() public {
+        Midnight otherMidnight = new Midnight();
+        Offer memory offer = makeOffer(lender);
+        offer.market.midnight = address(otherMidnight);
+        bytes32 _root = HashLib.hashOffer(offer);
+
+        vm.prank(lender);
+        otherMidnight.setIsAuthorized(borrower, true, lender);
+
+        vm.prank(borrower);
+        setterRatifier.setIsRootRatified(offer, _root, true);
+
+        assertTrue(setterRatifier.isRootRatified(lender, _root));
     }
 }
