@@ -482,8 +482,9 @@ contract Midnight is IMidnight {
             bytes memory buyerCallbackData = offer.buy ? offer.callbackData : takerCallbackData;
             require(
                 IBuyCallback(buyerCallback)
-                    .onBuy(id, offer.market, buyerAssets, units, buyerPendingFeeIncrease, buyer, buyerCallbackData)
-                == CALLBACK_SUCCESS,
+                    .onBuy(
+                        id, offer.market, buyerAssets, units, buyerPendingFeeIncrease, buyer, seller, buyerCallbackData
+                    ) == CALLBACK_SUCCESS,
                 WrongBuyCallbackReturnValue()
             );
         }
@@ -503,6 +504,7 @@ contract Midnight is IMidnight {
                         sellerPendingFeeDecrease,
                         seller,
                         receiver,
+                        buyer,
                         sellerCallbackData
                     ) == CALLBACK_SUCCESS,
                 WrongSellCallbackReturnValue()
