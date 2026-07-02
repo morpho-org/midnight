@@ -1144,34 +1144,33 @@ contract TakeTest is BaseTest {
         midnight.take(lenderOffer, emptySig, 0, sender, sender, address(0), hex"");
     }
 
-    function testTakeForwardsTakerToRatifier(address maker, address taker, address sender) public {
-        vm.assume(taker != address(0));
-        vm.assume(sender != address(0));
-        vm.assume(sender != taker);
-        vm.assume(maker != taker);
-        vm.assume(maker != address(0));
-        TakerGatedRatifier ratifier = new TakerGatedRatifier();
-        lenderOffer.maker = maker;
+    function testTakePassesTakerToRatifier() public {
+        TakerCheckingRatifier ratifier = new TakerCheckingRatifier();
+        lenderOffer.ratifier = address(ratifier);
+        bytes memory ratifierData = abi.encode(borrower);
+
+        vm.prank(lender);
+        midnight.setIsAuthorized(address(ratifier), true, lender);
+        // otherBorrower takes on behalf of borrower, so msg.sender != taker. This checks Midnight forwards the taker
+        // argument and not msg.sender.
+        vm.prank(borrower);
+        midnight.setIsAuthorized(otherBorrower, true, borrower);
+
+        vm.expectCall(address(ratifier), abi.encodeCall(IRatifier.isRatified, (lenderOffer, ratifierData, borrower)));
+        vm.prank(otherBorrower);
+        midnight.take(lenderOffer, ratifierData, 0, borrower, borrower, address(0), hex"");
+    }
+
+    function testTakeRevertsWhenRatifierRejectsTaker() public {
+        TakerCheckingRatifier ratifier = new TakerCheckingRatifier();
         lenderOffer.ratifier = address(ratifier);
 
-        vm.prank(maker);
-        midnight.setIsAuthorized(address(ratifier), true, maker);
+        vm.prank(lender);
+        midnight.setIsAuthorized(address(ratifier), true, lender);
 
-        // sender takes on behalf of taker, so msg.sender != taker. This checks Midnight forwards the taker argument
-        // and not msg.sender.
-        vm.prank(taker);
-        midnight.setIsAuthorized(sender, true, taker);
-
-        // The ratifier only ratifies when it receives the expected taker.
-        ratifier.setExpectedTaker(taker);
-        vm.prank(sender);
-        midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
-
-        // With a different expected taker, ratification fails, proving the actual taker is forwarded.
-        ratifier.setExpectedTaker(address(0xdead));
-        vm.expectRevert(IMidnight.RatifierFailed.selector);
-        vm.prank(sender);
-        midnight.take(lenderOffer, emptySig, 0, taker, taker, address(0), hex"");
+        vm.expectRevert("wrong taker");
+        vm.prank(borrower);
+        midnight.take(lenderOffer, abi.encode(otherBorrower), 0, borrower, borrower, address(0), hex"");
     }
 
     function testTakeRatificationFailed(address maker, address sender, uint256 signerPrivateKey) public {
@@ -1761,18 +1760,9 @@ contract IsRatifiedCallback is IRatifier {
     }
 }
 
-contract TakerGatedRatifier is IRatifier {
-    address public expectedTaker;
-
-    function setExpectedTaker(address _expectedTaker) external {
-        expectedTaker = _expectedTaker;
-    }
-
-    function isRatified(Offer memory, bytes memory, address taker) external view returns (bytes32) {
-        if (taker == expectedTaker) {
-            return CALLBACK_SUCCESS;
-        } else {
-            return bytes32(0);
-        }
+contract TakerCheckingRatifier is IRatifier {
+    function isRatified(Offer memory, bytes memory data, address taker) external pure returns (bytes32) {
+        require(taker == abi.decode(data, (address)), "wrong taker");
+        return CALLBACK_SUCCESS;
     }
 }
