@@ -112,55 +112,55 @@ filtered {
         && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
         && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
 } {
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     f(e, args);
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter == creditBefore;
+    assert netCreditAfter == netCreditBefore;
 }
 
 /// Withdrawing on behalf of another account does not change an unrelated user's net credit.
 rule withdrawDoesNotChangeOtherNetCredit(env e, Midnight.Market withdrawMarket, uint256 units, address onBehalf, address receiver, Midnight.Market market, address user) {
     require user != onBehalf || summaryToId(withdrawMarket) != summaryToId(market), "withdrawing for someone else or on another market";
 
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     withdraw(e, withdrawMarket, units, onBehalf, receiver);
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter == creditBefore;
+    assert netCreditAfter == netCreditBefore;
 }
 
 /// Withdrawing cannot increase net credit.
 rule withdrawNetCreditNonIncreasing(env e, Midnight.Market withdrawMarket, uint256 units, address onBehalf, address receiver, Midnight.Market market, address user) {
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     withdraw(e, withdrawMarket, units, onBehalf, receiver);
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter <= creditBefore;
+    assert netCreditAfter <= netCreditBefore;
 }
 
 /// Taking does not change the net credit of a user that is neither the taker nor the offer's maker.
 rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
     require (user != taker && user != offer.maker) || summaryToId(offer.market) != summaryToId(market), "user is not involved in the take or another market";
 
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter == creditBefore;
+    assert netCreditAfter == netCreditBefore;
 }
 
 /// Taking does not decrease the net credit of a buyer in a take, and does not increase the net credit of a seller in a take.
 rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
-    mathint creditBefore = netCredit(e, offer.market, user);
+    mathint netCreditBefore = netCredit(e, offer.market, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
@@ -169,12 +169,12 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     require offer.market.maturity <= e.block.timestamp + MAX_TTM(), "Maturity not too far in the future";
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
-    mathint creditAfter = netCredit(e, offer.market, user);
+    mathint netCreditAfter = netCredit(e, offer.market, user);
 
     address buyer = offer.buy ? offer.maker : taker;
     address seller = offer.buy ? taker : offer.maker;
-    assert user == buyer => creditAfter >= creditBefore;
-    assert user == seller => creditAfter <= creditBefore;
+    assert user == buyer => netCreditAfter >= netCreditBefore;
+    assert user == seller => netCreditAfter <= netCreditBefore;
 }
 
 /// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market,
@@ -183,21 +183,21 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = lossFactor(id);
 
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     liquidate(e, liquidateMarket, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    // Restrict to executions in which no bad debt was realized or that are on other markets. 
+    // Restrict to executions in which no bad debt was realized or that are on other markets.
     require lossFactor(id) == lossFactorBefore || summaryToId(liquidateMarket) != summaryToId(market), "no bad debt realized or on different market";
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter == creditBefore;
+    assert netCreditAfter == netCreditBefore;
 }
 
 /// Liquidation cannot increase net credit.
 rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
-    mathint creditBefore = netCredit(e, market, user);
+    mathint netCreditBefore = netCredit(e, market, user);
 
     require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => b1 <= b2 => ghostMulDivUp(a, b1, d) <= ghostMulDivUp(a, b2, d), "See mulDivMonotoneB in MulDiv.spec";
     require forall uint256 a. forall uint256 b1. forall uint256 b2. forall uint256 d. d > 0 => a <= d => b2 <= b1 => ghostMulDivUp(a, b1, d) - ghostMulDivUp(a, b2, d) <= b1 - b2, "See mulDivLipschitzB in MulDiv.spec";
@@ -209,7 +209,7 @@ rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uin
 
     liquidate(e, liquidateMarket, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    mathint creditAfter = netCredit(e, market, user);
+    mathint netCreditAfter = netCredit(e, market, user);
 
-    assert creditAfter <= creditBefore;
+    assert netCreditAfter <= netCreditBefore;
 }
