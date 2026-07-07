@@ -6,15 +6,14 @@ methods {
 
     function lossFactor(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
-    function toId(Midnight.Market) external returns (bytes32) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic hash preserves market-to-id relationship without adding assumptions.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Summarize mulDivDown and mulDivUp to simplify the verification task.
     // Use a ghost function that ensures mulDivDown/Up behaves deterministically and add only the axioms about mulDiv that are needed to prove the desired property.
@@ -84,11 +83,11 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 /// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
 function netCredit(env e, Midnight.Market market, address user) returns mathint {
-    bytes32 id = toId(market);
+    bytes32 id = summaryToId(market);
     uint128 credit;
     uint128 pending;
     uint128 accruedFee;
-    require pendingFee(id, user) <= creditOf(id, user), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require pendingFee(id, user) <= credit(id, user), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require lastLossFactor(id, user) <= lossFactor(id), "See lastLossFactorLeqMarketLossFactor in Midnight.spec";
     credit, pending, accruedFee = updatePositionView(e, market, id, user);
     return credit - pending;
@@ -100,7 +99,7 @@ function netCredit(env e, Midnight.Market market, address user) returns mathint 
 /// at zero: the continuous fee only accrues up to maturity, so there is nothing left to accrue.
 /// This implies that the net credit is equal to the credit once a position has been accrued at or after maturity.
 invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, address user)
-    toId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
+    summaryToId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
 
 /// RULES ///
 
@@ -124,7 +123,7 @@ filtered {
 
 /// Withdrawing on behalf of another account does not change an unrelated user's net credit.
 rule withdrawDoesNotChangeOtherNetCredit(env e, Midnight.Market withdrawMarket, uint256 units, address onBehalf, address receiver, Midnight.Market market, address user) {
-    require user != onBehalf || toId(withdrawMarket) != toId(market), "withdrawing for someone else or on another market";
+    require user != onBehalf || summaryToId(withdrawMarket) != summaryToId(market), "withdrawing for someone else or on another market";
 
     mathint creditBefore = netCredit(e, market, user);
 
@@ -148,7 +147,7 @@ rule withdrawNetCreditNonIncreasing(env e, Midnight.Market withdrawMarket, uint2
 
 /// Taking does not change the net credit of a user that is neither the taker nor the offer's maker.
 rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
-    require (user != taker && user != offer.maker) || toId(offer.market) != toId(market), "user is not involved in the take or another market";
+    require (user != taker && user != offer.maker) || summaryToId(offer.market) != summaryToId(market), "user is not involved in the take or another market";
 
     mathint creditBefore = netCredit(e, market, user);
 
@@ -166,9 +165,9 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     // We require it after `take`, because `take` may initialize the market first.
-    require continuousFee(toId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
     require offer.market.maturity <= e.block.timestamp + MAX_TTM(), "Maturity not too far in the future";
-    assert continuousFee(toId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
+    assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
     mathint creditAfter = netCredit(e, offer.market, user);
 
@@ -181,7 +180,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
 /// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market,
 /// i.e. the market loss factor is unchanged by the liquidation.
 rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
-    bytes32 id = toId(market);
+    bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = lossFactor(id);
 
     mathint creditBefore = netCredit(e, market, user);
@@ -189,7 +188,7 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
     liquidate(e, liquidateMarket, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     // Restrict to executions in which no bad debt was realized or that are on other markets. 
-    require lossFactor(id) == lossFactorBefore || toId(liquidateMarket) != toId(market), "no bad debt realized or on different market";
+    require lossFactor(id) == lossFactorBefore || summaryToId(liquidateMarket) != summaryToId(market), "no bad debt realized or on different market";
 
     mathint creditAfter = netCredit(e, market, user);
 
