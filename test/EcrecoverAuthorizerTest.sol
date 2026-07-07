@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {
@@ -58,7 +58,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Signature memory sig = signAuthorization(auth, borrower);
 
         vm.expectEmit();
-        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce);
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, borrower);
 
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
@@ -69,7 +69,7 @@ contract EcrecoverAuthorizerTest is BaseTest {
         sig = signAuthorization(auth, borrower);
 
         vm.expectEmit();
-        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, false, auth.nonce);
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, false, auth.nonce, borrower);
 
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
@@ -89,6 +89,20 @@ contract EcrecoverAuthorizerTest is BaseTest {
 
         assertEq(midnight.isAuthorized(borrower, lender), true);
         assertEq(ecrecoverAuthorizer.nonce(borrower), 1);
+    }
+
+    function testEcrecoverAuthorizerEventEmitsSigner() public {
+        vm.startPrank(borrower);
+        midnight.setIsAuthorized(address(ecrecoverAuthorizer), true, borrower);
+        midnight.setIsAuthorized(otherBorrower, true, borrower);
+        vm.stopPrank();
+
+        Authorization memory auth = makeAuthorization(borrower, lender, true);
+        Signature memory sig = signAuthorization(auth, otherBorrower);
+
+        vm.expectEmit();
+        emit IEcrecoverAuthorizer.SetIsAuthorized(address(this), borrower, lender, true, auth.nonce, otherBorrower);
+        ecrecoverAuthorizer.setIsAuthorized(auth, sig);
     }
 
     function testEcrecoverAuthorizerInvalidSignature() public {

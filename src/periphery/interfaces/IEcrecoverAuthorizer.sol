@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
 struct Signature {
@@ -32,7 +32,12 @@ interface IEcrecoverAuthorizer {
 
     /// EVENTS ///
     event SetIsAuthorized(
-        address indexed caller, address indexed authorizer, address indexed authorized, bool isAuthorized, uint256 nonce
+        address indexed caller,
+        address indexed authorizer,
+        address indexed authorized,
+        bool isAuthorized,
+        uint256 nonce,
+        address signer
     );
 
     /// STORAGE GETTERS ///

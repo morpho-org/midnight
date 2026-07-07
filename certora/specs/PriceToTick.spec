@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 import "TickToPrice.spec";
 
@@ -13,7 +14,7 @@ ghost ghostTickToPrice(uint256) returns uint256 {
     // matches rule tickToPriceIsOneAtMaxTick in TickToPrice.spec
     axiom ghostTickToPrice(cvlMaxTick()) == 10 ^ 18;
 
-    // Proven by exhaustive testing on the relevant range in testTickMonotonicity.
+    // matches rule tickToPriceIsMonotonic in TickToPrice.spec
     axiom forall uint256 t1. forall uint256 t2. t1 < t2 => ghostTickToPrice(t1) <= ghostTickToPrice(t2);
 }
 

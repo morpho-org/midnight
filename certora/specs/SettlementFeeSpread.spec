@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
@@ -9,13 +10,13 @@ methods {
     function settlementFee(bytes32, uint256) external returns (uint256) envfree;
 
     // Summary is required because abi.encodePacked doesn't ensure injectivity of the hash function in CVL, for an unknown reason.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic TickLib.tickToPrice summary to be able to reference the price in the rules.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 
     // Sound summary since toMarket is not used by the protocol.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Over-approximate view functions for prover performance.
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;

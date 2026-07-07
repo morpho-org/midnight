@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -6,7 +7,7 @@ methods {
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Over-approximate view functions.
-    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;

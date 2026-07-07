@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 abstract contract PermitExt {
@@ -13,6 +13,7 @@ abstract contract PermitExt {
         _name = name_;
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(
             abi.encode(

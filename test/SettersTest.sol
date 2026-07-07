@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {
+    WAD,
     MAX_CONTINUOUS_FEE,
     MAX_SETTLEMENT_FEE_0_DAYS,
     MAX_SETTLEMENT_FEE_1_DAY,
@@ -12,7 +13,7 @@ import {
     MAX_SETTLEMENT_FEE_180_DAYS,
     MAX_SETTLEMENT_FEE_360_DAYS
 } from "../src/libraries/ConstantsLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
@@ -28,30 +29,30 @@ contract SettersTest is BaseTest {
         assertEq(maxSettlementFee(6), MAX_SETTLEMENT_FEE_360_DAYS, "360 days max settlement fee");
     }
 
-    function testInitialRoleSetter() public view {
-        assertEq(midnight.roleSetter(), address(this), "deployer should be initial role setter");
+    function testInitialConfigurator() public view {
+        assertEq(midnight.configurator(), address(this), "deployer should be initial configurator");
     }
 
     function testConstructorEvent() public {
         vm.expectEmit();
-        emit EventsLib.Constructor(address(this), block.chainid);
+        emit EventsLib.Constructor(address(this));
 
         new Midnight();
     }
 
-    function testSetRoleSetterSuccess(address rdm) public {
+    function testSetConfiguratorSuccess(address rdm) public {
         vm.expectEmit();
-        emit EventsLib.SetRoleSetter(rdm);
+        emit EventsLib.SetConfigurator(rdm);
 
-        midnight.setRoleSetter(rdm);
-        assertEq(midnight.roleSetter(), rdm, "role setter should be transferred");
+        midnight.setConfigurator(rdm);
+        assertEq(midnight.configurator(), rdm, "configurator should be transferred");
     }
 
-    function testSetRoleSetterOnlyRoleSetter(address rdm) public {
+    function testSetConfiguratorOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
-        midnight.setRoleSetter(makeAddr("newRoleSetter"));
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
+        midnight.setConfigurator(makeAddr("newConfigurator"));
     }
 
     function testSetFeeSetterSuccess(address feeSetter) public {
@@ -70,11 +71,35 @@ contract SettersTest is BaseTest {
         assertEq(midnight.tickSpacingSetter(), tickSpacingSetter);
     }
 
-    function testSetFeeSetterOnlyRoleSetter(address rdm) public {
+    function testSetFeeSetterOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.setFeeSetter(makeAddr("newFeeSetter"));
+    }
+
+    function testEnableLltvSuccess(uint256 lltv) public {
+        lltv = bound(lltv, 0, WAD);
+        vm.assume(!midnight.isLltvEnabled(lltv));
+
+        vm.expectEmit();
+        emit EventsLib.EnableLltv(lltv);
+
+        midnight.enableLltv(lltv);
+        assertTrue(midnight.isLltvEnabled(lltv));
+    }
+
+    function testEnableLltvOnlyConfigurator(address rdm, uint256 lltv) public {
+        vm.assume(rdm != address(this));
+        vm.prank(rdm);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
+        midnight.enableLltv(lltv);
+    }
+
+    function testEnableLltvInvalidLltv(uint256 lltv) public {
+        lltv = bound(lltv, WAD + 1, type(uint256).max);
+        vm.expectRevert(IMidnight.InvalidLltv.selector);
+        midnight.enableLltv(lltv);
     }
 
     function testSetSettlementFeeSuccess(
@@ -97,9 +122,14 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -162,7 +192,7 @@ contract SettersTest is BaseTest {
     function testSetMarketSettlementFeeValueTooHigh(bytes32 id, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, maxSettlementFee(index) + 1, 1e18);
-        vm.expectRevert(IMidnight.SettlementFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.SettlementFeeAboveMax.selector);
         midnight.setMarketSettlementFee(id, index, feeTooHigh);
     }
 
@@ -208,11 +238,93 @@ contract SettersTest is BaseTest {
         assertEq(midnight.feeClaimer(), feeClaimer, "fee claimer set");
     }
 
-    function testSetFeeClaimerOnlyRoleSetter(address rdm) public {
+    function testSetFeeClaimerOnlyConfigurator(address rdm) public {
         vm.assume(rdm != address(this));
         vm.prank(rdm);
-        vm.expectRevert(IMidnight.OnlyRoleSetter.selector);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
         midnight.setFeeClaimer(makeAddr("newRecipient"));
+    }
+
+    // LiquidationCursor tests
+
+    function testEnableLiquidationCursorSuccess(uint256 liquidationCursor) public {
+        // Keep the cursor in a range where maxLif stays within the bounds enforced at market creation for LLTV.
+        liquidationCursor = bound(liquidationCursor, 0, 0.99e18);
+        // Use a cursor that isn't enabled at deployment, so market creation is initially rejected.
+        vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1), lltv: LLTV, liquidationCursor: liquidationCursor, oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        // A market using a not-yet-enabled liquidationCursor is rejected.
+        vm.expectRevert(IMidnight.LiquidationCursorNotEnabled.selector);
+        midnight.touchMarket(market);
+
+        // Enabling it emits the event and flips the mapping.
+        vm.expectEmit();
+        emit EventsLib.EnableLiquidationCursor(liquidationCursor);
+        midnight.enableLiquidationCursor(liquidationCursor);
+        assertTrue(midnight.isLiquidationCursorEnabled(liquidationCursor), "liquidationCursor enabled");
+
+        // The same market can now be created.
+        midnight.touchMarket(market);
+        assertTrue(midnight.tickSpacing(toId(market)) > 0, "market created with added liquidationCursor");
+    }
+
+    function testEnableLiquidationCursorOnlyConfigurator(address rdm, uint256 liquidationCursor) public {
+        vm.assume(rdm != address(this));
+        liquidationCursor = bound(liquidationCursor, 0, WAD);
+        vm.prank(rdm);
+        vm.expectRevert(IMidnight.OnlyConfigurator.selector);
+        midnight.enableLiquidationCursor(liquidationCursor);
+    }
+
+    function testEnableLiquidationCursorAtOrAboveOneReverts(uint256 liquidationCursor) public {
+        liquidationCursor = bound(liquidationCursor, WAD, type(uint256).max);
+        vm.expectRevert(IMidnight.InvalidLiquidationCursor.selector);
+        midnight.enableLiquidationCursor(liquidationCursor);
+    }
+
+    function testTouchMarketRejectsMaxLifAboveTwoWad() public {
+        uint256 liquidationCursor = 0.814e18;
+        midnight.enableLiquidationCursor(liquidationCursor);
+
+        // A low LLTV combined with this liquidationCursor yields a maxLif above 2 WAD.
+        uint256 lowLltv = 0.385e18;
+        midnight.enableLltv(lowLltv);
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: lowLltv,
+            liquidationCursor: liquidationCursor,
+            oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        vm.expectRevert(IMidnight.InvalidMaxLif.selector);
+        midnight.touchMarket(market);
     }
 
     // Default settlement fee tests
@@ -271,9 +383,14 @@ contract SettersTest is BaseTest {
         // touch market with this loan token
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: loanToken,
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: collateralParams,
@@ -305,7 +422,7 @@ contract SettersTest is BaseTest {
     function testSetDefaultSettlementFeeValidation(address loanToken, uint256 feeTooHigh, uint256 index) public {
         index = bound(index, 0, 6);
         feeTooHigh = bound(feeTooHigh, maxSettlementFee(index) + 1, 1e18);
-        vm.expectRevert(IMidnight.SettlementFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.SettlementFeeAboveMax.selector);
         midnight.setDefaultSettlementFee(loanToken, index, feeTooHigh);
     }
 
@@ -328,9 +445,14 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory cols = new CollateralParams[](1);
         cols[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(0),
             maturity: vm.getBlockTimestamp() + 1 days,
             collateralParams: cols,
@@ -382,9 +504,14 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
@@ -409,9 +536,14 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,
@@ -422,10 +554,10 @@ contract SettersTest is BaseTest {
         midnight.touchMarket(market);
         bytes32 id = toId(market);
 
-        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         midnight.setMarketContinuousFee(id, fee);
 
-        vm.expectRevert(IMidnight.ContinuousFeeTooHigh.selector);
+        vm.expectRevert(IMidnight.ContinuousFeeAboveMax.selector);
         midnight.setDefaultContinuousFee(address(loanToken), fee);
     }
 
@@ -442,9 +574,14 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
             loanToken: address(loanToken),
             maturity: vm.getBlockTimestamp() + 100 days,
             collateralParams: collateralParams,

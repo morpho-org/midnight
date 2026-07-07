@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {TickLib, MAX_TICK, PRICE_ROUNDING_STEP} from "../../src/libraries/TickLib.sol";
+import {TickLib, MAX_TICK, LN_ONE_PLUS_DELTA, PRICE_ROUNDING_STEP} from "../../src/libraries/TickLib.sol";
 
 contract TickLibWrapper {
+    function lnOnePlusDelta() external pure returns (int256) {
+        return LN_ONE_PLUS_DELTA;
+    }
+
     function maxTick() external pure returns (uint256) {
         return MAX_TICK;
     }
