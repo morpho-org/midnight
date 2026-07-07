@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Offer} from "../src/interfaces/IMidnight.sol";
@@ -48,7 +48,7 @@ contract EcrecoverRatifierTest is BaseTest {
         midnight.setIsAuthorized(address(ecrecoverRatifier), true, maker);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offer, abi.encode(_sig, root, 0, new bytes32[](0)));
+        bytes32 result = ecrecoverRatifier.isRatified(offer, abi.encode(_sig, root, 0, new bytes32[](0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -58,7 +58,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, lender);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -72,7 +72,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = buildRatifierData(_root, borrower);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData);
+        bytes32 result = ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -83,7 +83,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 
     function testIsRatifiedInvalidSignature() public {
@@ -94,7 +94,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 
     function testIsRatifiedWrongRoot() public {
@@ -104,7 +104,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.InvalidProof.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 
     function testIsRatifiedWorksForUnorderedTree() public {
@@ -126,7 +126,7 @@ contract EcrecoverRatifierTest is BaseTest {
         bytes memory ratifierData = abi.encode(sig, root, 1, proof);
 
         vm.prank(address(midnight));
-        bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData);
+        bytes32 result = ecrecoverRatifier.isRatified(rightOffer, ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -144,7 +144,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.RootCanceled.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 
     function testCancelRootAuthorizedOnBehalf() public {
@@ -162,7 +162,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.RootCanceled.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 
     function testCancelRootUnauthorizedOnBehalf() public {
@@ -184,7 +184,7 @@ contract EcrecoverRatifierTest is BaseTest {
 
         // Works while authorized.
         vm.prank(address(midnight));
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
 
         // Revoke.
         vm.prank(lender);
@@ -192,6 +192,6 @@ contract EcrecoverRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRatifier.Unauthorized.selector);
-        ecrecoverRatifier.isRatified(offer, ratifierData);
+        ecrecoverRatifier.isRatified(offer, ratifierData, address(0));
     }
 }

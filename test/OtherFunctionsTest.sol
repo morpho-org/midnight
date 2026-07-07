@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -249,7 +249,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+    function testSetConsumed(address user, bytes32 group, uint128 amount) public {
         vm.expectEmit();
         emit EventsLib.SetConsumed(user, group, amount, user);
 
@@ -258,9 +258,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount, "consumed");
     }
 
-    function testSetConsumedIncreasing(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 0, type(uint256).max - 1);
-        amount1 = bound(amount1, amount0, type(uint256).max);
+    function testSetConsumedIncreasing(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 0, type(uint128).max - 1));
+        amount1 = uint128(bound(amount1, amount0, type(uint128).max));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);
@@ -271,9 +271,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount1, "consumed 1");
     }
 
-    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 1, type(uint256).max);
-        amount1 = bound(amount1, 0, amount0 - 1);
+    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 1, type(uint128).max));
+        amount1 = uint128(bound(amount1, 0, amount0 - 1));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);
@@ -389,8 +389,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
-    function testSupplyCollateralDoesNotCallOracle(uint256 collateral) public {
-        collateral = bound(collateral, 0, MAX_TEST_AMOUNT);
+    function testSupplyCollateralRevertsIfOracleReverts(uint256 collateral) public {
+        // A positive amount is needed so that the collateral gets activated, which is when the oracle is called.
+        collateral = bound(collateral, 1, MAX_TEST_AMOUNT);
         RevertingOracle revertingOracle = new RevertingOracle();
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
@@ -411,6 +412,7 @@ contract OtherFunctionsTest is BaseTest {
         revertingOracle.stopOracle();
 
         deal(address(collateralToken1), address(this), collateral);
+        vm.expectRevert("Oracle should not be called");
         midnight.supplyCollateral(marketWithRevertingOracle, 0, collateral, borrower);
     }
 

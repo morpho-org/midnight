@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
@@ -179,7 +179,7 @@ abstract contract BaseTest is Test {
         lenderOffer.market = market;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.continuousFeeCap = type(uint256).max;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
@@ -301,7 +301,7 @@ abstract contract BaseTest is Test {
     }
 
     function _setupMarketOffer(Market memory market) internal view returns (Offer memory borrowerOffer) {
-        borrowerOffer = _setupMarketOffer(market, type(uint256).max);
+        borrowerOffer = _setupMarketOffer(market, type(uint128).max);
     }
 
     function _setupMarketOffer(Market memory market, uint256 maxUnits)
@@ -313,7 +313,7 @@ abstract contract BaseTest is Test {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = maxUnits;
+        borrowerOffer.maxUnits = maxUnits.toUint128();
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();

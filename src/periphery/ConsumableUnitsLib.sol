@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
@@ -7,7 +7,7 @@ import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 library ConsumableUnitsLib {
-    using UtilsLib for uint256;
+    using UtilsLib for uint128;
 
     /// @dev Returns a number of units such that it fully consumes the offer.
     /// @dev Assumes that `id` matches `offer.market`.

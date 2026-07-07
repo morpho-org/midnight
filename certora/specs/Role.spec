@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
@@ -21,6 +22,13 @@ methods {
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
+    // Summarize mulDivDown and mulDivUp by deterministic ghost functions (also modelling reverts).
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // msb is over-approximated by a nondeterministic value.
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
+
     // Assume that tokens do not reenter and do not revert: this is justified as we verify properties about the function's bodies.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
@@ -39,6 +47,26 @@ definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = in
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
 definition defaultSettlementFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultSettlementFeeCbp[loanToken][index] * CBP());
+
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
+
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
+
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return ghostMulDivDown(a, b, d);
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return ghostMulDivUp(a, b, d);
+}
 
 ghost mapping(address => mapping(address => mathint)) tokenBalance;
 
@@ -179,7 +207,7 @@ rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liqui
 }
 
 /// Every enabled liquidationCursor is strictly below WAD.
-invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
+strong invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
     currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
 /// FEE SETTER: LIVENESS ///

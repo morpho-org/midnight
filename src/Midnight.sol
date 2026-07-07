@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
 import {UtilsLib} from "./libraries/UtilsLib.sol";
@@ -32,8 +32,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
 /// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
-/// @dev Note that a borrower can activate a collateral once its oracle is reverting because the oracle is not called in
-/// supplyCollateral.
 /// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
 /// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
@@ -70,6 +68,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
+/// @dev maxRepaid is rounded up such that it doesn't prevent to liquidate enough to put back the account into health.
 /// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
 /// liquidated.
 /// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
@@ -78,9 +77,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers from opening small positions / liquidators from leaving small positions that might
-/// not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic
-/// aspect.
+/// @dev Nothing prevents borrowers from opening small positions / takers and liquidators from leaving small positions
+/// that might not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents
+/// the systemic aspect (liquidations with RCF progressively reducing the position's sizes).
 /// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
 /// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
@@ -91,15 +90,16 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same direction (offer.buy), max values and
-/// loan token.
+/// @dev To work as expected, all offers in the same group should have the same maker, direction (offer.buy), max values
+/// and loan token.
 ///
 /// OFFER SIZE
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev It is possible to give units to a fully consumed assets-based buy offer with price < 1.
+/// @dev Fully consumed assets-based offers can still be taken for nonzero units when the asset amount added to
+/// consumed is zero.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
@@ -131,8 +131,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
 /// realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
-/// @dev maxRepaid is rounded up to avoid consecutive max liquidations, so the liquidated position could be slightly
-/// healthy after a liquidation in the normal mode.
 ///
 /// GATES
 /// @dev Gates are optional (address(0) = unrestricted).
@@ -151,6 +149,8 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on price, liquidate reverts.
+/// @dev If the supplied collateral oracle reverts on price, the activation of that collateral through supplyCollateral
+/// reverts.
 /// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
 /// (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
@@ -195,7 +195,7 @@ contract Midnight is IMidnight {
 
     mapping(bytes32 id => mapping(address user => Position)) public position;
     mapping(bytes32 id => MarketState) public marketState;
-    mapping(address user => mapping(bytes32 group => uint256)) public consumed;
+    mapping(address user => mapping(bytes32 group => uint128)) public consumed;
     mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
     mapping(address loanToken => uint16[7]) public defaultSettlementFeeCbp;
     mapping(address loanToken => uint32) public defaultContinuousFee;
@@ -384,7 +384,7 @@ contract Midnight is IMidnight {
             UnusedReceiverMustBeZero()
         );
         require(isAuthorized[offer.maker][offer.ratifier], RatifierUnauthorized());
-        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData) == CALLBACK_SUCCESS, RatifierFailed());
+        require(IRatifier(offer.ratifier).isRatified(offer, ratifierData, taker) == CALLBACK_SUCCESS, RatifierFailed());
 
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
@@ -447,7 +447,8 @@ contract Midnight is IMidnight {
             UtilsLib.toUint128(_marketState.totalUnits + buyerCreditIncrease - sellerCreditDecrease);
         claimableSettlementFee[offer.market.loanToken] += buyerAssets - sellerAssets;
 
-        consumed[offer.maker][offer.group] = newConsumed;
+        // forge-lint: disable-next-item(unsafe-typecast) as newConsumed <= maxAssets or maxUnits.
+        consumed[offer.maker][offer.group] = uint128(newConsumed);
 
         address buyerCallback = offer.buy ? offer.callback : takerCallback;
         address sellerCallback = offer.buy ? takerCallback : offer.callback;
@@ -562,18 +563,20 @@ contract Midnight is IMidnight {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         bytes32 id = touchMarket(market);
         address collateralToken = market.collateralParams[collateralIndex].token;
-
         Position storage _position = position[id][onBehalf];
         uint256 oldCollateral = _position.collateral[collateralIndex];
-        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         if (oldCollateral == 0 && assets > 0) {
+            // Calling the oracle prevents activating a collateral whose oracle is reverting.
+            IOracle(market.collateralParams[collateralIndex].oracle).price();
             uint128 newCollateralBitmap = _position.collateralBitmap.setBit(collateralIndex);
             _position.collateralBitmap = newCollateralBitmap;
             require(
                 UtilsLib.countBits(newCollateralBitmap) <= MAX_COLLATERALS_PER_BORROWER, TooManyActivatedCollaterals()
             );
         }
+
+        _position.collateral[collateralIndex] = UtilsLib.toUint128(oldCollateral + assets);
 
         emit EventsLib.SupplyCollateral(msg.sender, id, collateralToken, assets, onBehalf);
 
@@ -754,8 +757,8 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    /// @dev Passing type(uint256).max cancels all offers in the group (and never reverts).
-    function setConsumed(bytes32 group, uint256 amount, address onBehalf) external {
+    /// @dev Passing type(uint128).max cancels all offers in the group (and never reverts).
+    function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
         consumed[onBehalf][group] = amount;

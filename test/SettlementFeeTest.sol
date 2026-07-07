@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
@@ -66,7 +66,7 @@ contract SettlementFeeTest is BaseTest {
         lenderOffer.market = market;
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.start = vm.getBlockTimestamp();
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -75,7 +75,7 @@ contract SettlementFeeTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
 

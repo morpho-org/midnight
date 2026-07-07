@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
@@ -33,11 +34,11 @@ definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = in
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
 /// Default settlement fees for any loan token at each index are bounded by its specific maxSettlementFee cap.
-invariant defaultSettlementFeePerIndexBound(address loanToken, uint256 index)
+strong invariant defaultSettlementFeePerIndexBound(address loanToken, uint256 index)
     index <= 6 => defaultSettlementFee(loanToken, index) <= Utils.maxSettlementFee(index);
 
 /// Every market's settlement fee breakpoints are bounded by the per-index maximum.
-invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
+strong invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
     index <= 6 => marketSettlementFee(id, index) <= Utils.maxSettlementFee(index)
     {
         preserved touchMarket(Midnight.Market market) with (env e) {
