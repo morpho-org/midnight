@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
@@ -8,7 +8,7 @@ import {ISetterRatifier} from "../src/ratifiers/interfaces/ISetterRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract SetterRatifierTest is BaseTest {
     SetterRatifier internal setterRatifier;
@@ -21,23 +21,31 @@ contract SetterRatifierTest is BaseTest {
     function makeOffer(address maker) internal view returns (Offer memory offer) {
         Market memory market;
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams = new CollateralParams[](1);
         market.collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
 
         offer.market = market;
         offer.buy = true;
         offer.maker = maker;
         offer.ratifier = address(setterRatifier);
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
     }
 
     function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
+
+        vm.expectEmit();
+        emit ISetterRatifier.SetIsRootRatified(lender, lender, _root, true);
 
         vm.prank(lender);
         setterRatifier.setIsRootRatified(lender, _root, true);
@@ -56,7 +64,7 @@ contract SetterRatifierTest is BaseTest {
         setterRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)));
+        bytes32 result = setterRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -90,10 +98,10 @@ contract SetterRatifierTest is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRatifier.InvalidProof.selector);
-        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof));
+        setterRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof), address(0));
 
         vm.prank(address(midnight));
-        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof));
+        bytes32 result = setterRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 

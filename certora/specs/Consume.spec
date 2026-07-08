@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function consumed(address user, bytes32 group) external returns (uint256) envfree;
+    function consumed(address user, bytes32 group) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
 
     // Summaries for complex internals irrelevant to consumed-mapping properties.
-    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -18,7 +19,7 @@ methods {
 }
 
 ///  Only setConsumed and take can modify the consumed mapping.
-rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint256, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
+rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint128, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     uint256 consumedBefore = consumed(user, group);
 
     f(e, args);
@@ -27,7 +28,7 @@ rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, add
 }
 
 /// Calling setConsumed only affects onBehalf's consumed value for the given group. No other (user, group) pair is modified.
-rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint256 amount, address onBehalf, address otherUser, bytes32 otherGroup) {
+rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint128 amount, address onBehalf, address otherUser, bytes32 otherGroup) {
     uint256 otherConsumedBefore = consumed(otherUser, otherGroup);
 
     setConsumed(e, group, amount, onBehalf);

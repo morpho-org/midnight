@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+
+using Utils as Utils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -8,6 +11,7 @@ methods {
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
+    function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
     /* Assumption: price does not change during rules.
      * We want to show that isHealthy() and isHealthyNoBitmap() behaves the same under the
@@ -15,7 +19,7 @@ methods {
      */
     function _.price() external => PER_CALLEE_CONSTANT;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => NONDET;
 
     /* Simplify mulDiv reasoning for the solver.  We summarize these by ghost functions, i.e.,
      * arbitrary deterministic functions and axiomatize the axioms we need.
@@ -25,8 +29,6 @@ methods {
 }
 
 /// SUMMARY ///
-
-definition MAX_COLLATERALS_PER_BORROWER() returns uint256 = 16;
 
 persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
     /* proved in mulDivZero in MulDiv.spec */
@@ -42,7 +44,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 // Check that the number of activated collaterals never exceeds MAX_COLLATERALS_PER_BORROWER.
 // This bounds the while-loop iterations in isHealthy() and liquidate().
 strong invariant atMostMaxCollateralsBitsSet(bytes32 id, address user)
-    summaryCountBits(currentContract.position[id][user].collateralBitmap) <= MAX_COLLATERALS_PER_BORROWER();
+    summaryCountBits(currentContract.position[id][user].collateralBitmap) <= Utils.maxCollateralsPerBorrower();
 
 // This shows that the real isHealthy returns true if and only if the isHealthy function
 // that does not use collateral bitmap returns true.  We also check that the latter function

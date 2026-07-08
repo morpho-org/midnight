@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./BaseTest.sol";
@@ -7,6 +7,7 @@ import {ERC20} from "./erc20s/ERC20.sol";
 import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     address[] internal recordedTokens;
@@ -34,6 +35,9 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         for (uint256 i = 0; i < tokens.length; i++) {
             deal(tokens[i], address(midnight), amounts[i]);
         }
+
+        vm.expectEmit();
+        emit EventsLib.FlashLoan(caller, tokens, amounts, address(this));
 
         vm.prank(caller);
         midnight.flashLoan(tokens, amounts, address(this), data);

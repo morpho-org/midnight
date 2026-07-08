@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {
-    IEcrecoverRatifier,
-    Signature,
-    EIP712_DOMAIN_TYPEHASH
-} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 /// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`.
 /// `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
@@ -29,13 +25,15 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -43,8 +41,8 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
@@ -56,7 +54,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         lenderOffer.buy = true;
         lenderOffer.maker = lender;
         lenderOffer.ratifier = address(ecrecoverRatifier);
-        lenderOffer.maxUnits = type(uint256).max;
+        lenderOffer.maxUnits = type(uint128).max;
         lenderOffer.market = market;
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
         lenderOffer.tick = MAX_TICK;
@@ -229,7 +227,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         uint256 price = TickLib.tickToPrice(lenderOffer.tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(market, borrower, units);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint128).max;
 
         vm.prank(borrower);
         midnight.take(
@@ -250,7 +248,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         uint256 price = TickLib.tickToPrice(lenderOffer.tick);
         deal(address(loanToken), lender, units.mulDivDown(price, WAD));
         collateralize(market, borrower, units);
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint128).max;
 
         Offer memory offer0 = lenderOffer;
 

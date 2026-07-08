@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {IMidnight, Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
@@ -18,13 +19,15 @@ contract AuthorizationTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -38,10 +41,16 @@ contract AuthorizationTest is BaseTest {
 
         assertEq(midnight.isAuthorized(user, authorized), false);
 
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, true, user);
+
         vm.prank(user);
         midnight.setIsAuthorized(authorized, true, user);
 
         assertEq(midnight.isAuthorized(user, authorized), true);
+
+        vm.expectEmit();
+        emit EventsLib.SetIsAuthorized(user, authorized, false, user);
 
         vm.prank(user);
         midnight.setIsAuthorized(authorized, false, user);
@@ -202,7 +211,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = units.toUint128();
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
@@ -226,7 +235,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = units.toUint128();
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
@@ -242,7 +251,7 @@ contract AuthorizationTest is BaseTest {
         vm.prank(operator);
         midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, taker), units);
+        assertEq(midnight.debt(id, taker), units);
     }
 
     function testRepayAuthorization(address authorized) public {
@@ -268,11 +277,12 @@ contract AuthorizationTest is BaseTest {
         vm.prank(authorized);
         midnight.repay(market, units, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), 0);
+        assertEq(midnight.debt(id, borrower), 0);
     }
 
     function testSetConsumedAuthorization(address user, address authorized) public {
         vm.assume(user != authorized);
+        vm.assume(!midnight.isAuthorized(user, authorized));
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
@@ -289,6 +299,7 @@ contract AuthorizationTest is BaseTest {
 
     function testSetIsAuthorizedAuthorization(address user, address authorized, address newAuthorized) public {
         vm.assume(user != authorized);
+        vm.assume(!midnight.isAuthorized(user, authorized));
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);
@@ -310,7 +321,7 @@ contract AuthorizationTest is BaseTest {
         offer.buy = true;
         offer.maker = lender;
         offer.ratifier = address(dummyRatifier);
-        offer.maxUnits = units;
+        offer.maxUnits = units.toUint128();
         offer.market = market;
         offer.expiry = vm.getBlockTimestamp() + 200;
         offer.tick = MAX_TICK;
@@ -321,6 +332,6 @@ contract AuthorizationTest is BaseTest {
         // Borrower can take for themselves (no authorization needed)
         take(units, borrower, offer);
 
-        assertEq(midnight.debtOf(id, borrower), units);
+        assertEq(midnight.debt(id, borrower), units);
     }
 }

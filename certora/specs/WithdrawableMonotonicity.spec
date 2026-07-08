@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
+
+using Utils as Utils;
 
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function toId(Midnight.Market) external returns (bytes32);
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     repay(e, market, units, onBehalf, callback, data);
     uint256 withdrawableAfter = withdrawable(id);
@@ -17,7 +20,7 @@ rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, ad
 }
 
 rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 seizedResult;
     uint256 repaidResult;
@@ -27,7 +30,7 @@ rule liquidateIncreasesWithdrawable(env e, Midnight.Market market, uint256 colla
 }
 
 rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256 unitsInput, address onBehalf, address receiver) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     withdraw(e, market, unitsInput, onBehalf, receiver);
     uint256 withdrawableAfter = withdrawable(id);
@@ -35,7 +38,7 @@ rule withdrawDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256
 }
 
 rule claimContinuousFeeDecreasesWithdrawableExactly(env e, Midnight.Market market, uint256 amount, address receiver) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     uint256 withdrawableBefore = withdrawable(id);
     claimContinuousFee(e, market, amount, receiver);
     uint256 withdrawableAfter = withdrawable(id);

@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function roleSetter() external returns (address) envfree;
+    function configurator() external returns (address) envfree;
     function feeSetter() external returns (address) envfree;
     function feeClaimer() external returns (address) envfree;
     function tickSpacingSetter() external returns (address) envfree;
+    function isLltvEnabled(uint256 lltv) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
@@ -19,12 +22,21 @@ methods {
     // This function is over-approximated, except for the reverting behavior. This is still sound as it is only used inside take but we don't look at the reverting behavior of take in this file.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
+    // Summarize mulDivDown and mulDivUp by deterministic ghost functions (also modelling reverts).
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // msb is over-approximated by a nondeterministic value.
+    function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
+
     // Assume that tokens do not reenter and do not revert: this is justified as we verify properties about the function's bodies.
     function SafeTransferLib.safeTransfer(address token, address receiver, uint256 amount) internal => cvlSafeTransfer(token, receiver, amount);
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 }
 
 /// HELPERS ///
+
+definition WAD() returns uint256 = 10 ^ 18;
 
 definition CBP() returns uint256 = 10 ^ 12;
 
@@ -35,6 +47,26 @@ definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = in
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
 definition defaultSettlementFee(address loanToken, uint256 index) returns uint256 = assert_uint256(currentContract.defaultSettlementFeeCbp[loanToken][index] * CBP());
+
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
+
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
+
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return ghostMulDivDown(a, b, d);
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return ghostMulDivUp(a, b, d);
+}
 
 ghost mapping(address => mapping(address => mathint)) tokenBalance;
 
@@ -51,76 +83,132 @@ function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
 }
 
-/// ROLE SETTER: LIVENESS ///
+/// CONFIGURATOR: LIVENESS ///
 
-rule roleSetterCanChangeRoleSetter(env e, address newRoleSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeConfigurator(env e, address newConfigurator) {
+    address configuratorBefore = configurator();
 
-    setRoleSetter@withrevert(e, newRoleSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
-    assert !lastReverted => roleSetter() == newRoleSetter;
+    setConfigurator@withrevert(e, newConfigurator);
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
+    assert !lastReverted => configurator() == newConfigurator;
 }
 
-rule roleSetterCanChangeFeeSetter(env e, address newFeeSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeFeeSetter(env e, address newFeeSetter) {
+    address configuratorBefore = configurator();
 
     setFeeSetter@withrevert(e, newFeeSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => feeSetter() == newFeeSetter;
 }
 
-rule roleSetterCanChangeFeeClaimer(env e, address newFeeClaimer) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeFeeClaimer(env e, address newFeeClaimer) {
+    address configuratorBefore = configurator();
 
     setFeeClaimer@withrevert(e, newFeeClaimer);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => feeClaimer() == newFeeClaimer;
 }
 
-rule roleSetterCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
-    address roleSetterBefore = roleSetter();
+rule configuratorCanChangeTickSpacingSetter(env e, address newTickSpacingSetter) {
+    address configuratorBefore = configurator();
 
     setTickSpacingSetter@withrevert(e, newTickSpacingSetter);
-    assert !lastReverted <=> e.msg.sender == roleSetterBefore && e.msg.value == 0;
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0;
     assert !lastReverted => tickSpacingSetter() == newTickSpacingSetter;
 }
 
-/// ROLE SETTER: ACCESS CONTROL ///
+rule configuratorCanEnableLltv(env e, uint256 lltv) {
+    address configuratorBefore = configurator();
 
-rule onlyRoleSetterCanChangeRoleSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
-    address roleSetterBefore = roleSetter();
+    enableLltv@withrevert(e, lltv);
+    assert !lastReverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && lltv <= WAD();
+    assert !lastReverted => isLltvEnabled(lltv);
+}
+
+/// CONFIGURATOR: ACCESS CONTROL ///
+
+rule onlyConfiguratorCanChangeConfigurator(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert roleSetter() != roleSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setRoleSetter(address).selector;
+    assert configurator() != configuratorBefore => e.msg.sender == configuratorBefore && f.selector == sig:setConfigurator(address).selector;
 }
 
-rule onlyRoleSetterCanChangeFeeSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeFeeSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address feeSetterBefore = feeSetter();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert feeSetter() != feeSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeSetter(address).selector;
+    assert feeSetter() != feeSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setFeeSetter(address).selector;
 }
 
-rule onlyRoleSetterCanChangeFeeClaimer(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeFeeClaimer(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address feeClaimerBefore = feeClaimer();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert feeClaimer() != feeClaimerBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setFeeClaimer(address).selector;
+    assert feeClaimer() != feeClaimerBefore => e.msg.sender == configuratorBefore && f.selector == sig:setFeeClaimer(address).selector;
 }
 
-rule onlyRoleSetterCanChangeTickSpacingSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
+rule onlyConfiguratorCanChangeTickSpacingSetter(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address tickSpacingSetterBefore = tickSpacingSetter();
-    address roleSetterBefore = roleSetter();
+    address configuratorBefore = configurator();
 
     f(e, args);
 
-    assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == roleSetterBefore && f.selector == sig:setTickSpacingSetter(address).selector;
+    assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
+
+/// LLTV TIERS: ACCESS CONTROL ///
+
+/// Enabled LLTV tiers can only be enabled by the configurator, and never removed.
+rule onlyConfiguratorCanEnableLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
+    bool enabledBefore = isLltvEnabled(lltv);
+    address configuratorBefore = configurator();
+
+    f(e, args);
+
+    assert isLltvEnabled(lltv) != enabledBefore => enabledBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:enableLltv(uint256).selector;
+}
+
+/// LIQUIDATION CURSORS: LIVENESS ///
+
+rule configuratorCanEnableLiquidationCursor(env e, uint256 liquidationCursor) {
+    address configuratorBefore = configurator();
+
+    enableLiquidationCursor@withrevert(e, liquidationCursor);
+    bool reverted = lastReverted;
+    assert !reverted <=> e.msg.sender == configuratorBefore && e.msg.value == 0 && liquidationCursor < WAD();
+    assert !reverted => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// LIQUIDATION CURSORS: ACCESS CONTROL ///
+
+/// Only the configurator can enable a liquidationCursor, and only through enableLiquidationCursor.
+rule onlyConfiguratorCanEnableLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+    address configuratorBefore = configurator();
+
+    f(e, args);
+
+    assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == configuratorBefore && f.selector == sig:enableLiquidationCursor(uint256).selector;
+}
+
+/// LiquidationCursors can only be enabled, never disabled.
+rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
+    bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
+
+    f(e, args);
+
+    assert enabledBefore => currentContract.isLiquidationCursorEnabled[liquidationCursor];
+}
+
+/// Every enabled liquidationCursor is strictly below WAD.
+strong invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
 /// FEE SETTER: LIVENESS ///
 
@@ -249,9 +337,9 @@ rule feeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, addre
 }
 
 rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver, address user) {
-    bytes32 id = toId(e, market);
+    bytes32 id = Utils.toId(market);
     address feeClaimerBefore = feeClaimer();
-    bool marketIsCreated = marketIsCreated(id);
+    bool marketWasCreated = marketIsCreated(id);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 totalUnitsBefore = totalUnits(id);
     uint128 continuousFeeCreditBefore = currentContract.marketState[id].continuousFeeCredit;
@@ -261,7 +349,8 @@ rule feeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amou
 
     claimContinuousFee@withrevert(e, market, amount, receiver);
     bool reverted = lastReverted;
-    assert !reverted <=> e.msg.sender == feeClaimerBefore && e.msg.value == 0 && marketIsCreated && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert !reverted => e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore;
+    assert marketWasCreated && e.msg.sender == feeClaimerBefore && e.msg.value == 0 && amount <= withdrawableBefore && amount <= totalUnitsBefore && amount <= continuousFeeCreditBefore => !reverted;
     assert !reverted => withdrawable(id) == withdrawableBefore - amount;
     assert !reverted => totalUnits(id) == totalUnitsBefore - amount;
     assert !reverted => currentContract.marketState[id].continuousFeeCredit == continuousFeeCreditBefore - amount;

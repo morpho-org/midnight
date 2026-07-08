@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
@@ -10,11 +10,7 @@ import {ERC20USDT} from "./erc20s/ERC20USDT.sol";
 import {ERC20RevertToZero} from "./erc20s/ERC20RevertToZero.sol";
 import {ERC20NoReturn} from "./erc20s/ERC20NoReturn.sol";
 import {Oracle} from "./helpers/Oracle.sol";
-import {
-    IEcrecoverRatifier,
-    Signature,
-    EIP712_DOMAIN_TYPEHASH
-} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {Signature, EIP712_DOMAIN_TYPEHASH} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {DummyRatifier} from "./helpers/DummyRatifier.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -24,16 +20,6 @@ import {
     WAD,
     ORACLE_PRICE_SCALE,
     MAX_COLLATERALS,
-    LIQUIDATION_CURSOR_LOW,
-    LLTV_0,
-    LLTV_1,
-    LLTV_2,
-    LLTV_3,
-    LLTV_4,
-    LLTV_5,
-    LLTV_6,
-    LLTV_7,
-    LLTV_8,
     maxSettlementFee as _maxSettlementFee,
     maxLif as _maxLif
 } from "../src/libraries/ConstantsLib.sol";
@@ -42,6 +28,12 @@ import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
+
+/// @dev The default LLTV enabled in tests.
+uint256 constant LLTV = 0.77e18;
+
+/// @dev The default liquidationCursor enabled in tests.
+uint256 constant LIQUIDATION_CURSOR = 0.3e18;
 
 abstract contract BaseTest is Test {
     using UtilsLib for uint256;
@@ -73,6 +65,11 @@ abstract contract BaseTest is Test {
 
         midnight.setFeeSetter(address(this));
         midnight.setTickSpacingSetter(address(this));
+
+        // Enable the default liquidationCursor at deployment time.
+        midnight.enableLiquidationCursor(LIQUIDATION_CURSOR);
+
+        midnight.enableLltv(LLTV);
 
         uint256 _privateKey;
         (borrower, _privateKey) = makeAddrAndKey("borrower");
@@ -167,10 +164,10 @@ abstract contract BaseTest is Test {
 
     // Convenience wrapper for take with the dummy ratifier and no callbacks.
     function take(uint256 units, address taker, Offer memory offer) internal returns (uint256, uint256) {
-        // receiverIfTakerIsSeller param is for taker (when offer.buy == true)
-        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false)
+        // receiverIfTakerIsSeller param is for taker (when offer.buy == true), and must be zero otherwise.
+        // offer.receiverIfMakerIsSeller is for maker (when offer.buy == false).
         vm.prank(taker);
-        return midnight.take(offer, hex"", units, taker, taker, address(0), hex"");
+        return midnight.take(offer, hex"", units, taker, offer.buy ? taker : address(0), address(0), hex"");
     }
 
     function setupOtherUsers(Market memory market, uint256 units) internal {
@@ -182,7 +179,8 @@ abstract contract BaseTest is Test {
         lenderOffer.market = market;
         lenderOffer.buy = true;
         lenderOffer.maker = otherLender;
-        lenderOffer.maxUnits = units;
+        lenderOffer.maxUnits = type(uint128).max;
+        lenderOffer.continuousFeeCap = type(uint256).max;
         lenderOffer.group = keccak256(abi.encode("non zero group"));
         lenderOffer.ratifier = address(dummyRatifier);
         lenderOffer.expiry = vm.getBlockTimestamp() + 200;
@@ -208,6 +206,7 @@ abstract contract BaseTest is Test {
         badBorrowerOffer.start = vm.getBlockTimestamp();
         badBorrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         badBorrowerOffer.tick = MAX_TICK;
+        badBorrowerOffer.continuousFeeCap = type(uint256).max;
 
         vm.prank(badBorrower);
 
@@ -231,16 +230,16 @@ abstract contract BaseTest is Test {
         // then empty the market (borrow side only).
         vm.prank(badBorrower);
         midnight.setIsAuthorized(address(this), true, badBorrower);
-        deal(address(loanToken), address(this), midnight.debtOf(toId(market), badBorrower));
-        midnight.repay(market, midnight.debtOf(toId(market), badBorrower), badBorrower, address(0), hex"");
-        assertEq(midnight.debtOf(toId(market), badBorrower), 0, "debt");
+        deal(address(loanToken), address(this), midnight.debt(toId(market), badBorrower));
+        midnight.repay(market, midnight.debt(toId(market), badBorrower), badBorrower, address(0), hex"");
+        assertEq(midnight.debt(toId(market), badBorrower), 0, "debt");
 
         // reset the price.
         Oracle(market.collateralParams[0].oracle).setPrice(ORACLE_PRICE_SCALE);
     }
 
-    function toId(Market memory market) internal view returns (bytes32) {
-        return IdLib.toId(market, block.chainid, address(midnight));
+    function toId(Market memory market) internal pure returns (bytes32) {
+        return IdLib.toId(market);
     }
 
     function domainSeparator(address verifyingContract) internal view returns (bytes32) {
@@ -272,12 +271,6 @@ abstract contract BaseTest is Test {
         return arr;
     }
 
-    /// @dev Returns an allowed LLTV tier based on a seed value.
-    function allowedLltv(uint256 seed) internal pure returns (uint256) {
-        uint256[9] memory tiers = [LLTV_0, LLTV_1, LLTV_2, LLTV_3, LLTV_4, LLTV_5, LLTV_6, LLTV_7, LLTV_8];
-        return tiers[seed % 9];
-    }
-
     /// @dev Returns a market with sorted, unique collateralParams, valid lltv/maxLif, and a creatable TTM.
     function validMarket(Market memory market) internal view returns (Market memory) {
         uint256 len =
@@ -287,11 +280,12 @@ abstract contract BaseTest is Test {
         for (uint256 i = 0; i < len; i++) {
             collateralParams[i].token =
                 address(uint160(uint256(keccak256(abi.encode(market.collateralParams[i].token, i)))));
-            uint256 lltv = allowedLltv(market.collateralParams[i].lltv);
-            collateralParams[i].lltv = lltv;
-            collateralParams[i].maxLif = maxLif(lltv, LIQUIDATION_CURSOR_LOW);
+            collateralParams[i].lltv = LLTV;
+            collateralParams[i].liquidationCursor = LIQUIDATION_CURSOR;
         }
         collateralParams = sortCollateralParams(collateralParams);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.collateralParams = collateralParams;
         market.maturity = bound(market.maturity, 0, vm.getBlockTimestamp() + 100 * 365 days);
         return market;
@@ -300,22 +294,31 @@ abstract contract BaseTest is Test {
     function setupMarket(Market memory market, uint256 units) internal {
         deal(address(loanToken), lender, units); // at tick MAX_TICK, price is 1.
 
-        Offer memory borrowerOffer = _setupMarketOffer(market, units);
+        Offer memory borrowerOffer = _setupMarketOffer(market);
 
         vm.prank(lender);
-        midnight.take(borrowerOffer, hex"", units, lender, borrower, address(0), hex"");
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
     }
 
-    function _setupMarketOffer(Market memory market, uint256 units) internal view returns (Offer memory borrowerOffer) {
+    function _setupMarketOffer(Market memory market) internal view returns (Offer memory borrowerOffer) {
+        borrowerOffer = _setupMarketOffer(market, type(uint128).max);
+    }
+
+    function _setupMarketOffer(Market memory market, uint256 maxUnits)
+        internal
+        view
+        returns (Offer memory borrowerOffer)
+    {
         borrowerOffer.market = market;
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = units;
+        borrowerOffer.maxUnits = maxUnits.toUint128();
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.start = vm.getBlockTimestamp();
         borrowerOffer.expiry = vm.getBlockTimestamp();
         borrowerOffer.tick = MAX_TICK;
+        borrowerOffer.continuousFeeCap = type(uint256).max;
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -330,8 +333,12 @@ abstract contract BaseTest is Test {
         return a > b ? a - b : b - a;
     }
 
-    function maxLif(uint256 lltv, uint256 cursor) internal pure returns (uint256) {
-        return _maxLif(lltv, cursor);
+    function maxLif(uint256 lltv, uint256 liquidationCursor) internal pure returns (uint256) {
+        return _maxLif(lltv, liquidationCursor);
+    }
+
+    function maxLif(CollateralParams memory params) internal pure returns (uint256) {
+        return _maxLif(params.lltv, params.liquidationCursor);
     }
 
     function maxSettlementFee(uint256 index) internal pure returns (uint256) {
