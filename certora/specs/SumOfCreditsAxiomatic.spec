@@ -4,10 +4,8 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
-    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function lossFactor(bytes32) external returns (uint128) envfree;
 
     /// SUMMARY OF updatePositionView -- see file header for soundness argument. ///
@@ -23,9 +21,8 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
     /// MISC INTERNALS irrelevant to credit / loss-index tracking. ///
-    function toId(Midnight.Market) external returns (bytes32) => NONDET;
-    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function touchMarket(Midnight.Market) external returns (bytes32) => NONDET;
     function Midnight.touchMarket(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
