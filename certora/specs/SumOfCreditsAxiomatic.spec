@@ -271,7 +271,7 @@ strong invariant lossFactorLeqLastLossFactor(bytes32 id, address owner)
 // here, and the SumOfCreditsSummaryTake.spec split for take).
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     sumOfCreditsBody(id)
-    filtered { f -> f.selector != sig:withdraw(Midnight.Market, uint256, address, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
+    filtered { f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
         preserved claimContinuousFee(Midnight.Market market, uint256 amount, address receiver) with (env e) {
             require axiomDistributivity(continuousFeeCredit(id) - amount, amount, PRECISION);
             require axiomDistributivity(totalUnits(id) - amount, amount, PRECISION);
