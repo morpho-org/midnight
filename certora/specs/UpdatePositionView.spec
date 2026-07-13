@@ -156,6 +156,7 @@ rule updatePositionViewReflectedByFactor(env e, Midnight.Market obligation, byte
 
     assert fee <= pendingBefore, "Cannot take more fee than pending";
     assert (newCredit + fee) * PRECISION <= preciseCreditBefore, "newCredit (with fees) is at most precise credit after slashing";
+
     // The two monotonicity facts the SumOfCredits summaries assume about
     // `updatePositionView`. `newCredit <= creditBefore` holds because
     // postSlashCredit = credit * mapFactor(lossFactor) / mapFactor(lastLossFactor)
