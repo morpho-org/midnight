@@ -33,6 +33,7 @@ methods {
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
     // Constant oracle price per address.
     function _.price() external => ghostPrice(calledContract) expect(uint256);
@@ -58,7 +59,7 @@ definition getPrice(uint256 collateralIndex, Midnight.CollateralParams[] params)
 
 definition getLltv(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? params[0].lltv : collateralIndex == 1 ? params[1].lltv : params[2].lltv;
 
-definition getMaxLif(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? params[0].maxLif : collateralIndex == 1 ? params[1].maxLif : params[2].maxLif;
+definition getMaxLif(uint256 collateralIndex, Midnight.CollateralParams[] params) returns uint256 = collateralIndex == 0 ? Utils.maxLif(params[0].lltv, params[0].liquidationCursor) : collateralIndex == 1 ? Utils.maxLif(params[1].lltv, params[1].liquidationCursor) : Utils.maxLif(params[2].lltv, params[2].liquidationCursor);
 
 // Assume the market is already created.
 function summaryToId(Midnight.Market market) returns bytes32 {
@@ -113,7 +114,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 /// Only the collat*price bound is a LIVENESS no-overflow assumption.
 function validCollateralAt(Midnight.Market market, bytes32 id, address borrower, uint256 i) {
     uint256 lltv = market.collateralParams[i].lltv;
-    uint256 maxLif = market.collateralParams[i].maxLif;
+    uint256 maxLif = Utils.maxLif(lltv, market.collateralParams[i].liquidationCursor);
 
     require lltv > 0 && lltv <= WAD(), "lltv in (0, WAD] for a created market (in CreatedMarkets.spec)";
     require maxLif >= WAD(), "maxLif >= WAD (maxLifIsAtLeastWad)";
@@ -171,9 +172,9 @@ function maxDebtSum(Midnight.Market market, bytes32 id, address borrower) return
 
 /// debtAfter = debt - badDebt, where badDebt = zeroFloorSub chain = max(0, debt - recovery0 - recovery1 - recovery2).
 function debtAfterBadDebt(Midnight.Market market, bytes32 id, address borrower) returns mathint {
-    mathint recovery0 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 0), ghostPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[0].maxLif);
-    mathint recovery1 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 1), ghostPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[1].maxLif);
-    mathint recovery2 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 2), ghostPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[2].maxLif);
+    mathint recovery0 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 0), ghostPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), WAD(), Utils.maxLif(market.collateralParams[0].lltv, market.collateralParams[0].liquidationCursor));
+    mathint recovery1 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 1), ghostPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), WAD(), Utils.maxLif(market.collateralParams[1].lltv, market.collateralParams[1].liquidationCursor));
+    mathint recovery2 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 2), ghostPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), WAD(), Utils.maxLif(market.collateralParams[2].lltv, market.collateralParams[2].liquidationCursor));
     mathint _debt = debt(id, borrower);
     mathint badDebt = _debt > recovery0 + recovery1 + recovery2 ? _debt - recovery0 - recovery1 - recovery2 : 0;
     return _debt - badDebt;
@@ -185,17 +186,17 @@ function debtAfterBadDebt(Midnight.Market market, bytes32 id, address borrower) 
 /// maxRepaid >= 1 (keeps the safe interval non-vacuous for any active seized collateral with quote >= 1 unit).
 function lowLltvScaffolding(Midnight.Market market, bytes32 id, address borrower, uint256 collateralIndex) {
     uint256 lltv0 = market.collateralParams[0].lltv;
-    uint256 maxLif0 = market.collateralParams[0].maxLif;
+    uint256 maxLif0 = Utils.maxLif(lltv0, market.collateralParams[0].liquidationCursor);
     uint256 price0 = ghostPrice(market.collateralParams[0].oracle);
     uint128 collat0 = collateral(id, borrower, 0);
 
     uint256 lltv1 = market.collateralParams[1].lltv;
-    uint256 maxLif1 = market.collateralParams[1].maxLif;
+    uint256 maxLif1 = Utils.maxLif(lltv1, market.collateralParams[1].liquidationCursor);
     uint256 price1 = ghostPrice(market.collateralParams[1].oracle);
     uint128 collat1 = collateral(id, borrower, 1);
 
     uint256 lltv2 = market.collateralParams[2].lltv;
-    uint256 maxLif2 = market.collateralParams[2].maxLif;
+    uint256 maxLif2 = Utils.maxLif(lltv2, market.collateralParams[2].liquidationCursor);
     uint256 price2 = ghostPrice(market.collateralParams[2].oracle);
     uint128 collat2 = collateral(id, borrower, 2);
 
