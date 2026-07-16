@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
 
@@ -7,8 +8,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
@@ -34,7 +35,7 @@ methods {
     // withdrawCollateral -> isHealthy which would hit the same reverting/zero oracle.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
-    function _.isRatified(Midnight.Offer, bytes) external => CVL_callbackBytes32() expect(bytes32);
+    function _.isRatified(Midnight.Offer, bytes, address) external => CVL_callbackBytes32() expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => CVL_callbackBytes32() expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => CVL_callbackBytes32() expect(bytes32);
     function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
@@ -45,10 +46,10 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => CVL_safeTransfer();
 
     // Bitmap operations (msb, clearBit, setBit) are provided by BitmapSummaries.spec.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // The function toMarket is not used by the protocol.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
@@ -192,6 +193,18 @@ rule oracleRevertCausesLiquidateRevert(env e, Midnight.Market market, uint256 co
     assert lastReverted;
 }
 
+/// If the supplied collateral oracle reverts on price, activating that collateral through supplyCollateral reverts.
+rule oracleRevertCausesCollatActivationRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf) {
+    require singleRevertingOracle == market.collateralParams[collateralIndex].oracle, "oracle is reverting";
+
+    bytes32 id = summaryToId(market);
+    uint128 collateralBefore = collateral(id, onBehalf, collateralIndex);
+
+    supplyCollateral@withrevert(e, market, collateralIndex, assets, onBehalf);
+
+    assert collateralBefore == 0 && assets > 0 => lastReverted;
+}
+
 /// If an activated collateral oracle reverts on price different than withdrawn collateral, withdrawCollateral reverts when the borrower has debt.
 rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, uint256 revertingCollateralIndex) {
     require singleRevertingOracle == market.collateralParams[revertingCollateralIndex].oracle, "oracle is reverting";
@@ -205,7 +218,7 @@ rule oracleRevertCausesWithdrawCollateralRevert(env e, Midnight.Market market, u
     withdrawCollateral@withrevert(e, market, collateralIndex, assets, onBehalf, receiver);
     bool reverted = lastReverted;
 
-    assert debtOf(id, onBehalf) > 0 => reverted;
+    assert debt(id, onBehalf) > 0 => reverted;
 }
 
 /// If an activated collateral oracle reverts on price, isHealthy reverts when the borrower has debt.
@@ -218,7 +231,7 @@ rule oracleRevertCausesIsHealthyRevert(env e, Midnight.Market market, bytes32 id
     isHealthy@withrevert(e, market, id, borrower);
     bool reverted = lastReverted;
 
-    assert debtOf(id, borrower) > 0 => reverted;
+    assert debt(id, borrower) > 0 => reverted;
 }
 
 /// If an activated collateral oracle reverts on price and take succeeds, the seller must have no debt.
@@ -237,7 +250,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, byte
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert debtOf(id, seller) == 0;
+    assert debt(id, seller) == 0;
 }
 
 /// ORACLE RETURNS ZERO ///
@@ -261,7 +274,7 @@ rule oracleZeroCausesIsHealthyReturnFalse(env e, Midnight.Market market, address
 
     bool healthy = isHealthy(e, market, id, borrower);
 
-    assert debtOf(id, borrower) > 0 => !healthy;
+    assert debt(id, borrower) > 0 => !healthy;
 }
 
 /// If all oracles return 0, withdrawCollateral reverts when the borrower has debt.
@@ -273,7 +286,7 @@ rule oracleZeroPreventsWithdrawCollateralWhenBorrowerHasDebt(env e, Midnight.Mar
 
     withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
 
-    assert debtOf(id, onBehalf) == 0;
+    assert debt(id, onBehalf) == 0;
 }
 
 /// If all oracles return 0 and take succeeds, the seller must have no debt.
@@ -286,7 +299,7 @@ rule oracleZeroPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, bytes 
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    assert debtOf(id, seller) == 0;
+    assert debt(id, seller) == 0;
 }
 
 /// GATE BLOCKING ///
@@ -297,11 +310,11 @@ rule enterGateBlocksCreditIncrease(env e, Midnight.Offer offer, bytes ratifierDa
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
-    uint256 creditBefore = creditOf(id, user);
+    uint256 creditBefore = credit(id, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    uint256 creditAfter = creditOf(id, user);
+    uint256 creditAfter = credit(id, user);
 
     assert creditAfter <= creditBefore;
 }
@@ -312,11 +325,11 @@ rule enterGateBlocksDebtIncrease(env e, Midnight.Offer offer, bytes ratifierData
     require offer.market.enterGate != 0, "enter gate is set";
 
     bytes32 id = summaryToId(offer.market);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 debtBefore = debt(id, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    uint256 debtAfter = debtOf(id, user);
+    uint256 debtAfter = debt(id, user);
 
     assert debtAfter <= debtBefore;
 }

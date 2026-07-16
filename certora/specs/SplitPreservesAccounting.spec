@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
@@ -18,10 +19,10 @@ methods {
     function UtilsLib.mulDivUp(uint256 a, uint256 b, uint256 d) internal returns (uint256) => ghostMulDivUp(a, b, d);
 
     // Deterministic hash preserves market-to-id relationship without adding assumptions.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
-    // Assume that the markets are already created.
-    function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    // Sound because the protocol doesn't use toMarket.
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Pure helper called with identical args across the three takes; CONSTANT collapses
     // its bit / hashing / arithmetic complexity (no behavioral abstraction).
@@ -71,10 +72,10 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
     // Path 1: take the full amount A.
     take(e, offer, ratifierData, unitsA, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    uint128 creditOfBuyer1 = creditOf(id, buyer);
-    uint128 debtOfBuyer1 = debtOf(id, buyer);
-    uint128 creditOfSeller1 = creditOf(id, seller);
-    uint128 debtOfSeller1 = debtOf(id, seller);
+    uint128 creditBuyer1 = credit(id, buyer);
+    uint128 debtBuyer1 = debt(id, buyer);
+    uint128 creditSeller1 = credit(id, seller);
+    uint128 debtSeller1 = debt(id, seller);
     uint128 totalUnits1 = totalUnits(id);
     uint128 buyerLossFactor1 = lastLossFactor(id, buyer);
     uint128 sellerLossFactor1 = lastLossFactor(id, seller);
@@ -89,10 +90,10 @@ rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 uni
 
     take(e, offer, ratifierData, unitsC, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    assert creditOfBuyer1 == creditOf(id, buyer);
-    assert debtOfBuyer1 == debtOf(id, buyer);
-    assert creditOfSeller1 == creditOf(id, seller);
-    assert debtOfSeller1 == debtOf(id, seller);
+    assert creditBuyer1 == credit(id, buyer);
+    assert debtBuyer1 == debt(id, buyer);
+    assert creditSeller1 == credit(id, seller);
+    assert debtSeller1 == debt(id, seller);
     assert totalUnits1 == totalUnits(id);
     assert buyerLossFactor1 == lastLossFactor(id, buyer);
     assert sellerLossFactor1 == lastLossFactor(id, seller);

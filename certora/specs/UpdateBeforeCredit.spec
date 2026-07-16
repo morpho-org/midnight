@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -10,7 +11,7 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
-    function IdLib.toId(Midnight.Market memory, uint256, address) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
 
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
     function _updatePosition(Midnight.Market memory, bytes32 id, address user) internal returns (uint128, uint128, uint128) => summaryUpdatePosition(id, user);
@@ -73,7 +74,7 @@ rule creditNotStoredBeforeUpdate(env e, method f, calldataarg args, bytes32 id, 
 
 /// Check that credit is never loaded before _updatePosition is called.
 /// The SLOADs of _updatePosition are ignored (see summary above).
-rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:creditOf(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
+rule creditNotLoadedBeforeUpdate(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:credit(bytes32, address).selector && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector && f.selector != sig:position(bytes32, address).selector } {
     require !creditLoadedBeforeUpdate[id][user], "initialize the ghost variable";
 
     f(e, args);

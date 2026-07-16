@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -17,7 +17,7 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {RevertingOracle} from "./helpers/RevertingOracle.sol";
-import {BaseTest, MAX_TEST_AMOUNT} from "./BaseTest.sol";
+import {BaseTest, LLTV, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {
     MAX_COLLATERALS,
     MAX_COLLATERALS_PER_BORROWER,
@@ -43,13 +43,15 @@ contract OtherFunctionsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -57,8 +59,8 @@ contract OtherFunctionsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
@@ -135,7 +137,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         midnight.repay(market, repaid, borrower, address(0), hex"");
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(midnight.withdrawable(id), repaid);
         assertEq(loanToken.balanceOf(address(midnight)), repaid);
         assertEq(loanToken.balanceOf(borrower), 0);
@@ -158,7 +160,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(caller);
         midnight.repay(market, repaid, borrower, address(callback), data);
 
-        assertEq(midnight.debtOf(id, borrower), units - repaid);
+        assertEq(midnight.debt(id, borrower), units - repaid);
         assertEq(callback.recordedId(), id, "id");
         assertEq(toId(callback.recordedMarket()), id, "market");
         assertEq(callback.recordedOnBehalf(), borrower, "onBehalf");
@@ -174,7 +176,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(lender);
         midnight.withdraw(market, withdraw, lender, lender);
 
-        assertEq(midnight.creditOf(id, lender), units - withdraw, "creditOf");
+        assertEq(midnight.credit(id, lender), units - withdraw, "credit");
         assertEq(midnight.withdrawable(id), 0, "withdrawable");
         assertEq(midnight.totalUnits(id), units - withdraw, "totalUnits");
         assertEq(loanToken.balanceOf(address(midnight)), 0, "balance of midnight");
@@ -247,7 +249,7 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(ERC20(collateralToken).balanceOf(receiver), withdraw, "balance of receiver");
     }
 
-    function testSetConsumed(address user, bytes32 group, uint256 amount) public {
+    function testSetConsumed(address user, bytes32 group, uint128 amount) public {
         vm.expectEmit();
         emit EventsLib.SetConsumed(user, group, amount, user);
 
@@ -256,9 +258,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount, "consumed");
     }
 
-    function testSetConsumedIncreasing(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 0, type(uint256).max - 1);
-        amount1 = bound(amount1, amount0, type(uint256).max);
+    function testSetConsumedIncreasing(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 0, type(uint128).max - 1));
+        amount1 = uint128(bound(amount1, amount0, type(uint128).max));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);
@@ -269,9 +271,9 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(midnight.consumed(user, group), amount1, "consumed 1");
     }
 
-    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 1, type(uint256).max);
-        amount1 = bound(amount1, 0, amount0 - 1);
+    function testSetConsumedDecreasingReverts(address user, bytes32 group, uint128 amount0, uint128 amount1) public {
+        amount0 = uint128(bound(amount0, 1, type(uint128).max));
+        amount1 = uint128(bound(amount1, 0, amount0 - 1));
 
         vm.prank(user);
         midnight.setConsumed(group, amount0, user);
@@ -310,22 +312,28 @@ contract OtherFunctionsTest is BaseTest {
 
         bytes32 _id = midnight.touchMarket(_market);
         Market memory marketFromId = midnight.toMarket(_id);
+        assertEq(_market.chainId, marketFromId.chainId, "chainId");
+        assertEq(_market.midnight, marketFromId.midnight, "midnight");
         assertEq(_market.loanToken, marketFromId.loanToken, "loanToken");
         assertEq(_market.maturity, marketFromId.maturity, "maturity");
         assertEq(_market.collateralParams.length, marketFromId.collateralParams.length, "collateralParams length");
         for (uint256 i = 0; i < marketFromId.collateralParams.length; i++) {
             assertEq(_market.collateralParams[i].token, marketFromId.collateralParams[i].token, "collateral token");
             assertEq(_market.collateralParams[i].lltv, marketFromId.collateralParams[i].lltv, "lltv");
-            assertEq(_market.collateralParams[i].maxLif, marketFromId.collateralParams[i].maxLif, "maxLif");
+            assertEq(
+                _market.collateralParams[i].liquidationCursor,
+                marketFromId.collateralParams[i].liquidationCursor,
+                "liquidationCursor"
+            );
             assertEq(_market.collateralParams[i].oracle, marketFromId.collateralParams[i].oracle, "oracle");
         }
     }
 
-    function testToId(Market memory _market) public view {
+    function testIdLibToId(Market memory _market) public view {
         _market = validMarket(_market);
 
         bytes32 expected = toId(_market);
-        bytes32 actual = midnight.toId(_market);
+        bytes32 actual = IdLib.toId(_market);
         assertEq(actual, expected, "toId mismatch");
     }
 
@@ -335,12 +343,9 @@ contract OtherFunctionsTest is BaseTest {
         _market = validMarket(_market);
 
         bytes32 idBefore = midnight.touchMarket(_market);
-        uint256 capturedChainId = midnight.INITIAL_CHAIN_ID();
-
         vm.chainId(newChainId);
 
-        assertEq(midnight.INITIAL_CHAIN_ID(), capturedChainId, "INITIAL_CHAIN_ID changed");
-        assertEq(midnight.toId(_market), idBefore, "toId changed");
+        assertEq(toId(_market), idBefore, "toId changed");
         Market memory roundTrip = midnight.toMarket(idBefore);
         assertEq(keccak256(abi.encode(roundTrip)), keccak256(abi.encode(_market)), "stored market lost");
 
@@ -355,6 +360,24 @@ contract OtherFunctionsTest is BaseTest {
         midnight.toMarket(_id);
     }
 
+    function testTouchMarketInvalidChainId(Market memory _market) public {
+        vm.assume(_market.collateralParams.length > 0);
+        _market = validMarket(_market);
+        _market.chainId = block.chainid + 1;
+
+        vm.expectRevert(IMidnight.InvalidChainId.selector);
+        midnight.touchMarket(_market);
+    }
+
+    function testTouchMarketInvalidMidnight(Market memory _market) public {
+        vm.assume(_market.collateralParams.length > 0);
+        _market = validMarket(_market);
+        _market.midnight = address(0);
+
+        vm.expectRevert(IMidnight.InvalidMidnight.selector);
+        midnight.touchMarket(_market);
+    }
+
     function testSstore2CodeStartsWithStop(Market memory _market) public {
         vm.assume(_market.collateralParams.length > 0);
         _market = validMarket(_market);
@@ -366,19 +389,22 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(uint8(sstore2Address.code[0]), 0x00, "first byte should be STOP opcode");
     }
 
-    function testSupplyCollateralDoesNotCallOracle(uint256 collateral) public {
-        collateral = bound(collateral, 0, MAX_TEST_AMOUNT);
+    function testSupplyCollateralRevertsIfOracleReverts(uint256 collateral) public {
+        // A positive amount is needed so that the collateral gets activated, which is when the oracle is called.
+        collateral = bound(collateral, 1, MAX_TEST_AMOUNT);
         RevertingOracle revertingOracle = new RevertingOracle();
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
-            maxLif: maxLif(0.77e18, 0.25e18),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
+        marketWithRevertingOracle.chainId = block.chainid;
+        marketWithRevertingOracle.midnight = address(midnight);
         marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
@@ -386,6 +412,7 @@ contract OtherFunctionsTest is BaseTest {
         revertingOracle.stopOracle();
 
         deal(address(collateralToken1), address(this), collateral);
+        vm.expectRevert("Oracle should not be called");
         midnight.supplyCollateral(marketWithRevertingOracle, 0, collateral, borrower);
     }
 
@@ -396,13 +423,15 @@ contract OtherFunctionsTest is BaseTest {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
-            lltv: 0.77e18,
-            maxLif: maxLif(0.77e18, 0.25e18),
+            lltv: LLTV,
+            liquidationCursor: LIQUIDATION_CURSOR,
             oracle: address(revertingOracle)
         });
 
         Market memory marketWithRevertingOracle;
         marketWithRevertingOracle.loanToken = address(loanToken);
+        marketWithRevertingOracle.chainId = block.chainid;
+        marketWithRevertingOracle.midnight = address(midnight);
         marketWithRevertingOracle.maturity = vm.getBlockTimestamp() + 100;
         marketWithRevertingOracle.collateralParams = collateralParams;
 
@@ -426,11 +455,13 @@ contract OtherFunctionsTest is BaseTest {
             ERC20 token = new ERC20("", "");
             Oracle _oracle = new Oracle();
             collateralParams[i] = CollateralParams({
-                token: address(token), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(_oracle)
+                token: address(token), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(_oracle)
             });
         }
         collateralParams = sortCollateralParams(collateralParams);
         _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = collateralParams;
         _market.rcfThreshold = 0;
@@ -440,6 +471,8 @@ contract OtherFunctionsTest is BaseTest {
         maturity = bound(maturity, vm.getBlockTimestamp() + 100 * 365 days + 1, type(uint256).max);
         Market memory longMarket;
         longMarket.loanToken = address(loanToken);
+        longMarket.chainId = block.chainid;
+        longMarket.midnight = address(midnight);
         longMarket.maturity = maturity;
         longMarket.collateralParams = market.collateralParams;
 
@@ -450,6 +483,8 @@ contract OtherFunctionsTest is BaseTest {
     function testZeroCollaterals() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         _market.collateralParams = new CollateralParams[](0);
         vm.expectRevert(IMidnight.NoCollateralParams.selector);
@@ -480,45 +515,57 @@ contract OtherFunctionsTest is BaseTest {
     function testCollateralsNotSorted() public {
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](2);
         collateralParams[0] = CollateralParams({
-            token: address(uint160(2)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(uint160(2)), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle1)
         });
         collateralParams[1] = CollateralParams({
-            token: address(uint160(1)), lltv: 0.77e18, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle2)
+            token: address(uint160(1)), lltv: LLTV, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle2)
         });
         _market.collateralParams = collateralParams;
         vm.expectRevert(IMidnight.CollateralParamsNotSorted.selector);
         midnight.touchMarket(_market);
     }
 
-    function testLltvNotAllowedAboveWad(uint256 lltv) public {
+    function testLltvNotEnabledAboveWad(uint256 lltv) public {
         lltv = bound(lltv, WAD + 1, type(uint256).max);
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
-        vm.expectRevert(IMidnight.LltvNotAllowed.selector);
+        vm.expectRevert(IMidnight.LltvNotEnabled.selector);
         midnight.touchMarket(_market);
     }
 
-    function testLltvNotAllowedBelowWad() public {
-        // 0.5e18 is not an allowed LLTV tier
+    function testLltvNotEnabledBelowWad() public {
+        // 0.5e18 is not an enabled LLTV tier
         uint256 lltv = 0.5e18;
         Market memory _market;
         _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(0.77e18, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
-        vm.expectRevert(IMidnight.LltvNotAllowed.selector);
+        vm.expectRevert(IMidnight.LltvNotEnabled.selector);
         midnight.touchMarket(_market);
     }
 
@@ -638,54 +685,45 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(collateralBitmap & (1 << collateralIndex), 0, "liquidated collateral bit should be cleared");
     }
 
-    // LIF validation tests.
+    // LiquidationCursor validation tests.
 
-    function testInvalidLif(uint256 lif) public {
-        lif = bound(lif, 0, type(uint256).max);
-        uint256 lltv = 0.77e18;
-        vm.assume(lif != maxLif(lltv, 0.25e18));
-        vm.assume(lif != maxLif(lltv, 0.5e18));
+    function testLiquidationCursorNotEnabled(uint256 liquidationCursor) public {
+        vm.assume(liquidationCursor != LIQUIDATION_CURSOR);
+        uint256 lltv = LLTV;
 
         Market memory _market;
         _market.loanToken = address(loanToken);
-        _market.maturity = vm.getBlockTimestamp() + 100;
-        CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        collateralParams[0] =
-            CollateralParams({token: address(collateralToken1), lltv: lltv, maxLif: lif, oracle: address(oracle1)});
-        _market.collateralParams = collateralParams;
-
-        vm.expectRevert(IMidnight.InvalidMaxLif.selector);
-        midnight.touchMarket(_market);
-    }
-
-    function testValidLifCursor025() public {
-        uint256 lltv = 0.77e18;
-        Market memory _market;
-        _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
         _market.maturity = vm.getBlockTimestamp() + 100;
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.25e18), oracle: address(oracle1)
+            token: address(collateralToken1), lltv: lltv, liquidationCursor: liquidationCursor, oracle: address(oracle1)
+        });
+        _market.collateralParams = collateralParams;
+
+        vm.expectRevert(IMidnight.LiquidationCursorNotEnabled.selector);
+        midnight.touchMarket(_market);
+    }
+
+    function testValidLifLiquidationCursor() public {
+        uint256 lltv = LLTV;
+        Market memory _market;
+        _market.loanToken = address(loanToken);
+        _market.chainId = block.chainid;
+        _market.midnight = address(midnight);
+        _market.maturity = vm.getBlockTimestamp() + 100;
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: LIQUIDATION_CURSOR,
+            oracle: address(oracle1)
         });
         _market.collateralParams = collateralParams;
 
         midnight.touchMarket(_market);
-        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with cursor 0.25");
-    }
-
-    function testValidLifCursor05() public {
-        uint256 lltv = 0.77e18;
-        Market memory _market;
-        _market.loanToken = address(loanToken);
-        _market.maturity = vm.getBlockTimestamp() + 200;
-        CollateralParams[] memory collateralParams = new CollateralParams[](1);
-        collateralParams[0] = CollateralParams({
-            token: address(collateralToken1), lltv: lltv, maxLif: maxLif(lltv, 0.5e18), oracle: address(oracle1)
-        });
-        _market.collateralParams = collateralParams;
-
-        midnight.touchMarket(_market);
-        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with cursor 0.5");
+        assertEq(midnight.tickSpacing(toId(_market)) > 0, true, "market created with enabled liquidationCursor");
     }
 
     function testMarketStateGetter(Market memory _market, uint256 _defaultContinuousFee) public {
@@ -781,7 +819,7 @@ contract RepayCallback {
         external
         returns (bytes32)
     {
-        require(marketId == IdLib.toId(market, block.chainid, msg.sender), "wrong marketId");
+        require(marketId == IdLib.toId(market), "wrong marketId");
         recordedId = marketId;
         _recordedMarket = market;
         recordedData = data;
