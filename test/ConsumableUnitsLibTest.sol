@@ -3,8 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
-import {TickLib} from "../src/libraries/TickLib.sol";
+import {WAD, CBP, maxSettlementFee as _maxSettlementFee} from "../src/libraries/ConstantsLib.sol";
+import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ConsumableUnitsLib} from "../src/periphery/ConsumableUnitsLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
@@ -46,6 +46,13 @@ contract ConsumableUnitsLibTest is BaseTest {
         id = toId(market);
         midnight.touchMarket(market);
 
+        // Set a non-zero settlement fee on every index. The maxUnits path must be independent of it, and the maxAssets
+        // paths already account for it, so none of the tests below should need to change.
+        for (uint256 index = 0; index <= 6; index++) {
+            uint256 fee = _maxSettlementFee(index) / CBP * CBP; // largest CBP-aligned fee for the index.
+            midnight.setMarketSettlementFee(id, index, fee);
+        }
+
         offer.market = market;
         offer.maker = borrower;
         offer.group = keccak256("consumable group");
@@ -53,55 +60,61 @@ contract ConsumableUnitsLibTest is BaseTest {
         offer.maxUnits = 100e18;
     }
 
-    function testMaxUnitsReturnsRemainingUnits() public {
-        _setConsumed(40e18);
+    /// @dev The maxUnits path returns `maxUnits - consumed` (floored at zero) and does not read the settlement fee.
+    function testFuzzMaxUnitsReturnsRemainingUnits(uint128 maxUnits, uint128 consumed) public {
+        offer.maxUnits = maxUnits;
 
-        assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), 60e18);
+        _setConsumed(consumed);
+
+        uint256 expectedUnits = uint256(maxUnits).zeroFloorSub(consumed);
+
+        assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), expectedUnits);
+        // When consumed reaches or exceeds the cap the result must be exactly zero.
+        if (consumed >= maxUnits) assertEq(expectedUnits, 0);
     }
 
-    function testMaxUnitsFloorsAtZeroWhenConsumedAboveCap() public {
-        _setConsumed(125e18);
-
-        assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), 0);
-    }
-
-    function testMaxAssetsBuyReturnsUnitsForRemainingBuyerAssets() public {
-        uint128 maxAssets = 1_000e18;
-        uint128 consumed = 250e18;
+    function testFuzzMaxAssetsBuyReturnsUnitsForRemainingBuyerAssets(uint128 maxAssets, uint128 consumed, uint256 tick)
+        public
+    {
+        // Keep the tick above MAX_TICK / 2 so offerPrice stays well above the settlement fee and the buy path never
+        // reverts on `offerPrice - settlementFee`.
+        tick = bound(tick, MAX_TICK / 2, MAX_TICK);
         offer.buy = true;
         offer.maker = lender;
         offer.maxUnits = 0;
         offer.maxAssets = maxAssets;
+        offer.tick = tick;
 
         _setConsumed(consumed);
 
-        uint256 remainingAssets = uint256(maxAssets) - consumed;
-        uint256 expectedUnits = remainingAssets.mulDivUp(WAD, TickLib.tickToPrice(offer.tick));
+        uint256 remainingAssets = uint256(maxAssets).zeroFloorSub(consumed);
+        // Independent recomputation of the buy-offer conversion (buyerPrice == offerPrice for a buy offer).
+        uint256 buyerPrice = TickLib.tickToPrice(tick);
+        uint256 expectedUnits = remainingAssets.mulDivUp(WAD, buyerPrice);
 
         assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), expectedUnits);
+        if (consumed >= maxAssets) assertEq(expectedUnits, 0);
     }
 
-    function testMaxAssetsSellReturnsUnitsForRemainingSellerAssets() public {
-        uint128 maxAssets = 1_000e18;
-        uint128 consumed = 250e18;
+    function testFuzzMaxAssetsSellReturnsUnitsForRemainingSellerAssets(
+        uint128 maxAssets,
+        uint128 consumed,
+        uint256 tick
+    ) public {
+        tick = bound(tick, MAX_TICK / 2, MAX_TICK);
         offer.maxUnits = 0;
         offer.maxAssets = maxAssets;
+        offer.tick = tick;
 
         _setConsumed(consumed);
 
-        uint256 remainingAssets = uint256(maxAssets) - consumed;
-        uint256 expectedUnits = remainingAssets.mulDivDown(WAD, TickLib.tickToPrice(offer.tick));
+        uint256 remainingAssets = uint256(maxAssets).zeroFloorSub(consumed);
+        // Independent recomputation of the sell-offer conversion (sellerPrice == offerPrice for a sell offer).
+        uint256 sellerPrice = TickLib.tickToPrice(tick);
+        uint256 expectedUnits = remainingAssets.mulDivDown(WAD, sellerPrice);
 
         assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), expectedUnits);
-    }
-
-    function testMaxAssetsFloorsAtZeroWhenConsumedAboveCap() public {
-        offer.maxUnits = 0;
-        offer.maxAssets = 100e18;
-
-        _setConsumed(125e18);
-
-        assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), 0);
+        if (consumed >= maxAssets) assertEq(expectedUnits, 0);
     }
 
     function _setConsumed(uint128 amount) internal {
