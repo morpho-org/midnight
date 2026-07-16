@@ -25,7 +25,7 @@ prices per address. Scope: a 3-collateral market with up to 3 active collaterals
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
@@ -39,7 +39,7 @@ methods {
 
     // Market already created; skip touchMarket's creation branch (borrower has debt).
     function touchMarket(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Well-behaved tokens (transfers never revert).
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
@@ -140,7 +140,7 @@ function threeCollatSetup(env e, Midnight.Market market, bytes32 id, address bor
     require e.block.timestamp <= max_uint64, "timestamp fits in uint64";
     require market.maturity <= max_uint64, "maturity fits in uint64";
 
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     require totalUnits(id) >= _debt, "totalUnits = sumDebt + withdrawable >= this borrower's debt (Midnight.spec)";
     require withdrawable(id) + _debt <= max_uint128, "withdrawable + debt <= sumDebt + withdrawable = totalUnits <= uint128 max (Midnight.spec)";
     require !liquidationLocked(id, borrower), "transient lock is zero at tx start";
@@ -174,7 +174,7 @@ function debtAfterBadDebt(Midnight.Market market, bytes32 id, address borrower) 
     mathint recovery0 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 0), ghostPrice(market.collateralParams[0].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[0].maxLif);
     mathint recovery1 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 1), ghostPrice(market.collateralParams[1].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[1].maxLif);
     mathint recovery2 = ghostMulDivUp(ghostMulDivUp(collateral(id, borrower, 2), ghostPrice(market.collateralParams[2].oracle), ORACLE_PRICE_SCALE()), WAD(), market.collateralParams[2].maxLif);
-    mathint _debt = debtOf(id, borrower);
+    mathint _debt = debt(id, borrower);
     mathint badDebt = _debt > recovery0 + recovery1 + recovery2 ? _debt - recovery0 - recovery1 - recovery2 : 0;
     return _debt - badDebt;
 }
@@ -227,7 +227,7 @@ rule unhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market market
 
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
     require _debt > maxDebtSum(market, id, borrower), "unhealthy: debt > maxDebt";
 
@@ -238,7 +238,7 @@ rule unhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market market
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, false, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// Unhealthy, lltv < WAD: maxRepaid is finite, so the safe interval is additionally capped by repaidUnits <= maxRepaid.
@@ -252,7 +252,7 @@ rule unhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market market,
 
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint maxDebt = maxDebtSum(market, id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
     require _debt > maxDebt, "unhealthy: debt > maxDebt";
@@ -272,7 +272,7 @@ rule unhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market market,
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, false, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// Post-maturity: liquidatable by expiry alone (no health check), RCF / `debt - maxDebt` block skipped. lif <=
@@ -286,7 +286,7 @@ rule postMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market, add
     uint256 maxLif = getMaxLif(collateralIndex, market.collateralParams);
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
 
     require repaidUnits > 0;
@@ -296,7 +296,7 @@ rule postMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market, add
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, 0, repaidUnits, borrower, true, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// SEIZE PATH (seizedAssets > 0, repaidUnits = 0): contract derives repaidUnits = mulDivUp(mulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE), WAD, lif).
@@ -312,7 +312,7 @@ rule seizeUnhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market m
 
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
     require _debt > maxDebtSum(market, id, borrower), "unhealthy: debt > maxDebt";
 
@@ -325,7 +325,7 @@ rule seizeUnhealthyLltvFullLiquidatableForAnySafeAmount(env e, Midnight.Market m
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, false, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// Seize path, unhealthy, lltv < WAD: RCF caps the derived repaidUnits by maxRepaid; same scaffolding applies.
@@ -339,7 +339,7 @@ rule seizeUnhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market ma
 
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint maxDebt = maxDebtSum(market, id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
     require _debt > maxDebt, "unhealthy: debt > maxDebt";
@@ -361,7 +361,7 @@ rule seizeUnhealthyLowLltvLiquidatableForAnySafeAmount(env e, Midnight.Market ma
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, false, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// Seize path, post-maturity: no RCF. lif >= WAD, and the derived repaidUnits = mulDivUp(quote, WAD, lif) is
@@ -374,7 +374,7 @@ rule seizePostMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market
 
     uint128 collatJ = collateral(id, borrower, collateralIndex);
     uint256 priceJ = getPrice(collateralIndex, market.collateralParams);
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
     mathint debtAfter = debtAfterBadDebt(market, id, borrower);
 
     mathint quoteUp = ghostMulDivUp(seizedAssets, priceJ, ORACLE_PRICE_SCALE());
@@ -386,7 +386,7 @@ rule seizePostMaturityLiquidatableForAnySafeAmount(env e, Midnight.Market market
     bytes data;
     liquidate@withrevert(e, market, collateralIndex, seizedAssets, 0, borrower, true, receiver, 0, data);
     assert !lastReverted;
-    assert debtOf(id, borrower) < _debt;
+    assert debt(id, borrower) < _debt;
 }
 
 /// BAD-DEBT WITNESS (repaidUnits = 0, seizedAssets = 0): any liquidatable borrower can be liquidated with the
@@ -397,7 +397,7 @@ rule badDebtCanBeLiquidated(env e, Midnight.Market market, address borrower, add
 
     require postMaturityMode ? e.block.timestamp > market.maturity : !isHealthy(market, id, borrower), "borrower is liquidatable in the chosen mode";
 
-    uint256 _debt = debtOf(id, borrower);
+    uint256 _debt = debt(id, borrower);
 
     // (0,0) skips the seize/RCF/underflow block, so the call's only debt effect is the bad-debt write-down:
     // post-debt == debt - badDebt == debtAfterBadDebt. Hence bad debt to realize (debtAfter < debt) => debt strictly drops.
@@ -406,5 +406,5 @@ rule badDebtCanBeLiquidated(env e, Midnight.Market market, address borrower, add
     bytes data;
     liquidate@withrevert(e, market, 0, 0, 0, borrower, postMaturityMode, receiver, 0, data);
     assert !lastReverted;
-    assert debtAfter < _debt => debtOf(id, borrower) < _debt;
+    assert debtAfter < _debt => debt(id, borrower) < _debt;
 }
