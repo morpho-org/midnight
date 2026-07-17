@@ -28,7 +28,7 @@ contract BlueBuyCallbackFactoryTest is Test {
 
     function testCreateBlueBuyCallback() public {
         vm.prank(owner);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(owner);
         address callbackAddress = factory.callbackOf(owner);
         BlueBuyCallback callback = BlueBuyCallback(callbackAddress);
 
@@ -42,7 +42,7 @@ contract BlueBuyCallbackFactoryTest is Test {
     function testCreateBlueBuyCallbackEmitsEvent() public {
         vm.recordLogs();
         vm.prank(owner);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(owner);
         address callback = factory.callbackOf(owner);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -55,18 +55,18 @@ contract BlueBuyCallbackFactoryTest is Test {
 
     function testCreateBlueBuyCallbackRevertsIfAlreadyCreated() public {
         vm.startPrank(owner);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(owner);
 
         vm.expectRevert(IBlueBuyCallbackFactory.AlreadyCreated.selector);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(owner);
         vm.stopPrank();
     }
 
     function testCreateBlueBuyCallbackDifferentOwners() public {
         vm.prank(owner);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(owner);
         vm.prank(otherOwner);
-        factory.createBlueBuyCallback();
+        factory.createBlueBuyCallback(otherOwner);
 
         address callback = factory.callbackOf(owner);
         address otherCallback = factory.callbackOf(otherOwner);
@@ -74,6 +74,17 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertTrue(callback != otherCallback);
         assertEq(factory.callbackOf(owner), callback);
         assertEq(factory.callbackOf(otherOwner), otherCallback);
+    }
+
+    function testCreateBlueBuyCallbackForOtherOwner() public {
+        address caller = makeAddr("caller");
+
+        vm.prank(caller);
+        factory.createBlueBuyCallback(owner);
+
+        address callback = factory.callbackOf(owner);
+        assertEq(BlueBuyCallback(callback).OWNER(), owner);
+        assertTrue(blue.isAuthorized(callback, owner));
     }
 }
 
@@ -84,11 +95,11 @@ contract MockFactoryBlue is IBlue {
         isAuthorized[msg.sender][authorized] = newIsAuthorized;
     }
 
-    function withdraw(BlueMarketParams memory, uint256, uint256, address, address)
+    function withdraw(BlueMarketParams memory, uint256 assets, uint256 shares, address, address)
         external
         pure
         returns (uint256, uint256)
     {
-        return (0, 0);
+        return (assets, shares);
     }
 }

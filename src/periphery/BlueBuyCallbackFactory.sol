@@ -16,12 +16,12 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
         BLUE = _blue;
     }
 
-    function createBlueBuyCallback() external {
-        require(callbackOf[msg.sender] == address(0), AlreadyCreated());
+    function createBlueBuyCallback(address owner) external {
+        require(callbackOf[owner] == address(0), AlreadyCreated());
 
-        address callback = address(new BlueBuyCallback(msg.sender, MIDNIGHT, BLUE));
-        callbackOf[msg.sender] = callback;
+        address callback = address(new BlueBuyCallback(owner, MIDNIGHT, BLUE));
+        callbackOf[owner] = callback;
 
-        emit CreateBlueBuyCallback(msg.sender, callback);
+        emit CreateBlueBuyCallback(owner, callback);
     }
 }

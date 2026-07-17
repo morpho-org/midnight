@@ -104,7 +104,7 @@ contract MockBlue is IBlue {
         recordedAssets = assets;
         recordedShares = shares;
 
-        ERC20(marketParams.loanToken).transfer(receiver, assets);
+        require(ERC20(marketParams.loanToken).transfer(receiver, assets));
         return (assets, shares);
     }
 }
