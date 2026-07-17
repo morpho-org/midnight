@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
+import {IMorpho, MarketParams} from "morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
-import {BlueMarketParams, IBlue} from "./interfaces/IBlue.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 
 contract BlueBuyCallback is IBlueBuyCallback {
@@ -17,7 +17,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         MIDNIGHT = _midnight;
         BLUE = _blue;
 
-        IBlue(BLUE).setAuthorization(OWNER, true);
+        IMorpho(BLUE).setAuthorization(OWNER, true);
     }
 
     function onBuy(
@@ -32,10 +32,10 @@ contract BlueBuyCallback is IBlueBuyCallback {
         require(msg.sender == MIDNIGHT, NotMidnight());
         require(buyer == OWNER, NotOwnerBuyer());
 
-        BlueMarketParams memory blueMarketParams = abi.decode(data, (BlueMarketParams));
+        MarketParams memory blueMarketParams = abi.decode(data, (MarketParams));
         require(blueMarketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
-        IBlue(BLUE).withdraw(blueMarketParams, buyerAssets, 0, address(this), address(this));
+        if (buyerAssets > 0) IMorpho(BLUE).withdraw(blueMarketParams, buyerAssets, 0, address(this), address(this));
         safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
 
         return CALLBACK_SUCCESS;

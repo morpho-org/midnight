@@ -16,3 +16,13 @@ exclude_lints = [
     "incorrect-shift",
     "block-timestamp",
 ]
+
+[[profile.default.compilation_restrictions]]
+paths = "src/imports/MorphoImport.sol"
+optimizer_runs = 999999
+evm_version = "paris"
+
+[[profile.default.additional_compiler_profiles]]
+name = "999999-paris"
+optimizer_runs = 999999
+evm_version = "paris"

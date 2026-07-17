@@ -4,20 +4,20 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {Vm} from "../lib/forge-std/src/Vm.sol";
+import {IMorpho} from "morpho-blue/src/interfaces/IMorpho.sol";
 import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
 import {BlueBuyCallbackFactory} from "../src/periphery/BlueBuyCallbackFactory.sol";
-import {BlueMarketParams, IBlue} from "../src/periphery/interfaces/IBlue.sol";
 import {IBlueBuyCallbackFactory} from "../src/periphery/interfaces/IBlueBuyCallbackFactory.sol";
 
 contract BlueBuyCallbackFactoryTest is Test {
     address internal midnight = makeAddr("midnight");
     address internal owner = makeAddr("owner");
     address internal otherOwner = makeAddr("otherOwner");
-    MockFactoryBlue internal blue;
+    IMorpho internal blue;
     BlueBuyCallbackFactory internal factory;
 
     function setUp() public {
-        blue = new MockFactoryBlue();
+        blue = IMorpho(deployCode("Morpho.sol", abi.encode(address(this))));
         factory = new BlueBuyCallbackFactory(midnight, address(blue));
     }
 
@@ -85,21 +85,5 @@ contract BlueBuyCallbackFactoryTest is Test {
         address callback = factory.callbackOf(owner);
         assertEq(BlueBuyCallback(callback).OWNER(), owner);
         assertTrue(blue.isAuthorized(callback, owner));
-    }
-}
-
-contract MockFactoryBlue is IBlue {
-    mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
-
-    function setAuthorization(address authorized, bool newIsAuthorized) external {
-        isAuthorized[msg.sender][authorized] = newIsAuthorized;
-    }
-
-    function withdraw(BlueMarketParams memory, uint256 assets, uint256 shares, address, address)
-        external
-        pure
-        returns (uint256, uint256)
-    {
-        return (assets, shares);
     }
 }

@@ -3,10 +3,10 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
+import {IMorpho, MarketParams} from "morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
-import {BlueMarketParams, IBlue} from "../src/periphery/interfaces/IBlue.sol";
 import {IBlueBuyCallback} from "../src/periphery/interfaces/IBlueBuyCallback.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 
@@ -15,16 +15,16 @@ contract BlueBuyCallbackTest is Test {
     ERC20 internal loanToken;
     ERC20 internal otherToken;
     MockMidnight internal midnight;
-    MockBlue internal blue;
+    IMorpho internal blue;
     BlueBuyCallback internal callback;
     Market internal market;
-    BlueMarketParams internal blueMarketParams;
+    MarketParams internal blueMarketParams;
 
     function setUp() public {
         loanToken = new ERC20("loan", "LOAN");
         otherToken = new ERC20("other", "OTHER");
         midnight = new MockMidnight();
-        blue = new MockBlue();
+        blue = IMorpho(deployCode("Morpho.sol", abi.encode(address(this))));
         callback = new BlueBuyCallback(owner, address(midnight), address(blue));
 
         market.midnight = address(midnight);
@@ -32,8 +32,12 @@ contract BlueBuyCallbackTest is Test {
         blueMarketParams.loanToken = address(loanToken);
         blueMarketParams.collateralToken = makeAddr("collateralToken");
         blueMarketParams.oracle = makeAddr("oracle");
-        blueMarketParams.irm = makeAddr("irm");
+        blueMarketParams.irm = address(0);
         blueMarketParams.lltv = 0.86e18;
+
+        blue.enableIrm(blueMarketParams.irm);
+        blue.enableLltv(blueMarketParams.lltv);
+        blue.createMarket(blueMarketParams);
     }
 
     function testConstructorAuthorizesOwnerOnBlue() public view {
@@ -41,19 +45,19 @@ contract BlueBuyCallbackTest is Test {
     }
 
     function testOnBuyWithdrawsAndApproves(uint256 buyerAssets) public {
-        buyerAssets = bound(buyerAssets, 0, type(uint128).max);
-        deal(address(loanToken), address(blue), buyerAssets);
+        buyerAssets = bound(buyerAssets, 0, 1e30);
+        if (buyerAssets > 0) {
+            deal(address(loanToken), address(this), buyerAssets);
+            require(loanToken.approve(address(blue), buyerAssets));
+            blue.supply(blueMarketParams, buyerAssets, 0, address(callback), hex"");
+        }
 
         vm.prank(address(midnight));
         bytes32 result = callback.onBuy(bytes32(0), market, buyerAssets, 0, 0, owner, abi.encode(blueMarketParams));
 
         assertEq(result, CALLBACK_SUCCESS);
-        assertEq(blue.recordedOnBehalf(), address(callback));
-        assertEq(blue.recordedReceiver(), address(callback));
-        assertEq(blue.recordedAssets(), buyerAssets);
-        assertEq(blue.recordedShares(), 0);
-        assertEq(blue.recordedLoanToken(), address(loanToken));
         assertEq(loanToken.balanceOf(address(callback)), buyerAssets);
+        assertEq(loanToken.balanceOf(address(blue)), 0);
         assertEq(loanToken.allowance(address(callback), address(midnight)), buyerAssets);
     }
 
@@ -78,33 +82,3 @@ contract BlueBuyCallbackTest is Test {
 }
 
 contract MockMidnight {}
-
-contract MockBlue is IBlue {
-    mapping(address authorizer => mapping(address authorized => bool)) public isAuthorized;
-    address public recordedOnBehalf;
-    address public recordedReceiver;
-    address public recordedLoanToken;
-    uint256 public recordedAssets;
-    uint256 public recordedShares;
-
-    function setAuthorization(address authorized, bool newIsAuthorized) external {
-        isAuthorized[msg.sender][authorized] = newIsAuthorized;
-    }
-
-    function withdraw(
-        BlueMarketParams memory marketParams,
-        uint256 assets,
-        uint256 shares,
-        address onBehalf,
-        address receiver
-    ) external returns (uint256, uint256) {
-        recordedOnBehalf = onBehalf;
-        recordedReceiver = receiver;
-        recordedLoanToken = marketParams.loanToken;
-        recordedAssets = assets;
-        recordedShares = shares;
-
-        require(ERC20(marketParams.loanToken).transfer(receiver, assets));
-        return (assets, shares);
-    }
-}
