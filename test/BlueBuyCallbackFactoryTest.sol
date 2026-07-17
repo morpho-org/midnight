@@ -36,6 +36,7 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertEq(callback.OWNER(), owner);
         assertEq(callback.MIDNIGHT(), midnight);
         assertEq(callback.BLUE(), address(blue));
+        assertTrue(factory.isBlueCallback(callbackAddress));
         assertTrue(blue.isAuthorized(callbackAddress, owner));
     }
 
@@ -46,11 +47,11 @@ contract BlueBuyCallbackFactoryTest is Test {
         address callback = factory.callbackOf(owner);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(logs.length, 1);
-        assertEq(logs[0].emitter, address(factory));
-        assertEq(logs[0].topics[0], IBlueBuyCallbackFactory.CreateBlueBuyCallback.selector);
-        assertEq(logs[0].topics[1], bytes32(uint256(uint160(owner))));
-        assertEq(abi.decode(logs[0].data, (address)), callback);
+        assertEq(logs.length, 2);
+        assertEq(logs[1].emitter, address(factory));
+        assertEq(logs[1].topics[0], IBlueBuyCallbackFactory.CreateBlueBuyCallback.selector);
+        assertEq(logs[1].topics[1], bytes32(uint256(uint160(owner))));
+        assertEq(abi.decode(logs[1].data, (address)), callback);
     }
 
     function testCreateBlueBuyCallbackRevertsIfAlreadyCreated() public {
@@ -85,5 +86,9 @@ contract BlueBuyCallbackFactoryTest is Test {
         address callback = factory.callbackOf(owner);
         assertEq(BlueBuyCallback(callback).OWNER(), owner);
         assertTrue(blue.isAuthorized(callback, owner));
+    }
+
+    function testIsBlueCallbackFalseForUnknownAddress(address account) public view {
+        assertFalse(factory.isBlueCallback(account));
     }
 }

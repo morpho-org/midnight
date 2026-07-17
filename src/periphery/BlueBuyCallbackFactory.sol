@@ -10,6 +10,7 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
     address public immutable BLUE;
 
     mapping(address owner => address) public callbackOf;
+    mapping(address callback => bool) public isBlueCallback;
 
     constructor(address _midnight, address _blue) {
         MIDNIGHT = _midnight;
@@ -21,6 +22,7 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
 
         address callback = address(new BlueBuyCallback(owner, MIDNIGHT, BLUE));
         callbackOf[owner] = callback;
+        isBlueCallback[callback] = true;
 
         emit CreateBlueBuyCallback(owner, callback);
     }
