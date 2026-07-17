@@ -46,8 +46,6 @@ contract ConsumableUnitsLibTest is BaseTest {
         id = toId(market);
         midnight.touchMarket(market);
 
-        // Set a non-zero settlement fee on every index. The maxUnits path must be independent of it, and the maxAssets
-        // paths already account for it, so none of the tests below should need to change.
         for (uint256 index = 0; index <= 6; index++) {
             uint256 fee = _maxSettlementFee(index) / CBP * CBP; // largest CBP-aligned fee for the index.
             midnight.setMarketSettlementFee(id, index, fee);
@@ -60,7 +58,6 @@ contract ConsumableUnitsLibTest is BaseTest {
         offer.maxUnits = 100e18;
     }
 
-    /// @dev The maxUnits path returns `maxUnits - consumed` (floored at zero) and does not read the settlement fee.
     function testFuzzMaxUnitsReturnsRemainingUnits(uint128 maxUnits, uint128 consumed) public {
         offer.maxUnits = maxUnits;
 
@@ -69,15 +66,13 @@ contract ConsumableUnitsLibTest is BaseTest {
         uint256 expectedUnits = uint256(maxUnits).zeroFloorSub(consumed);
 
         assertEq(ConsumableUnitsLib.consumableUnits(address(midnight), id, offer), expectedUnits);
-        // When consumed reaches or exceeds the cap the result must be exactly zero.
         if (consumed >= maxUnits) assertEq(expectedUnits, 0);
     }
 
     function testFuzzMaxAssetsBuyReturnsUnitsForRemainingBuyerAssets(uint128 maxAssets, uint128 consumed, uint256 tick)
         public
     {
-        // Keep the tick above MAX_TICK / 2 so offerPrice stays well above the settlement fee and the buy path never
-        // reverts on `offerPrice - settlementFee`.
+        // Keep the tick above MAX_TICK / 2 so that the computation offerPrice - settlementFee doesn't revert.
         tick = bound(tick, MAX_TICK / 2, MAX_TICK);
         offer.buy = true;
         offer.maker = lender;
@@ -88,7 +83,6 @@ contract ConsumableUnitsLibTest is BaseTest {
         _setConsumed(consumed);
 
         uint256 remainingAssets = uint256(maxAssets).zeroFloorSub(consumed);
-        // Independent recomputation of the buy-offer conversion (buyerPrice == offerPrice for a buy offer).
         uint256 buyerPrice = TickLib.tickToPrice(tick);
         uint256 expectedUnits = remainingAssets.mulDivUp(WAD, buyerPrice);
 
@@ -101,7 +95,8 @@ contract ConsumableUnitsLibTest is BaseTest {
         uint128 consumed,
         uint256 tick
     ) public {
-        tick = bound(tick, MAX_TICK / 2, MAX_TICK);
+        // Tick corresponding to a non-zero price, so that the expectedUnits computation doesn't revert.
+        tick = bound(tick, 2, MAX_TICK);
         offer.maxUnits = 0;
         offer.maxAssets = maxAssets;
         offer.tick = tick;
@@ -109,7 +104,6 @@ contract ConsumableUnitsLibTest is BaseTest {
         _setConsumed(consumed);
 
         uint256 remainingAssets = uint256(maxAssets).zeroFloorSub(consumed);
-        // Independent recomputation of the sell-offer conversion (sellerPrice == offerPrice for a sell offer).
         uint256 sellerPrice = TickLib.tickToPrice(tick);
         uint256 expectedUnits = remainingAssets.mulDivDown(WAD, sellerPrice);
 
