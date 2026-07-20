@@ -28,10 +28,12 @@ contract BlueBuyCallbackFactoryTest is Test {
 
     function testCreateBlueBuyCallback() public {
         vm.prank(owner);
-        factory.createBlueBuyCallback(owner);
-        address callbackAddress = factory.callbackOf(owner);
+        address callbackAddress = factory.createBlueBuyCallback(owner);
         BlueBuyCallback callback = BlueBuyCallback(callbackAddress);
+        bytes32 initCodeHash =
+            keccak256(abi.encodePacked(type(BlueBuyCallback).creationCode, abi.encode(owner, midnight, address(blue))));
 
+        assertEq(callbackAddress, vm.computeCreate2Address(bytes32(0), initCodeHash, address(factory)));
         assertEq(factory.callbackOf(owner), callbackAddress);
         assertEq(callback.OWNER(), owner);
         assertEq(callback.MIDNIGHT(), midnight);

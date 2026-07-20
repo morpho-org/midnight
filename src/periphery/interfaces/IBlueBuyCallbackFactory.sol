@@ -16,5 +16,5 @@ interface IBlueBuyCallbackFactory {
     function isBlueCallback(address callback) external view returns (bool);
 
     /// FUNCTIONS ///
-    function createBlueBuyCallback(address owner) external;
+    function createBlueBuyCallback(address owner) external returns (address callback);
 }
