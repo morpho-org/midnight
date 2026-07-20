@@ -61,15 +61,22 @@ contract BlueBuyCallbackTest is Test {
         assertEq(loanToken.allowance(address(callback), address(midnight)), type(uint256).max);
     }
 
-    function testOnBuyRevertsIfCallerIsNotMidnight() public {
+    function testOnBuyWithdrawsAndApprovesZeroAssets() public {
+        testOnBuyWithdrawsAndApproves(0);
+    }
+
+    function testOnBuyRevertsIfCallerIsNotMidnight(address caller) public {
+        vm.assume(caller != address(midnight));
         vm.expectRevert(IBlueBuyCallback.NotMidnight.selector);
+        vm.prank(caller);
         callback.onBuy(bytes32(0), market, 0, 0, 0, owner, abi.encode(blueMarketParams));
     }
 
-    function testOnBuyRevertsIfBuyerIsNotOwner() public {
+    function testOnBuyRevertsIfBuyerIsNotOwner(address buyer) public {
+        vm.assume(buyer != owner);
         vm.expectRevert(IBlueBuyCallback.NotOwnerBuyer.selector);
         vm.prank(address(midnight));
-        callback.onBuy(bytes32(0), market, 0, 0, 0, address(callback), abi.encode(blueMarketParams));
+        callback.onBuy(bytes32(0), market, 0, 0, 0, buyer, abi.encode(blueMarketParams));
     }
 
     function testOnBuyRevertsIfLoanTokenIsInconsistent() public {
