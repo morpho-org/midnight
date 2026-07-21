@@ -11,7 +11,7 @@
 // However, this would result in a different revert, if the mulDiv is never called.
 // This spec checks for overflows at the end, showing that if there is no other reason the
 // call would have reverted the mulDiv didn't overflow.
-// Thus the mulDiv did not singlehandedly cause the revert.
+// Thus, the mulDiv did not singlehandedly cause the revert.
 
 using Utils as Utils;
 
@@ -88,9 +88,9 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (product > max_uint256) {
         // overflow in mulDivDown
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
-            // we explicitly allow the revert when some user's collateral is priced at too many debt units
-            // this asserts double-checks that this only happens in this case.
-            // gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
+            // Explicitly allow to revert when some user's collateral is priced at too many debt units
+            // This assert double-checks that a revert only happens in this case.
+            // Gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
             assert lastCollateralAmount * lastOraclePrice / ORACLE_PRICE_SCALE() > max_uint128, "collateral worth more than max_uint128 debt units";
             revert();
         } else {
@@ -114,9 +114,9 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (product > max_uint256 || (d > 0 && product + d - 1 > max_uint256)) {
         // overflow in mulDivUp
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
-            // we explicitly allow the revert when some user's collateral is priced at too many debt units
-            // this asserts double-checks that this only happens in this case.
-            // gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
+            // Explicitly allow to revert when some user's collateral is priced at too many debt units
+            // This assert double-checks that a revert only happens in this case.
+            // Gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
             assert lastCollateralAmount * lastOraclePrice / ORACLE_PRICE_SCALE() > max_uint128, "collateral worth more than max_uint128 debt units";
             revert();
         } else {
