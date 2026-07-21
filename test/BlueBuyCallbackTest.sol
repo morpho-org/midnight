@@ -94,7 +94,7 @@ contract BlueBuyCallbackTest is Test {
         Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp - 1);
         Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
 
-        vm.expectRevert(IBlueBuyCallback.Expired.selector);
+        vm.expectRevert(IBlueBuyCallback.AuthorizationExpired.selector);
         signedCallback.setAuthorizationWithSig(authorization, signature);
     }
 

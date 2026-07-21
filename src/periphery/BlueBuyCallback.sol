@@ -40,7 +40,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
     }
 
     function setAuthorizationWithSig(Authorization memory authorization, Signature calldata signature) external {
-        require(block.timestamp <= authorization.deadline, Expired());
+        require(block.timestamp <= authorization.deadline, AuthorizationExpired());
         require(authorization.nonce == nonce++, InvalidNonce());
 
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));

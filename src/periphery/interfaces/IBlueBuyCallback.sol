@@ -8,7 +8,7 @@ import {Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/
 interface IBlueBuyCallback is IBuyCallback {
     /// ERRORS ///
     error ApproveReturnedFalse();
-    error Expired();
+    error AuthorizationExpired();
     error InconsistentLoanToken();
     error InvalidNonce();
     error InvalidSignature();
