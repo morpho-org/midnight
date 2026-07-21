@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Proves that the onlye overflows in mulDivDown and mulDivUp that can cause a revert are
-// the ones that compute the value of a collateral against the oracle price. These can
-// only overflow if the collateral is priced at more than max_uint128 debt units, which is
-// a documented limitation.
+// Proves that the only overflows in mulDivDown and mulDivUp that can cause a revert are
+// the ones that compute the value of a collateral against the oracle price.
+// These can only overflow if the collateral is priced at more than max_uint128 debt units,
+// which is documented in Midnight.sol.
 
-// Strictly speaking, other mulDivDown/mulDivUp may revert due to overflow. This spec
-// checks for overflows at the end, showing that if there is no other reason the
-// call would have reverted the mulDiv didn't overflow. Thus the mulDiv did not
-// singlehandedly cause the revert.
+// Strictly speaking, other mulDivDown/mulDivUp may revert due to overflow, e.g.,
+// for withdraw a mulDiv can revert for very large values of units > 2^128.
+// However, this would result in a different revert, if the mulDiv is never called.
+// This spec checks for overflows at the end, showing that if there is no other reason the
+// call would have reverted the mulDiv didn't overflow.
+// Thus the mulDiv did not singlehandedly cause the revert.
 
 using Utils as Utils;
 
@@ -88,7 +90,7 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
             // we explicitly allow the revert when some user's collateral is priced at too many debt units
             // this asserts double-checks that this only happens in this case.
-            // gap: here we assume that collateral and oracle price match.
+            // gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
             assert lastCollateralAmount * lastOraclePrice / ORACLE_PRICE_SCALE() > max_uint128, "collateral worth more than max_uint128 debt units";
             revert();
         } else {
@@ -114,7 +116,7 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
             // we explicitly allow the revert when some user's collateral is priced at too many debt units
             // this asserts double-checks that this only happens in this case.
-            // gap: here we assume that collateral and oracle price match.
+            // gap: here we assume that collateral and oracle price match. A bug where the wrong collateral index is used for the oracle is not detected by this spec.
             assert lastCollateralAmount * lastOraclePrice / ORACLE_PRICE_SCALE() > max_uint128, "collateral worth more than max_uint128 debt units";
             revert();
         } else {
