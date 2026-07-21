@@ -9,10 +9,14 @@ interface IBlueBuyCallback is IBuyCallback {
     error ApproveReturnedFalse();
     error InconsistentLoanToken();
     error NotMidnight();
+    error NotOwner();
     error NotOwnerBuyer();
 
     /// STORAGE GETTERS ///
     function OWNER() external view returns (address);
     function MIDNIGHT() external view returns (address);
     function BLUE() external view returns (address);
+
+    /// FUNCTIONS ///
+    function setAuthorization(address authorized, bool newIsAuthorized) external;
 }

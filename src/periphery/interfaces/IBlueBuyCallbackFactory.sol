@@ -3,9 +3,6 @@
 pragma solidity >=0.5.0;
 
 interface IBlueBuyCallbackFactory {
-    /// ERRORS ///
-    error AlreadyCreated();
-
     /// EVENTS ///
     event CreateBlueBuyCallback(address indexed owner, address callback);
 
@@ -16,5 +13,5 @@ interface IBlueBuyCallbackFactory {
     function isBlueCallback(address callback) external view returns (bool);
 
     /// FUNCTIONS ///
-    function createBlueBuyCallback(address owner) external returns (address callback);
+    function createBlueBuyCallback(address owner) external returns (address);
 }

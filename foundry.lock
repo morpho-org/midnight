@@ -1,14 +1,8 @@
 {
   "lib/forge-std": {
-    "tag": {
-      "name": "v1.14.0",
-      "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
-    }
+    "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
   },
   "lib/morpho-blue": {
-    "tag": {
-      "name": "v1.0.0",
-      "rev": "55d2d99304fb3fb930c688462ae2ccabb1d533ad"
-    }
+    "rev": "528ccf43568e2f45ccd14fb2dcfcbaf46311f398"
   }
 }

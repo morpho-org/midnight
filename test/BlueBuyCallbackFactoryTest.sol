@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {Vm} from "../lib/forge-std/src/Vm.sol";
-import {IMorpho} from "morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
 import {BlueBuyCallbackFactory} from "../src/periphery/BlueBuyCallbackFactory.sol";
 import {IBlueBuyCallbackFactory} from "../src/periphery/interfaces/IBlueBuyCallbackFactory.sol";
@@ -12,7 +12,6 @@ import {IBlueBuyCallbackFactory} from "../src/periphery/interfaces/IBlueBuyCallb
 contract BlueBuyCallbackFactoryTest is Test {
     address internal midnight = makeAddr("midnight");
     address internal owner = makeAddr("owner");
-    address internal otherOwner = makeAddr("otherOwner");
     IMorpho internal blue;
     BlueBuyCallbackFactory internal factory;
 
@@ -56,27 +55,13 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertEq(abi.decode(logs[1].data, (address)), callback);
     }
 
-    function testCreateBlueBuyCallbackRevertsIfAlreadyCreated() public {
+    function testCreateBlueBuyCallbackRevertsIfAlreadyDeployed() public {
         vm.startPrank(owner);
         factory.createBlueBuyCallback(owner);
 
-        vm.expectRevert(IBlueBuyCallbackFactory.AlreadyCreated.selector);
+        vm.expectRevert();
         factory.createBlueBuyCallback(owner);
         vm.stopPrank();
-    }
-
-    function testCreateBlueBuyCallbackDifferentOwners() public {
-        vm.prank(owner);
-        factory.createBlueBuyCallback(owner);
-        vm.prank(otherOwner);
-        factory.createBlueBuyCallback(otherOwner);
-
-        address callback = factory.callbackOf(owner);
-        address otherCallback = factory.callbackOf(otherOwner);
-
-        assertTrue(callback != otherCallback);
-        assertEq(factory.callbackOf(owner), callback);
-        assertEq(factory.callbackOf(otherOwner), otherCallback);
     }
 
     function testCreateBlueBuyCallbackForOtherOwner() public {

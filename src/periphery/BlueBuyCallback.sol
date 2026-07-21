@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, MarketParams} from "morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
@@ -16,6 +16,8 @@ interface IERC20 {
 /// making the owner buy dummy credit on Midnight.
 /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is too
 /// small.
+/// @dev No-ops are not systematically prevented.
+/// @dev Zero checks are not systematically performed.
 contract BlueBuyCallback is IBlueBuyCallback {
     address public immutable OWNER;
     address public immutable MIDNIGHT;
@@ -27,6 +29,11 @@ contract BlueBuyCallback is IBlueBuyCallback {
         BLUE = _blue;
 
         IMorpho(BLUE).setAuthorization(OWNER, true);
+    }
+
+    function setAuthorization(address authorized, bool newIsAuthorized) external {
+        require(msg.sender == OWNER, NotOwner());
+        IMorpho(BLUE).setAuthorization(authorized, newIsAuthorized);
     }
 
     function onBuy(

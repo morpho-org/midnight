@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {IMorpho, MarketParams} from "morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
@@ -42,6 +42,30 @@ contract BlueBuyCallbackTest is Test {
 
     function testConstructorAuthorizesOwnerOnBlue() public view {
         assertTrue(blue.isAuthorized(address(callback), owner));
+    }
+
+    function testSetAuthorization() public {
+        address authorized = makeAddr("authorized");
+
+        vm.prank(owner);
+        callback.setAuthorization(authorized, true);
+
+        assertTrue(blue.isAuthorized(address(callback), authorized));
+    }
+
+    function testSetAuthorizationCanRevoke() public {
+        address authorized = makeAddr("authorized");
+        vm.startPrank(owner);
+        callback.setAuthorization(authorized, true);
+        callback.setAuthorization(authorized, false);
+        vm.stopPrank();
+
+        assertFalse(blue.isAuthorized(address(callback), authorized));
+    }
+
+    function testSetAuthorizationRevertsIfCallerIsNotOwner() public {
+        vm.expectRevert(IBlueBuyCallback.NotOwner.selector);
+        callback.setAuthorization(makeAddr("authorized"), true);
     }
 
     function testOnBuyWithdrawsAndApproves(uint256 buyerAssets) public {
