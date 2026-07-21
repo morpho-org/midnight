@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams, Authorization, Signature} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
@@ -47,6 +48,8 @@ contract BlueBuyCallbackTest is Test {
     function testSetAuthorization() public {
         address authorized = makeAddr("authorized");
 
+        vm.expectEmit(address(callback));
+        emit IBlueBuyCallback.SetAuthorization(owner, authorized, true);
         vm.prank(owner);
         callback.setAuthorization(authorized, true);
 
@@ -66,6 +69,56 @@ contract BlueBuyCallbackTest is Test {
     function testSetAuthorizationRevertsIfCallerIsNotOwner() public {
         vm.expectRevert(IBlueBuyCallback.NotOwner.selector);
         callback.setAuthorization(makeAddr("authorized"), true);
+    }
+
+    function testSetAuthorizationWithSig() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        address authorized = makeAddr("authorized");
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, authorized, true, 0, block.timestamp);
+        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
+
+        vm.expectEmit(address(signedCallback));
+        emit IBlueBuyCallback.SetAuthorizationWithSig(address(this), authorized, true, 0);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+
+        assertTrue(blue.isAuthorized(address(signedCallback), authorized));
+        assertEq(signedCallback.nonce(), 1);
+    }
+
+    function testSetAuthorizationWithSigRevertsIfExpired() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp - 1);
+        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
+
+        vm.expectRevert(IBlueBuyCallback.Expired.selector);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+    }
+
+    function testSetAuthorizationWithSigRevertsIfNonceIsReused() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp);
+        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+
+        vm.expectRevert(IBlueBuyCallback.InvalidNonce.selector);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+    }
+
+    function testSetAuthorizationWithSigRevertsIfSignerIsNotOwner() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp);
+        Signature memory signature = _signAuthorization(2, address(signedCallback), authorization);
+
+        vm.expectRevert(IBlueBuyCallback.InvalidSignature.selector);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
     }
 
     function testOnBuyWithdrawsAndApproves(uint256 buyerAssets) public {
@@ -109,6 +162,17 @@ contract BlueBuyCallbackTest is Test {
         vm.expectRevert(IBlueBuyCallback.InconsistentLoanToken.selector);
         vm.prank(address(midnight));
         callback.onBuy(bytes32(0), market, 0, 0, 0, owner, abi.encode(blueMarketParams));
+    }
+
+    function _signAuthorization(uint256 privateKey, address verifyingContract, Authorization memory authorization)
+        internal
+        view
+        returns (Signature memory signature)
+    {
+        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, verifyingContract));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        (signature.v, signature.r, signature.s) = vm.sign(privateKey, digest);
     }
 }
 

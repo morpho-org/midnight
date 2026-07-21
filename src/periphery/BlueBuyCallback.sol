@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, MarketParams} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams, Authorization, Signature} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
@@ -22,6 +23,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
     address public immutable OWNER;
     address public immutable MIDNIGHT;
     address public immutable BLUE;
+    uint256 public nonce;
 
     constructor(address _owner, address _midnight, address _blue) {
         OWNER = _owner;
@@ -33,7 +35,24 @@ contract BlueBuyCallback is IBlueBuyCallback {
 
     function setAuthorization(address authorized, bool newIsAuthorized) external {
         require(msg.sender == OWNER, NotOwner());
+        emit SetAuthorization(msg.sender, authorized, newIsAuthorized);
         IMorpho(BLUE).setAuthorization(authorized, newIsAuthorized);
+    }
+
+    function setAuthorizationWithSig(Authorization memory authorization, Signature calldata signature) external {
+        require(block.timestamp <= authorization.deadline, Expired());
+        require(authorization.nonce == nonce++, InvalidNonce());
+
+        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        address signer = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
+
+        emit SetAuthorizationWithSig(
+            msg.sender, authorization.authorized, authorization.isAuthorized, authorization.nonce
+        );
+        IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
     }
 
     function onBuy(

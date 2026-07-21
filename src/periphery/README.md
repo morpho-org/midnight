@@ -10,7 +10,7 @@ The callback owns the Blue position.
 During a Midnight buy, it withdraws the required loan tokens from Blue and approves Midnight to pull them.
 The callback data must be the ABI-encoded Blue `MarketParams`.
 
-The owner can grant or revoke permission to manage the callback's Blue position with `setAuthorization`.
+The owner can grant or revoke permission to manage the callback's Blue position directly with `setAuthorization` or by signature with `setAuthorizationWithSig`.
 
 Anyone authorized to act for the owner on Midnight can trigger this callback through an offer, so the owner should only authorize trusted addresses.
 
