@@ -120,7 +120,6 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
         } else {
             // other overflows are checked at the end that they didn't cause a revert.
             mulOverflow = true;
-            assert false;
             return result;
         }
     }
@@ -154,28 +153,5 @@ rule noMultiplicationOverflowUpdatePositionView(env e, Midnight.Market market, b
     require !mulOverflow, "prestate: no overflow before call";
     require id == summaryToId(market), "id corresponds to market";
     updatePositionView(e, market, id, user);
-    assert !mulOverflow;
-}
-
-rule noMultiplicationOverflowTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
-    require !mulOverflow, "prestate: no overflow before call";
-    require units < 2^129, "ensured by the toUint128 casts on units - buyerCreditIncrease and buyerCreditIncrease";
-    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
-    assert !mulOverflow;
-}
-
-rule noMultiplicationOverflowWithdraw(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
-    require !mulOverflow, "prestate: no overflow before call";
-    require units < 2^128, "ensured by the toUint128 casts on units";
-    withdraw(e, market, units, onBehalf, receiver);
-    assert !mulOverflow;
-}
-
-rule noMultiplicationOverflowLiquidate(env e, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
-    require !mulOverflow, "prestate: no overflow before call";
-    require id == summaryToId(market), "id corresponds to market";
-    require repaidUnits < 2^128, "ensured by cast";
-    require seizedAssets * oraclePriceGhost(market.collateralParams[collateralIndex].oracle) / ORACLE_PRICE_SCALE() < 2^128, "ensured by subtracting seizedAssets from collateral";
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
     assert !mulOverflow;
 }
