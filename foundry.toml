@@ -18,7 +18,7 @@ exclude_lints = [
 ]
 
 [[profile.default.compilation_restrictions]]
-paths = "src/imports/MorphoImport.sol"
+paths = "test/imports/MorphoImport.sol"
 optimizer_runs = 999999
 evm_version = "paris"
 
