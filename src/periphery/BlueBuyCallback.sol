@@ -2,11 +2,16 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
+<<<<<<< HEAD
 import {IMorpho, Id, MarketParams, Authorization, Signature} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {MarketParamsLib} from "../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {MorphoBalancesLib} from "../../lib/morpho-blue/src/libraries/periphery/MorphoBalancesLib.sol";
 import {SharesMathLib} from "../../lib/morpho-blue/src/libraries/SharesMathLib.sol";
+=======
+import {IMorpho, MarketParams, Authorization, Signature} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
+>>>>>>> origin/main
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
@@ -19,10 +24,13 @@ interface IERC20 {
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
 /// making the owner buy dummy credit on Midnight.
 contract BlueBuyCallback is IBlueBuyCallback {
+<<<<<<< HEAD
     using MarketParamsLib for MarketParams;
     using MorphoBalancesLib for IMorpho;
     using SharesMathLib for uint256;
 
+=======
+>>>>>>> origin/main
     address public immutable OWNER;
     address public immutable MIDNIGHT;
     address public immutable BLUE;
