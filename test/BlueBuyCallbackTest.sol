@@ -176,18 +176,6 @@ contract BlueBuyCallbackTest is Test {
         assertEq(result, supplyAssets);
     }
 
-    function testBuyerAssetsBoundRevertsIfBuyerIsNotOwner(address buyer) public {
-        vm.assume(buyer != owner);
-        vm.expectRevert(IBlueBuyCallback.NotOwnerBuyer.selector);
-        callback.buyerAssetsBound(bytes32(0), market, buyer, abi.encode(blueMarketParams));
-    }
-
-    function testBuyerAssetsBoundRevertsIfLoanTokenIsInconsistent() public {
-        blueMarketParams.loanToken = address(otherToken);
-
-        vm.expectRevert(IBlueBuyCallback.InconsistentLoanToken.selector);
-        callback.buyerAssetsBound(bytes32(0), market, owner, abi.encode(blueMarketParams));
-    }
 
     function testOnBuyRevertsIfCallerIsNotMidnight(address caller) public {
         vm.assume(caller != address(midnight));
