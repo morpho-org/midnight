@@ -81,11 +81,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function buyerAssetsBound(bytes32, Market memory market, address buyer, bytes memory data)
-        external
-        view
-        returns (uint256)
-    {
+    function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
