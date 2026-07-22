@@ -15,8 +15,6 @@ interface IERC20 {
 
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
 /// making the owner buy dummy credit on Midnight.
-/// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is too
-/// small.
 contract BlueBuyCallback is IBlueBuyCallback {
     address public immutable OWNER;
     address public immutable MIDNIGHT;
@@ -54,6 +52,8 @@ contract BlueBuyCallback is IBlueBuyCallback {
         }
     }
 
+    /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is
+    /// too small.
     function onBuy(
         bytes32,
         Market memory market,
