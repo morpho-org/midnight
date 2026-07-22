@@ -81,14 +81,12 @@ contract BlueBuyCallback is IBlueBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function maxBuyerAssets(bytes32, Market memory market, address buyer, bytes memory data)
+    function buyerAssetsBound(bytes32, Market memory market, address buyer, bytes memory data)
         external
         view
         returns (uint256)
     {
-        require(buyer == OWNER, NotOwnerBuyer());
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
-        require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);

@@ -28,7 +28,7 @@ interface IBlueBuyCallback is IBuyCallback {
     function nonce() external view returns (uint256);
 
     /// FUNCTIONS ///
-    function maxBuyerAssets(bytes32 id, Market memory market, address buyer, bytes memory data)
+    function buyerAssetsBound(bytes32 id, Market memory market, address buyer, bytes memory data)
         external
         view
         returns (uint256);

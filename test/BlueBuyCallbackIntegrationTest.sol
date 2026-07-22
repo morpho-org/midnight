@@ -90,7 +90,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         assertEq(midnight.debt(toId(market), borrower), units);
     }
 
-    function testMaxBuyerAssetsIsCappedByAvailableLiquidity(uint256 suppliedAssets, uint256 borrowedAssets) public {
+    function testBuyerAssetsBoundIsCappedByAvailableLiquidity(uint256 suppliedAssets, uint256 borrowedAssets) public {
         suppliedAssets = bound(suppliedAssets, 2, 1e30);
         borrowedAssets = bound(borrowedAssets, 1, suppliedAssets / 2);
         deal(address(loanToken), address(this), suppliedAssets);
@@ -104,7 +104,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         blue.borrow(blueMarketParams, borrowedAssets, 0, borrower, borrower);
         vm.stopPrank();
 
-        uint256 result = callback.maxBuyerAssets(bytes32(0), market, lender, abi.encode(blueMarketParams));
+        uint256 result = callback.buyerAssetsBound(bytes32(0), market, lender, abi.encode(blueMarketParams));
 
         assertEq(result, suppliedAssets - borrowedAssets);
     }
