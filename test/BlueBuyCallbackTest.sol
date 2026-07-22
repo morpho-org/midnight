@@ -176,7 +176,6 @@ contract BlueBuyCallbackTest is Test {
         assertEq(result, supplyAssets);
     }
 
-
     function testOnBuyRevertsIfCallerIsNotMidnight(address caller) public {
         vm.assume(caller != address(midnight));
         vm.expectRevert(IBlueBuyCallback.NotMidnight.selector);

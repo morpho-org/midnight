@@ -81,7 +81,10 @@ contract BlueBuyCallback is IBlueBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
-    /// @dev Safe buyerAssets amount that the callback can handle.
+    /// @dev Max buyerAssets amount that the callback can handle.
+    /// @dev This function is useful for bundles to query how much is available at the moment.
+    /// @dev Other buy callbacks might not take all constraints into account to provide their bound, but this is fine,
+    /// if the routing layer can take into account the other reasons.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
