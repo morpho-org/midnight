@@ -3,6 +3,7 @@
 pragma solidity >=0.5.0;
 
 import {IBuyCallback} from "../../interfaces/ICallbacks.sol";
+import {Market} from "../../interfaces/IMidnight.sol";
 import {Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 
 interface IBlueBuyCallback is IBuyCallback {
@@ -27,6 +28,14 @@ interface IBlueBuyCallback is IBuyCallback {
     function nonce() external view returns (uint256);
 
     /// FUNCTIONS ///
+    function maxBuyerAssets(
+        bytes32 id,
+        Market memory market,
+        uint256 units,
+        uint256 pendingFeeIncrease,
+        address buyer,
+        bytes memory data
+    ) external view returns (uint256);
     function setAuthorization(address authorized, bool newIsAuthorized) external;
     function setAuthorizationWithSig(Authorization memory authorization, Signature memory signature) external;
 }

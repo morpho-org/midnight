@@ -2,8 +2,11 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, MarketParams, Authorization, Signature} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, Id, MarketParams, Authorization, Signature} from "../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
+import {MarketParamsLib} from "../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
+import {MorphoBalancesLib} from "../../lib/morpho-blue/src/libraries/periphery/MorphoBalancesLib.sol";
+import {SharesMathLib} from "../../lib/morpho-blue/src/libraries/SharesMathLib.sol";
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
@@ -16,6 +19,10 @@ interface IERC20 {
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
 /// making the owner buy dummy credit on Midnight.
 contract BlueBuyCallback is IBlueBuyCallback {
+    using MarketParamsLib for MarketParams;
+    using MorphoBalancesLib for IMorpho;
+    using SharesMathLib for uint256;
+
     address public immutable OWNER;
     address public immutable MIDNIGHT;
     address public immutable BLUE;
@@ -65,14 +72,31 @@ contract BlueBuyCallback is IBlueBuyCallback {
     ) external returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         require(buyer == OWNER, NotOwnerBuyer());
+        MarketParams memory marketParams = abi.decode(data, (MarketParams));
+        require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
-        MarketParams memory blueMarketParams = abi.decode(data, (MarketParams));
-        require(blueMarketParams.loanToken == market.loanToken, InconsistentLoanToken());
-
-        if (buyerAssets > 0) IMorpho(BLUE).withdraw(blueMarketParams, buyerAssets, 0, address(this), address(this));
+        if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
         forceApproveMax(market.loanToken, MIDNIGHT);
 
         return CALLBACK_SUCCESS;
+    }
+
+    function maxBuyerAssets(bytes32, Market memory market, uint256, uint256, address buyer, bytes memory data)
+        external
+        view
+        returns (uint256)
+    {
+        require(buyer == OWNER, NotOwnerBuyer());
+        MarketParams memory marketParams = abi.decode(data, (MarketParams));
+        require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
+
+        (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
+            IMorpho(BLUE).expectedMarketBalances(marketParams);
+        uint256 supplyAssets = IMorpho(BLUE).position(marketParams.id(), address(this)).supplyShares
+            .toAssetsDown(totalSupplyAssets, totalSupplyShares);
+        uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
+
+        return supplyAssets < liquidity ? supplyAssets : liquidity;
     }
 
     /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
