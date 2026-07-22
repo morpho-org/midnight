@@ -81,6 +81,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
+    /// @dev Max buyerAssets that the callback can handle.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
