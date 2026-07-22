@@ -81,7 +81,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
-    function maxBuyerAssets(bytes32, Market memory market, uint256, uint256, address buyer, bytes memory data)
+    function maxBuyerAssets(bytes32, Market memory market, address buyer, bytes memory data)
         external
         view
         returns (uint256)

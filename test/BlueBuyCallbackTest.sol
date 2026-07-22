@@ -171,9 +171,7 @@ contract BlueBuyCallbackTest is Test {
         if (supplyAssets > 0) blue.supply(blueMarketParams, supplyAssets, 0, address(callback), hex"");
         if (otherSupplyAssets > 0) blue.supply(blueMarketParams, otherSupplyAssets, 0, address(this), hex"");
 
-        uint256 result = callback.maxBuyerAssets(
-            bytes32(0), market, type(uint256).max, type(uint256).max, owner, abi.encode(blueMarketParams)
-        );
+        uint256 result = callback.maxBuyerAssets(bytes32(0), market, owner, abi.encode(blueMarketParams));
 
         assertEq(result, supplyAssets);
     }
@@ -181,14 +179,14 @@ contract BlueBuyCallbackTest is Test {
     function testMaxBuyerAssetsRevertsIfBuyerIsNotOwner(address buyer) public {
         vm.assume(buyer != owner);
         vm.expectRevert(IBlueBuyCallback.NotOwnerBuyer.selector);
-        callback.maxBuyerAssets(bytes32(0), market, 0, 0, buyer, abi.encode(blueMarketParams));
+        callback.maxBuyerAssets(bytes32(0), market, buyer, abi.encode(blueMarketParams));
     }
 
     function testMaxBuyerAssetsRevertsIfLoanTokenIsInconsistent() public {
         blueMarketParams.loanToken = address(otherToken);
 
         vm.expectRevert(IBlueBuyCallback.InconsistentLoanToken.selector);
-        callback.maxBuyerAssets(bytes32(0), market, 0, 0, owner, abi.encode(blueMarketParams));
+        callback.maxBuyerAssets(bytes32(0), market, owner, abi.encode(blueMarketParams));
     }
 
     function testOnBuyRevertsIfCallerIsNotMidnight(address caller) public {

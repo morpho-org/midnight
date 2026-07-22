@@ -104,9 +104,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         blue.borrow(blueMarketParams, borrowedAssets, 0, borrower, borrower);
         vm.stopPrank();
 
-        uint256 result = callback.maxBuyerAssets(
-            bytes32(0), market, type(uint256).max, type(uint256).max, lender, abi.encode(blueMarketParams)
-        );
+        uint256 result = callback.maxBuyerAssets(bytes32(0), market, lender, abi.encode(blueMarketParams));
 
         assertEq(result, suppliedAssets - borrowedAssets);
     }
