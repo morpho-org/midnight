@@ -48,8 +48,6 @@ contract BlueBuyCallbackTest is Test {
     function testSetAuthorization() public {
         address authorized = makeAddr("authorized");
 
-        vm.expectEmit(address(callback));
-        emit IBlueBuyCallback.SetAuthorization(owner, authorized, true);
         vm.prank(owner);
         callback.setAuthorization(authorized, true);
 
@@ -62,6 +60,15 @@ contract BlueBuyCallbackTest is Test {
         callback.setAuthorization(authorized, true);
         callback.setAuthorization(authorized, false);
         vm.stopPrank();
+
+        assertFalse(blue.isAuthorized(address(callback), authorized));
+    }
+
+    function testSetAuthorizationAllowsNoOp() public {
+        address authorized = makeAddr("authorized");
+
+        vm.prank(owner);
+        callback.setAuthorization(authorized, false);
 
         assertFalse(blue.isAuthorized(address(callback), authorized));
     }
@@ -80,7 +87,7 @@ contract BlueBuyCallbackTest is Test {
         Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
 
         vm.expectEmit(address(signedCallback));
-        emit IBlueBuyCallback.SetAuthorizationWithSig(address(this), authorized, true, 0);
+        emit IBlueBuyCallback.SetAuthorizationWithSig(address(this), 0);
         signedCallback.setAuthorizationWithSig(authorization, signature);
 
         assertTrue(blue.isAuthorized(address(signedCallback), authorized));
@@ -96,6 +103,20 @@ contract BlueBuyCallbackTest is Test {
 
         vm.expectRevert(IBlueBuyCallback.AuthorizationExpired.selector);
         signedCallback.setAuthorizationWithSig(authorization, signature);
+    }
+
+    function testSetAuthorizationWithSigAllowsNoOp() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        address authorized = makeAddr("authorized");
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, authorized, false, 0, block.timestamp);
+        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
+
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+
+        assertFalse(blue.isAuthorized(address(signedCallback), authorized));
+        assertEq(signedCallback.nonce(), 1);
     }
 
     function testSetAuthorizationWithSigRevertsIfNonceIsReused() public {

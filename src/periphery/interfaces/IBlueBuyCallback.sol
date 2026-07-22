@@ -17,10 +17,8 @@ interface IBlueBuyCallback is IBuyCallback {
     error NotOwnerBuyer();
 
     /// EVENTS ///
-    event SetAuthorization(address indexed caller, address indexed authorized, bool newIsAuthorized);
-    event SetAuthorizationWithSig(
-        address indexed caller, address indexed authorized, bool newIsAuthorized, uint256 nonce
-    );
+    /// @dev To track authorization changes, listen to the SetAuthorization event emitted by Blue.
+    event SetAuthorizationWithSig(address indexed caller, uint256 nonce);
 
     /// STORAGE GETTERS ///
     function OWNER() external view returns (address);

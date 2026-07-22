@@ -17,8 +17,6 @@ interface IERC20 {
 /// making the owner buy dummy credit on Midnight.
 /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is too
 /// small.
-/// @dev No-ops are not systematically prevented.
-/// @dev Zero checks are not systematically performed.
 contract BlueBuyCallback is IBlueBuyCallback {
     address public immutable OWNER;
     address public immutable MIDNIGHT;
@@ -35,8 +33,9 @@ contract BlueBuyCallback is IBlueBuyCallback {
 
     function setAuthorization(address authorized, bool newIsAuthorized) external {
         require(msg.sender == OWNER, NotOwner());
-        emit SetAuthorization(msg.sender, authorized, newIsAuthorized);
-        IMorpho(BLUE).setAuthorization(authorized, newIsAuthorized);
+        if (IMorpho(BLUE).isAuthorized(address(this), authorized) != newIsAuthorized) {
+            IMorpho(BLUE).setAuthorization(authorized, newIsAuthorized);
+        }
     }
 
     function setAuthorizationWithSig(Authorization memory authorization, Signature calldata signature) external {
@@ -49,10 +48,10 @@ contract BlueBuyCallback is IBlueBuyCallback {
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
 
-        emit SetAuthorizationWithSig(
-            msg.sender, authorization.authorized, authorization.isAuthorized, authorization.nonce
-        );
-        IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
+        emit SetAuthorizationWithSig(msg.sender, authorization.nonce);
+        if (IMorpho(BLUE).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
+            IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
+        }
     }
 
     function onBuy(
