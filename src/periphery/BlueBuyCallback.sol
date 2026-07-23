@@ -14,6 +14,7 @@ import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint256);
     function approve(address spender, uint256 value) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
 }
 
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
@@ -93,8 +94,10 @@ contract BlueBuyCallback is IBlueBuyCallback {
         uint256 supplyAssets = IMorpho(BLUE).position(marketParams.id(), address(this)).supplyShares
             .toAssetsDown(totalSupplyAssets, totalSupplyShares);
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
+        uint256 blueBalance = IERC20(marketParams.loanToken).balanceOf(BLUE);
 
-        return supplyAssets < liquidity ? supplyAssets : liquidity;
+        uint256 bound = supplyAssets < liquidity ? supplyAssets : liquidity;
+        return bound < blueBalance ? bound : blueBalance;
     }
 
     /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
