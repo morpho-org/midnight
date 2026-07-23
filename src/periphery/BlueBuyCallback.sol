@@ -96,8 +96,9 @@ contract BlueBuyCallback is IBlueBuyCallback {
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20(marketParams.loanToken).balanceOf(BLUE);
 
-        uint256 bound = supplyAssets < liquidity ? supplyAssets : liquidity;
-        return bound < blueBalance ? bound : blueBalance;
+        return supplyAssets < liquidity
+            ? (supplyAssets < blueBalance ? supplyAssets : blueBalance)
+            : (liquidity < blueBalance ? liquidity : blueBalance);
     }
 
     /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
