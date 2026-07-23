@@ -96,9 +96,11 @@ contract BlueBuyCallback is IBlueBuyCallback {
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20(marketParams.loanToken).balanceOf(BLUE);
 
-        return supplyAssets < liquidity
-            ? (supplyAssets < blueBalance ? supplyAssets : blueBalance)
-            : (liquidity < blueBalance ? liquidity : blueBalance);
+        return min(min(supplyAssets, liquidity), blueBalance);
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
     }
 
     /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
