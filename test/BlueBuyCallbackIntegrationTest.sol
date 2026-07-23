@@ -110,22 +110,18 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         assertEq(result, suppliedAssets - borrowedAssets);
     }
 
-    function testBuyerAssetsBoundIsCappedByBlueBalance(uint256 suppliedAssets) public {
+    function testBuyerAssetsBoundIsCappedByBlueBalance(uint256 suppliedAssets, uint256 flashloanedAssets) public {
         suppliedAssets = bound(suppliedAssets, 1, 1e30);
+        flashloanedAssets = bound(flashloanedAssets, 1, suppliedAssets);
         deal(address(loanToken), address(this), suppliedAssets);
         require(loanToken.approve(address(blue), suppliedAssets));
         blue.supply(blueMarketParams, suppliedAssets, 0, address(callback), hex"");
 
-        // Outside of any flashloan or callback, the bound is the full supplied amount.
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, abi.encode(blueMarketParams)), suppliedAssets);
 
-        // Flash loaning Blue's entire loan token balance drains its real balance to 0 while its accounting still
-        // reports suppliedAssets of idle liquidity. The bound is queried inside onMorphoFlashLoan below.
-        blue.flashLoan(address(loanToken), suppliedAssets, hex"");
+        blue.flashLoan(address(loanToken), flashloanedAssets, hex"");
 
-        // Inside the flashloan the real balance (0) is below the accounting liquidity, so the bound must be capped to 0
-        // instead of over-promising suppliedAssets.
-        assertEq(observedBound, 0);
+        assertEq(observedBound, suppliedAssets - flashloanedAssets);
     }
 
     function onMorphoFlashLoan(uint256 assets, bytes calldata) external {
