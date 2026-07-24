@@ -187,10 +187,7 @@ strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address u
 /// by the !f.isView filter. Unreachable prover states (an uncreated market with a non-zero field,
 /// which could unlock a control-flow path that reads another field) are excluded via the
 /// requireInvariant calls below rather than by filtering zero-valued reads.
-rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex)
-filtered {
-    f -> !f.isView
-} {
+rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex) filtered { f -> !f.isView } {
     // Exclude states an uncreated market can never actually be in.
     requireInvariant marketTotalUnitsIsEmptyIfNotCreated(id);
     requireInvariant marketWithdrawableIsEmptyIfNotCreated(id);
