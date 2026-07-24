@@ -12,10 +12,6 @@ methods {
 
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
 
-    // take's ratifier/gate checks (isRatified, canIncreaseCredit, canIncreaseDebt) run after touchMarket
-    // has created the market, and are view (staticcall) so they cannot mutate Midnight storage. Summarizing
-    // them as NONDET is sound for the read-before-create property and avoids the full-storage havoc that
-    // resolving these unresolved external calls otherwise triggers, which blows up the solver on take.
     function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
@@ -28,11 +24,6 @@ persistent ghost mapping(bytes32 => bool) marketReadBeforeCreated;
 
 /// HOOKS ///
 
-/// A market is created iff its tickSpacing is non-zero. The hooks below flag the read itself,
-/// value-independently: any load of a market field while the market is not yet created flips the
-/// ghost, regardless of the value loaded.
-/// tickSpacing is deliberately not hooked: the createdness check itself reads it, so hooking it
-/// would flag legitimate reads.
 
 hook Sload uint128 val marketState[KEY bytes32 id].totalUnits {
     if (currentContract.marketState[id].tickSpacing == 0) marketReadBeforeCreated[id] = true;
