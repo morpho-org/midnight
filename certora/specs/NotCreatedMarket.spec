@@ -102,9 +102,6 @@ rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, b
     assert accruedFee == 0;
 }
 
-/// isHealthy returns true when the market is not created. The borrower's debt is zero for an
-/// uncreated market, so the oracle-querying branch is skipped entirely (no external price() call,
-/// hence no havoc) and maxDebt (0) >= debt (0) holds.
 rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
     require currentContract.marketState[id].tickSpacing == 0; // the market is not created
 
