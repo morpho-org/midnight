@@ -31,14 +31,16 @@ methods {
     function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
     /* Summarize the oracle price read inside the liquidate() collateral loop.
-     * price() is a view (staticcall) and cannot mutate state, so summarizing it does not
-     * weaken the HAVOC_ALL reentrancy modeling that -havocAllByDefault provides for the
-     * genuinely state-changing external calls (the onLiquidate callback, token transfers).
-     * Without this summary each loop iteration's unresolved price() call triggers a full
-     * HAVOC_ALL of storage, which the solver must re-prove across the loop unrolling and the
-     * z3 seed portfolio -- the dominant cost behind the SMT timeout. Matches CollateralBitmap.spec.
+     * NONDET keeps the return value fully non-deterministic: the prover picks an adversarial
+     * price and may return DIFFERENT values across reads of the same oracle (e.g. across the
+     * onLiquidate reentrancy). It only removes the HAVOC_ALL of storage that -havocAllByDefault
+     * applies to the unresolved call. Because price() is a view (staticcall) it cannot mutate
+     * state or reenter with side effects, so that havoc modeled behavior the EVM forbids -- the
+     * summary removes impossible behavior, not real behavior. NONDET is strictly more adversarial
+     * than PER_CALLEE_CONSTANT on the return value, so it cannot hide a bug that depends on the
+     * price varying. Removing the per-iteration HAVOC_ALL is the dominant SMT-timeout fix.
      */
-    function _.price() external => PER_CALLEE_CONSTANT;
+    function _.price() external => NONDET;
 
     // Internal library summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
