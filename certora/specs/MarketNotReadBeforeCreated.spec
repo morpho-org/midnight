@@ -12,6 +12,14 @@ methods {
 
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
 
+    // take's ratifier/gate checks (isRatified, canIncreaseCredit, canIncreaseDebt) run after touchMarket
+    // has created the market, and are view (staticcall) so they cannot mutate Midnight storage. Summarizing
+    // them as NONDET is sound for the read-before-create property and avoids the full-storage havoc that
+    // resolving these unresolved external calls otherwise triggers, which blows up the solver on take.
+    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+
     // Getters used by the "empty if not created" invariants assumed below. These invariants are
     // proven in NotCreatedMarket.spec; this conf only verifies the read rule (see the conf's "rule"
     // key), so they are declared here solely to be referenced by requireInvariant.
