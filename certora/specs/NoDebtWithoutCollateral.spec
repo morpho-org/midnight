@@ -30,12 +30,7 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
-    // Summarize the oracle price read in the liquidate() collateral loop.
-    // price() is a view (staticcall): it cannot mutate state or reenter with side effects, so
-    // the storage HAVOC_ALL that -havocAllByDefault applies to the unresolved call models
-    // behavior the EVM forbids -- dropping it is sound, and that per-iteration havoc is the
-    // dominant SMT cost. NONDET still returns a fully adversarial value (which may differ
-    // across reads of the same oracle), so it cannot hide a price-dependent bug.
+    // price() is a view; NONDET avoids the per-call HAVOC_ALL that dominates SMT time here.
     function _.price() external => NONDET;
 
     // Internal library summaries.
