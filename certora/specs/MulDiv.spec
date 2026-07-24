@@ -96,6 +96,14 @@ rule mulDivInverseUpDown(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(mulDivDown(a, b, d), d, b) <= a;
 }
 
+// Getter-form seize valuation bound: valuing (up-up) the collateral that liquidate seizes (down-down)
+// for repaidUnits r never exceeds r, when the seize and the valuation share the same factor l.
+rule mulDivSeizeValueBounded(uint256 r, uint256 l, uint256 price, uint256 wad, uint256 scale) {
+    require l > 0 && price > 0 && wad > 0 && scale > 0;
+    uint256 seized = mulDivDown(mulDivDown(r, l, wad), scale, price);
+    assert mulDivUp(mulDivUp(seized, price, scale), wad, l) <= r;
+}
+
 rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
     assert a <= d => mulDivDown(a, b, d) <= b;
     assert a <= d => mulDivUp(a, b, d) <= b;
