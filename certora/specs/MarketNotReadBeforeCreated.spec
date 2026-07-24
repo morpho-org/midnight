@@ -24,7 +24,6 @@ persistent ghost mapping(bytes32 => bool) marketReadBeforeCreated;
 
 /// HOOKS ///
 
-
 hook Sload uint128 val marketState[KEY bytes32 id].totalUnits {
     if (currentContract.marketState[id].tickSpacing == 0) marketReadBeforeCreated[id] = true;
 }
