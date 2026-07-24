@@ -166,6 +166,11 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant defaultContinuousFeeBoundedAll();
             requireInvariant maturityBoundedByLastTimestamp(offer.market);
             require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
+        
+            // Uncreated market: take -> touchMarket enforces this bound via MaturityTooFar
+            // (src/Midnight.sol:798). It's take-internal input validation, not a storage
+            // property, so it can't be an invariant over a market that doesn't exist yet.
+            require !marketIsCreated(offer.market) => to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM();
         }
     }
 

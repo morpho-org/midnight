@@ -192,6 +192,11 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     // maturity <= block.timestamp + MAX_TTM follows from the proven invariant plus timestamp monotonicity.
     requireInvariant maturityBoundedByLastTimestamp(offer.market);
     require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
+
+    // Uncreated market: take -> touchMarket enforces this bound via MaturityTooFar
+    // (src/Midnight.sol:798). It's take-internal input validation, not a storage
+    // property, so it can't be an invariant over a market that doesn't exist yet.
+    require !marketIsCreated(offer.market) => to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM();
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
     mathint netCreditAfter = netCredit(e, offer.market, user);
