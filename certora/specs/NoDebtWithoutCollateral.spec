@@ -30,6 +30,16 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
+    /* Summarize the oracle price read inside the liquidate() collateral loop.
+     * price() is a view (staticcall) and cannot mutate state, so summarizing it does not
+     * weaken the HAVOC_ALL reentrancy modeling that -havocAllByDefault provides for the
+     * genuinely state-changing external calls (the onLiquidate callback, token transfers).
+     * Without this summary each loop iteration's unresolved price() call triggers a full
+     * HAVOC_ALL of storage, which the solver must re-prove across the loop unrolling and the
+     * z3 seed portfolio -- the dominant cost behind the SMT timeout. Matches CollateralBitmap.spec.
+     */
+    function _.price() external => PER_CALLEE_CONSTANT;
+
     // Internal library summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
