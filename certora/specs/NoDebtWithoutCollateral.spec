@@ -30,16 +30,12 @@ methods {
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
 
-    /* Summarize the oracle price read inside the liquidate() collateral loop.
-     * NONDET keeps the return value fully non-deterministic: the prover picks an adversarial
-     * price and may return DIFFERENT values across reads of the same oracle (e.g. across the
-     * onLiquidate reentrancy). It only removes the HAVOC_ALL of storage that -havocAllByDefault
-     * applies to the unresolved call. Because price() is a view (staticcall) it cannot mutate
-     * state or reenter with side effects, so that havoc modeled behavior the EVM forbids -- the
-     * summary removes impossible behavior, not real behavior. NONDET is strictly more adversarial
-     * than PER_CALLEE_CONSTANT on the return value, so it cannot hide a bug that depends on the
-     * price varying. Removing the per-iteration HAVOC_ALL is the dominant SMT-timeout fix.
-     */
+    // Summarize the oracle price read in the liquidate() collateral loop.
+    // price() is a view (staticcall): it cannot mutate state or reenter with side effects, so
+    // the storage HAVOC_ALL that -havocAllByDefault applies to the unresolved call models
+    // behavior the EVM forbids -- dropping it is sound, and that per-iteration havoc is the
+    // dominant SMT cost. NONDET still returns a fully adversarial value (which may differ
+    // across reads of the same oracle), so it cannot hide a price-dependent bug.
     function _.price() external => NONDET;
 
     // Internal library summaries.
