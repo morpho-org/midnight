@@ -113,10 +113,30 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].collateral[IND
 /// RULES ///
 
 /// Check that no code path reads a field of a market before that market is created. Reads are
-/// flagged value-independently by the hooks above. View functions (including the raw storage
-/// getters, which legitimately read a field without requiring the market to be created) are excluded
-/// by the !f.isView filter.
-rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
+/// flagged value-independently by the hooks above. We exclude only the pure storage getters (by
+/// selector), not all view functions: those getters legitimately return a market/position field
+/// without requiring the market to be created (the field reads zero for an uncreated market by
+/// design). Every computed view (e.g. updatePositionView, isHealthy, settlementFee) stays in scope
+/// so the rule still catches a computed view that reads a field before the market is created.
+rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id)
+filtered {
+    f -> f.selector != sig:marketState(bytes32).selector
+        && f.selector != sig:position(bytes32, address).selector
+        && f.selector != sig:tickSpacing(bytes32).selector
+        && f.selector != sig:totalUnits(bytes32).selector
+        && f.selector != sig:lossFactor(bytes32).selector
+        && f.selector != sig:withdrawable(bytes32).selector
+        && f.selector != sig:continuousFee(bytes32).selector
+        && f.selector != sig:continuousFeeCredit(bytes32).selector
+        && f.selector != sig:settlementFeeCbps(bytes32).selector
+        && f.selector != sig:credit(bytes32, address).selector
+        && f.selector != sig:debt(bytes32, address).selector
+        && f.selector != sig:pendingFee(bytes32, address).selector
+        && f.selector != sig:lastAccrual(bytes32, address).selector
+        && f.selector != sig:lastLossFactor(bytes32, address).selector
+        && f.selector != sig:collateralBitmap(bytes32, address).selector
+        && f.selector != sig:collateral(bytes32, address, uint256).selector
+} {
     require !marketReadBeforeCreated[id], "initialize the ghost variable";
 
     f(e, args);
