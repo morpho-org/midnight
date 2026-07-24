@@ -19,6 +19,13 @@ methods {
     function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
     function _.canIncreaseCredit(address) external => NONDET;
     function _.canIncreaseDebt(address) external => NONDET;
+
+    // Envfree getters used by the uncreated-market behavior rules below and their invariant hypotheses.
+    function tickSpacing(bytes32) external returns (uint8) envfree;
+    function credit(bytes32, address) external returns (uint128) envfree;
+    function debt(bytes32, address) external returns (uint128) envfree;
+    function pendingFee(bytes32, address) external returns (uint128) envfree;
+    function lastAccrual(bytes32, address) external returns (uint128) envfree;
 }
 
 /// GHOSTS ///
@@ -116,8 +123,12 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].collateral[IND
 /// flagged value-independently by the hooks above. We exclude only the pure storage getters (by
 /// selector), not all view functions: those getters legitimately return a market/position field
 /// without requiring the market to be created (the field reads zero for an uncreated market by
-/// design). Every computed view (e.g. updatePositionView, isHealthy, settlementFee) stays in scope
-/// so the rule still catches a computed view that reads a field before the market is created.
+/// design). Most computed views (e.g. settlementFee) stay in scope so the rule still catches a
+/// computed view that reads a field before the market is created.
+/// The two computed views updatePositionView and isHealthy are also excluded: they read position
+/// fields before any createdness check, but their behavior on an uncreated market is proven benign
+/// (rather than merely assumed) by updatePositionViewIsZeroIfMarketNotCreated and
+/// marketIsHealthyIfNotCreated below, which show they return (0, 0, 0) and true respectively.
 rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id)
 filtered {
     f -> f.selector != sig:marketState(bytes32).selector
@@ -136,10 +147,89 @@ filtered {
         && f.selector != sig:lastLossFactor(bytes32, address).selector
         && f.selector != sig:collateralBitmap(bytes32, address).selector
         && f.selector != sig:collateral(bytes32, address, uint256).selector
+        && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector
+        && f.selector != sig:isHealthy(Midnight.Market, bytes32, address).selector
 } {
     require !marketReadBeforeCreated[id], "initialize the ghost variable";
 
     f(e, args);
 
     assert !marketReadBeforeCreated[id], "a market field was read before the market was created";
+}
+
+/// HELPERS FOR THE UNCREATED-MARKET BEHAVIOR RULES ///
+
+/// A market is created iff its tickSpacing is non-zero.
+function marketIsCreated(bytes32 id) returns (bool) {
+    return tickSpacing(id) > 0;
+}
+
+definition userHasNoRemainingContinuousFee(bytes32 id, address user) returns bool = pendingFee(id, user) == 0;
+
+definition userHasNoLastAccrual(bytes32 id, address user) returns bool = lastAccrual(id, user) == 0;
+
+/// INVARIANT HYPOTHESES ///
+
+/// These "empty if not created" invariants are proven in NotCreatedMarket.conf. Here they are only
+/// requireInvariant'd (assumed) as hypotheses of the two rules below, so that the fields those views
+/// read are known to be zero on an uncreated market. We deliberately do NOT import NotCreatedMarket.spec,
+/// which summarizes isHealthy as NONDET; that summary would make marketIsHealthyIfNotCreated vacuous
+/// since it calls isHealthy directly. Only the invariants actually needed as hypotheses are redeclared.
+
+// Fields read by updatePositionView on an uncreated market.
+strong invariant marketCreditIsEmptyIfNotCreated(bytes32 id, address user)
+    !marketIsCreated(id) => credit(id, user) == 0;
+
+strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
+    !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+
+strong invariant marketLossFactorIsEmptyIfNotCreated(bytes32 id)
+    !marketIsCreated(id) => currentContract.marketState[id].lossFactor == 0;
+
+strong invariant marketPendingFeeIsEmptyIfNotCreated(bytes32 id, address user)
+    !marketIsCreated(id) => userHasNoRemainingContinuousFee(id, user);
+
+strong invariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(bytes32 id, address user)
+    !marketIsCreated(id) => userHasNoLastAccrual(id, user);
+
+// Field read by isHealthy on an uncreated market.
+strong invariant marketDebtIsEmptyIfNotCreated(bytes32 id, address user)
+    !marketIsCreated(id) => debt(id, user) == 0;
+
+/// UNCREATED-MARKET BEHAVIOR RULES ///
+
+/// updatePositionView returns (0, 0, 0) when the market is not created. Its returns are derived
+/// solely from the position's credit, lastLossFactor, pendingFee, lastAccrual and the market's
+/// lossFactor, all of which are zero for an uncreated market; the Market struct argument only feeds
+/// the fee computation, which collapses to 0 once pendingFee is 0. Hence excluding it from the read
+/// rule above is safe.
+rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
+    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+
+    requireInvariant marketCreditIsEmptyIfNotCreated(id, user);
+    requireInvariant positionLastLossFactorIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLossFactorIsEmptyIfNotCreated(id);
+    requireInvariant marketPendingFeeIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePositionView(e, market, id, user);
+
+    assert newCredit == 0;
+    assert newPendingFee == 0;
+    assert accruedFee == 0;
+}
+
+/// isHealthy returns true when the market is not created. The borrower's debt is zero for an
+/// uncreated market, so the oracle-querying branch is skipped entirely (no external price() call,
+/// hence no havoc) and maxDebt (0) >= debt (0) holds. Hence excluding it from the read rule above is
+/// safe.
+rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
+    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+
+    requireInvariant marketDebtIsEmptyIfNotCreated(id, borrower);
+
+    assert isHealthy(e, market, id, borrower);
 }
