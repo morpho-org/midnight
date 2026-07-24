@@ -3,19 +3,12 @@
 
 // Property (issue #109):
 //   "realizableBadDebt cannot increase (without a price update). Liquidation is a special
-//    case: it is not enough that it does not increase realizableBadDebt, it also realizes it."
+//    case: it should realize the bad debt and leave zero."
 //
 // realizableBadDebt(id, borrower) is the `badDebt` local computed at the top of
-// Midnight.liquidate (src/Midnight.sol:643-657):
-//   zeroFloorSub(debt, SUM over active-collateral i of ceil(ceil(col_i*price_i/OPS)*WAD/maxLif_i)).
-// It is exposed by MidnightWrapper.realizableBadDebt(market, id, borrower), whose loop is a
-// verbatim copy of that production loop so the prover can equate the getter with liquidate's
-// inlined computation (the same "match the spec's check against the code" trick used in
-// Healthiness.spec for isHealthy()).
+// Midnight.liquidate (src/Midnight.sol:643-657).
 //
-// "Without a price update" is modelled by summarizing _.price() as PER_CALLEE_CONSTANT: each
-// oracle returns a single deterministic value fixed across the whole rule, so the before- and
-// after-snapshots of the getter (and liquidate's own loop) all observe the same prices.
+// "Without a price update" is modelled by summarizing _.price() as PER_CALLEE_CONSTANT.
 
 import "BitmapSummaries.spec";
 
