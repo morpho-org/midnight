@@ -191,6 +191,14 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
     require forall mathint b. forall mathint d. axiomDownZero(b, d), "axiom";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
+    // Tight floor/ceil characterizations (proven in MulDiv.spec, matching LiquidationBoundedByLIF.spec).
+    // Confined to this rule so the seize-path arithmetic is pinned down without adding nonlinear cost to
+    // the other rules' cheap ghosts.
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b, "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b, "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b, "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b, "axiom";
+
     uint256 rbdBefore = realizableBadDebt(market, id, borrower);
     uint256 totalUnitsBefore = totalUnits(id);
 
