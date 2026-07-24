@@ -28,7 +28,9 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
+    function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
     function Utils.maxCollateralsPerBorrower() external returns (uint256) envfree;
+    function Utils.maxLif(uint256, uint256) external returns (uint256) envfree;
 
     // Internal library summaries.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
@@ -62,6 +64,18 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
+/// DEFINITIONS ///
+
+definition WAD() returns uint256 = 10 ^ 18;
+
+/// BITMAP INVARIANTS (proved in CollateralBitmap.spec; redeclared here for requireInvariant) ///
+
+strong invariant atMostMaxCollateralsBitsSet(bytes32 id, address user)
+    summaryCountBits(currentContract.position[id][user].collateralBitmap) <= Utils.maxCollateralsPerBorrower();
+
+strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
+    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
+
 /// INVARIANT ///
 
 strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
@@ -76,6 +90,12 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
             require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2), "see mulDivMonotoneD";
         
             require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "see mulDivInverseUpDown";
+
+            requireInvariant atMostMaxCollateralsBitsSet(id, user);
+            requireInvariant nonZeroCollateralsAreActivated(id, user, collateralIndex);
+
+            // Bounds the RCF denominator WAD * WAD - lif * lltv away from zero, removing nonlinear case splits.
+            require market.collateralParams[collateralIndex].lltv == WAD() || market.collateralParams[collateralIndex].lltv * Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor) <= 999 * 10 ^ 15 * WAD(), "see createdMarketsRespectMaxLifBound in CreatedMarkets.spec";
         }
         preserved onTransactionBoundary with (env e) {
             requireInvariant liquidationLockClearedAtBoundary(id, user);
