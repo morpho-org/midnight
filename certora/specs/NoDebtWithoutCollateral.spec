@@ -90,10 +90,10 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
             require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2), "see mulDivMonotoneD";
         
             require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "see mulDivInverseUpDown";
-
+        
             requireInvariant atMostMaxCollateralsBitsSet(id, user);
             requireInvariant nonZeroCollateralsAreActivated(id, user, collateralIndex);
-
+        
             // Bounds the RCF denominator WAD * WAD - lif * lltv away from zero, removing nonlinear case splits.
             require market.collateralParams[collateralIndex].lltv == WAD() || market.collateralParams[collateralIndex].lltv * Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor) <= 999 * 10 ^ 15 * WAD(), "see createdMarketsRespectMaxLifBound in CreatedMarkets.spec";
         }
