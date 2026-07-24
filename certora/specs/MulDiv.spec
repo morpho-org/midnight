@@ -121,6 +121,10 @@ rule mulDivUpRoundsUp(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) * d >= a * b;
 }
 
+rule mulDivUpGeqMulDivDown(uint256 a, uint256 b, uint256 d) {
+    assert mulDivUp(a, b, d) >= mulDivDown(a, b, d);
+}
+
 rule mulDivUpTightBound(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) > 0 => (mulDivUp(a, b, d) - 1) * d < a * b;
 }
