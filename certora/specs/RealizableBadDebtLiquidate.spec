@@ -119,11 +119,59 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 /// RULES ///
 
 // liquidate realizes the bad debt: the recomputed realizable bad debt is zero after a full-args
-// liquidate. Double-mulDivUp sub-additivity bounds the getter-sum drop by g(seizedAssets), and the
-// seize-value bound gives g(seizedAssets) <= repaidUnits, so the getter-sum drops by at most the
-// debt drop. Restricted to !postMaturityMode, where the seize factor lif equals maxLif.
-rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
+// liquidate. Restricted to !postMaturityMode, where the seize factor lif equals maxLif.
+//
+// The rule is split along liquidate's exclusive-input branch (src/Midnight.sol:633,
+// `require repaidUnits == 0 || seizedAssets == 0`), one CI leg per branch, because the single
+// combined rule was heavy enough to be killed server-side. Each branch keeps only the near-linear
+// ghost consequences it uses; the nonlinear reasoning is done once, over concrete mulDiv, in
+// MulDiv.spec (mulDivAddUpUp, mulDivSeizeValueBounded, mulDivMonotoneA, mulDivZero).
+
+// Seized-assets-input branch (repaidUnits == 0): liquidate computes
+//   repaidUnits = mulDivUp(mulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE), WAD, lif) = g(seizedAssets)
+// (src/Midnight.sol:691), i.e. the debt drop is exactly the getter value of the seized collateral.
+// Sub-additivity bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by g(seizedAssets), which
+// here equals the repaid debt drop, so the recomputed bad debt stays zero. No seize-value bound is
+// needed on this branch (repaid is literally the getter term), so axiomSeizeValue is dropped.
+rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
+
+    require repaidUnits == 0, "seized-assets-input branch: repaidUnits is derived from seizedAssets (src/Midnight.sol:691)";
+
+    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
+    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
+    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
+    require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
+    require data.length == 0, "no liquidate callback data (prover performance; matches LiquidationBoundedByLIF.spec)";
+    require !postMaturityMode, "non-post-maturity path: the seize factor lif equals maxLif (src/Midnight.sol:685-687)";
+
+    // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, collateralIndex);
+
+    mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
+    require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
+
+    // Only the near-linear consequences of the MulDiv lemmas needed on this branch are assumed.
+    // The seize-value bound (axiomSeizeValue) is not needed here: repaidUnits is exactly g(seizedAssets).
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
+    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpSubAdditive(a1, a2, b, d), "sub-additivity (mulDivAddUpUp)";
+
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert realizableBadDebt(market, id, borrower) == 0;
+}
+
+// Repaid-units-input branch (seizedAssets == 0): liquidate computes
+//   seizedAssets = mulDivDown(mulDivDown(repaidUnits, lif, WAD), ORACLE_PRICE_SCALE, price)
+// (src/Midnight.sol:693). Sub-additivity bounds the getter-sum drop by g(seizedAssets), and the
+// seize-value bound (axiomSeizeValue) closes g(seizedAssets) <= repaidUnits, so the getter-sum drops
+// by at most the repaid debt drop and the recomputed bad debt stays zero. This is the harder case:
+// it needs the full axiom set including axiomSeizeValue.
+rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
+    bytes32 id = summaryToId(market);
+
+    require seizedAssets == 0, "repaid-units-input branch: seizedAssets is derived from repaidUnits (src/Midnight.sol:693)";
 
     require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
     require marketIsCreated(market), "market must be created (tickSpacing > 0)";
