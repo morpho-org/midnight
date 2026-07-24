@@ -112,17 +112,8 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].collateral[IND
 
 /// RULES ///
 
-/// Check that no code path reads a field of a market before that market is created. Reads are
-/// flagged value-independently by the hooks above. We exclude only the pure storage getters (by
-/// selector), not all view functions: those getters legitimately return a market/position field
-/// without requiring the market to be created (the field reads zero for an uncreated market by
-/// design). Most computed views (e.g. settlementFee) stay in scope so the rule still catches a
-/// computed view that reads a field before the market is created.
-/// The two computed views updatePositionView and isHealthy are also excluded: they read position
-/// fields before any createdness check, but their behavior on an uncreated market is proven benign
-/// (rather than merely assumed) by updatePositionViewIsZeroIfMarketNotCreated and
-/// marketIsHealthyIfNotCreated in NotCreatedMarket.spec, which show they return (0, 0, 0) and true
-/// respectively.
+/// Check that no code path reads a field of a market before that market is created. We exclude only the pure storage getters.
+/// updatePositionView and isHealthy are also excluded: they read position fields before any createdness check, but their behavior on an uncreated market is proven by updatePositionViewIsZeroIfMarketNotCreated and marketIsHealthyIfNotCreated in NotCreatedMarket.spec.
 rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id)
 filtered {
     f -> f.selector != sig:marketState(bytes32).selector
