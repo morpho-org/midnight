@@ -55,6 +55,12 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
+// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
+// so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+persistent ghost mathint lastTimestamp {
+    init_state axiom lastTimestamp == 0;
+}
+
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 r;
     require x == 0 => r == 0, "see mulDivZero";
@@ -137,6 +143,17 @@ strong invariant continuousFeeBounded(bytes32 id)
         }
     }
 
+// A created market's maturity is at most MAX_TTM in the future: touchMarket enforces it at creation
+// (MaturityTooFar in Midnight.sol), maturity is immutable, and block.timestamp only increases.
+strong invariant maturityBoundedByLastTimestamp(Midnight.Market market)
+    marketIsCreated(market) => to_mathint(market.maturity) <= lastTimestamp + MAX_TTM()
+    {
+        preserved with (env e) {
+            require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
+            lastTimestamp = to_mathint(e.block.timestamp);
+        }
+    }
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= credit(id, user)
     {
@@ -147,7 +164,8 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
         preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
-            require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
+            requireInvariant maturityBoundedByLastTimestamp(offer.market);
+            require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
         }
     }
 
