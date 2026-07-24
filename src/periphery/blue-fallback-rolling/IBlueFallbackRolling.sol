@@ -19,8 +19,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// EVENTS ///
     event SetConfig(
         address indexed user,
-        bytes32 indexed midnightMarketId,
-        bytes32 indexed blueMarketId,
+        bytes32 indexed midnightId,
+        bytes32 indexed blueId,
         uint256 start,
         uint256 incentive,
         bool enabled
@@ -28,8 +28,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     event Roll(
         address indexed caller,
         address indexed user,
-        bytes32 indexed midnightMarketId,
-        bytes32 blueMarketId,
+        bytes32 indexed midnightId,
+        bytes32 blueId,
         uint256 debtAssets,
         uint256 collateralAssets,
         uint256 incentiveAssets
@@ -41,8 +41,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     function isConfig(address user, bytes32 configId) external view returns (bool);
 
     /// FUNCTIONS ///
-    function setConfig(bytes32 midnightMarketId, bytes32 blueMarketId, uint64 start, uint64 incentive, bool enabled)
-        external;
+    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled) external;
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
