@@ -83,10 +83,6 @@ strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address u
 
 /// UNCREATED-MARKET BEHAVIOR RULES ///
 
-/// updatePositionView returns (0, 0, 0) when the market is not created. Its returns are derived
-/// solely from the position's credit, lastLossFactor, pendingFee, lastAccrual and the market's
-/// lossFactor, all of which are zero for an uncreated market; the Market struct argument only feeds
-/// the fee computation, which collapses to 0 once pendingFee is 0.
 rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
     require currentContract.marketState[id].tickSpacing == 0; // the market is not created
 
