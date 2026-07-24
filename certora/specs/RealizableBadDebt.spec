@@ -100,21 +100,20 @@ definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >
 
 /// RULES ///
 
-// No non-liquidate, non-view function that removes collateral or raises debt (take,
-// withdrawCollateral) may increase realizableBadDebt of an arbitrary position. Those three are
-// excluded here and handled by dedicated rules below.
-rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight.Market market, address borrower)
-filtered {
-    f -> !f.isView
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
-        && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
-        && f.selector != sig:withdrawCollateral(Midnight.Market, uint256, uint256, address, address).selector
-} {
+// No non-liquidate, non-view function may increase realizableBadDebt of an arbitrary position.
+// take and withdrawCollateral both require the acted-on borrower healthy afterwards, and a healthy
+// borrower has zero realizable bad debt (via the health-bridge axioms below); the locked seller
+// (only reachable re-entrantly) is scoped out.
+rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight.Market market, address borrower) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     bytes32 id = summaryToId(market);
 
     require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
+    require !liquidationLocked(id, borrower), "scope out the locked (re-entrant) seller case";
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomUpGeqDown(a, b, d), "axiom";
+    require forall mathint a. forall mathint lif. forall mathint lltv. axiomLifLLTV(a, lif, lltv), "axiom";
+    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     uint256 rbdBefore = realizableBadDebt(market, id, borrower);
 
@@ -125,56 +124,8 @@ filtered {
     assert rbdAfter <= rbdBefore;
 }
 
-// withdrawCollateral removes collateral but requires the borrower to be healthy afterwards
-// (src/Midnight.sol:606), and a healthy borrower has zero realizable bad debt (lltv * maxLif <=
-// WAD * WAD, via axiomLifLLTV). Measuring on the acted-on (market, id, onBehalf) closes it.
-rule withdrawCollateralDoesNotIncreaseRealizableBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver) {
-    bytes32 id = summaryToId(market);
-
-    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d. axiomUpGeqDown(a, b, d), "axiom";
-    require forall mathint a. forall mathint lif. forall mathint lltv. axiomLifLLTV(a, lif, lltv), "axiom";
-    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
-
-    uint256 rbdBefore = realizableBadDebt(market, id, onBehalf);
-
-    withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
-
-    uint256 rbdAfter = realizableBadDebt(market, id, onBehalf);
-
-    assert rbdAfter <= rbdBefore;
-}
-
-// take may raise the seller's debt but requires the seller to be healthy or liquidation-locked
-// afterwards (src/Midnight.sol:512). Scoping out the locked seller (only reachable re-entrantly)
-// leaves the healthy branch, and a healthy borrower has zero realizable bad debt.
-rule takeDoesNotIncreaseRealizableBadDebt(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
-    bytes32 id = summaryToId(offer.market);
-    address seller = offer.buy ? offer.maker : taker;
-
-    require offer.market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-    require !liquidationLocked(id, seller), "scope out the locked (re-entrant) seller case";
-
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d. axiomUpGeqDown(a, b, d), "axiom";
-    require forall mathint a. forall mathint lif. forall mathint lltv. axiomLifLLTV(a, lif, lltv), "axiom";
-    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
-
-    uint256 rbdBefore = realizableBadDebt(offer.market, id, seller);
-
-    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
-
-    uint256 rbdAfter = realizableBadDebt(offer.market, id, seller);
-
-    assert rbdAfter <= rbdBefore;
-}
-
-// liquidate never increases realizable bad debt, and when there is bad debt it realizes it: the
-// getter equals liquidate's own badDebt local (same pre-state, price, maxLif and mulDiv ghosts),
-// and liquidate drops totalUnits by exactly that amount (src/Midnight.sol:673); the seize/repay
-// block never touches totalUnits.
+// liquidate realizes bad debt: it recomputes to zero and drops totalUnits by exactly the realized
+// bad debt (src/Midnight.sol:673); the seize/repay block never touches totalUnits.
 rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
@@ -192,8 +143,6 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     // Tight floor/ceil characterizations (proven in MulDiv.spec, matching LiquidationBoundedByLIF.spec).
-    // Confined to this rule so the seize-path arithmetic is pinned down without adding nonlinear cost to
-    // the other rules' cheap ghosts.
     require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivDown(a, b, d) * d <= a * b, "axiom";
     require forall mathint a. forall mathint b. forall mathint d. d > 0 => (ghostMulDivDown(a, b, d) + 1) * d > a * b, "axiom";
     require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b, "axiom";
@@ -206,26 +155,6 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
 
     uint256 rbdAfter = realizableBadDebt(market, id, borrower);
 
-    assert rbdAfter <= rbdBefore;
-    assert rbdBefore > 0 => to_mathint(totalUnits(id)) == to_mathint(totalUnitsBefore) - to_mathint(rbdBefore);
-}
-
-// On the pure realization path (seizedAssets == 0 and repaidUnits == 0) liquidate only reduces
-// debt by badDebt and leaves collateral untouched, so the recomputed realizable bad debt is zero.
-rule liquidateLeavesZeroBadDebt(env e, Midnight.Market market, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
-    bytes32 id = summaryToId(market);
-
-    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
-    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
-    require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
-
-    uint256 rbdBefore = realizableBadDebt(market, id, borrower);
-    require rbdBefore > 0, "there is bad debt to realize";
-
-    liquidate(e, market, 0, 0, 0, borrower, postMaturityMode, receiver, callback, data);
-
-    uint256 rbdAfter = realizableBadDebt(market, id, borrower);
-
     assert rbdAfter == 0;
+    assert rbdBefore > 0 => to_mathint(totalUnits(id)) == to_mathint(totalUnitsBefore) - to_mathint(rbdBefore);
 }
